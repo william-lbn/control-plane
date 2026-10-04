@@ -53,6 +53,7 @@ func TestPostgRESTRowSecurityIntegration(t *testing.T) {
 	password := suffix + suffix // disposable CI credential, never a production input
 	setup := []string{
 		"CREATE ROLE " + quote(auth) + " LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD '" + password + "'",
+		"ALTER ROLE " + quote(auth) + " SET idle_session_timeout = '5s'",
 		"CREATE ROLE " + quote(web) + " NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS",
 		"CREATE ROLE " + quote(anon) + " NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS",
 		"GRANT " + quote(web) + ", " + quote(anon) + " TO " + quote(auth) + " WITH INHERIT FALSE, SET TRUE",
@@ -118,6 +119,7 @@ db-config = false
 db-pre-request = %s
 db-pool = 1
 db-pool-max-idletime = 1
+db-channel-enabled = false
 db-max-rows = 100
 jwt-secret = %s
 jwt-aud = %s
@@ -227,6 +229,60 @@ server-port = %d
 		response.Body.Close()
 		if response.StatusCode != 401 {
 			t.Fatal("Console cookie authorized application data")
+		}
+	})
+	t.Run("idle physical sessions close and first pooled request reconnects", func(t *testing.T) {
+		// A configuration string is not evidence of physical connection closure.
+		// Observe PostgreSQL, then issue exactly one HTTP write per idle window:
+		// no retries may hide a failed reconnect or duplicate an accepted write.
+		for attempt := 0; attempt < 3; attempt++ {
+			deadline := time.Now().Add(12 * time.Second)
+			closed := false
+			for time.Now().Before(deadline) {
+				var count int
+				if err := conn.QueryRow(ctx, `SELECT count(*) FROM pg_stat_activity WHERE usename=$1`, auth).Scan(&count); err != nil {
+					t.Fatal("physical pool observation failed")
+				}
+				if count == 0 {
+					closed = true
+					break
+				}
+				time.Sleep(200 * time.Millisecond)
+			}
+			if !closed {
+				t.Fatal("idle service sessions prevented physical suspension")
+			}
+			body := fmt.Sprintf(`{"id":"idle-%d","owner":"user-alice","body":"reconnected"}`, attempt)
+			status, _ := query("POST", "/notes", "user-alice", web, body)
+			if status != 201 {
+				t.Fatalf("first request after idle failed: %d", status)
+			}
+		}
+	})
+	t.Run("service timeout preserves active queries and idle transactions", func(t *testing.T) {
+		service, err := pgx.Connect(ctx, parsed.String())
+		if err != nil {
+			t.Fatal("service session unavailable")
+		}
+		defer service.Close(context.Background())
+		var timeout string
+		if err := service.QueryRow(ctx, "SHOW idle_session_timeout").Scan(&timeout); err != nil || timeout != "5s" {
+			t.Fatal("owned login did not receive the bounded idle timeout")
+		}
+		if _, err := service.Exec(ctx, "SELECT pg_sleep(6)"); err != nil {
+			t.Fatal("idle timeout interrupted an active query")
+		}
+		tx, err := service.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer tx.Rollback(ctx)
+		time.Sleep(6 * time.Second)
+		if _, err := tx.Exec(ctx, "SELECT 1"); err != nil {
+			t.Fatal("idle timeout interrupted an open transaction")
+		}
+		if err := tx.Commit(ctx); err != nil {
+			t.Fatal(err)
 		}
 	})
 	// No roles/schemas are dropped during this test: the dedicated disposable

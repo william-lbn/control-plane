@@ -44,11 +44,11 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 		return err
 	}
 	defer tx.Rollback(ctx)
-	var id, projectID, action string
+	var id, projectID, resourceID, action string
 	var payload []byte
-	err = tx.QueryRow(ctx, `SELECT id,project_id,action,payload FROM operations
+	err = tx.QueryRow(ctx, `SELECT id,project_id,resource_id,action,payload FROM operations
         WHERE state='queued' OR (state='running' AND lease_expires_at < now())
-        ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1`).Scan(&id, &projectID, &action, &payload)
+        ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1`).Scan(&id, &projectID, &resourceID, &action, &payload)
 	if isNoRows(err) {
 		return nil
 	}
@@ -97,6 +97,15 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 			}
 		}()
 		switch action {
+		case "enable_data_api", "disable_data_api":
+			var p dataAPIPayload
+			stepErr = json.Unmarshal(payload, &p)
+			if stepErr == nil && (p.ProjectID != projectID || p.BranchID != resourceID) {
+				stepErr = errors.New("Data API operation scope mismatch")
+			}
+			if stepErr == nil {
+				stepErr = s.reconcileDataAPI(runCtx, id, workerID, action, p)
+			}
 		case "create_role", "rotate_role_password", "delete_role", "create_database", "delete_database":
 			var p catalogPayload
 			if err := json.Unmarshal(payload, &p); err != nil {
@@ -196,6 +205,14 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 		}
 	}
 	var waitErr vmWaitError
+	var busy computeBusyError
+	if errors.As(stepErr, &busy) {
+		code, message = "compute_in_use", "Compute still has SQL sessions, replication, subscriptions or autovacuum work after the idle drain window; close connections and retry"
+	}
+	var prerequisite dataAPIPrerequisiteError
+	if errors.As(stepErr, &prerequisite) {
+		code, message = prerequisite.code, prerequisite.message
+	}
 	if errors.As(stepErr, &waitErr) {
 		code = "compute_not_ready"
 		message = "NeonVM did not become Running; inspect VM, Pod and scheduler events before retrying"
@@ -222,6 +239,16 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 		return err
 	}
 	if state == "failed" {
+		if action == "enable_data_api" || action == "disable_data_api" {
+			if _, err = finishTx.Exec(ctx, `UPDATE data_api_instances SET state='degraded',updated_at=now()
+				WHERE branch_id=$1 AND project_id=$2 AND generation=(SELECT (payload->>'generation')::bigint FROM operations WHERE id=$3)`, resourceID, projectID, id); err != nil {
+				return err
+			}
+			if _, err = finishTx.Exec(ctx, `UPDATE branch_service_instances SET observed_state='degraded',last_observed_at=now()
+				WHERE branch_id=$1 AND service_kind='data_api'`, resourceID); err != nil {
+				return err
+			}
+		}
 		if _, err = finishTx.Exec(ctx, `UPDATE operation_steps SET state='failed',
 			detail='Reconciliation interrupted',updated_at=now()
 			WHERE operation_id=$1 AND state='running'`, id); err != nil {

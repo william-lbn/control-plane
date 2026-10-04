@@ -4,7 +4,7 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Compute 管理网关
 许可证：Apache-2.0。项目由自托管维护者开发，与 Neon 托管服务独立。
 
 **发行状态：预览版本。已经验证的实验环境功能不等于生产认证，也不等于 Neon 官网全部 Backend 服务。**
-Chart 0.2.0 提供独立 API、Worker、Web 进程；Worker 使用 PostgreSQL 领导租约。
+Chart 0.3.0 提供独立 API、Worker、Web 进程及可选 Data API、应用凭据；Worker 使用 PostgreSQL 领导租约。
 当前只允许一个 API 和一个 Worker，跨实例外部 fencing 与 HA 仍须独立验收。
 旧合并版本升级前必须执行 [停止/排空流程](docs/WORKER-SPLIT.md)。
 运行代码与实际合同见 [OpenAPI](contracts/openapi-v1.json)；本项目使用 `/api/v1`，未声称兼容托管 Neon `/api/v2`。
@@ -21,12 +21,13 @@ Chart 0.2.0 提供独立 API、Worker、Web 进程；Worker 使用 PostgreSQL �
 | 监控、Operation 步骤、错误与重试 | 已实现 | 长期指标持久化、SLO 告警、完整审计导出未完成 |
 | HA / DR / PITR | 部分租约、恢复工具和接口设计基础 | 未通过独立故障域 HA/DR；用户数据库 PITR 未实现 |
 | Auth、Functions、Object Storage、AI Gateway | 能力与服务模型预留，明确 disabled | 对应 Backend 服务尚未实现，不能作为可用功能宣传 |
-| Data API | Go JWT/分支认证入口、独立镜像/Chart、RLS 集成测试 | 完整 Driver 与 UI 未闭环，capability 仍 disabled |
+| Data API | 原生 Go Driver、持久 Operation、React UI、分支 JWT Gateway 和固定 PostgREST 镜像 | 默认禁用；须显式 labHTTP，真实 Neon UI 验收独立于 PG CI；RPC/views 等不在首版范围 |
+| 分支应用凭据 | 一次性 Token、范围/到期、轮换/撤销、哈希存储、当前权限检查和 UI | 当前仅 ai_gateway:invoke；凭据不等于 AI 推理服务可用 |
 
 **外部依赖**：Neon Storage Controller、Pageserver、Safekeeper、Proxy、持久对象存储、
 NeonVM、Autoscaling Agent/Scheduler，以及与本版合同匹配的 Proxy/Storage adapter。
 当前实验环境 adapter 仍为外部单实例原型；该原型及 Python 验证代码不在此仓库。
-控制面、管理网关与 Data API 入口 Chart 不替代完整 Neon/Autoscaling 基础设施或 PostgREST Driver。
+控制面、管理网关与 Data API Chart 不替代完整 Neon/Autoscaling 基础设施。
 
 ## 2. 目录与合同
 
@@ -42,13 +43,17 @@ docs/                 架构、对象模型、部署、测试、来源及生产�
 ```
 
 - [架构与模型](docs/ARCHITECTURE.md)
-- [48 个实际 API 操作](docs/API.md)
+- [57 个实际控制 API 操作](docs/API.md)
 - [Linux 部署与回滚](docs/DEPLOYMENT.md)
 - [测试与交付标准](docs/TESTING.md)
 - [Fork 来源与镜像对应关系](docs/SOURCE-PROVENANCE.md)
 - [生产功能门槛](docs/PRODUCTION-GATES.md)
 - [API/Worker 拆分与升级](docs/WORKER-SPLIT.md)
 - [完整 Backend 产品实施合同](docs/FULL-PRODUCT-IMPLEMENTATION.md)
+- [AI Gateway 官网核验、平台配置与动态模型设计](docs/AI-GATEWAY-PLATFORM-DESIGN.md)
+- [原生 Data API 驱动与部署](docs/DATA-API-NATIVE-DRIVER.md)
+- [分支应用凭据：模型、API、部署、UI 和验收](docs/BACKEND-CREDENTIALS.md)
+- [2026-10-04 产品切片验收、修复与手动复测](docs/ACCEPTANCE-2026-10-04.md)
 - [贡献规范](CONTRIBUTING.md) / [安全政策](SECURITY.md)
 
 ## 3. Linux 开发与 CI
@@ -72,9 +77,9 @@ CI 在 Linux 执行 gofmt、vet、race、真实 PG 集成、OpenAPI 路由/引�
 
 ## 4. 镜像与部署
 
-可信分支通过质量门槛后发布 `control-api`、`control-web`、`control-gateway`、`control-dataapi`。
-Data API 镜像/Chart 当前是独立认证入口基础；尚未有 Console 原生服务 Driver，
-实际合同和未验收内容见 [Data API 基础](docs/DATA-API-FOUNDATION.md)，能力开关仍禁用。
+可信分支通过质量门槛后发布 `control-api`、`control-web`、`control-gateway`、`control-dataapi`、`control-postgrest`。
+原生 Data API 的数据库权限、RLS、服务开关及现场测试见
+[Driver 手册](docs/DATA-API-NATIVE-DRIVER.md)。默认禁用，不能用 Ready Pod 代替实际数据访问验收。
 tag 使用 `sha-<full-commit>-r<run-id>-a<attempt>`，重跑产生新 tag；部署固定 registry manifest digest，不能使用 `latest`。
 默认 GHCR owner 为仓库所有者；Docker Hub 需要在本仓库设置
 `DOCKERHUB_USERNAME` 与 `DOCKERHUB_TOKEN`。初次 GHCR package 公开性须独立检查。

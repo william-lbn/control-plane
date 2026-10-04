@@ -193,10 +193,22 @@ function App() {
                 <span>◷</span>操作记录
               </a>
               <a
+                className={page === 'data-api' ? 'active' : ''}
+                href={route(projectId, 'data-api')}
+              >
+                <span>⇄</span>Data API
+              </a>
+              <a
                 className={page === 'permissions' ? 'active' : ''}
                 href={route(projectId, 'permissions')}
               >
                 <span>♙</span>项目权限
+              </a>
+              <a
+                className={page === 'credentials' ? 'active' : ''}
+                href={route(projectId, 'credentials')}
+              >
+                <span>⚿</span>应用凭据
               </a>
             </>
           )}

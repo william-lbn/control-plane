@@ -714,6 +714,57 @@ textarea:focus {
   gap: 15px;
   margin: 22px 0;
 }
+.backend-panel label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 16px 0;
+  min-width: 0;
+  color: #aab9b9;
+  font-size: 12px;
+  font-weight: 700;
+}
+.backend-panel input,
+.backend-panel select,
+.backend-panel textarea {
+  width: 100%;
+  min-width: 0;
+}
+.backend-panel textarea {
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  line-height: 1.6;
+}
+.backend-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin: 22px 0;
+}
+.backend-form label {
+  margin: 0;
+}
+.backend-wide,
+.backend-form > p,
+.backend-form > .actions {
+  grid-column: 1 / -1;
+}
+.backend-panel pre {
+  padding: 18px;
+  border: 1px solid #2c393c;
+  border-radius: 8px;
+  background: #11191b;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 360px;
+  overflow: auto;
+}
+@media (max-width: 900px) {
+  .backend-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 .muted {
   color: #91a4a5;
   font-size: 11px;

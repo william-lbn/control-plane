@@ -2,12 +2,12 @@
 
 ## 1. 前提与边界
 
-本仓库发布 API、Web、Compute Management Gateway。
-API 镜像也包含独立 control-worker 二进制；Chart 0.2.0 默认使用 split profile。
+本仓库发布 API、Web、Compute Management Gateway、Data API Gateway 和 PostgREST。
+API 镜像也包含独立 control-worker 二进制；Chart 0.3.0 默认使用 split profile。
 旧版本升级必须先执行 WORKER-SPLIT.md 的停止/排空步骤，不能直接覆盖运行中的合并 Worker。
 Neon/Autoscaling 完整基础设施须先安装并验收：CRD/NeonVM controller、Agent/Scheduler、
 Storage Controller、Pageserver、Safekeeper、Proxy、持久对象存储和兼容 adapter。
-当前依赖外部 adapter，不能只安装本仓库的两个 Chart 就获得完整数据库服务。
+当前依赖外部 adapter，不能只安装本仓库 Chart 就获得完整数据库服务。
 
 要求：Linux amd64、Kubernetes >=1.30、NeonVM 所需虚拟化能力、固定 PG16 guest、
 可用 metadata PostgreSQL、可信 SQL/管理证书以及明确的 namespace 与内部 DNS。
@@ -44,7 +44,7 @@ kubectl -n neon create secret generic neon-postgres-ca \
 
 ## 3. 固定镜像部署
 
-从通过 Linux CI 的 image receipt 获取三个 digest；不要根据 tag 猜 digest。
+从通过 Linux CI 的 image receipt 获取所需组件 digest；不要根据 tag 猜 digest。
 首次 GHCR package 公开性需要匿名 pull 验证，或显式配置 imagePullSecrets。
 
 安全目录中的 values 示例：
@@ -106,6 +106,17 @@ Gateway 默认 ClusterIP、image profile，无 hostPath；host-binary 仅保留�
 - 测试后通过控制 API/UI suspend Compute，保留身份 fixture、证据和数据。
 
 真实步骤见 TESTING.md。未执行过的测试不能写为通过。
+
+### 4.1 可选 Backend 产品模块
+
+Data API 默认禁用。当前 Driver 使用显式实验传输例外，启用前读取
+[Native Driver](DATA-API-NATIVE-DRIVER.md)：准备固定 Gateway/PostgREST digest、
+Schema/RLS 和部署身份的显式数据库/对象授权，再通过 UI 提交服务 Operation。
+未配置前置权限时会返回可操作错误；不要把运行身份提升为超级用户来绕过 RLS。
+
+应用凭据默认禁用。按 [Credentials](BACKEND-CREDENTIALS.md) 在 Linux 生成和备份
+独立 pepper keyring，创建 API-only Secret，并设置 backendCredentials values。
+正式入口必须 HTTPS；labHTTP 只用于明确的隔离实验环境。启用凭据模块不会启用 AI 推理服务。
 
 ## 5. 回滚与恢复
 

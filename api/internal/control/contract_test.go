@@ -122,6 +122,24 @@ func TestOpenAPIReferencesAndSessionContract(t *testing.T) {
 	if schemes["sessionCookie"].(map[string]any)["name"] != "neon_v2_session" {
 		t.Fatal("session cookie contract differs from the implemented session boundary")
 	}
+	// OpenAPI security names are references even though they do not use $ref.
+	// A typo here would silently break generated clients and Swagger auth.
+	for path, raw := range contract["paths"].(map[string]any) {
+		for method, value := range raw.(map[string]any) {
+			operation, ok := value.(map[string]any)
+			if !ok {
+				continue
+			}
+			security, _ := operation["security"].([]any)
+			for _, entry := range security {
+				for name := range entry.(map[string]any) {
+					if schemes[name] == nil {
+						t.Errorf("undefined security scheme %s at %s %s", name, method, path)
+					}
+				}
+			}
+		}
+	}
 }
 
 func TestOpenAPIOperationIDs(t *testing.T) {

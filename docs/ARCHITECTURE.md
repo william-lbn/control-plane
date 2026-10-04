@@ -4,7 +4,8 @@
 
 目标语义参考固定官网快照的 `the-object-model`、`branch-your-backend` 与 Compute 文档。
 Organization 是权限和配额边界；Project 是区域与资源边界；
-Branch 是数据库 Timeline 和未来 Backend 服务版本边界。当前只有 Postgres 可用。
+Branch 是数据库 Timeline 和 Backend 服务版本边界。当前 Postgres、可选实验传输的
+原生 Data API，以及分支应用凭据已有代码；其余服务保持 disabled。
 
 ```mermaid
 flowchart LR
@@ -31,7 +32,7 @@ flowchart LR
   Autoscaling --> Readers
 ```
 
-Chart 0.2.0 将 API 与 Worker 分成独立进程；Worker/Monitor/Idle 为同一控制器组。
+Chart 0.3.0 将 API 与 Worker 分成独立进程；Worker/Monitor/Idle 为同一控制器组。
 API 与 Worker 各限制一个副本。领导租约不等于完整 HA 或外部 fencing。
 管理网关只承载原生 Compute 管理协议，不是 SQL/HTTP Data API。
 Metadata PostgreSQL 必须与用户项目生命周期独立。
@@ -65,7 +66,7 @@ sequenceDiagram
 
 ## 3. 模型与不变量
 
-物理模型以 `api/internal/control/migrations/001..009` 为权威。
+物理模型以 `api/internal/control/migrations/001..011` 为权威。
 新增结构只能通过新的前向迁移；没有通用安全的 down migration。
 
 ```mermaid
@@ -83,6 +84,10 @@ erDiagram
   OPERATIONS ||--o{ OPERATION_STEPS : progresses
   OPERATIONS ||--o{ IDEMPOTENCY_KEYS : replays
   USERS ||--o{ API_KEYS : authorizes
+  BRANCHES ||--o| DATA_API_INSTANCES : serves
+  BRANCHES ||--o{ BACKEND_CREDENTIALS : anchors
+  USERS ||--o{ BACKEND_CREDENTIALS : issues
+  USERS ||--o{ BACKEND_CREDENTIAL_REQUESTS : replays
 ```
 
 | 对象 | 关键字段/责任 | 约束 |
@@ -96,11 +101,15 @@ erDiagram
 | operation_steps | ordinal、name、state、attempts、detail | 只允许当前有效租约更新；失败保留证据 |
 | sessions / api_keys | 主体、token/key hash、expiry、scope/ceiling | 撤销和过期服务端检查；token 不持久明文 |
 | audit_events / metrics | 主体/资源/动作、观测时间与指标 | 当前保留范围有限，不能替代完整生产审计与长期 TSDB |
-| branch_service_instances | 服务类型/能力、实例状态 | Postgres 外的服务 disabled；Data API 属于 PG 服务目标 |
+| branch_service_instances / data_api_instances | 服务类型/能力、意图代次、Writer、公开 spec、Secret reference | 原生 Data API 默认关闭；凭 owned Secret/角色/Deployment 调谐，真实 RLS 独立验收 |
+| backend_credentials / backend_credential_requests | 分支/发行主体、作用域、到期/撤销、hash/pepper version、public replay | 明文 Token 仅首次返回；当前主体/谱系校验；模型推理不因凭据存在而启用 |
 | control_runtime_leases | owner、epoch、process_role、heartbeat/expiry | 专属 PG session 持锁；失去连接 fail closed；不能 fence 旧外部请求 |
 
 Endpoint 资源支持整数 CPU 1000–2000m 和内存 1024–3072Mi、1024Mi slot。
 这些边界是本发行兼容范围，不能自动解释为资源热缩回全部通过。
+
+Data API 的详细数据链路、SQL 角色和 Operation 时序见 DATA-API-NATIVE-DRIVER.md。
+应用凭据的授权图、一次性 Token 和密钥恢复边界见 BACKEND-CREDENTIALS.md。
 
 ## 4. 休眠与唤醒流程
 

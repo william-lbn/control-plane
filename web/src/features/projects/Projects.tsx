@@ -13,6 +13,8 @@ import { fmt, short, stateLabel, status, PageHeading, Empty } from '../../shared
 import { Compute } from '../compute/Compute';
 import { Monitoring } from '../monitoring/Monitoring';
 import { Connections } from '../connect/Connections';
+import { DataAPI } from '../data-api/DataAPI';
+import { BackendCredentials } from '../credentials/BackendCredentials';
 import { Workbench } from '../sql/Workbench';
 import { Operations } from '../operations/Operations';
 import { CreateResource } from './CreateResources';
@@ -159,6 +161,19 @@ export function ProjectWorkspace({
   const canEdit =
     project.effective_permission === 'admin' || project.effective_permission === 'editor';
   const canAdmin = project.effective_permission === 'admin';
+  if (page === 'data-api')
+    return (
+      <DataAPI projectId={projectId} branches={branches} canEdit={canEdit} showError={showError} />
+    );
+  if (page === 'credentials')
+    return (
+      <BackendCredentials
+        projectId={projectId}
+        branches={branches}
+        canEdit={canEdit}
+        showError={showError}
+      />
+    );
   if (page === 'databases')
     return (
       <Catalog projectId={projectId} branches={branches} canEdit={canEdit} showError={showError} />

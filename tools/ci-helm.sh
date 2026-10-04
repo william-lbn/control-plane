@@ -23,4 +23,15 @@ if helm template bad charts/data-api-gateway -f charts/data-api-gateway/ci/rende
 if helm template bad charts/data-api-gateway -f charts/data-api-gateway/ci/render-values.yaml --set ingress.enabled=false > artifacts/helm/rejected-data-api-http.log 2>&1; then exit 1; fi
 if helm template bad charts/data-api-gateway -f charts/data-api-gateway/ci/render-values.yaml --set replicaCount=2 > artifacts/helm/rejected-data-api-replicas.log 2>&1; then exit 1; fi
 helm package charts/data-api-gateway -d artifacts/helm
+helm template native-data charts/neon-control-plane --namespace neon -f charts/neon-control-plane/ci/render-values.yaml \
+  --set dataAPI.enabled=true --set dataAPI.labHTTP=true \
+  --set "dataAPI.gatewayImage=example.invalid/gateway@sha256:$(printf 'a%.0s' {1..64})" \
+  --set "dataAPI.postgrestImage=example.invalid/postgrest@sha256:$(printf 'b%.0s' {1..64})" > artifacts/helm/native-data-api.yaml
+if helm template bad charts/neon-control-plane -f charts/neon-control-plane/ci/render-values.yaml --set dataAPI.enabled=true > artifacts/helm/rejected-native-data-api-default.log 2>&1; then exit 1; fi
+if helm template bad charts/neon-control-plane -f charts/neon-control-plane/ci/render-values.yaml --set dataAPI.enabled=true --set dataAPI.labHTTP=true --set dataAPI.gatewayImage=example.invalid/gateway:latest > artifacts/helm/rejected-native-data-api-tag.log 2>&1; then exit 1; fi
+helm template credentials charts/neon-control-plane --namespace neon -f charts/neon-control-plane/ci/render-values.yaml \
+  --set backendCredentials.enabled=true --set backendCredentials.labHTTP=true --set backendCredentials.existingSecret=backend-keys > artifacts/helm/backend-credentials.yaml
+grep -q 'NEON_BACKEND_CREDENTIAL_KEYS_FILE' artifacts/helm/backend-credentials.yaml
+if helm template bad charts/neon-control-plane -f charts/neon-control-plane/ci/render-values.yaml --set backendCredentials.enabled=true --set backendCredentials.labHTTP=true > artifacts/helm/rejected-backend-secret.log 2>&1; then exit 1; fi
+if helm template bad charts/neon-control-plane -f charts/neon-control-plane/ci/render-values.yaml --set backendCredentials.enabled=true --set backendCredentials.existingSecret=backend-keys --set api.cookieSecure=false > artifacts/helm/rejected-backend-http.log 2>&1; then exit 1; fi
 sha256sum artifacts/helm/*.tgz > artifacts/helm/SHA256SUMS

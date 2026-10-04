@@ -39,7 +39,7 @@ func validPGIdentifier(name string) bool {
 }
 func protectedPGRole(name string) bool {
 	n := strings.ToLower(name)
-	return n == "cloud_admin" || n == "postgres" || strings.HasPrefix(n, "pg_") || strings.HasPrefix(n, "neon_") || strings.HasPrefix(n, "control_")
+	return n == "cloud_admin" || n == "postgres" || strings.HasPrefix(n, "pg_") || strings.HasPrefix(n, "neon_") || strings.HasPrefix(n, "control_") || strings.HasPrefix(n, "app_da_")
 }
 func protectedPGDatabase(name string) bool {
 	n := strings.ToLower(name)

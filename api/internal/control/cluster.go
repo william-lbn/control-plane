@@ -593,6 +593,17 @@ func (k *kubeClient) publishRoute(ctx context.Context, p createPayload, vm map[s
 			(stringVal(previous["project_id"]) != p.ProjectID || stringVal(previous["branch_id"]) != p.BranchID) {
 			return errors.New("endpoint selector ownership mismatch")
 		}
+		// Service identities are SQL-created NOSUPERUSER/NOBYPASSRLS roles,
+		// deliberately absent from Compute's privileged ordinary role spec.
+		// Preserve only this branch's reserved identity when republishing a
+		// cold-start template; every other role still follows the catalog spec.
+		if previous, ok := routes[key].(map[string]any); ok {
+			if previousRoles, ok := previous["roles"].(map[string]any); ok {
+				if verifier := stringVal(previousRoles[dataAPILogin(p.BranchID)]); verifier != "" {
+					roles[dataAPILogin(p.BranchID)] = verifier
+				}
+			}
+		}
 		routes[key] = route
 		encoded, _ := json.Marshal(routes)
 		secret["data"].(map[string]any)["routes.json"] = base64.StdEncoding.EncodeToString(encoded)

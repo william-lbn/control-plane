@@ -10,3 +10,10 @@ Go module dependencies are declared in api/go.mod and api/go.sum.
 Web dependencies are declared in web/package.json and web/package-lock.json.
 Container CI emits per-image SBOM and build provenance. Operators must review
 dependency licenses and security advisories for their own distribution.
+
+The control-postgrest image redistributes the digest-verified official PostgREST
+16.4 executable under its upstream MIT license. The unmodified notice from
+https://github.com/PostgREST/postgrest/blob/v16.4/LICENSE is retained in
+third_party/licenses/PostgREST-16.4-MIT.txt and copied into that image at
+/usr/share/licenses/postgrest/LICENSE. Apache-2.0 applies to this control plane's
+own source, not to the upstream PostgREST executable or its dependencies.

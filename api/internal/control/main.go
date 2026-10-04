@@ -34,6 +34,7 @@ type server struct {
 	proxyHost      string
 	proxyPort      string
 	secureCookies  bool
+	backendKeys    *backendKeyring
 	processRole    processRole
 }
 
@@ -146,7 +147,11 @@ func runProcess(ctx context.Context, role processRole) error {
 		proxyHost:     env("NEON_PROXY_HOST", "192.168.146.100"),
 		proxyPort:     env("NEON_PROXY_PORT", "30432"),
 		secureCookies: os.Getenv("NEON_COOKIE_SECURE") == "true"}
-	if creationEnabled() {
+	s.backendKeys, err = loadBackendKeyring()
+	if err != nil {
+		return err
+	}
+	if creationEnabled() || s.backendKeys != nil {
 		path := os.Getenv("NEON_V2_IDEMPOTENCY_KEY_FILE")
 		if path == "" {
 			return errors.New("NEON_V2_IDEMPOTENCY_KEY_FILE is required when creation is enabled")

@@ -6,10 +6,10 @@
 PostgREST 转发。它不使用 Console Cookie、控制面 API Key、Kubernetes 凭据或数据库管理员密码。
 `charts/data-api-gateway` 部署这个入口，`Dockerfile.dataapi` 构建独立无 shell 的非 root 镜像。
 
-**这尚不是 Console 原生 Data API 产品。** 控制面 `services.data_api.enabled` 继续 false。
-尚需完成 service intent/Operation、最小权限数据库角色 Driver、每分支 PostgREST 部署、
-clone/轮换/删除/恢复、UI、NetworkPolicy、真实 Neon Proxy 冷醒和浏览器端到端验收。
-Pod 配置就绪不能代替 PostgreSQL/RLS/产品就绪。
+此文记录独立认证入口基础。Console 原生 service intent/Operation、最小权限角色 Driver、
+每分支 PostgREST 和 UI 已新增；当前部署和测试以 [Native Driver](DATA-API-NATIVE-DRIVER.md) 为准。
+能力默认禁用，仅显式启用且满足权限/RLS前置条件后才可调谐服务。
+clone/删除/恢复、NetworkPolicy、可信 TLS 仍有独立门槛；Pod 就绪不能代替真实 Neon 数据访问验收。
 
 官网依据为本地 website `c0d49cbb…` 的 `docs/data-api/access-control.md`、
 `custom-authentication-providers.md`。标准参考：

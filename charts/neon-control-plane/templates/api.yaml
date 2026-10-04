@@ -1,4 +1,7 @@
 {{- $name := include "neonControl.name" . -}}
+{{- if and .Values.backendCredentials.enabled (not .Values.api.cookieSecure) (not .Values.backendCredentials.labHTTP) -}}
+{{- fail "Backend credentials require secure cookies or explicit backendCredentials.labHTTP laboratory override" -}}
+{{- end -}}
 {{- if and (eq .Values.api.pgTLSMode "verify-full") (not .Values.api.pgCASecret) -}}
 {{- fail "verify-full requires api.pgCASecret containing ca.crt; use lab-insecure only in an explicit laboratory override" -}}
 {{- end -}}
@@ -47,9 +50,15 @@ spec:
             - {name: NEON_CONTROL_PROCESS_ROLE, value: {{ ternary "api" "all" .Values.worker.enabled | quote }}}
             - {name: NEON_V2_BIND, value: ':8788'}
             - {name: NEON_V2_ADMIN_PASSWORD_FILE, value: /run/neon-secrets/admin-password}
+            {{- if .Values.backendCredentials.enabled }}
+            - {name: NEON_BACKEND_CREDENTIAL_KEYS_FILE, value: /run/backend-keys/keyring.json}
+            {{- end }}
             {{- include "neonControl.runtimeEnv" . | nindent 12 }}
           volumeMounts:
             - {name: credentials, mountPath: /run/neon-secrets, readOnly: true}
+            {{- if .Values.backendCredentials.enabled }}
+            - {name: backend-keys, mountPath: /run/backend-keys, readOnly: true}
+            {{- end }}
             {{- if .Values.api.pgCASecret }}
             - {name: pg-ca, mountPath: /run/pg-ca, readOnly: true}
             {{- end }}
@@ -59,6 +68,13 @@ spec:
       volumes:
         - name: credentials
           secret: {secretName: {{ .Values.api.existingSecret }}, defaultMode: 0440}
+        {{- if .Values.backendCredentials.enabled }}
+        - name: backend-keys
+          secret:
+            secretName: {{ required "backendCredentials.existingSecret is required" .Values.backendCredentials.existingSecret }}
+            defaultMode: 0440
+            items: [{key: keyring.json, path: keyring.json}]
+        {{- end }}
         {{- if .Values.api.pgCASecret }}
         - name: pg-ca
           secret: {secretName: {{ .Values.api.pgCASecret }}, defaultMode: 0440}

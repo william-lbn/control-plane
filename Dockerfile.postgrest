@@ -1,0 +1,15 @@
+ARG GO_BUILDER_IMAGE
+FROM ${GO_BUILDER_IMAGE} AS build
+WORKDIR /src/tools/postgrest-installer
+COPY containers/services.lock.json containers/services.lock.json
+# The Go builder includes the verified CI toolchain and archive tools. A small
+# standard-library downloader avoids adding an unpinned curl/apt dependency.
+COPY tools/postgrest-installer/ ./
+RUN go mod download && go run . /opt/postgrest
+FROM scratch
+COPY third_party/licenses/PostgREST-16.4-MIT.txt /usr/share/licenses/postgrest/LICENSE
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY --from=build /opt/postgrest/postgrest /opt/neon-control/postgrest
+USER 65532:65532
+EXPOSE 3000
+ENTRYPOINT ["/opt/neon-control/postgrest"]

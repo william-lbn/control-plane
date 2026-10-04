@@ -24,6 +24,52 @@ const idleGuardSQL = `SELECT
  (SELECT count(*) FROM pg_stat_subscription WHERE pid IS NOT NULL),
  (SELECT count(*) FROM pg_stat_activity WHERE backend_type='autovacuum worker')`
 
+type computeBusyError struct{}
+
+func (computeBusyError) Error() string { return "compute has client sessions or background work" }
+
+// Await normal connection closure, without terminating a session or excluding
+// a service login from the SQL guard. The caller holds the exclusive internal
+// probe gate; external admission fencing remains a separate production gate.
+func awaitComputeIdle(ctx context.Context, window, interval time.Duration, read func(context.Context) (sqlResult, error)) error {
+	guardCtx, cancel := context.WithTimeout(ctx, window)
+	defer cancel()
+	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		result, err := read(guardCtx)
+		if err != nil {
+			return fmt.Errorf("idle guard query: %w", err)
+		}
+		if len(result.Rows) != 1 || len(result.Rows[0]) != 4 {
+			return errors.New("idle guard result invalid")
+		}
+		idle := true
+		for _, count := range result.Rows[0] {
+			if fmt.Sprint(count) != "0" {
+				idle = false
+			}
+		}
+		if idle {
+			return nil
+		}
+		timer := time.NewTimer(interval)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-guardCtx.Done():
+			timer.Stop()
+			if err := ctx.Err(); err != nil {
+				return err
+			}
+			return computeBusyError{}
+		case <-timer.C:
+		}
+	}
+}
+
 func (s *server) suspendCompute(ctx context.Context, p suspendPayload) error {
 	name := kubeName(p.EndpointID)
 	if p.WorkloadName != name {
@@ -80,17 +126,10 @@ func (s *server) suspendCompute(ctx context.Context, p suspendPayload) error {
 	if err != nil {
 		return err
 	}
-	result, err := runSQL(ctx, s.proxyHost, s.proxyPort, "control_probe", password, "postgres", selector(p.EndpointID), idleGuardSQL)
-	if err != nil {
-		return fmt.Errorf("idle guard query: %w", err)
-	}
-	if len(result.Rows) != 1 || len(result.Rows[0]) != 4 {
-		return errors.New("idle guard result invalid")
-	}
-	for _, count := range result.Rows[0] {
-		if fmt.Sprint(count) != "0" {
-			return errors.New("compute has active sessions or background work")
-		}
+	if err = awaitComputeIdle(ctx, 10*time.Second, time.Second, func(guardCtx context.Context) (sqlResult, error) {
+		return runSQL(guardCtx, s.proxyHost, s.proxyPort, "control_probe", password, "postgres", selector(p.EndpointID), idleGuardSQL)
+	}); err != nil {
+		return err
 	}
 	// Verify the exact VM still exists immediately before deletion. Kubernetes
 	// UID preconditions prevent a stale controller from deleting a newer wake.

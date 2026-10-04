@@ -1,6 +1,16 @@
 name: Trusted Linux live UI
 on:
   workflow_dispatch:
+    inputs:
+      suite:
+        description: Real Linux UI acceptance slice
+        type: choice
+        options: [native-product.spec.ts, data-api.spec.ts, backend-credentials.spec.ts]
+        default: native-product.spec.ts
+      credential_project:
+        description: Retained authorized test project for Backend credential UI suite
+        type: string
+        required: false
 permissions: {contents: read}
 concurrency: {group: neon-live-ui, cancel-in-progress: false}
 jobs:
@@ -13,6 +23,8 @@ jobs:
       NEON_E2E_BASE_URL: ${{ vars.NEON_E2E_BASE_URL }}
       NEON_E2E_ATTEMPT: run-${{ github.run_id }}-${{ github.run_attempt }}
       NEON_E2E_EXPECT_SPLIT: 'true'
+      NEON_E2E_SUITE: ${{ inputs.suite }}
+      NEON_E2E_CREDENTIAL_PROJECT: ${{ inputs.credential_project }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
@@ -31,13 +43,18 @@ jobs:
         run: |
           test -n "$NEON_E2E_BASE_URL"
           test -n "$ADMIN_PASSWORD"
+          case "$NEON_E2E_SUITE" in
+            native-product.spec.ts|data-api.spec.ts) ;;
+            backend-credentials.spec.ts) [[ "$NEON_E2E_CREDENTIAL_PROJECT" =~ ^prj_[a-f0-9]{16}$ ]] ;;
+            *) exit 1 ;;
+          esac
           install -d -m 0700 "$NEON_E2E_PRIVATE_DIR"
           (umask 077; printf '%s' "$ADMIN_PASSWORD" > "$NEON_E2E_ADMIN_PASSWORD_FILE")
       - run: npm ci --no-audit --fund=false
         working-directory: web
       - run: npx playwright install --with-deps chromium
         working-directory: web
-      - run: npm run test:e2e
+      - run: npm run test:e2e -- "$NEON_E2E_SUITE"
         working-directory: web
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()

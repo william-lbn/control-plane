@@ -14,6 +14,9 @@ mkdir -p "$task_evidence"
 (cd api && gofmt -l cmd internal) > "$task_evidence/gofmt.txt"
 if [[ -s "$task_evidence/gofmt.txt" ]]; then cat "$task_evidence/gofmt.txt"; exit 1; fi
 (cd api && go vet ./...)
+(cd tools/postgrest-installer && gofmt -l .) > "$task_evidence/installer-gofmt.txt"
+if [[ -s "$task_evidence/installer-gofmt.txt" ]]; then cat "$task_evidence/installer-gofmt.txt"; exit 1; fi
+(cd tools/postgrest-installer && go vet ./... && go build -o ../../"$task_evidence"/postgrest-installer .)
 set +e
 (cd api && go test -race -count=1 -json ./...) > "$task_evidence/tests.jsonl"
 task_exit=$?

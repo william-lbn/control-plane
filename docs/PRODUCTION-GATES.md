@@ -33,8 +33,10 @@
 
 ## 3. 官网 Backend 服务
 
-Auth、Functions、Object Storage、AI Gateway 尚未实现；Data API 已有独立 JWT 认证入口、
-Chart 和 RLS 集成测试源码，但完整服务 Driver/UI/Neon 现场流程尚未完成，仍禁用。
+Auth、Functions、Object Storage、AI Gateway 尚未实现服务。Data API 已有原生 Driver、
+异步生命周期、最小权限角色、PostgREST、UI 和 RLS 集成测试；默认禁用、仅实验传输开关。
+现场 Neon UI 验收与生产 TLS/HA 是独立门槛，具体结果以该版本交付证据为准。
+应用凭据管理及分支/模型授权检查已有代码和真实 PostgreSQL 验收；不代表 AI 推理可用。
 控制台登录不能冒充 Managed Auth；Neon 持久层对象存储不能冒充产品 Object Storage；
 SQL 工作台不能冒充 Data API。现有 fork Proxy 的 REST 构建依赖包含 stub，
 不能作为完整官网数据服务的验收证据。

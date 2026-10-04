@@ -84,6 +84,18 @@ func (s *server) routes() *http.ServeMux {
 	mux.Handle("POST /api/v1/projects/{project}/branches", s.auth(http.HandlerFunc(s.createBranch), true))
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}", s.auth(http.HandlerFunc(s.branch), false))
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/services", s.auth(http.HandlerFunc(s.branchServices), false))
+	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/data-api", s.auth(http.HandlerFunc(s.dataAPIRead), false))
+	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/data-api", s.auth(http.HandlerFunc(s.dataAPIMutate), true))
+	mux.Handle("DELETE /api/v1/projects/{project}/branches/{branch}/data-api", s.auth(http.HandlerFunc(s.dataAPIMutate), true))
+	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/data-api/request", s.auth(http.HandlerFunc(s.dataAPIConsoleRequest), true))
+	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/credentials", s.auth(http.HandlerFunc(s.backendCredentials), false))
+	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/credentials", s.auth(http.HandlerFunc(s.backendCredentials), true))
+	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/credentials/check", s.auth(http.HandlerFunc(s.checkBackendCredential), true))
+	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/credentials/{credential}/rotate", s.auth(http.HandlerFunc(s.mutateBackendCredential), true))
+	mux.Handle("DELETE /api/v1/projects/{project}/branches/{branch}/credentials/{credential}", s.auth(http.HandlerFunc(s.mutateBackendCredential), true))
+	// Application data requests authenticate at the branch gateway, independently
+	// of Console cookies. The handler validates methods and branch ownership.
+	mux.HandleFunc("/data/v1/{dataBranch}/{rest...}", s.dataAPIRelay)
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/roles", s.auth(http.HandlerFunc(s.catalogList), false))
 	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/roles", s.auth(http.HandlerFunc(s.catalogMutation), true))
 	mux.Handle("PATCH /api/v1/projects/{project}/branches/{branch}/roles/{role}", s.auth(http.HandlerFunc(s.catalogMutation), true))
@@ -125,6 +137,7 @@ func (s *server) capabilities(w http.ResponseWriter, r *http.Request) {
 		"features": map[string]any{
 			"tenant_authorization": map[string]any{"enabled": true, "reason": "organization_and_additive_project_policy"},
 			"api_keys":             map[string]any{"enabled": true, "reason": "hashed_scoped_revocable_credentials"},
+			"backend_credentials":  map[string]any{"enabled": s.backendKeys != nil, "reason": "branch_scoped_credentials_inference_independent"},
 			"database_management":  map[string]any{"enabled": true, "reason": "branch_catalog_operation_driver"},
 			"role_management":      map[string]any{"enabled": true, "reason": "branch_role_and_proxy_spec_reconciliation"},
 			"project_create":       creation, "branch_create": creation, "endpoint_create": creation,
@@ -134,7 +147,8 @@ func (s *server) capabilities(w http.ResponseWriter, r *http.Request) {
 			"project_delete":     disabled,
 		},
 		"services": map[string]any{"postgres": map[string]any{"enabled": true, "reason": "read_and_query_validated"},
-			"auth": disabled, "object_storage": disabled, "functions": disabled, "ai_gateway": disabled, "data_api": disabled},
+			"auth": disabled, "object_storage": disabled, "functions": disabled, "ai_gateway": disabled,
+			"data_api": map[string]any{"enabled": dataAPIEnabled(), "reason": "native_driver_lab_transport_gate"}},
 		"limits": map[string]any{"min_cpu_milli": 1000, "max_cpu_milli": 2000, "min_memory_mib": 1024, "max_memory_mib": 3072, "supported_memory_slot_mib": []int{1024}},
 	})
 }
@@ -242,7 +256,7 @@ func (s *server) branchServices(w http.ResponseWriter, r *http.Request) {
 	items := []record{}
 	for _, kind := range []string{"postgres", "auth", "object_storage", "functions", "ai_gateway", "data_api"} {
 		if item, ok := byKind[kind]; ok {
-			item["enabled"] = kind == "postgres" && item["observed_state"] == "active"
+			item["enabled"] = (kind == "postgres" || kind == "data_api" && dataAPIEnabled()) && item["observed_state"] == "active"
 			item["reason"] = ""
 			if item["enabled"] != true {
 				item["reason"] = "not_ready_or_driver_not_implemented"

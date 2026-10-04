@@ -1,4 +1,15 @@
 fullnameOverride: neon-control
+backendCredentials:
+  enabled: false
+  existingSecret: ''
+  labHTTP: false
+dataAPI:
+  enabled: false
+  # Native Driver v1 requires this explicit development transport exception.
+  # It does not satisfy the trusted TLS production gate.
+  labHTTP: false
+  gatewayImage: ''
+  postgrestImage: ''
 worker:
   # Upgrade from combined mode requires the documented stop/drain procedure.
   enabled: true

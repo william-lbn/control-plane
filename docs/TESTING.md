@@ -11,7 +11,7 @@
 | Web | npm ci / format:check / test / build | CSPRNG fallback 回归、strict TS、Vite 静态产物 |
 | Workflows | 固定 actionlint 1.7.12 / Linux ShellCheck | 校验全部 CI/live workflow；拒绝非法上下文和 shell 问题 |
 | Helm | tools/ci-helm.sh | lint/template；拒绝多 API 副本、缺 CA、浮动 tag；gateway 无 hostPath |
-| Image | protected main/tag after gates | 固定 builder、SHA tag、API/Web/Gateway/DataAPI 四镜像、SBOM/provenance、digest receipt |
+| Image | protected main/tag after gates | 固定 builder、SHA tag、API/Web/Gateway/DataAPI/PostgREST 五镜像、SBOM/provenance、digest receipt |
 
 ```bash
 export NEON_V2_TEST_DATABASE_URL='postgres://ci:ci-disposable@127.0.0.1:5432/control_ci?sslmode=disable'
@@ -42,7 +42,7 @@ export NEON_E2E_ADMIN_PASSWORD_FILE='/secure/e2e/admin-password'
 export NEON_E2E_PRIVATE_DIR='/secure/e2e/attempt-001'
 export NEON_E2E_ARTIFACTS='/var/lib/neon-evidence/attempt-001'
 export NEON_E2E_ATTEMPT='attempt-001'
-npm run test:e2e
+npm run test:e2e -- native-product.spec.ts
 ```
 
 每次 attempt 使用新名称；不能覆盖数据库密码文件。Private fixture 包含资源身份与
@@ -83,6 +83,21 @@ variable `NEON_E2E_BASE_URL` 与 Secret `NEON_E2E_ADMIN_PASSWORD`。
 未注册 runner 或未配置凭据时不会自动完成测试。普通 PR 不得获得这类 Secrets。
 
 CI image 构建通过不意味着 live UI 已通过；现场 Job/截图/JSON 是独立证据。
+workflow_dispatch 的 suite 分别选择 native-product、data-api 或 backend-credentials。
+凭据切片另需显式指定已有授权测试项目 credential_project，不创建 Compute。
+
+### 3.0 Backend 独立产品切片
+
+Data API：按 [Native Driver](DATA-API-NATIVE-DRIVER.md) 从 UI 创建项目、准备真实 RLS、
+启用服务，检查双主体隔离、无效 JWT、伪造/合法写入、幂等、浏览器来源配置保留、停用/重新启用，
+以及 Data API 保持运行时的手动缩零、自动空闲缩零和两次首请求冷醒。
+运行 `npm run test:e2e -- data-api.spec.ts`；失败记录必须保留，按 fixture 正常停用服务和 suspend Compute。
+
+应用凭据：按 [Credentials](BACKEND-CREDENTIALS.md) 指定 NEON_E2E_CREDENTIAL_PROJECT，
+运行 `npm run test:e2e -- backend-credentials.spec.ts`。测试 UI 创建 data-only 子/兄弟分支、
+一次性 Token、重放不返回秘密、模型/分支正反例、轮换和撤销、刷新无法找回明文。
+Token 只在进程内存，截图遮罩全部秘密输入，完成后仅撤销本测试凭据并保留分支/审计。
+凭据授权通过不是真实供应商调用通过；推理服务仍需独立验收。
 
 ### 3.1 从操作历史恢复真实故障
 

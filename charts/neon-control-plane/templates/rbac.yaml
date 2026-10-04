@@ -22,7 +22,11 @@ rules:
     verbs: [get]
   - apiGroups: [apps]
     resources: [deployments]
+    {{- if .Values.dataAPI.enabled }}
+    verbs: [get, create, update]
+    {{- else }}
     verbs: [get]
+    {{- end }}
   - apiGroups: [vm.neon.tech]
     resources: [virtualmachines]
     verbs: [get, create, update, patch, delete]

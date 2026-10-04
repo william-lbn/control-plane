@@ -1,7 +1,7 @@
 # 实际 API 合同
 
 OpenAPI 3 合同的权威源是 [openapi-v1.json](../contracts/openapi-v1.json)。
-版本 0.3.3，35 个路径、48 个操作，全部拥有稳定且唯一的 operationId。
+版本 0.5.0，41 个路径、57 个操作，全部拥有稳定且唯一的 operationId。
 运行 Swagger 位于 `/api/docs`，JSON 位于 `/api/openapi.json`。
 本合同是自托管 `/api/v1`，不声称兼容 Neon SaaS `/api/v2`。
 
@@ -68,6 +68,15 @@ request_id/operation_id/error_code，再由显式 retry 接口恢复可重试操
 | GET | `/api/v1/projects/{project}/branches/{branch}/databases` | `GetBranchDatabases` | 200 |
 | POST | `/api/v1/projects/{project}/branches/{branch}/databases` | `PostBranchDatabases` | 202 |
 | DELETE | `/api/v1/projects/{project}/branches/{branch}/databases/{database}` | `DeleteBranchDatabase` | 202 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/data-api` | `getDataAPI` | 200 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/data-api` | `enableDataAPI` | 202 |
+| DELETE | `/api/v1/projects/{project}/branches/{branch}/data-api` | `disableDataAPI` | 202 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/credentials` | `listBackendCredentials` | 200 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/credentials` | `createBackendCredential` | 200, 201 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/credentials/check` | `checkBackendCredential` | 200 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/credentials/{credential}/rotate` | `rotateBackendCredential` | 200 |
+| DELETE | `/api/v1/projects/{project}/branches/{branch}/credentials/{credential}` | `revokeBackendCredential` | 200 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/data-api/request` | `testDataAPIConsoleRequest` | 200 |
 
 ## 3. 实现映射与演进
 

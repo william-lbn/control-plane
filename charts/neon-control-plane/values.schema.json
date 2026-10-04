@@ -1,28 +1,195 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
-  "required": ["api", "web", "service"],
+  "required": [
+    "api",
+    "web",
+    "service"
+  ],
   "properties": {
-    "worker": {"type": "object", "required": ["enabled", "replicaCount"], "properties": {
-      "enabled": {"type": "boolean"}, "replicaCount": {"type": "integer", "const": 1}
-    }},
-    "api": {
-      "type": "object", "required": ["image", "replicaCount", "existingSecret", "pgTLSMode"],
+    "worker": {
+      "type": "object",
+      "required": [
+        "enabled",
+        "replicaCount"
+      ],
       "properties": {
-        "replicaCount": {"type": "integer", "const": 1},
-        "existingSecret": {"type": "string", "minLength": 1},
-        "pgTLSMode": {"enum": ["verify-full", "lab-insecure"]},
-        "computeImage": {"type": "string", "pattern": "^[a-z0-9./_-]+@sha256:[a-f0-9]{64}$"},
-        "image": {"$ref": "#/definitions/image"}
+        "enabled": {
+          "type": "boolean"
+        },
+        "replicaCount": {
+          "type": "integer",
+          "const": 1
+        }
       }
     },
-    "web": {"type": "object", "properties": {"replicaCount": {"type": "integer", "minimum": 1}, "image": {"$ref": "#/definitions/image"}}},
-    "service": {"type": "object", "properties": {"type": {"enum": ["ClusterIP", "NodePort"]}, "nodePort": {"type": "integer", "minimum": 30000, "maximum": 32767}}}
+    "api": {
+      "type": "object",
+      "required": [
+        "image",
+        "replicaCount",
+        "existingSecret",
+        "pgTLSMode"
+      ],
+      "properties": {
+        "replicaCount": {
+          "type": "integer",
+          "const": 1
+        },
+        "existingSecret": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pgTLSMode": {
+          "enum": [
+            "verify-full",
+            "lab-insecure"
+          ]
+        },
+        "computeImage": {
+          "type": "string",
+          "pattern": "^[a-z0-9./_-]+@sha256:[a-f0-9]{64}$"
+        },
+        "image": {
+          "$ref": "#/definitions/image"
+        }
+      }
+    },
+    "web": {
+      "type": "object",
+      "properties": {
+        "replicaCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "image": {
+          "$ref": "#/definitions/image"
+        }
+      }
+    },
+    "service": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "enum": [
+            "ClusterIP",
+            "NodePort"
+          ]
+        },
+        "nodePort": {
+          "type": "integer",
+          "minimum": 30000,
+          "maximum": 32767
+        }
+      }
+    },
+    "dataAPI": {
+      "type": "object",
+      "required": [
+        "enabled",
+        "labHTTP",
+        "gatewayImage",
+        "postgrestImage"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "labHTTP": {
+          "type": "boolean"
+        },
+        "gatewayImage": {
+          "type": "string"
+        },
+        "postgrestImage": {
+          "type": "string"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "labHTTP": {
+                "const": true
+              },
+              "gatewayImage": {
+                "pattern": "^[a-z0-9./_-]+@sha256:[a-f0-9]{64}$"
+              },
+              "postgrestImage": {
+                "pattern": "^[a-z0-9./_-]+@sha256:[a-f0-9]{64}$"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "backendCredentials": {
+      "type": "object",
+      "required": [
+        "enabled",
+        "existingSecret",
+        "labHTTP"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "existingSecret": {
+          "type": "string",
+          "pattern": "^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+          "maxLength": 63
+        },
+        "labHTTP": {
+          "type": "boolean"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "existingSecret": {
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
+    }
   },
   "definitions": {
-    "image": {"type": "object", "required": ["reference", "pullPolicy"], "properties": {
-      "reference": {"type": "string", "pattern": "^[a-z0-9./_-]+@sha256:[a-f0-9]{64}$"},
-      "pullPolicy": {"enum": ["IfNotPresent", "Always", "Never"]}
-    }}
+    "image": {
+      "type": "object",
+      "required": [
+        "reference",
+        "pullPolicy"
+      ],
+      "properties": {
+        "reference": {
+          "type": "string",
+          "pattern": "^[a-z0-9./_-]+@sha256:[a-f0-9]{64}$"
+        },
+        "pullPolicy": {
+          "enum": [
+            "IfNotPresent",
+            "Always",
+            "Never"
+          ]
+        }
+      }
+    }
   }
 }

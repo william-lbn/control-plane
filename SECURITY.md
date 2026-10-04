@@ -13,6 +13,8 @@ Operation ID、镜像 digest、源码提交、复现步骤与预期行为。
 - 服务端组织/项目授权和有界 Key scope；API Key 仅保存哈希。
 - Session cookie 与写请求 CSRF；浏览器 UI 不是授权边界。
 - 创建请求用 HMAC 做幂等内容指纹；该密钥须在恢复时保持一致。
+- 分支应用 Token 只首次返回，metadata 保存 versioned pepper HMAC；密钥与数据库分开备份。
+- Data API 使用独立 NOSUPERUSER/NOBYPASSRLS 身份、强制 RLS 和应用 JWT；Console Explorer 的会话不进入分支服务。
 - Compute 管理使用 Endpoint 身份、短期凭据和 TLS 校验。
 - API 当前只允许一副本；没有通过跨实例缩零/外部 fencing 的验收。
 - API 在命名空间范围内有 Secrets 与工作负载管理能力，须隔离管理网络。

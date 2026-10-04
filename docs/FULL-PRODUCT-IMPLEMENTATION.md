@@ -4,9 +4,10 @@
 
 目标是依据 Neon 官网对象模型实现自托管 Backend，同时保持开源数据面可用。
 本文件定义后续实现合同；它不改变 `/api/v1/capabilities` 的实际能力开关。
-Auth、Functions、Object Storage、AI Gateway、Data API 当前没有完整可验收 Driver。
-Data API 已加入独立 Go JWT/分支认证入口、镜像与 Chart；合同和实际范围见 DATA-API-FOUNDATION.md。
-控制面原生服务生命周期及 UI 尚未闭环，能力开关继续禁用。
+Auth、Functions、Object Storage、AI Gateway 尚未实现服务。
+Data API 已加入原生 Go Driver、持久 Operation、最小权限数据库身份、PostgREST 调谐及 UI；
+默认禁用，具体合同和真实 Neon 验收边界见 DATA-API-NATIVE-DRIVER.md。
+分支应用凭据管理及当前权限检查已有实现，见 BACKEND-CREDENTIALS.md；AI 推理仍未启用。
 PITR、完整删除、细粒度资源回收、HA/DR 和跨实例 fencing 仍需独立开发与测试。
 API/Worker 拆分已有源码和 Chart，验收方法见 WORKER-SPLIT.md。
 
@@ -18,7 +19,7 @@ API/Worker 拆分已有源码和 Chart，验收方法见 WORKER-SPLIT.md。
 | Data API | PostgREST compatible、JWT、RLS、HTTP 无长期 TCP | 独立 PostgREST 数据服务；非 owner/non-BYPASSRLS 连接、issuer/audience/JWKS 与 schema allowlist |
 | Functions | Node.js 24 JS/TS、长期服务、SSE/WS、cron/object trigger、随分支部署 | Go 调谐不可变 bundle；Node runtime，容器隔离、egress/limits、调度/事件幂等与日志 |
 | Object Storage | S3 compatible、private/public_read、预签名、文件视图随分支 | 产品桶与 Pageserver 桶分开；不可变 blobs + 随 PG Timeline 克隆的对象清单；S3 协议 Driver |
-| AI Gateway | 每分支 endpoint；统一凭据、多协议/模型、streaming、用量/预算 | 独立 Go gateway；provider 配置白名单、秘密引用、并发预算/计量；真实 provider 凭据是部署输入 |
+| AI Gateway | 每分支 endpoint；统一平台凭据、多协议/模型、streaming、用量/预算 | 独立 Go gateway；平台管理员 UI 配置上游/密钥，项目用户使用模型目录和 scoped 凭据；真实上游由运营方接入 |
 
 参考官网：[Auth](https://neon.com/docs/auth/overview)、
 [Auth branching](https://neon.com/docs/auth/branching-authentication)、
@@ -27,6 +28,10 @@ API/Worker 拆分已有源码和 Chart，验收方法见 WORKER-SPLIT.md。
 [Storage](https://neon.com/docs/storage/overview)、
 [AI Gateway](https://neon.com/docs/ai-gateway/overview)。
 这些 URL 会演进；版本判断以已保存快照和后续实际核验日期为准。
+AI Gateway 已于 2026-10-04 重新核验在线文档、目录和网站源码，
+专用合同见 [平台配置、模型、凭据和验收设计](AI-GATEWAY-PLATFORM-DESIGN.md)。
+官网用户无须提供供应商 API Key；自托管平台的运营方须接入真实上游，
+配置 UI 是正式产品需求，不能长期要求项目用户手动提供 Kubernetes Secret 名称。
 
 ## 2. 总体架构
 
@@ -71,7 +76,7 @@ flowchart TB
 | application credentials | key_id、hash/secret_ref、project/branch scope、allowed_services/actions、expiry/revoke | key 只创建时返回；应用凭据不能调用控制 API |
 | function releases | function_id、branch、bundle_digest、runtime_version、config_generation、active_release | immutable bundle；同一 release 可重放；环境变量秘密仅引用 |
 | function triggers | trigger_id、event_kind、schedule/bucket/filter、retry/DLQ policy、generation | 执行去重 key=(trigger,event_id)，不可承诺 exactly-once 副作用 |
-| service usage | event_id、scope、request_id、unit、quantity、reservation_id、status、sample_at | 预算先 reserve，结束 settle；崩溃释放有 TTL 与恢复记录 |
+| service usage | event_id、scope、request_id、unit、quantity、reservation_id、status、sample_at | 预算先 reserve，结束 settle；上游已接收但结果不明时进入 uncertain，对账前不按 TTL 直接释放 |
 | restore operations | source/target branch、timestamp/LSN、retention check、service snapshot refs、steps | 恢复到新分支优先；禁止不可恢复覆盖生产默认分支 |
 | deletion intent | resource、generation、dependency snapshot、grace_until、tombstone、GC cursor | 前台隐藏/停入口与物理 GC 分离；恢复窗口之前保留数据 |
 
@@ -122,6 +127,9 @@ sequenceDiagram
 通用错误：401 身份、403 scope、404 隐藏跨租户资源、409 generation/dependency、
 422 spec/retention、429 quota/budget、503 dependency。错误返回 request_id，秘密不回显。
 正式实现时必须进入实际 OpenAPI、Go 路由双向校验与 typed UI；本设计表不是 Swagger 可用接口。
+通用 `/application-credentials` 为早期合同占位；Backend scoped credentials 的正式路径及一次明文、
+幂等重试、到期/撤销语义以 BACKEND-CREDENTIALS.md 和已实现 OpenAPI 的 `/credentials` 为准。
+供应商、模型目录及推理合同仍以 AI-GATEWAY-PLATFORM-DESIGN.md 作为演进目标。
 
 ## 5. 各服务独立放行
 

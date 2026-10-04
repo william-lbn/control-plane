@@ -2,7 +2,7 @@
 
 ## 1. 实现边界
 
-Chart 0.2.0 默认启动独立 API、Worker、Web 三个 Deployment。
+Chart 0.3.0 默认启动独立 API、Worker、Web 三个 Deployment。
 API 与 Worker 使用同一个固定 digest 的 API 镜像，分别运行
 `control-api` 与 `control-worker`，避免调谐协议版本漂移。
 API 保留同步 SQL/连接管理路径；没有完整连接 fencing 前，仍限制一个 API。
@@ -23,7 +23,7 @@ flowchart LR
 
 | 进程 | 角色 | HTTP | 数据库连接 |
 | --- | --- | --- | --- |
-| control-api | `NEON_CONTROL_PROCESS_ROLE=api` | 8788，原 48 个操作 | 意图、授权、读取、SQL guard |
+| control-api | `NEON_CONTROL_PROCESS_ROLE=api` | 8788，57 个控制操作及独立数据入口 | 意图、授权、读取、SQL guard |
 | control-worker | worker，入口固定 | 8789，仅 healthz / readyz | 调谐与专属 leadership session |
 | 显式兼容 profile | all | 8788 | 原合并功能 + 新领导租约 |
 

@@ -1,4 +1,13 @@
 {{- define "neonControl.runtimeEnv" -}}
+{{- if .Values.dataAPI.enabled }}
+{{- if not .Values.dataAPI.labHTTP }}
+{{- fail "Data API native Driver v1 requires explicit dataAPI.labHTTP; trusted TLS has not passed" }}
+{{- end }}
+- {name: NEON_DATA_API_ENABLED, value: 'true'}
+- {name: NEON_DATA_API_LAB_HTTP, value: 'true'}
+- {name: NEON_DATA_API_GATEWAY_IMAGE, value: {{ .Values.dataAPI.gatewayImage | quote }}}
+- {name: NEON_DATA_API_POSTGREST_IMAGE, value: {{ .Values.dataAPI.postgrestImage | quote }}}
+{{- end }}
 - {name: NEON_KUBE_NAMESPACE, value: {{ .Release.Namespace | quote }}}
 - {name: NEON_V2_CREATE_ENABLED, value: {{ .Values.api.creationEnabled | quote }}}
 - {name: NEON_V2_SCALE_ZERO_ENABLED, value: {{ .Values.api.scaleToZeroEnabled | quote }}}
