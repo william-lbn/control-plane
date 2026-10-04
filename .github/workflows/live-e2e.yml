@@ -21,9 +21,11 @@ jobs:
         shell: bash
         run: |
           task_run="run-$GITHUB_RUN_ID-a$GITHUB_RUN_ATTEMPT"
-          echo "NEON_E2E_ARTIFACTS=$RUNNER_TEMP/neon-ui-artifacts/$task_run" >> "$GITHUB_ENV"
-          echo "NEON_E2E_PRIVATE_DIR=$RUNNER_TEMP/neon-ui-private/$task_run" >> "$GITHUB_ENV"
-          echo "NEON_E2E_ADMIN_PASSWORD_FILE=$RUNNER_TEMP/neon-ui-private/$task_run/admin-password" >> "$GITHUB_ENV"
+          {
+            echo "NEON_E2E_ARTIFACTS=$RUNNER_TEMP/neon-ui-artifacts/$task_run"
+            echo "NEON_E2E_PRIVATE_DIR=$RUNNER_TEMP/neon-ui-private/$task_run"
+            echo "NEON_E2E_ADMIN_PASSWORD_FILE=$RUNNER_TEMP/neon-ui-private/$task_run/admin-password"
+          } >> "$GITHUB_ENV"
       - name: Prepare protected credentials outside the checkout
         env: {ADMIN_PASSWORD: '${{ secrets.NEON_E2E_ADMIN_PASSWORD }}'}
         run: |
