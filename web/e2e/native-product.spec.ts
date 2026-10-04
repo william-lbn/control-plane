@@ -226,6 +226,10 @@ test('native UI: project, timeline branch, writer, Proxy SQL and cold resume', a
 
     await page.goto('/#/projects/' + project + '/monitoring');
     await expect(page.getByRole('heading', { name: '监控与运行洞察', exact: true })).toBeVisible();
+    await expect(page.getByTestId('monitor-runtime-state')).toHaveText('已休眠');
+    await expect(page.locator('.stats-grid .stat-card strong').nth(0)).toHaveText('—');
+    await expect(page.locator('.stats-grid .stat-card strong').nth(1)).toHaveText('—');
+    await record('ui_monitoring_does_not_present_old_active_samples_after_suspend');
     if (expectSplit) {
       await expect(page.getByLabel('控制面运行状态')).toContainText('独立 API / Worker');
       await expect(page.getByLabel('控制面运行状态')).toContainText('Worker 心跳正常');

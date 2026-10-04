@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, endpointPath } from '../../api';
 import type { Endpoint, Metric, MetricHistory } from '../../api';
-import { fmt, PageHeading } from '../../shared/ui';
+import { fmt, PageHeading, stateLabel } from '../../shared/ui';
 import { useEndpointSelection } from '../../shared/useEndpointSelection';
 import { RuntimeHealth } from './RuntimeHealth';
+import { monitoringSnapshot } from './snapshot';
 
 function Sparkline({
   items,
@@ -105,6 +106,7 @@ export function Monitoring({
   const [selected, setSelected] = useEndpointSelection(projectId, endpoints);
   const [period, setPeriod] = useState('1h');
   const [history, setHistory] = useState<MetricHistory | null>(null);
+  const [currentEndpoint, setCurrentEndpoint] = useState<Endpoint | null>(null);
   const pending = useRef<AbortController | null>(null);
   const endpoint = endpoints.find((e) => e.id === selected) || endpoints[0];
   const load = () => {
@@ -113,18 +115,31 @@ export function Monitoring({
     pending.current?.abort();
     const controller = new AbortController();
     pending.current = controller;
-    api<MetricHistory>(endpointPath(projectId, endpoint.id) + `/metrics?period=${period}`, {
-      signal: controller.signal,
-    })
-      .then((data) => {
-        if (!controller.signal.aborted && data.endpoint_id === endpoint.id) setHistory(data);
+    const route = endpointPath(projectId, endpoint.id);
+    Promise.all([
+      api<MetricHistory>(route + `/metrics?period=${period}`, { signal: controller.signal }),
+      api<Endpoint>(route, { signal: controller.signal }),
+    ])
+      .then(([data, current]) => {
+        if (
+          !controller.signal.aborted &&
+          data.endpoint_id === endpoint.id &&
+          current.id === endpoint.id
+        ) {
+          setHistory(data);
+          setCurrentEndpoint(current);
+        }
       })
       .catch((error) => {
-        if (!controller.signal.aborted) showError(error);
+        if (!controller.signal.aborted) {
+          setCurrentEndpoint(null);
+          showError(error);
+        }
       });
   };
   useEffect(() => {
     setHistory(null);
+    setCurrentEndpoint(null);
     load();
     const timer = setInterval(load, 30000);
     return () => {
@@ -133,6 +148,9 @@ export function Monitoring({
     };
   }, [endpoint?.id, period]);
   const latest = history?.items.at(-1);
+  const runtimeEndpoint = currentEndpoint?.id === endpoint?.id ? currentEndpoint : null;
+  const snapshot = monitoringSnapshot(history, runtimeEndpoint);
+  const current = snapshot.current;
   return (
     <>
       <RuntimeHealth />
@@ -168,38 +186,43 @@ export function Monitoring({
             </button>
           ))}
         </div>
-        <span className={history?.fresh ? 'fresh' : 'stale'}>
-          ● {history?.fresh ? '实时采集中' : '暂无新鲜样本'}
+        <span className={snapshot.fresh ? 'fresh' : 'stale'}>
+          ●{' '}
+          {snapshot.state === 'suspended'
+            ? '已休眠 · 保留历史样本'
+            : snapshot.fresh
+              ? '实时采集中'
+              : '暂无当前运行样本'}
         </span>
       </div>
       <div className="stats-grid">
         <div className="stat-card">
           <small>CPU 实际用量</small>
           <strong>
-            {latest?.cpu_used_milli == null ? '—' : `${latest.cpu_used_milli.toFixed(1)}m`}
+            {current?.cpu_used_milli == null ? '—' : `${current.cpu_used_milli.toFixed(1)}m`}
           </strong>
-          <span>Pod · 已分配 {latest?.cpu_allocated_milli ?? '—'}m</span>
+          <span>Pod · 当前已分配 {runtimeEndpoint?.runtime.cpu_milli ?? '—'}m</span>
         </div>
         <div className="stat-card">
           <small>内存实际用量</small>
           <strong>
-            {latest?.memory_used_mib == null ? '—' : `${latest.memory_used_mib.toFixed(1)} MiB`}
+            {current?.memory_used_mib == null ? '—' : `${current.memory_used_mib.toFixed(1)} MiB`}
           </strong>
-          <span>Pod · 已分配 {latest?.memory_allocated_mib ?? '—'} MiB</span>
+          <span>Pod · 当前已分配 {runtimeEndpoint?.runtime.memory_mib ?? '—'} MiB</span>
         </div>
         <div className="stat-card">
           <small>数据库连接</small>
-          <strong>{latest?.connections ?? '—'}</strong>
-          <span>活跃 {latest?.active_connections ?? '—'}</span>
+          <strong>{current?.connections ?? '—'}</strong>
+          <span>活跃 {current?.active_connections ?? '—'}</span>
         </div>
         <div className="stat-card">
-          <small>数据库大小</small>
+          <small>数据库大小（最后采样）</small>
           <strong>
             {latest?.database_size_bytes == null
               ? '—'
               : `${(latest.database_size_bytes / 1048576).toFixed(1)} MiB`}
           </strong>
-          <span>PostgreSQL</span>
+          <span>PostgreSQL · {latest ? fmt(latest.sampled_at) : '尚未采样'}</span>
         </div>
       </div>
       <div className="two-col charts">
@@ -261,8 +284,8 @@ export function Monitoring({
         </div>
         <div className="source-grid">
           <div>
-            <small>Compute 状态</small>
-            <strong>{latest?.observed_state || '—'}</strong>
+            <small>Compute 当前状态</small>
+            <strong data-testid="monitor-runtime-state">{stateLabel(snapshot.state)}</strong>
           </div>
           <div>
             <small>资源分配</small>
@@ -287,7 +310,8 @@ export function Monitoring({
         )}
         <p className="muted">
           Pod 用量包含 VM 开销，不等于 Guest 内 PostgreSQL 进程。缺测显示“—”，Idle Compute
-          不会因采样被唤醒。
+          不会因采样被唤醒。当前状态由只读 Kubernetes 观察获取；历史指标不冒充新一代 Compute
+          的当前用量。
         </p>
       </div>
     </>

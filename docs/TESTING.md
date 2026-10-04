@@ -9,6 +9,7 @@
 | Go | 专用 PG16，tools/ci-go.sh | gofmt、vet、race、真实 PG 集成，零 skipped |
 | API contract | Go AST + bundled OpenAPI | implemented/documented route 双向一致、所有引用可解析、Cookie 合同一致 |
 | Web | npm ci / format:check / test / build | CSPRNG fallback 回归、strict TS、Vite 静态产物 |
+| Workflows | 固定 actionlint 1.7.12 / Linux ShellCheck | 校验全部 CI/live workflow；拒绝非法上下文和 shell 问题 |
 | Helm | tools/ci-helm.sh | lint/template；拒绝多 API 副本、缺 CA、浮动 tag；gateway 无 hostPath |
 | Image | protected main/tag after gates | 固定 builder、SHA tag、三镜像、SBOM/provenance、digest receipt |
 
@@ -52,11 +53,23 @@ npm run test:e2e
 5. UI 单独创建子 Writer，验证父数据继承，再写入子分支。
 6. UI suspend 子 Writer，查询父 Writer 触发冷醒，验证子写入不影响父数据。
 7. UI suspend 父 Writer，查看监控和 Operation history；保留截图/JSON。
+   监控必须显示当前“已休眠”，当前 CPU/RAM 用量为缺测符号，不能把旧 active 样本当作当前资源。
+   使用 NEON_E2E_EXPECT_SPLIT=true 时，另检查独立 API/Worker 和 Worker 心跳；
+   受控 Worker 故障模式见 [拆分手册](WORKER-SPLIT.md)。
 8. 失败时保留 fixture 和 Job/日志，使用其中 Endpoint ID 正常 suspend，
    不能删除数据、Secrets、WAL 或证据。
 
 这些断言覆盖原生资源与分支/连接闭环，**不等于完整权限、自动 idle、
 Reader、热伸缩、目录、HA/DR 的全面现场回归**。扩展每项测试时须分别列明结果。
+
+### 2.1 监控状态与采样边界
+
+监控页面同时只读获取 Endpoint 的 Kubernetes runtime 和历史 metrics，均不调用 SQL 唤醒。
+当前状态来自 runtime，历史图表保留原样；数据库大小明确标识最后采样时间。
+当前资源用量仅使用新鲜、active、同一 Endpoint、晚于当前 VM 创建时间的样本。
+休眠、未知、过期、未来时间、缺 VM 身份、旧代次和读取失败均不能显示旧用量为当前值。
+运行时读取失败会清除当前观察，保留历史曲线及错误提示。
+Node 回归覆盖这些边界，真实浏览器在最终 suspend 后检查状态和资源卡片。
 
 ## 3. GitHub trusted live workflow
 

@@ -40,6 +40,8 @@ export type Runtime = {
   memory_mib?: number;
   pod_name?: string;
   node_name?: string;
+  workload_uid?: string;
+  workload_created_at?: string;
   error?: string;
 };
 export type Endpoint = {
