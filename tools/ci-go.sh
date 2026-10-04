@@ -2,6 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 : "${NEON_V2_TEST_DATABASE_URL:?Dedicated disposable CI PostgreSQL DSN required}"
+: "${NEON_DATA_API_TEST_POSTGREST:?Pinned PostgREST executable required for the real RLS gate}"
 task_attempt="${NEON_CI_ATTEMPT:-$(date -u +%Y%m%d%H%M%S)}"
 [[ "$task_attempt" =~ ^[a-z0-9_]+$ ]] || { echo 'Invalid CI attempt'; exit 1; }
 export NEON_V2_TEST_SCHEMA="v2_migration_ci_$task_attempt"

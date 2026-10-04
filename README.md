@@ -20,20 +20,21 @@ Chart 0.2.0 提供独立 API、Worker、Web 进程；Worker 使用 PostgreSQL �
 | CPU / 内存边界、自动休眠、连接唤醒 | 已实现实验环境控制路径 | 整数 CPU 1→2→1 已验证；小数 CPU、完整内存缩回、跨实例栅栏未验收 |
 | 监控、Operation 步骤、错误与重试 | 已实现 | 长期指标持久化、SLO 告警、完整审计导出未完成 |
 | HA / DR / PITR | 部分租约、恢复工具和接口设计基础 | 未通过独立故障域 HA/DR；用户数据库 PITR 未实现 |
-| Auth、Functions、Object Storage、AI Gateway、Data API | 能力与服务模型预留，明确 disabled | 对应 Backend 服务尚未实现，不能作为可用功能宣传 |
+| Auth、Functions、Object Storage、AI Gateway | 能力与服务模型预留，明确 disabled | 对应 Backend 服务尚未实现，不能作为可用功能宣传 |
+| Data API | Go JWT/分支认证入口、独立镜像/Chart、RLS 集成测试 | 完整 Driver 与 UI 未闭环，capability 仍 disabled |
 
 **外部依赖**：Neon Storage Controller、Pageserver、Safekeeper、Proxy、持久对象存储、
 NeonVM、Autoscaling Agent/Scheduler，以及与本版合同匹配的 Proxy/Storage adapter。
 当前实验环境 adapter 仍为外部单实例原型；该原型及 Python 验证代码不在此仓库。
-两个 Chart 仅部署控制面与管理网关，不替代完整 Neon/Autoscaling 基础设施 Chart。
+控制面、管理网关与 Data API 入口 Chart 不替代完整 Neon/Autoscaling 基础设施或 PostgREST Driver。
 
 ## 2. 目录与合同
 
 ```text
-api/                  Go module：API/Worker、Compute Gateway、DR 工具、SQL migrations
+api/                  Go module：API/Worker、Compute/Data API Gateway、DR 工具、SQL migrations
 web/                  React/TypeScript：控制台、Node 回归测试、Playwright 真实 UI 测试
 contracts/            版本化 OpenAPI；路由与引用由 Go 测试校验
-charts/               控制面和 Compute 管理网关 Helm Chart
+charts/               控制面、Compute 管理网关与 Data API 认证入口 Helm Chart
 containers/           固定 builder / runtime digest
 tools/                Linux CI、Helm 安装/验收、供应链输入输出
 docs/                 架构、对象模型、部署、测试、来源及生产门槛
@@ -57,6 +58,8 @@ docs/                 架构、对象模型、部署、测试、来源及生产�
 
 ```bash
 export NEON_V2_TEST_DATABASE_URL='postgres://ci:ci-disposable@127.0.0.1:5432/control_ci?sslmode=disable'
+bash tools/install-postgrest.sh /tmp/neon-postgrest
+export NEON_DATA_API_TEST_POSTGREST=/tmp/neon-postgrest/postgrest
 make test
 make web
 bash tools/install-helm.sh /tmp/neon-helm
@@ -69,7 +72,9 @@ CI 在 Linux 执行 gofmt、vet、race、真实 PG 集成、OpenAPI 路由/引�
 
 ## 4. 镜像与部署
 
-可信分支通过质量门槛后发布 `control-api`、`control-web`、`control-gateway`。
+可信分支通过质量门槛后发布 `control-api`、`control-web`、`control-gateway`、`control-dataapi`。
+Data API 镜像/Chart 当前是独立认证入口基础；尚未有 Console 原生服务 Driver，
+实际合同和未验收内容见 [Data API 基础](docs/DATA-API-FOUNDATION.md)，能力开关仍禁用。
 tag 使用 `sha-<full-commit>-r<run-id>-a<attempt>`，重跑产生新 tag；部署固定 registry manifest digest，不能使用 `latest`。
 默认 GHCR owner 为仓库所有者；Docker Hub 需要在本仓库设置
 `DOCKERHUB_USERNAME` 与 `DOCKERHUB_TOKEN`。初次 GHCR package 公开性须独立检查。

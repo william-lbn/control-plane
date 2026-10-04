@@ -1,0 +1,11 @@
+apiVersion: v2
+name: neon-data-api-gateway
+description: Branch-scoped JWT boundary for independently provisioned PostgREST runtimes
+type: application
+version: 0.1.0
+appVersion: 0.1.0-driver-foundation
+home: https://github.com/william-lbn/control-plane
+sources:
+  - https://github.com/william-lbn/control-plane
+maintainers:
+  - name: william-lbn

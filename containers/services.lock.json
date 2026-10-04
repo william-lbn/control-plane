@@ -1,0 +1,8 @@
+{
+  "postgrest": {
+    "version": "16.4",
+    "linux_amd64_url": "https://github.com/PostgREST/postgrest/releases/download/v16.4/postgrest-v16.4-linux-static-x86-64.tar.xz",
+    "linux_amd64_sha256": "b47ecc82fce1dcebbbc4183d839e52f07f7630c9d7ad0f54db753d1939299354",
+    "source": "https://github.com/PostgREST/postgrest/releases/tag/v16.4"
+  }
+}

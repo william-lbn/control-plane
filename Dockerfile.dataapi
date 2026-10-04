@@ -1,0 +1,15 @@
+ARG GO_BUILDER_IMAGE
+FROM ${GO_BUILDER_IMAGE} AS build
+WORKDIR /src/api
+COPY api/go.mod api/go.sum ./
+RUN go mod download
+COPY api/cmd ./cmd
+COPY api/internal ./internal
+RUN CGO_ENABLED=0 GOMAXPROCS=2 go build -p=2 -trimpath -buildvcs=false -o /control-data-gateway ./cmd/control-data-gateway
+FROM scratch
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY --from=build /control-data-gateway /opt/neon-control/control-data-gateway
+ENV NEON_DATA_API_BIND=:9080 NEON_DATA_API_HEALTH_BIND=:9081
+USER 65532:65532
+EXPOSE 9080 9081
+ENTRYPOINT ["/opt/neon-control/control-data-gateway"]

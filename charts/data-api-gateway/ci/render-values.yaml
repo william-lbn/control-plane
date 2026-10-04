@@ -1,0 +1,7 @@
+image:
+  reference: example.invalid/control-dataapi@sha256:1111111111111111111111111111111111111111111111111111111111111111
+configSecret: ci-data-api-config
+signingSecret: ci-data-api-signing
+ingress:
+  host: data.example.test
+  tlsSecret: ci-data-api-tls

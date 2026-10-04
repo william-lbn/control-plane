@@ -1,0 +1,26 @@
+image:
+  reference: ""
+  pullPolicy: IfNotPresent
+replicaCount: 1
+configSecret: ""
+signingSecret: ""
+upstreamCASecret: ""
+service:
+  type: ClusterIP
+  nodePort: 0
+ingress:
+  enabled: true
+  className: ""
+  host: ""
+  tlsSecret: ""
+laboratory:
+  allowHTTP: false
+resources:
+  requests:
+    cpu: 100m
+    memory: 64Mi
+  limits:
+    cpu: "1"
+    memory: 256Mi
+nodeSelector: {}
+tolerations: []

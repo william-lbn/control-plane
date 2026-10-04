@@ -6,22 +6,26 @@
 
 | Gate | 命令/环境 | 判定 |
 | --- | --- | --- |
-| Go | 专用 PG16，tools/ci-go.sh | gofmt、vet、race、真实 PG 集成，零 skipped |
+| Go | 专用 PG16 + 固定 PostgREST 16.4，tools/ci-go.sh | gofmt、vet、race、真实 PG/RLS 集成，零 skipped |
 | API contract | Go AST + bundled OpenAPI | implemented/documented route 双向一致、所有引用可解析、Cookie 合同一致 |
 | Web | npm ci / format:check / test / build | CSPRNG fallback 回归、strict TS、Vite 静态产物 |
 | Workflows | 固定 actionlint 1.7.12 / Linux ShellCheck | 校验全部 CI/live workflow；拒绝非法上下文和 shell 问题 |
 | Helm | tools/ci-helm.sh | lint/template；拒绝多 API 副本、缺 CA、浮动 tag；gateway 无 hostPath |
-| Image | protected main/tag after gates | 固定 builder、SHA tag、三镜像、SBOM/provenance、digest receipt |
+| Image | protected main/tag after gates | 固定 builder、SHA tag、API/Web/Gateway/DataAPI 四镜像、SBOM/provenance、digest receipt |
 
 ```bash
 export NEON_V2_TEST_DATABASE_URL='postgres://ci:ci-disposable@127.0.0.1:5432/control_ci?sslmode=disable'
 export NEON_CI_ATTEMPT="manual_$(date -u +%Y%m%d%H%M%S)"
+bash tools/install-postgrest.sh /tmp/neon-postgrest
+export NEON_DATA_API_TEST_POSTGREST=/tmp/neon-postgrest/postgrest
 make test web
 PATH="/tmp/neon-helm:$PATH" make helm
 ```
 
 每次测试使用新的 schema/attempt；失败 evidence 保留。
 真实 PG tests 使用独立测试 schema。运行人对传入 DSN 负责，不得用生产库。
+Data API 集成另要求数据库名 control_ci 或 dataapi_ci，使用实际独立 NOINHERIT/NOBYPASSRLS
+角色和 PostgREST 子进程；配置/数据库只在 disposable CI 使用。具体边界见 DATA-API-FOUNDATION.md。
 
 ## 2. 真实 UI：项目到数据库
 

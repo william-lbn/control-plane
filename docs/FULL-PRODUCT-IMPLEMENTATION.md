@@ -4,7 +4,9 @@
 
 目标是依据 Neon 官网对象模型实现自托管 Backend，同时保持开源数据面可用。
 本文件定义后续实现合同；它不改变 `/api/v1/capabilities` 的实际能力开关。
-Auth、Functions、Object Storage、AI Gateway、Data API 当前没有可验收 Driver。
+Auth、Functions、Object Storage、AI Gateway、Data API 当前没有完整可验收 Driver。
+Data API 已加入独立 Go JWT/分支认证入口、镜像与 Chart；合同和实际范围见 DATA-API-FOUNDATION.md。
+控制面原生服务生命周期及 UI 尚未闭环，能力开关继续禁用。
 PITR、完整删除、细粒度资源回收、HA/DR 和跨实例 fencing 仍需独立开发与测试。
 API/Worker 拆分已有源码和 Chart，验收方法见 WORKER-SPLIT.md。
 

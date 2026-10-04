@@ -17,4 +17,10 @@ grep -q '/opt/neon-control/control-worker' artifacts/helm/control-plane.yaml
 if grep -q '/opt/neon-control/control-worker' artifacts/helm/combined-profile.yaml; then exit 1; fi
 helm package charts/neon-control-plane -d artifacts/helm
 helm package charts/compute-management-gateway -d artifacts/helm
+helm lint charts/data-api-gateway --strict -f charts/data-api-gateway/ci/render-values.yaml
+helm template neon-data charts/data-api-gateway --namespace neon -f charts/data-api-gateway/ci/render-values.yaml > artifacts/helm/data-api-gateway.yaml
+if helm template bad charts/data-api-gateway -f charts/data-api-gateway/ci/render-values.yaml --set image.reference=example.invalid/control-dataapi:latest > artifacts/helm/rejected-data-api-tag.log 2>&1; then exit 1; fi
+if helm template bad charts/data-api-gateway -f charts/data-api-gateway/ci/render-values.yaml --set ingress.enabled=false > artifacts/helm/rejected-data-api-http.log 2>&1; then exit 1; fi
+if helm template bad charts/data-api-gateway -f charts/data-api-gateway/ci/render-values.yaml --set replicaCount=2 > artifacts/helm/rejected-data-api-replicas.log 2>&1; then exit 1; fi
+helm package charts/data-api-gateway -d artifacts/helm
 sha256sum artifacts/helm/*.tgz > artifacts/helm/SHA256SUMS

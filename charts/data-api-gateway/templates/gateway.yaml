@@ -1,0 +1,113 @@
+{{- $name := printf "%s-data-api" .Release.Name | trunc 63 | trimSuffix "-" -}}
+{{- if not (regexMatch "^[a-z0-9./_-]+@sha256:[a-f0-9]{64}$" .Values.image.reference) -}}
+{{- fail "Data API image must be pinned by sha256 digest" -}}
+{{- end -}}
+{{- if ne (int .Values.replicaCount) 1 -}}{{- fail "Data API multi-instance quotas and signing rotation require independent acceptance; replicaCount must be 1" -}}{{- end -}}
+{{- $config := required "configSecret with config.json is required" .Values.configSecret -}}
+{{- $signing := required "signingSecret with delegation-seed is required" .Values.signingSecret -}}
+{{- if eq $config $signing -}}{{- fail "Keep public provider configuration and private delegation signing in different Secrets" -}}{{- end -}}
+{{- if and (not .Values.laboratory.allowHTTP) (or (not .Values.ingress.enabled) (ne .Values.service.type "ClusterIP")) -}}
+{{- fail "Production profile requires HTTPS Ingress and a private ClusterIP Service" -}}
+{{- end -}}
+{{- if .Values.ingress.enabled -}}
+{{- $_ := required "Ingress host is required" .Values.ingress.host -}}
+{{- $_ := required "Ingress TLS Secret is required" .Values.ingress.tlsSecret -}}
+{{- end -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels: {app.kubernetes.io/name: neon-data-api-gateway, app.kubernetes.io/instance: {{ .Release.Name | quote }}}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app.kubernetes.io/name: neon-data-api-gateway, app.kubernetes.io/instance: {{ .Release.Name | quote }}}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: neon-data-api-gateway, app.kubernetes.io/instance: {{ .Release.Name | quote }}}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile: {type: RuntimeDefault}
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: gateway
+          image: {{ .Values.image.reference | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - {name: http, containerPort: 9080}
+            - {name: health, containerPort: 9081}
+          env:
+            - {name: NEON_DATA_API_CONFIG_FILE, value: /run/data-api/config/config.json}
+            - {name: NEON_DATA_API_SIGNING_SEED_FILE, value: /run/data-api/signing/delegation-seed}
+            - {name: NEON_DATA_API_ALLOW_PLAINTEXT_UPSTREAM, value: {{ .Values.laboratory.allowHTTP | quote }}}
+            {{- if .Values.upstreamCASecret }}
+            - {name: NEON_DATA_API_UPSTREAM_CA_FILE, value: /run/data-api/upstream-ca/ca.crt}
+            {{- end }}
+          startupProbe: {httpGet: {path: /readyz, port: health}, periodSeconds: 2, failureThreshold: 30}
+          readinessProbe: {httpGet: {path: /readyz, port: health}, periodSeconds: 5}
+          livenessProbe: {httpGet: {path: /healthz, port: health}, periodSeconds: 15}
+          resources: {{ toYaml .Values.resources | nindent 12 }}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+          volumeMounts:
+            - {name: config, mountPath: /run/data-api/config, readOnly: true}
+            - {name: signing, mountPath: /run/data-api/signing, readOnly: true}
+            {{- if .Values.upstreamCASecret }}
+            - {name: upstream-ca, mountPath: /run/data-api/upstream-ca, readOnly: true}
+            {{- end }}
+      volumes:
+        - name: config
+          secret: {secretName: {{ $config | quote }}, defaultMode: 0440, items: [{key: config.json, path: config.json}]}
+        - name: signing
+          secret: {secretName: {{ $signing | quote }}, defaultMode: 0440, items: [{key: delegation-seed, path: delegation-seed}]}
+        {{- if .Values.upstreamCASecret }}
+        - name: upstream-ca
+          secret: {secretName: {{ .Values.upstreamCASecret | quote }}, defaultMode: 0440, items: [{key: ca.crt, path: ca.crt}]}
+        {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+spec:
+  type: {{ .Values.service.type }}
+  selector: {app.kubernetes.io/name: neon-data-api-gateway, app.kubernetes.io/instance: {{ .Release.Name | quote }}}
+  ports:
+    - name: http
+      port: 9080
+      targetPort: http
+      {{- if and (eq .Values.service.type "NodePort") .Values.service.nodePort }}
+      nodePort: {{ .Values.service.nodePort }}
+      {{- end }}
+{{- if .Values.ingress.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $name }}
+spec:
+  {{- if .Values.ingress.className }}
+  ingressClassName: {{ .Values.ingress.className | quote }}
+  {{- end }}
+  tls:
+    - hosts: [{{ .Values.ingress.host | quote }}]
+      secretName: {{ .Values.ingress.tlsSecret | quote }}
+  rules:
+    - host: {{ .Values.ingress.host | quote }}
+      http:
+        paths:
+          - path: /data/v1/
+            pathType: Prefix
+            backend:
+              service: {name: {{ $name }}, port: {name: http}}
+{{- end }}
