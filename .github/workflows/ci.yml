@@ -11,6 +11,14 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
+  workflows:
+    name: GitHub workflow contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - run: bash tools/install-actionlint.sh "$RUNNER_TEMP/neon-actionlint"
+      - run: '"$RUNNER_TEMP/neon-actionlint/actionlint" -color'
   go:
     name: Go + real PostgreSQL
     runs-on: ubuntu-24.04
@@ -69,7 +77,7 @@ jobs:
         with: {name: helm-packages-and-gates, path: artifacts/helm, retention-days: 30}
   publish:
     name: Publish ${{ matrix.component }}
-    needs: [go, web, helm]
+    needs: [go, web, helm, workflows]
     if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-24.04
     timeout-minutes: 20

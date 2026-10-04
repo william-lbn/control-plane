@@ -11,14 +11,19 @@ jobs:
     timeout-minutes: 40
     env:
       NEON_E2E_BASE_URL: ${{ vars.NEON_E2E_BASE_URL }}
-      NEON_E2E_ARTIFACTS: ${{ runner.temp }}/neon-ui-artifacts/run-${{ github.run_id }}-a${{ github.run_attempt }}
-      NEON_E2E_PRIVATE_DIR: ${{ runner.temp }}/neon-ui-private/run-${{ github.run_id }}-a${{ github.run_attempt }}
-      NEON_E2E_ADMIN_PASSWORD_FILE: ${{ runner.temp }}/neon-ui-private/run-${{ github.run_id }}-a${{ github.run_attempt }}/admin-password
       NEON_E2E_ATTEMPT: run-${{ github.run_id }}-${{ github.run_attempt }}
+      NEON_E2E_EXPECT_SPLIT: 'true'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with: {node-version: '24.19.0', cache: npm, cache-dependency-path: web/package-lock.json}
+      - name: Resolve Linux runner paths
+        shell: bash
+        run: |
+          task_run="run-$GITHUB_RUN_ID-a$GITHUB_RUN_ATTEMPT"
+          echo "NEON_E2E_ARTIFACTS=$RUNNER_TEMP/neon-ui-artifacts/$task_run" >> "$GITHUB_ENV"
+          echo "NEON_E2E_PRIVATE_DIR=$RUNNER_TEMP/neon-ui-private/$task_run" >> "$GITHUB_ENV"
+          echo "NEON_E2E_ADMIN_PASSWORD_FILE=$RUNNER_TEMP/neon-ui-private/$task_run/admin-password" >> "$GITHUB_ENV"
       - name: Prepare protected credentials outside the checkout
         env: {ADMIN_PASSWORD: '${{ secrets.NEON_E2E_ADMIN_PASSWORD }}'}
         run: |
