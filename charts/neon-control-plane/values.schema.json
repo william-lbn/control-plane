@@ -3,6 +3,9 @@
   "type": "object",
   "required": ["api", "web", "service"],
   "properties": {
+    "worker": {"type": "object", "required": ["enabled", "replicaCount"], "properties": {
+      "enabled": {"type": "boolean"}, "replicaCount": {"type": "integer", "const": 1}
+    }},
     "api": {
       "type": "object", "required": ["image", "replicaCount", "existingSecret", "pgTLSMode"],
       "properties": {

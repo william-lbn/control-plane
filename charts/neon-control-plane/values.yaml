@@ -1,6 +1,13 @@
 fullnameOverride: neon-control
+worker:
+  # Upgrade from combined mode requires the documented stop/drain procedure.
+  enabled: true
+  replicaCount: 1
+  resources:
+    requests: {cpu: 100m, memory: 128Mi}
+    limits: {cpu: '1', memory: 512Mi}
 api:
-  # Combined API/worker currently requires one instance; HA has a separate gate.
+  # Multiple APIs still require external connection fencing and a separate gate.
   replicaCount: 1
   image: {reference: '', pullPolicy: IfNotPresent}
   existingSecret: neon-control-plane-credentials

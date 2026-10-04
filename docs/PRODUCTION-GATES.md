@@ -16,7 +16,7 @@
 | 外部 adapter | 当前依赖单实例原型，不在本 Go 仓库内 | 版本化 Go Driver/adapter、安全凭据、失败矩阵、全新环境 Helm 安装 |
 | 多租户生产安全 | OIDC/SSO/MFA、邀请、并发攻击与完整审计缺口 | 跨组织/项目正反例、撤销/成员变更竞争、外部安全评审 |
 | 跨实例缩零栅栏 | DB 租约无法 fence 所有外部动作；缺短连接 ledger | 多 API/Proxy 并发、过期 worker、新连接/删除竞争负例与无误删 |
-| HA | API 为单副本 Recreate；Metadata/数据面单故障域实验部署 | 独立故障域、主从切换/脑裂矩阵、指标和业务连续性 |
+| HA | 独立 API/Worker 的领导租约已有代码；两者仍单副本；Metadata/数据面单故障域实验部署 | 独立故障域、主从切换/脑裂矩阵、指标和业务连续性 |
 | DR | 元数据/Secrets/对象/WAL 恢复未形成全栈演练 | 固定镜像与密钥、隔离 restore、真实 PG 数据校验、实测 RPO/RTO |
 | PITR | 当前仅当前状态分支，未实现时间点恢复产品流程 | timeline/LSN/时间映射、保留窗口、GC 边界、安全恢复与 UI |
 | 小数 CPU | 已支持的 bounds 只有整核 | Guest cgroup quota + SQL + 调度竞争/计量实测 |
@@ -27,6 +27,9 @@
 | 生命周期完整性 | project/branch delete、reset/restore 等缺口 | 所有权/保护/GC/计费/幂等/恢复与 UI 负例 |
 | 监控与运营 | 长期指标、告警、审计、容量/计量不足 | SLO、持久 TSDB、告警测试、预算与容量恢复 |
 | 发布供应链 | 镜像公开性和 registry 凭据需独立确认 | 固定 SHA/digest、SBOM/provenance、匿名拉取、回滚镜像保留 |
+
+首个 e4fd1f3 发行三个镜像已由 Linux CI 发布，Linux 匿名 manifest/config 验证通过。
+后续源码每次修改仍须取得本次提交的独立回执；不能沿用旧版本通过结果。
 
 ## 3. 官网 Backend 服务
 

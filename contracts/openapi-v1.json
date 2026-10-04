@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.3.2",
+    "version": "0.3.3",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -196,6 +196,9 @@
           "limits": {
             "type": "object",
             "additionalProperties": true
+          },
+          "runtime": {
+            "$ref": "#/components/schemas/RuntimeStatus"
           }
         }
       },
@@ -1252,6 +1255,43 @@
           "size_bytes": {
             "type": "integer",
             "format": "int64"
+          }
+        }
+      },
+      "RuntimeStatus": {
+        "type": "object",
+        "required": [
+          "process_role",
+          "separated",
+          "controller_status"
+        ],
+        "properties": {
+          "process_role": {
+            "type": "string",
+            "enum": [
+              "all",
+              "api",
+              "worker"
+            ]
+          },
+          "separated": {
+            "type": "boolean"
+          },
+          "controller_status": {
+            "type": "string",
+            "enum": [
+              "active",
+              "stale",
+              "unavailable"
+            ]
+          },
+          "epoch": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "last_heartbeat_at": {
+            "type": "string",
+            "format": "date-time"
           }
         }
       }

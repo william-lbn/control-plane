@@ -68,6 +68,14 @@ export type Capabilities = {
   observed_at: string;
   features: Record<string, Feature>;
   services: Record<string, Feature>;
+  runtime?: RuntimeStatus;
+};
+export type RuntimeStatus = {
+  process_role: 'all' | 'api' | 'worker';
+  separated: boolean;
+  controller_status: 'active' | 'stale' | 'unavailable';
+  epoch?: number;
+  last_heartbeat_at?: string;
 };
 export type OperationStep = {
   ordinal: number;

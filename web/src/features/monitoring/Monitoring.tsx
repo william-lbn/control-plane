@@ -3,6 +3,7 @@ import { api, endpointPath } from '../../api';
 import type { Endpoint, Metric, MetricHistory } from '../../api';
 import { fmt, PageHeading } from '../../shared/ui';
 import { useEndpointSelection } from '../../shared/useEndpointSelection';
+import { RuntimeHealth } from './RuntimeHealth';
 
 function Sparkline({
   items,
@@ -134,6 +135,7 @@ export function Monitoring({
   const latest = history?.items.at(-1);
   return (
     <>
+      <RuntimeHealth />
       <PageHeading
         kicker="PROJECT / OBSERVABILITY"
         title="监控与运行洞察"

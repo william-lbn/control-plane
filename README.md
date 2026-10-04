@@ -4,7 +4,9 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Compute 管理网关
 许可证：Apache-2.0。项目由自托管维护者开发，与 Neon 托管服务独立。
 
 **发行状态：预览版本。已经验证的实验环境功能不等于生产认证，也不等于 Neon 官网全部 Backend 服务。**
-当前 API、Worker、Idle Monitor 合并运行，只允许一个 API 实例；Helm 会拒绝多实例部署。
+Chart 0.2.0 提供独立 API、Worker、Web 进程；Worker 使用 PostgreSQL 领导租约。
+当前只允许一个 API 和一个 Worker，跨实例外部 fencing 与 HA 仍须独立验收。
+旧合并版本升级前必须执行 [停止/排空流程](docs/WORKER-SPLIT.md)。
 运行代码与实际合同见 [OpenAPI](contracts/openapi-v1.json)；本项目使用 `/api/v1`，未声称兼容托管 Neon `/api/v2`。
 
 ## 1. 功能范围
@@ -44,6 +46,8 @@ docs/                 架构、对象模型、部署、测试、来源及生产�
 - [测试与交付标准](docs/TESTING.md)
 - [Fork 来源与镜像对应关系](docs/SOURCE-PROVENANCE.md)
 - [生产功能门槛](docs/PRODUCTION-GATES.md)
+- [API/Worker 拆分与升级](docs/WORKER-SPLIT.md)
+- [完整 Backend 产品实施合同](docs/FULL-PRODUCT-IMPLEMENTATION.md)
 - [贡献规范](CONTRIBUTING.md) / [安全政策](SECURITY.md)
 
 ## 3. Linux 开发与 CI

@@ -1,27 +1,39 @@
+{{- if .Values.worker.enabled -}}
 {{- $name := include "neonControl.name" . -}}
-{{- if and (eq .Values.api.pgTLSMode "verify-full") (not .Values.api.pgCASecret) -}}
-{{- fail "verify-full requires api.pgCASecret containing ca.crt; use lab-insecure only in an explicit laboratory override" -}}
-{{- end -}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}-worker
+  labels:
+    {{- include "neonControl.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $name }}-worker
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: {{ $name }}-api}
+subjects:
+  - {kind: ServiceAccount, name: {{ $name }}-worker, namespace: {{ .Release.Namespace }}}
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ $name }}-api
+  name: {{ $name }}-worker
   labels:
     {{- include "neonControl.labels" . | nindent 4 }}
 spec:
-  replicas: {{ .Values.api.replicaCount }}
+  replicas: {{ .Values.worker.replicaCount }}
   revisionHistoryLimit: 5
-  # An overlapping worker cannot be allowed before the distributed fence gate.
   strategy: {type: Recreate}
   selector:
-    matchLabels: {app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: api}
+    matchLabels: {app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: worker}
   template:
     metadata:
       labels:
-        app.kubernetes.io/component: api
+        app.kubernetes.io/component: worker
         {{- include "neonControl.labels" . | nindent 8 }}
     spec:
-      serviceAccountName: {{ $name }}-api
+      serviceAccountName: {{ $name }}-worker
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets: {{ toYaml . | nindent 8 }}
       {{- end }}
@@ -37,37 +49,33 @@ spec:
       terminationGracePeriodSeconds: 35
       securityContext: {runAsNonRoot: true, runAsUser: 65532, runAsGroup: 65532, fsGroup: 65532, seccompProfile: {type: RuntimeDefault}}
       containers:
-        - name: api
+        - name: worker
           image: {{ required "api.image.reference is required" .Values.api.image.reference | quote }}
           imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          command: [/opt/neon-control/control-worker]
           securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
-          ports: [{name: http, containerPort: 8788}]
-          resources: {{ toYaml .Values.api.resources | nindent 12 }}
+          ports: [{name: health, containerPort: 8789}]
+          resources: {{ toYaml .Values.worker.resources | nindent 12 }}
           env:
-            - {name: NEON_CONTROL_PROCESS_ROLE, value: {{ ternary "api" "all" .Values.worker.enabled | quote }}}
-            - {name: NEON_V2_BIND, value: ':8788'}
-            - {name: NEON_V2_ADMIN_PASSWORD_FILE, value: /run/neon-secrets/admin-password}
+            - {name: NEON_CONTROL_PROCESS_ROLE, value: worker}
+            - {name: NEON_WORKER_BIND, value: ':8789'}
             {{- include "neonControl.runtimeEnv" . | nindent 12 }}
           volumeMounts:
             - {name: credentials, mountPath: /run/neon-secrets, readOnly: true}
             {{- if .Values.api.pgCASecret }}
             - {name: pg-ca, mountPath: /run/pg-ca, readOnly: true}
             {{- end }}
-          startupProbe: {httpGet: {path: /readyz, port: http}, periodSeconds: 5, timeoutSeconds: 4, failureThreshold: 60}
-          readinessProbe: {httpGet: {path: /readyz, port: http}, periodSeconds: 10, timeoutSeconds: 4, failureThreshold: 3}
-          livenessProbe: {httpGet: {path: /healthz, port: http}, periodSeconds: 15, timeoutSeconds: 3, failureThreshold: 3}
+          startupProbe: {httpGet: {path: /healthz, port: health}, periodSeconds: 5, timeoutSeconds: 4, failureThreshold: 60}
+          readinessProbe: {httpGet: {path: /readyz, port: health}, periodSeconds: 5, timeoutSeconds: 4, failureThreshold: 3}
+          livenessProbe: {httpGet: {path: /healthz, port: health}, periodSeconds: 15, timeoutSeconds: 3, failureThreshold: 3}
       volumes:
         - name: credentials
-          secret: {secretName: {{ .Values.api.existingSecret }}, defaultMode: 0440}
+          secret:
+            secretName: {{ .Values.api.existingSecret }}
+            defaultMode: 0440
+            items: [{key: idempotency-key, path: idempotency-key}]
         {{- if .Values.api.pgCASecret }}
         - name: pg-ca
           secret: {secretName: {{ .Values.api.pgCASecret }}, defaultMode: 0440}
         {{- end }}
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: {{ $name }}-api
-spec:
-  selector: {app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: api}
-  ports: [{name: http, port: 8788, targetPort: http}]
+{{- end }}

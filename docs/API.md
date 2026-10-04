@@ -1,7 +1,7 @@
 # 实际 API 合同
 
 OpenAPI 3 合同的权威源是 [openapi-v1.json](../contracts/openapi-v1.json)。
-版本 0.3.2，35 个路径、48 个操作，全部拥有稳定且唯一的 operationId。
+版本 0.3.3，35 个路径、48 个操作，全部拥有稳定且唯一的 operationId。
 运行 Swagger 位于 `/api/docs`，JSON 位于 `/api/openapi.json`。
 本合同是自托管 `/api/v1`，不声称兼容 Neon SaaS `/api/v2`。
 

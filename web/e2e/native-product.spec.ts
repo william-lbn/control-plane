@@ -38,6 +38,9 @@ test('native UI: project, timeline branch, writer, Proxy SQL and cold resume', a
   let project = '';
   const startedAt = new Date().toISOString();
   let result = 'running';
+  const expectSplit = process.env.NEON_E2E_EXPECT_SPLIT === 'true';
+  const workerFault = process.env.NEON_E2E_WORKER_FAULT === 'true';
+  let workerQueueRecorded = false;
 
   async function save() {
     const evidence = {
@@ -76,6 +79,27 @@ test('native UI: project, timeline branch, writer, Proxy SQL and cold resume', a
       idempotency_key: response.request().headers()['idempotency-key'],
     });
     await save();
+    if (workerFault && !workerQueueRecorded) {
+      workerQueueRecorded = true;
+      project = item.resource.project_id || item.resource.id;
+      await expect(page.locator('.create-modal .create-progress')).toContainText('queued');
+      const pending = await context.request.get(
+        baseURL! + '/api/v1/projects/' + project + '/operations/' + item.operation.id,
+      );
+      expect(pending.status()).toBe(200);
+      expect((await pending.json()).state).toBe('queued');
+      await record('ui_worker_offline_preserves_operation_queue', {
+        operation_id: item.operation.id,
+      });
+      await shot('worker-offline-queue');
+      // The external Linux orchestrator restores the Worker only after this
+      // UI/DB acceptance marker. No Kubernetes credentials enter the browser.
+      await writeFile(
+        path.join(privateRoot, 'worker-queue-ready.json'),
+        JSON.stringify({ operation_id: item.operation.id }) + '\n',
+        { mode: 0o600, flag: 'wx' },
+      );
+    }
     await expect(page.locator('.create-modal')).toBeHidden({ timeout: 490_000 });
     return item;
   }
@@ -130,6 +154,15 @@ test('native UI: project, timeline branch, writer, Proxy SQL and cold resume', a
     await page.getByLabel('用户名').fill('admin');
     await page.getByLabel('密码', { exact: true }).fill(adminPassword);
     await page.getByRole('button', { name: '登录控制台 →', exact: true }).click();
+    await expect(page.getByRole('button', { name: '＋ 创建项目', exact: true })).toBeVisible();
+    if (expectSplit) {
+      const runtime = await context.request.get(baseURL + '/api/v1/capabilities');
+      expect(runtime.status()).toBe(200);
+      const status = (await runtime.json()).runtime;
+      expect(status.process_role).toBe('api');
+      expect(status.separated).toBe(true);
+      await record('ui_uses_separate_api_worker', { process_role: status.process_role });
+    }
     await page.getByRole('button', { name: '＋ 创建项目', exact: true }).click();
     await page.getByLabel('项目名称').fill('ci-ui-' + attempt);
     await page.locator('.create-modal input[type="password"]').fill(password);
@@ -193,6 +226,13 @@ test('native UI: project, timeline branch, writer, Proxy SQL and cold resume', a
 
     await page.goto('/#/projects/' + project + '/monitoring');
     await expect(page.getByRole('heading', { name: '监控与运行洞察', exact: true })).toBeVisible();
+    if (expectSplit) {
+      await expect(page.getByLabel('控制面运行状态')).toContainText('独立 API / Worker');
+      await expect(page.getByLabel('控制面运行状态')).toContainText('Worker 心跳正常');
+      const runtime = await context.request.get(baseURL + '/api/v1/capabilities');
+      expect((await runtime.json()).runtime.controller_status).toBe('active');
+      await record('ui_worker_heartbeat_recovers');
+    }
     await shot('monitoring');
     await page.goto('/#/projects/' + project + '/operations');
     await expect(page.getByRole('heading', { name: '操作记录', exact: true })).toBeVisible();

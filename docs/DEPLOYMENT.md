@@ -3,6 +3,8 @@
 ## 1. 前提与边界
 
 本仓库发布 API、Web、Compute Management Gateway。
+API 镜像也包含独立 control-worker 二进制；Chart 0.2.0 默认使用 split profile。
+旧版本升级必须先执行 WORKER-SPLIT.md 的停止/排空步骤，不能直接覆盖运行中的合并 Worker。
 Neon/Autoscaling 完整基础设施须先安装并验收：CRD/NeonVM controller、Agent/Scheduler、
 Storage Controller、Pageserver、Safekeeper、Proxy、持久对象存储和兼容 adapter。
 当前依赖外部 adapter，不能只安装本仓库的两个 Chart 就获得完整数据库服务。
@@ -84,10 +86,12 @@ helm upgrade --install neon-gateway charts/compute-management-gateway -n neon \
 helm upgrade --install neon-control charts/neon-control-plane -n neon \
   -f /secure/neon-control/control-values.yaml --wait --timeout 10m
 kubectl -n neon rollout status deployment/neon-control-api --timeout=300s
+kubectl -n neon rollout status deployment/neon-control-worker --timeout=300s
 kubectl -n neon rollout status deployment/neon-control-web --timeout=300s
 ```
 
 Chart 当前 API 单副本、Recreate，滚动升级会有短暂控制面中断。
+独立 Worker 同样单副本 Recreate；数据库 session 领导锁不替代连接与外部动作 fencing。
 DB、已有数据与 Secrets 不由这个 Chart 创建/销毁。
 Public SQL 入口由 Proxy Chart 暴露；Web ingress 不承担 PostgreSQL TCP。
 Gateway 默认 ClusterIP、image profile，无 hostPath；host-binary 仅保留显式调试兼容。
@@ -110,6 +114,7 @@ Gateway 默认 ClusterIP、image profile，无 hostPath；host-binary 仅保留�
 2. 先确认没有活动 Operation；暂停新的控制面变更并记录维护窗口。
 3. metadata 迁移目前为 forward-only；旧 API 必须先验证新 schema 兼容。
 4. 仅 schema 兼容时使用 `helm rollback <release> <revision> --wait`。
+   涉及 split/all 或旧无锁版本切换，先停止两组控制器并确认 Pod 退出，详见 WORKER-SPLIT.md。
 5. 不兼容迁移按隔离恢复流程恢复 DB + Secrets + 固定镜像；
    不能将数据库降级脚本或重置密钥当作安全回滚。
 6. 恢复后再次验证真实 Proxy SQL、目录、分支、冷醒及授权负例。

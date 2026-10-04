@@ -121,6 +121,7 @@ func (s *server) capabilities(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonResponse(w, 200, map[string]any{
 		"cluster_id": "rke2-lab", "observed_at": time.Now().UTC(),
+		"runtime": s.runtimeStatus(r.Context()),
 		"features": map[string]any{
 			"tenant_authorization": map[string]any{"enabled": true, "reason": "organization_and_additive_project_policy"},
 			"api_keys":             map[string]any{"enabled": true, "reason": "hashed_scoped_revocable_credentials"},

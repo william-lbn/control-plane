@@ -9,7 +9,11 @@ Branch 是数据库 Timeline 和未来 Backend 服务版本边界。当前只有
 ```mermaid
 flowchart LR
   Browser[React Console] --> Web[Nginx Web]
-  Web --> API[Go API + Worker + Idle Monitor]
+  Web --> API[Go API]
+  Worker[Go Worker + Idle Monitor] --> Metadata
+  Worker --> K8s
+  Worker --> Adapter
+  Worker --> Gateway
   API --> Metadata[(Metadata PostgreSQL)]
   API --> K8s[Kubernetes namespace API]
   API --> Adapter[External Proxy / Storage adapter]
@@ -27,7 +31,8 @@ flowchart LR
   Autoscaling --> Readers
 ```
 
-API、Worker、Idle Monitor 当前是一个进程、一个副本；这属于明确限制。
+Chart 0.2.0 将 API 与 Worker 分成独立进程；Worker/Monitor/Idle 为同一控制器组。
+API 与 Worker 各限制一个副本。领导租约不等于完整 HA 或外部 fencing。
 管理网关只承载原生 Compute 管理协议，不是 SQL/HTTP Data API。
 Metadata PostgreSQL 必须与用户项目生命周期独立。
 
@@ -60,7 +65,7 @@ sequenceDiagram
 
 ## 3. 模型与不变量
 
-物理模型以 `api/internal/control/migrations/001..008` 为权威。
+物理模型以 `api/internal/control/migrations/001..009` 为权威。
 新增结构只能通过新的前向迁移；没有通用安全的 down migration。
 
 ```mermaid
@@ -92,6 +97,7 @@ erDiagram
 | sessions / api_keys | 主体、token/key hash、expiry、scope/ceiling | 撤销和过期服务端检查；token 不持久明文 |
 | audit_events / metrics | 主体/资源/动作、观测时间与指标 | 当前保留范围有限，不能替代完整生产审计与长期 TSDB |
 | branch_service_instances | 服务类型/能力、实例状态 | Postgres 外的服务 disabled；Data API 属于 PG 服务目标 |
+| control_runtime_leases | owner、epoch、process_role、heartbeat/expiry | 专属 PG session 持锁；失去连接 fail closed；不能 fence 旧外部请求 |
 
 Endpoint 资源支持整数 CPU 1000–2000m 和内存 1024–3072Mi、1024Mi slot。
 这些边界是本发行兼容范围，不能自动解释为资源热缩回全部通过。
@@ -120,5 +126,5 @@ flowchart TD
 
 新的 Backend Driver 必须定义 desired/observed generation、秘密引用、幂等键、
 有界超时、错误分类、恢复/补偿、权限作用域及覆盖明确的 API/UI。
-后续分离 Worker、接入 outbox 与外部 fencing，再开启多实例；
+独立 Worker 已有实现；后续接入 outbox 与外部 fencing，再开启多实例；
 服务 API 与模型扩展必须保持旧合同可演进，不能仅用 disabled→enabled 宣告实现。

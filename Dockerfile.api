@@ -6,9 +6,11 @@ RUN go mod download
 COPY api/cmd ./cmd
 COPY api/internal ./internal
 RUN CGO_ENABLED=0 GOMAXPROCS=2 go build -p=2 -trimpath -buildvcs=false -o /control-api ./cmd/control-api
+RUN CGO_ENABLED=0 GOMAXPROCS=2 go build -p=2 -trimpath -buildvcs=false -o /control-worker ./cmd/control-worker
 FROM scratch
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --from=build /control-api /opt/neon-control/control-api
+COPY --from=build /control-worker /opt/neon-control/control-worker
 COPY contracts/openapi-v1.json /opt/neon-control/openapi-v1.json
 ENV NEON_V2_BIND=:8788 NEON_V2_OPENAPI=/opt/neon-control/openapi-v1.json NEON_V2_WEB_DIST=/nonexistent
 USER 65532:65532

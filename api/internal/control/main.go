@@ -34,6 +34,7 @@ type server struct {
 	proxyHost      string
 	proxyPort      string
 	secureCookies  bool
+	processRole    processRole
 }
 
 func env(name, fallback string) string {
@@ -101,6 +102,20 @@ func migrate(ctx context.Context, db *pgxpool.Pool) error {
 }
 
 func Run(ctx context.Context) error {
+	role, err := parseProcessRole(env("NEON_CONTROL_PROCESS_ROLE", "all"))
+	if err != nil {
+		return err
+	}
+	return runProcess(ctx, role)
+}
+
+// RunWorker starts controllers and private health endpoints, never the public
+// control API. Keep the compatibility Run entry point for explicit lab profiles.
+func RunWorker(ctx context.Context) error {
+	return runProcess(ctx, roleWorker)
+}
+
+func runProcess(ctx context.Context, role processRole) error {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	if _, err := sqlConnectTimeout(); err != nil {
 		return err
@@ -127,7 +142,7 @@ func Run(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("kubernetes config: %w", err)
 	}
-	s := &server{db: db, kube: kube, logger: logger,
+	s := &server{db: db, kube: kube, logger: logger, processRole: role,
 		proxyHost:     env("NEON_PROXY_HOST", "192.168.146.100"),
 		proxyPort:     env("NEON_PROXY_PORT", "30432"),
 		secureCookies: os.Getenv("NEON_COOKIE_SECURE") == "true"}
@@ -145,37 +160,64 @@ func Run(ctx context.Context) error {
 			return errors.New("idempotency key must be base64 of at least 32 random bytes")
 		}
 	}
-	if err := s.bootstrapAdmin(ctx); err != nil {
-		return fmt.Errorf("admin bootstrap: %w", err)
+	if role != roleWorker {
+		if err := s.bootstrapAdmin(ctx); err != nil {
+			return fmt.Errorf("admin bootstrap: %w", err)
+		}
+		if err := s.seedLab(ctx); err != nil {
+			return fmt.Errorf("lab seed failed: %w", err)
+		}
 	}
-	if err := s.seedLab(ctx); err != nil {
-		return fmt.Errorf("lab seed failed: %w", err)
+	processCtx, cancelProcess := context.WithCancel(ctx)
+	defer cancelProcess()
+	controllerDone := make(chan error, 1)
+	leadership := &controllerState{}
+	if role != roleAPI {
+		go func() { controllerDone <- s.runLeaderControllers(processCtx, role, leadership) }()
 	}
-	go s.runWorker(ctx)
-	go s.runMonitor(ctx)
-	if os.Getenv("NEON_V2_SCALE_ZERO_ENABLED") == "true" {
-		go s.runIdleController(ctx)
-	}
-	go s.cleanSessions(ctx)
-	mux := s.routes()
+	var handler http.Handler
 	addr := env("NEON_V2_BIND", "127.0.0.1:8788")
-	httpServer := &http.Server{Addr: addr, Handler: s.middleware(mux), ReadHeaderTimeout: 10 * time.Second,
+	if role == roleWorker {
+		addr = env("NEON_WORKER_BIND", "127.0.0.1:8789")
+		handler = s.workerHealthHandler(leadership)
+	} else {
+		handler = s.middleware(s.routes())
+	}
+	httpServer := &http.Server{Addr: addr, Handler: handler, ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout: 30 * time.Second, WriteTimeout: 195 * time.Second, IdleTimeout: 60 * time.Second}
 	errCh := make(chan error, 1)
-	go func() { logger.Info("control api listening", "address", addr); errCh <- httpServer.ListenAndServe() }()
+	go func() {
+		logger.Info("control process listening", "address", addr, "role", role)
+		errCh <- httpServer.ListenAndServe()
+	}()
+	var processErr error
+	controllersFinished := false
 	select {
 	case <-ctx.Done():
 	case err := <-errCh:
 		if !errors.Is(err, http.ErrServerClosed) {
-			return fmt.Errorf("http server stopped: %w", err)
+			processErr = fmt.Errorf("http server stopped: %w", err)
 		}
+	case processErr = <-controllerDone:
+		controllersFinished = true
 	}
+	cancelProcess()
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {
 		return fmt.Errorf("shutdown: %w", err)
 	}
-	return nil
+	if role != roleAPI && !controllersFinished {
+		select {
+		case err := <-controllerDone:
+			if processErr == nil {
+				processErr = err
+			}
+		case <-shutdownCtx.Done():
+			return errors.New("controller shutdown deadline exceeded")
+		}
+	}
+	return processErr
 }
 
 func jsonResponse(w http.ResponseWriter, status int, value any) {
