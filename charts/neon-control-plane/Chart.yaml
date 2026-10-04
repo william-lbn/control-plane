@@ -1,0 +1,7 @@
+apiVersion: v2
+name: neon-control-plane
+description: Go/PostgreSQL Neon control API and independently released React console
+type: application
+version: 0.1.0
+appVersion: 0.4.0-linux
+kubeVersion: '>=1.30.0-0'

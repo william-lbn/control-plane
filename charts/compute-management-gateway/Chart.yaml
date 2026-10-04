@@ -1,0 +1,6 @@
+apiVersion: v2
+name: neon-compute-management-gateway
+description: Endpoint-scoped TLS gateway for Neon compute_ctl management HTTP
+type: application
+version: 0.1.0
+appVersion: "0.3.0"

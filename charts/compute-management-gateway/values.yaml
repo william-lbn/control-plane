@@ -1,0 +1,16 @@
+replicaCount: 1
+imagePullSecrets: []
+image:
+  reference: ''
+  pullPolicy: IfNotPresent
+# The released gateway image needs no privileged host binary mount.
+runtime:
+  mode: image
+  binaryHostPath: ""
+  binarySha256: ""
+service:
+  type: ClusterIP
+  nodePort: 30480
+resources:
+  requests: {cpu: 100m, memory: 64Mi}
+  limits: {cpu: 500m, memory: 192Mi}

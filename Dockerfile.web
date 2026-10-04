@@ -1,0 +1,16 @@
+ARG NODE_BUILDER_IMAGE
+ARG WEB_RUNTIME_IMAGE
+FROM ${NODE_BUILDER_IMAGE} AS build
+WORKDIR /src/web
+COPY web/package.json web/package-lock.json ./
+RUN npm ci --no-audit --fund=false
+COPY web/index.html web/tsconfig.json web/vite.config.ts ./
+COPY web/src ./src
+COPY web/scripts ./scripts
+RUN npm run build
+FROM ${WEB_RUNTIME_IMAGE}
+COPY --from=build /src/web/dist /usr/share/nginx/html
+COPY charts/neon-control-plane/files/nginx.conf /etc/nginx/nginx.conf
+USER 101:101
+EXPOSE 8080
+ENTRYPOINT ["nginx", "-g", "daemon off;"]

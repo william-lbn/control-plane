@@ -1,0 +1,3 @@
+# Rendering fixture only.
+image:
+  reference: example.invalid/compute-gateway@sha256:cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc

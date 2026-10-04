@@ -1,0 +1,74 @@
+{{- $name := include "neonControl.name" . -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}-web
+data:
+  nginx.conf: |
+    {{- .Files.Get "files/nginx.conf" | replace "neon-control-api:8788" (printf "%s-api:8788" $name) | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}-web
+  labels:
+    {{- include "neonControl.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.web.replicaCount }}
+  revisionHistoryLimit: 5
+  selector:
+    matchLabels: {app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: web}
+  template:
+    metadata:
+      labels:
+        {{- include "neonControl.labels" . | nindent 8 }}
+        app.kubernetes.io/component: web
+      annotations:
+        checksum/config: {{ .Files.Get "files/nginx.conf" | sha256sum }}
+    spec:
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+      terminationGracePeriodSeconds: 30
+      securityContext: {runAsNonRoot: true, runAsUser: 101, runAsGroup: 101, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: web
+          image: {{ required "web.image.reference is required" .Values.web.image.reference | quote }}
+          imagePullPolicy: {{ .Values.web.image.pullPolicy }}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+          ports: [{name: http, containerPort: 8080}]
+          resources: {{ toYaml .Values.web.resources | nindent 12 }}
+          volumeMounts:
+            - {name: config, mountPath: /etc/nginx/nginx.conf, subPath: nginx.conf, readOnly: true}
+            - {name: temporary, mountPath: /tmp}
+          startupProbe: {httpGet: {path: /healthz, port: http}, periodSeconds: 5, failureThreshold: 20}
+          readinessProbe: {httpGet: {path: /readyz, port: http}, periodSeconds: 10}
+          livenessProbe: {httpGet: {path: /healthz, port: http}, periodSeconds: 15}
+      volumes:
+        - {name: config, configMap: {name: {{ $name }}-web}}
+        - {name: temporary, emptyDir: {sizeLimit: 64Mi}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}-web
+spec:
+  type: {{ .Values.service.type }}
+  selector: {app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: web}
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: http
+      {{- if eq .Values.service.type "NodePort" }}
+      nodePort: {{ .Values.service.nodePort }}
+      {{- end }}

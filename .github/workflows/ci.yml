@@ -1,0 +1,138 @@
+name: Linux quality and images
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+jobs:
+  go:
+    name: Go + real PostgreSQL
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres@sha256:a3b7f434b2dc57ce85a67e171163eb8ab1a1ebcb39d27484661f26b1dfbe30d6
+        env: {POSTGRES_USER: ci, POSTGRES_PASSWORD: ci-disposable, POSTGRES_DB: control_ci}
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U ci -d control_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with: {go-version: '1.27.1', cache-dependency-path: api/go.sum}
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with: {node-version: '24.19.0'}
+      - name: Public source boundary
+        run: node tools/check-public-source.mjs
+      - name: Format, vet, race, integration and contract gates (zero skips)
+        env:
+          NEON_V2_TEST_DATABASE_URL: postgres://ci:ci-disposable@127.0.0.1:5432/control_ci?sslmode=disable
+          NEON_CI_ATTEMPT: run_${{ github.run_id }}_${{ github.run_attempt }}
+        run: bash tools/ci-go.sh
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with: {name: go-evidence, path: artifacts/go-*, retention-days: 30}
+  web:
+    name: TypeScript console
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    defaults:
+      run: {working-directory: web}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with: {node-version: '24.19.0', cache: npm, cache-dependency-path: web/package-lock.json}
+      - run: npm ci --no-audit --fund=false
+      - run: npm run format:check
+      - run: npm test
+      - run: npm run build
+  helm:
+    name: Helm rendering and rejection gates
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with: {node-version: '24.19.0'}
+      - run: bash tools/install-helm.sh "$RUNNER_TEMP/neon-helm"
+      - run: echo "$RUNNER_TEMP/neon-helm" >> "$GITHUB_PATH"
+      - run: bash tools/ci-helm.sh
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with: {name: helm-packages-and-gates, path: artifacts/helm, retention-days: 30}
+  publish:
+    name: Publish ${{ matrix.component }}
+    needs: [go, web, helm]
+    if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions: {contents: read, packages: write}
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix: {component: [api, web, gateway]}
+    env:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with: {node-version: '24.19.0'}
+      - name: Immutable image names and locked builders
+        id: names
+        shell: bash
+        env: {COMPONENT: '${{ matrix.component }}'}
+        run: |
+          node tools/build-args.mjs >> "$GITHUB_OUTPUT"
+          task_name="control-$COMPONENT"
+          task_tag="sha-$GITHUB_SHA-r$GITHUB_RUN_ID-a$GITHUB_RUN_ATTEMPT"
+          task_tags="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/$task_name:$task_tag"
+          if [[ -n "$DOCKERHUB_USERNAME" && -n "$DOCKERHUB_TOKEN" ]]; then
+            task_tags="$task_tags"$'\n'"docker.io/$DOCKERHUB_USERNAME/$task_name:$task_tag"
+          else
+            echo "::notice::Docker Hub secrets absent; only GHCR publication can run"
+          fi
+          { echo 'tags<<TAGS'; printf '%s\n' "$task_tags"; echo TAGS; } >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
+      - uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
+        with: {registry: ghcr.io, username: '${{ github.actor }}', password: '${{ secrets.GITHUB_TOKEN }}'}
+      - uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772
+        if: env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != ''
+        with: {username: '${{ secrets.DOCKERHUB_USERNAME }}', password: '${{ secrets.DOCKERHUB_TOKEN }}'}
+      - uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        id: image
+        with:
+          context: .
+          file: Dockerfile.${{ matrix.component }}
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.names.outputs.tags }}
+          build-args: |
+            GO_BUILDER_IMAGE=${{ steps.names.outputs.GO_BUILDER_IMAGE }}
+            NODE_BUILDER_IMAGE=${{ steps.names.outputs.NODE_BUILDER_IMAGE }}
+            WEB_RUNTIME_IMAGE=${{ steps.names.outputs.WEB_RUNTIME_IMAGE }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.licenses=Apache-2.0
+          sbom: true
+          provenance: mode=max
+          cache-from: type=gha,scope=${{ matrix.component }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.component }}
+      - name: Image publication receipt
+        env:
+          COMPONENT: ${{ matrix.component }}
+          DIGEST: ${{ steps.image.outputs.digest }}
+          TAGS: ${{ steps.names.outputs.tags }}
+        run: |
+          mkdir -p artifacts
+          node --input-type=module -e 'import fs from "node:fs"; fs.writeFileSync("artifacts/image-"+process.env.COMPONENT+".json", JSON.stringify({component:process.env.COMPONENT,commit:process.env.GITHUB_SHA,digest:process.env.DIGEST,tags:process.env.TAGS.split("\n"),platform:"linux/amd64"},null,2)+"\n")'
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with: {name: 'image-${{ matrix.component }}', path: artifacts/image-*.json, retention-days: 90}

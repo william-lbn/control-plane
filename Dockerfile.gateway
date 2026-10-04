@@ -1,0 +1,14 @@
+ARG GO_BUILDER_IMAGE
+FROM ${GO_BUILDER_IMAGE} AS build
+WORKDIR /src/api
+COPY api/go.mod api/go.sum ./
+RUN go mod download
+COPY api/cmd ./cmd
+COPY api/internal ./internal
+RUN CGO_ENABLED=0 GOMAXPROCS=2 go build -p=2 -trimpath -buildvcs=false -o /compute-gateway ./cmd/compute-gateway
+FROM scratch
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY --from=build /compute-gateway /opt/neon-control/compute-gateway
+USER 65532:65532
+EXPOSE 8443
+ENTRYPOINT ["/opt/neon-control/compute-gateway"]

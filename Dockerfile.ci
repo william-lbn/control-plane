@@ -1,0 +1,11 @@
+ARG GO_BUILDER_IMAGE
+FROM ${GO_BUILDER_IMAGE}
+WORKDIR /workspace/control-plane/production/api
+COPY api/go.mod api/go.sum ./
+RUN go mod download
+COPY api/cmd ./cmd
+COPY api/internal ./internal
+COPY contracts ../contracts
+ENV GOTOOLCHAIN=local GOTELEMETRY=off GOMAXPROCS=2 GOCACHE=/tmp/go-build
+USER 65532:65532
+ENTRYPOINT ["go"]

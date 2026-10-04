@@ -1,0 +1,37 @@
+name: Trusted Linux live UI
+on:
+  workflow_dispatch:
+permissions: {contents: read}
+concurrency: {group: neon-live-ui, cancel-in-progress: false}
+jobs:
+  browser:
+    # Register a dedicated Linux runner; never route untrusted PRs to it.
+    runs-on: [self-hosted, Linux, X64, neon-e2e]
+    environment: neon-live-e2e
+    timeout-minutes: 40
+    env:
+      NEON_E2E_BASE_URL: ${{ vars.NEON_E2E_BASE_URL }}
+      NEON_E2E_ARTIFACTS: ${{ runner.temp }}/neon-ui-artifacts/run-${{ github.run_id }}-a${{ github.run_attempt }}
+      NEON_E2E_PRIVATE_DIR: ${{ runner.temp }}/neon-ui-private/run-${{ github.run_id }}-a${{ github.run_attempt }}
+      NEON_E2E_ADMIN_PASSWORD_FILE: ${{ runner.temp }}/neon-ui-private/run-${{ github.run_id }}-a${{ github.run_attempt }}/admin-password
+      NEON_E2E_ATTEMPT: run-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with: {node-version: '24.19.0', cache: npm, cache-dependency-path: web/package-lock.json}
+      - name: Prepare protected credentials outside the checkout
+        env: {ADMIN_PASSWORD: '${{ secrets.NEON_E2E_ADMIN_PASSWORD }}'}
+        run: |
+          test -n "$NEON_E2E_BASE_URL"
+          test -n "$ADMIN_PASSWORD"
+          install -d -m 0700 "$NEON_E2E_PRIVATE_DIR"
+          (umask 077; printf '%s' "$ADMIN_PASSWORD" > "$NEON_E2E_ADMIN_PASSWORD_FILE")
+      - run: npm ci --no-audit --fund=false
+        working-directory: web
+      - run: npx playwright install --with-deps chromium
+        working-directory: web
+      - run: npm run test:e2e
+        working-directory: web
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        if: always()
+        with: {name: live-ui-evidence, path: '${{ env.NEON_E2E_ARTIFACTS }}', retention-days: 30}

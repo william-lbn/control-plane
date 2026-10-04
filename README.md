@@ -1,0 +1,86 @@
+# Neon 自托管控制面
+
+Go + PostgreSQL 控制 API、React + TypeScript 控制台、Compute 管理网关及 Helm Chart。
+许可证：Apache-2.0。项目由自托管维护者开发，与 Neon 托管服务独立。
+
+**发行状态：预览版本。已经验证的实验环境功能不等于生产认证，也不等于 Neon 官网全部 Backend 服务。**
+当前 API、Worker、Idle Monitor 合并运行，只允许一个 API 实例；Helm 会拒绝多实例部署。
+运行代码与实际合同见 [OpenAPI](contracts/openapi-v1.json)；本项目使用 `/api/v1`，未声称兼容托管 Neon `/api/v2`。
+
+## 1. 功能范围
+
+| 功能 | 本仓库代码 | 当前边界 |
+| --- | --- | --- |
+| 组织、成员、项目授权、API Key | 已实现，真实 PostgreSQL 集成测试 | 加法式项目授权；完整生产安全审计、SSO/MFA 未完成 |
+| 项目、当前时间点分支、Writer、多个 Reader | 已实现，异步 Operation + SQL 就绪探针 | 单集群、单 Region、PG16；不支持所有项目/分支删除与恢复动作 |
+| PostgreSQL 连接与 SQL 工作台 | 通过独立 Neon Proxy 和 Endpoint selector | 应用不能直接连接控制 API；生产入口必须配置可信 TLS |
+| 数据库、角色与密码轮换 | 分支目录、Compute 原生配置、Proxy spec 调谐 | rename、owner 变更、未知外部 DDL 恢复未完成 |
+| CPU / 内存边界、自动休眠、连接唤醒 | 已实现实验环境控制路径 | 整数 CPU 1→2→1 已验证；小数 CPU、完整内存缩回、跨实例栅栏未验收 |
+| 监控、Operation 步骤、错误与重试 | 已实现 | 长期指标持久化、SLO 告警、完整审计导出未完成 |
+| HA / DR / PITR | 部分租约、恢复工具和接口设计基础 | 未通过独立故障域 HA/DR；用户数据库 PITR 未实现 |
+| Auth、Functions、Object Storage、AI Gateway、Data API | 能力与服务模型预留，明确 disabled | 对应 Backend 服务尚未实现，不能作为可用功能宣传 |
+
+**外部依赖**：Neon Storage Controller、Pageserver、Safekeeper、Proxy、持久对象存储、
+NeonVM、Autoscaling Agent/Scheduler，以及与本版合同匹配的 Proxy/Storage adapter。
+当前实验环境 adapter 仍为外部单实例原型；该原型及 Python 验证代码不在此仓库。
+两个 Chart 仅部署控制面与管理网关，不替代完整 Neon/Autoscaling 基础设施 Chart。
+
+## 2. 目录与合同
+
+```text
+api/                  Go module：API/Worker、Compute Gateway、DR 工具、SQL migrations
+web/                  React/TypeScript：控制台、Node 回归测试、Playwright 真实 UI 测试
+contracts/            版本化 OpenAPI；路由与引用由 Go 测试校验
+charts/               控制面和 Compute 管理网关 Helm Chart
+containers/           固定 builder / runtime digest
+tools/                Linux CI、Helm 安装/验收、供应链输入输出
+docs/                 架构、对象模型、部署、测试、来源及生产门槛
+.github/              Linux 质量 CI、镜像发布、受保护的 live UI workflow
+```
+
+- [架构与模型](docs/ARCHITECTURE.md)
+- [48 个实际 API 操作](docs/API.md)
+- [Linux 部署与回滚](docs/DEPLOYMENT.md)
+- [测试与交付标准](docs/TESTING.md)
+- [Fork 来源与镜像对应关系](docs/SOURCE-PROVENANCE.md)
+- [生产功能门槛](docs/PRODUCTION-GATES.md)
+- [贡献规范](CONTRIBUTING.md) / [安全政策](SECURITY.md)
+
+## 3. Linux 开发与 CI
+
+固定工具链：Go 1.27.1、Node 24.19.0；Web 锁文件提交到仓库。
+测试使用专用可丢弃 PostgreSQL，不能把生产数据库 DSN 注入 CI。
+
+```bash
+export NEON_V2_TEST_DATABASE_URL='postgres://ci:ci-disposable@127.0.0.1:5432/control_ci?sslmode=disable'
+make test
+make web
+bash tools/install-helm.sh /tmp/neon-helm
+PATH="/tmp/neon-helm:$PATH" make helm
+```
+
+CI 在 Linux 执行 gofmt、vet、race、真实 PG 集成、OpenAPI 路由/引用、
+前端格式/回归/类型/构建以及 Helm 拒绝门槛。集成测试跳过会导致 CI 失败。
+详细的真实 UI 流程见 [测试手册](docs/TESTING.md)。
+
+## 4. 镜像与部署
+
+可信分支通过质量门槛后发布 `control-api`、`control-web`、`control-gateway`。
+tag 使用 `sha-<full-commit>-r<run-id>-a<attempt>`，重跑产生新 tag；部署固定 registry manifest digest，不能使用 `latest`。
+默认 GHCR owner 为仓库所有者；Docker Hub 需要在本仓库设置
+`DOCKERHUB_USERNAME` 与 `DOCKERHUB_TOKEN`。初次 GHCR package 公开性须独立检查。
+
+```bash
+helm upgrade --install neon-control charts/neon-control-plane -n neon \
+  -f /secure/operator/control-values.yaml --wait --timeout 10m
+```
+
+此命令的前提、Secrets、完整参数和安全回滚步骤见 [部署手册](docs/DEPLOYMENT.md)。
+没有外部基础组件、可用 adapter、可信证书和实际镜像 digest 时不能直接部署运行。
+
+## 5. 演进方向
+
+按照 Neon 官网对象语义扩展：Organization → Project → Branch → Backend services，
+Postgres 下包含一个 Writer、多个 Readers、数据库、角色和 Data API。
+具体实现受能力门槛约束，所有新增服务必须提供实际驱动、API、UI、负例和 Linux 现场测试。
+独立 HA/fencing、容量、TLS、备份恢复门槛完成后再发布生产就绪声明。

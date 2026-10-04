@@ -1,0 +1,6 @@
+# Rendering fixture only: these are synthetic digests, never a deployable release.
+api:
+  image: {reference: 'example.invalid/control-api@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'}
+  pgCASecret: render-only-postgres-ca
+web:
+  image: {reference: 'example.invalid/control-web@sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'}

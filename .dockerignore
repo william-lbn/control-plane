@@ -1,0 +1,14 @@
+.git
+.github
+.local
+artifacts
+**/node_modules
+**/dist
+**/test-results
+**/playwright-report
+**/.env*
+**/*.pem
+**/*.key
+**/*.dump
+**/*.py
+**/*.ps1

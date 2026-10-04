@@ -1,0 +1,4927 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Neon Self-hosted Control API",
+    "version": "0.3.2",
+    "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
+  },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Identity"
+    },
+    {
+      "name": "Catalog"
+    },
+    {
+      "name": "Compute"
+    },
+    {
+      "name": "Operations"
+    },
+    {
+      "name": "Observability"
+    },
+    {
+      "name": "SQL"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "sessionCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "neon_v2_session"
+      },
+      "bearerToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "ncp_ scoped API key",
+        "description": "Expiry, revocation, current membership and key permission ceiling checked on every request."
+      }
+    },
+    "parameters": {
+      "project": {
+        "name": "project",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "branch": {
+        "name": "branch",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "endpoint": {
+        "name": "endpoint",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "operation": {
+        "name": "operation",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string"
+        }
+      },
+      "idempotency": {
+        "name": "Idempotency-Key",
+        "in": "header",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 8,
+          "maxLength": 128
+        }
+      },
+      "csrf": {
+        "name": "X-CSRF-Token",
+        "in": "header",
+        "required": false,
+        "schema": {
+          "type": "string"
+        },
+        "description": "Required for cookie-authenticated mutations. Bearer-authenticated requests do not use cookie CSRF."
+      },
+      "role": {
+        "name": "role",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63
+        },
+        "description": "URL-encoded PostgreSQL role identifier, at most 63 UTF-8 bytes."
+      },
+      "database": {
+        "name": "database",
+        "in": "path",
+        "required": true,
+        "schema": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63
+        }
+      }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "required": [
+          "code",
+          "message",
+          "request_id",
+          "retryable"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "retryable": {
+            "type": "boolean"
+          }
+        }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          }
+        }
+      },
+      "Capability": {
+        "type": "object",
+        "required": [
+          "enabled",
+          "reason"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          }
+        }
+      },
+      "Capabilities": {
+        "type": "object",
+        "properties": {
+          "cluster_id": {
+            "type": "string"
+          },
+          "observed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "features": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Capability"
+            }
+          },
+          "services": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/Capability"
+            }
+          },
+          "limits": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "Project": {
+        "type": "object",
+        "required": [
+          "id",
+          "org_id",
+          "name",
+          "state",
+          "postgres_version"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "org_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "region_id": {
+            "type": "string"
+          },
+          "postgres_version": {
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "effective_permission": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "editor",
+              "viewer",
+              "none"
+            ]
+          }
+        }
+      },
+      "Branch": {
+        "type": "object",
+        "required": [
+          "id",
+          "project_id",
+          "name",
+          "state"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "parent_branch_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "is_default": {
+            "type": "boolean"
+          },
+          "state": {
+            "type": "string"
+          },
+          "timeline_id": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Endpoint": {
+        "type": "object",
+        "required": [
+          "id",
+          "project_id",
+          "branch_id",
+          "selector",
+          "workload_kind",
+          "version",
+          "endpoint_type"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "branch_id": {
+            "type": "string"
+          },
+          "selector": {
+            "type": "string"
+          },
+          "workload_kind": {
+            "type": "string",
+            "enum": [
+              "neonvm",
+              "deployment"
+            ]
+          },
+          "workload_name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "min_cpu_milli": {
+            "type": "integer"
+          },
+          "max_cpu_milli": {
+            "type": "integer"
+          },
+          "min_memory_mib": {
+            "type": "integer"
+          },
+          "max_memory_mib": {
+            "type": "integer"
+          },
+          "observed_state": {
+            "type": "string"
+          },
+          "runtime": {
+            "type": "object",
+            "description": "Observed workload state. Managed VM observations include workload_uid and workload_created_at for generation-scoped idle evidence; absent/unknown observations cannot qualify for automatic suspension.",
+            "additionalProperties": true
+          },
+          "endpoint_type": {
+            "type": "string",
+            "enum": [
+              "read_write",
+              "read_only"
+            ],
+            "description": "Read-only computes share branch storage and can be created multiple times."
+          },
+          "scale_to_zero": {
+            "type": "boolean"
+          },
+          "idle_timeout_seconds": {
+            "type": "integer",
+            "minimum": 60,
+            "maximum": 3600
+          }
+        }
+      },
+      "Operation": {
+        "type": "object",
+        "required": [
+          "id",
+          "action",
+          "state",
+          "resource_id"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "queued",
+              "running",
+              "retry_wait",
+              "succeeded",
+              "failed"
+            ]
+          },
+          "resource_type": {
+            "type": "string"
+          },
+          "resource_id": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "error_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "error_message": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "steps": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "Page": {
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "MetricHistory": {
+        "type": "object",
+        "properties": {
+          "endpoint_id": {
+            "type": "string"
+          },
+          "period": {
+            "type": "string"
+          },
+          "fresh": {
+            "type": "boolean"
+          },
+          "sample_count": {
+            "type": "integer"
+          },
+          "latest_age_seconds": {
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "sample_interval_seconds": {
+            "type": "integer"
+          },
+          "retention_days": {
+            "type": "integer"
+          },
+          "sources": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        }
+      },
+      "SQLResult": {
+        "type": "object",
+        "properties": {
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "rows": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {}
+            }
+          },
+          "command": {
+            "type": "string"
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AutoscalingBounds": {
+        "type": "object",
+        "required": [
+          "min_cpu_milli",
+          "max_cpu_milli",
+          "min_memory_mib",
+          "max_memory_mib"
+        ],
+        "properties": {
+          "min_cpu_milli": {
+            "type": "integer",
+            "enum": [
+              1000,
+              2000
+            ]
+          },
+          "max_cpu_milli": {
+            "type": "integer",
+            "enum": [
+              1000,
+              2000
+            ]
+          },
+          "min_memory_mib": {
+            "type": "integer",
+            "enum": [
+              1024,
+              2048,
+              3072
+            ]
+          },
+          "max_memory_mib": {
+            "type": "integer",
+            "enum": [
+              1024,
+              2048,
+              3072
+            ]
+          }
+        }
+      },
+      "CreateProject": {
+        "type": "object",
+        "required": [
+          "name",
+          "password"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "minLength": 12,
+            "writeOnly": true
+          },
+          "default_branch_name": {
+            "type": "string",
+            "default": "main"
+          },
+          "region_id": {
+            "type": "string",
+            "enum": [
+              "rke2-lab"
+            ]
+          },
+          "postgres_version": {
+            "type": "integer",
+            "enum": [
+              16
+            ]
+          },
+          "autoscaling": {
+            "$ref": "#/components/schemas/AutoscalingBounds"
+          }
+        }
+      },
+      "CreateBranch": {
+        "type": "object",
+        "required": [
+          "name",
+          "parent_branch_id"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 63
+          },
+          "parent_branch_id": {
+            "type": "string"
+          },
+          "create_endpoint": {
+            "type": "boolean",
+            "default": true
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "minLength": 12,
+            "writeOnly": true
+          },
+          "autoscaling": {
+            "$ref": "#/components/schemas/AutoscalingBounds"
+          }
+        }
+      },
+      "CreateEndpoint": {
+        "type": "object",
+        "required": [
+          "branch_id"
+        ],
+        "properties": {
+          "branch_id": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "minLength": 12,
+            "writeOnly": true,
+            "description": "Required only for read_write; forbidden for read_only."
+          },
+          "autoscaling": {
+            "$ref": "#/components/schemas/AutoscalingBounds"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "read_write",
+              "read_only"
+            ],
+            "default": "read_write"
+          }
+        },
+        "description": "type defaults to read_write. A writer requires a new password; a read_only endpoint must omit password and reuses the branch writer role verifier."
+      },
+      "Accepted": {
+        "type": "object",
+        "required": [
+          "resource",
+          "operation"
+        ],
+        "properties": {
+          "resource": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "operation": {
+            "$ref": "#/components/schemas/Operation"
+          }
+        }
+      },
+      "LifecyclePolicy": {
+        "type": "object",
+        "required": [
+          "scale_to_zero",
+          "idle_timeout_seconds"
+        ],
+        "properties": {
+          "scale_to_zero": {
+            "type": "boolean"
+          },
+          "idle_timeout_seconds": {
+            "type": "integer",
+            "minimum": 60,
+            "maximum": 3600
+          }
+        },
+        "additionalProperties": false
+      },
+      "Organization": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "active",
+              "suspended"
+            ]
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "admin",
+              "editor",
+              "viewer",
+              "collaborator"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "max_projects": {
+            "type": "integer"
+          },
+          "max_endpoints": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "role"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationCreate": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationMember": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "admin",
+              "editor",
+              "viewer",
+              "collaborator"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "user_id",
+          "username",
+          "role"
+        ],
+        "additionalProperties": false
+      },
+      "MemberCreate": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.@+-]{2,127}$"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 256,
+            "writeOnly": true,
+            "description": "Only for new local accounts (12-256 characters). Existing accounts must omit or send empty password; this does not reset a shared account."
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "editor",
+              "viewer",
+              "collaborator"
+            ]
+          }
+        },
+        "required": [
+          "username",
+          "role"
+        ],
+        "additionalProperties": false
+      },
+      "MemberRole": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "editor",
+              "viewer",
+              "collaborator"
+            ]
+          }
+        },
+        "required": [
+          "role"
+        ],
+        "additionalProperties": false
+      },
+      "MemberChanged": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "removed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "user_id",
+          "removed"
+        ],
+        "additionalProperties": false
+      },
+      "ProjectPermission": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "organization_role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "admin",
+              "editor",
+              "viewer",
+              "collaborator"
+            ]
+          },
+          "project_role": {
+            "type": "string",
+            "enum": [
+              "",
+              "admin",
+              "editor",
+              "viewer"
+            ]
+          },
+          "effective_permission": {
+            "type": "string",
+            "enum": [
+              "none",
+              "viewer",
+              "editor",
+              "admin"
+            ]
+          }
+        },
+        "required": [
+          "user_id",
+          "username",
+          "organization_role",
+          "project_role",
+          "effective_permission"
+        ],
+        "additionalProperties": false
+      },
+      "ProjectPermissionChange": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "editor",
+              "viewer"
+            ]
+          }
+        },
+        "required": [
+          "role"
+        ],
+        "additionalProperties": false
+      },
+      "ProjectPermissionChanged": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string"
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string"
+          },
+          "revoked": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "user_id",
+          "project_id",
+          "revoked"
+        ],
+        "additionalProperties": false
+      },
+      "APIKey": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "string"
+          },
+          "org_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "project_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "max_role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "editor",
+              "viewer"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "revoked_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "max_role",
+          "created_at",
+          "expires_at"
+        ],
+        "additionalProperties": false
+      },
+      "APIKeyCreate": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "project_id": {
+            "type": "string",
+            "description": "Only on organization endpoint; must belong to that organization. Empty means organization scope."
+          },
+          "max_role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "editor",
+              "viewer"
+            ]
+          },
+          "expires_days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 365
+          }
+        },
+        "required": [
+          "name",
+          "max_role",
+          "expires_days"
+        ],
+        "additionalProperties": false
+      },
+      "APIKeyCreated": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "user_id": {
+            "type": "string"
+          },
+          "org_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "project_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "max_role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "editor",
+              "viewer"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "revoked_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "token": {
+            "type": "string",
+            "description": "Only returned once. ncp_ prefix, cryptographically random. Server stores only SHA256 digest."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "max_role",
+          "created_at",
+          "expires_at",
+          "token"
+        ],
+        "additionalProperties": false
+      },
+      "Revocation": {
+        "type": "object",
+        "properties": {
+          "revoked": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "revoked"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Organization"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "OrganizationMemberPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OrganizationMember"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "ProjectPermissionPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectPermission"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "APIKeyPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/APIKey"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "BranchRole": {
+        "type": "object",
+        "required": [
+          "name",
+          "managed",
+          "protected",
+          "state"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "managed": {
+            "type": "boolean"
+          },
+          "protected": {
+            "type": "boolean"
+          },
+          "state": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "can_login": {
+            "type": "boolean"
+          },
+          "superuser": {
+            "type": "boolean"
+          },
+          "create_role": {
+            "type": "boolean"
+          },
+          "create_database": {
+            "type": "boolean"
+          },
+          "bypass_rls": {
+            "type": "boolean"
+          },
+          "replication": {
+            "type": "boolean"
+          }
+        }
+      },
+      "BranchDatabase": {
+        "type": "object",
+        "required": [
+          "name",
+          "managed",
+          "protected",
+          "state"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "managed": {
+            "type": "boolean"
+          },
+          "protected": {
+            "type": "boolean"
+          },
+          "state": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "size_bytes": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      }
+    },
+    "responses": {
+      "Error": {
+        "description": "Structured API error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/healthz": {
+      "get": {
+        "summary": "Process liveness",
+        "responses": {
+          "200": {
+            "description": "Alive"
+          }
+        },
+        "operationId": "getHealth"
+      }
+    },
+    "/readyz": {
+      "get": {
+        "summary": "Metadata DB readiness",
+        "responses": {
+          "200": {
+            "description": "Ready"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getReadiness"
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "Create cookie session",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "username",
+                  "password"
+                ],
+                "properties": {
+                  "username": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string",
+                    "format": "password"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Session created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "user": {
+                      "$ref": "#/components/schemas/User"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "login"
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "Revoke session",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Revoked"
+          }
+        },
+        "operationId": "logout"
+      }
+    },
+    "/api/v1/session": {
+      "get": {
+        "tags": [
+          "Identity"
+        ],
+        "summary": "Current principal",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current user",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "user": {
+                      "$ref": "#/components/schemas/User"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getSession"
+      }
+    },
+    "/api/v1/capabilities": {
+      "get": {
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "Live feature gates and service availability",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Capabilities",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Capabilities"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getCapabilities"
+      }
+    },
+    "/api/v1/organizations/{org}/projects": {
+      "get": {
+        "tags": [
+          "Catalog"
+        ],
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Project page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "listProjects"
+      },
+      "post": {
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "Create managed project, root branch and writer Endpoint",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateProject"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Queued; follow Location header until succeeded",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            }
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "createProject"
+      }
+    },
+    "/api/v1/projects/{project}": {
+      "get": {
+        "tags": [
+          "Catalog"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Project",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Project"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getProject"
+      }
+    },
+    "/api/v1/projects/{project}/branches": {
+      "get": {
+        "tags": [
+          "Catalog"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Branch page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "listBranches"
+      },
+      "post": {
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "Fork timeline and optionally create writer Endpoint",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBranch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Queued; follow Location header until succeeded",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            }
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "createBranch"
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}": {
+      "get": {
+        "tags": [
+          "Catalog"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Branch",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Branch"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getBranch"
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/services": {
+      "get": {
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "Branch service instances and disabled drivers",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Branch service catalog",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "branch_id": {
+                      "type": "string"
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "service_kind": {
+                            "type": "string",
+                            "enum": [
+                              "postgres",
+                              "auth",
+                              "object_storage",
+                              "functions",
+                              "ai_gateway",
+                              "data_api"
+                            ]
+                          },
+                          "desired_state": {
+                            "type": "string"
+                          },
+                          "observed_state": {
+                            "type": "string"
+                          },
+                          "driver_version": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "public_endpoint": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "reason": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "listBranchServices"
+      }
+    },
+    "/api/v1/projects/{project}/endpoints": {
+      "get": {
+        "tags": [
+          "Compute"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Endpoint page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "listEndpoints"
+      },
+      "post": {
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "Create a writer or a read replica for a ready branch",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEndpoint"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Queued; follow Location header until succeeded",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            }
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "createEndpoint"
+      }
+    },
+    "/api/v1/projects/{project}/endpoints/{endpoint}": {
+      "get": {
+        "tags": [
+          "Compute"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/endpoint"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Endpoint with observed runtime",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Endpoint"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getEndpoint"
+      },
+      "patch": {
+        "tags": [
+          "Compute"
+        ],
+        "summary": "Queue NeonVM scaling bounds reconciliation",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/endpoint"
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "autoscaling"
+                ],
+                "properties": {
+                  "autoscaling": {
+                    "type": "object",
+                    "required": [
+                      "min_cpu_milli",
+                      "max_cpu_milli",
+                      "min_memory_mib",
+                      "max_memory_mib"
+                    ],
+                    "properties": {
+                      "min_cpu_milli": {
+                        "type": "integer"
+                      },
+                      "max_cpu_milli": {
+                        "type": "integer"
+                      },
+                      "min_memory_mib": {
+                        "type": "integer"
+                      },
+                      "max_memory_mib": {
+                        "type": "integer"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Queued operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "resource": {
+                      "$ref": "#/components/schemas/Endpoint"
+                    },
+                    "operation": {
+                      "$ref": "#/components/schemas/Operation"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "description": "Queues an idempotent autoscaling soft-bounds update. Reconciliation validates endpoint ownership and immutable NeonVM capacity, persists the Proxy cold-wake template with Secret resourceVersion compare-and-swap, then patches the live VM with UID/resourceVersion checks and verifies the resume template before committing endpoint metadata. Suspended endpoints update their resume template without waking compute. A live VM whose current allocation exceeds the requested maximum rejects the operation; the requested bounds must fit its immutable hard min/max. Partial external failure marks the Operation failed/retryable rather than committing success, and retry converges the same desired bounds. Connection fencing and cross-instance lifecycle races remain an independent production gate.",
+        "operationId": "updateEndpoint"
+      }
+    },
+    "/api/v1/projects/{project}/endpoints/{endpoint}/connection-info": {
+      "get": {
+        "tags": [
+          "Compute"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/endpoint"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Password-free Proxy connection template",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "host": {
+                      "type": "string"
+                    },
+                    "port": {
+                      "type": "integer"
+                    },
+                    "role": {
+                      "type": "string"
+                    },
+                    "database": {
+                      "type": "string"
+                    },
+                    "ssl_mode": {
+                      "type": "string"
+                    },
+                    "endpoint_selector": {
+                      "type": "string"
+                    },
+                    "connection_uri_template": {
+                      "type": "string"
+                    },
+                    "password_included": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getEndpointConnectionInfo"
+      }
+    },
+    "/api/v1/projects/{project}/endpoints/{endpoint}/metrics": {
+      "get": {
+        "tags": [
+          "Observability"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/endpoint"
+          },
+          {
+            "name": "period",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "15m",
+                "1h",
+                "6h",
+                "24h"
+              ],
+              "default": "1h"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Recent metrics with source quality",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MetricHistory"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getEndpointMetrics"
+      }
+    },
+    "/api/v1/projects/{project}/endpoints/{endpoint}/query": {
+      "post": {
+        "tags": [
+          "SQL"
+        ],
+        "summary": "Execute SQL through Neon Proxy",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/endpoint"
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "password",
+                  "sql"
+                ],
+                "properties": {
+                  "password": {
+                    "type": "string",
+                    "format": "password"
+                  },
+                  "sql": {
+                    "type": "string",
+                    "maxLength": 32000
+                  },
+                  "role": {
+                    "type": "string",
+                    "maxLength": 63,
+                    "description": "Optional public role. Defaults to endpoint role; protected internal identities rejected."
+                  },
+                  "database": {
+                    "type": "string",
+                    "maxLength": 63,
+                    "description": "Optional database. Defaults to endpoint database."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Query result, up to 200 rows",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SQLResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input, database authentication or PostgreSQL query error; retryable=false.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "408": {
+            "description": "Request cancelled; retryable=false.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Invalid SQL gateway configuration; retryable=false.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Database TLS certificate verification failed; retryable=false.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database connection unavailable. retryable=true only before user SQL was sent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Connection or query budget exceeded. retryable=true only before user SQL was sent; otherwise verify the outcome before retrying.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid console session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CSRF validation or global write-role validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project or endpoint not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Executes SQL through Neon Proxy with a 180-second total budget. The connection and cold-wake budget defaults to 120 seconds and is configured server-side with NEON_SQL_CONNECT_TIMEOUT_SECONDS (5-150 seconds). Query statement_timeout is 120 seconds, additionally bounded by the remaining total budget. Error responses include a request_id correlated to redacted structured logs. A timeout or connection loss after SQL was sent can have an unknown outcome: retryable=false, so clients must verify the outcome before retrying writes. SQL is never automatically retried by this gateway. During connection setup the fixed Proxy can encode password authentication failures and cold-wake internal failures as XX000. The gateway recognizes the documented password authentication prefix only during connect and returns 422 with retryable=false; other internal connection failures return 503 before user SQL is submitted. Raw PostgreSQL messages are never exposed or logged.",
+        "operationId": "executeEndpointQuery"
+      }
+    },
+    "/api/v1/projects/{project}/operations": {
+      "get": {
+        "tags": [
+          "Operations"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation page",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Page"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "listOperations"
+      }
+    },
+    "/api/v1/projects/{project}/operations/{operation}": {
+      "get": {
+        "tags": [
+          "Operations"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/operation"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Operation with steps",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getOperation"
+      }
+    },
+    "/api/v1/projects/{project}/operations/{operation}/retry": {
+      "post": {
+        "tags": [
+          "Operations"
+        ],
+        "summary": "Retry a failed retryable operation with its original identity and payload",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/operation"
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Operation queued again",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Operation"
+                }
+              }
+            }
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "retryOperation"
+      }
+    },
+    "/api/v1/projects/{project}/endpoints/{endpoint}/lifecycle": {
+      "patch": {
+        "tags": [
+          "Compute"
+        ],
+        "summary": "Set opt-in idle scale-to-zero policy",
+        "description": "Requires If-Match endpoint version. The idle controller only runs when explicitly enabled in the deployment.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/endpoint"
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LifecyclePolicy"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated Endpoint",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Endpoint"
+                }
+              }
+            }
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "configureEndpointLifecycle"
+      }
+    },
+    "/api/v1/projects/{project}/endpoints/{endpoint}/suspend": {
+      "post": {
+        "tags": [
+          "Compute"
+        ],
+        "summary": "Queue guarded 1-to-0 NeonVM suspension",
+        "description": "Checks route recovery template, ownership and active PostgreSQL sessions before a UID-preconditioned VM deletion. Proxy SQL wakes the VM on next connection.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/endpoint"
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Suspend operation queued",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            }
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "suspendEndpoint"
+      }
+    },
+    "/api/v1/organizations": {
+      "get": {
+        "operationId": "listOrganizations",
+        "tags": [
+          "Identity and access"
+        ],
+        "summary": "listOrganizations",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [],
+        "description": "Resource authorization is enforced on every request. Organization defaults and project grants are additive. Unreachable resources return 404; reachable resources with insufficient permission return 403. Administrator membership changes serialize and preserve the last Admin. API keys cannot administer other credentials and are capped by their current issuer permissions.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated or expired/revoked token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permission or CSRF",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not reachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict or last organization Admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Metadata unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createOrganization",
+        "tags": [
+          "Identity and access"
+        ],
+        "summary": "createOrganization",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/csrf"
+          }
+        ],
+        "description": "Resource authorization is enforced on every request. Organization defaults and project grants are additive. Unreachable resources return 404; reachable resources with insufficient permission return 403. Administrator membership changes serialize and preserve the last Admin. API keys cannot administer other credentials and are capped by their current issuer permissions.",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Organization"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated or expired/revoked token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permission or CSRF",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not reachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict or last organization Admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Metadata unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OrganizationCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/{org}": {
+      "get": {
+        "operationId": "getOrganization",
+        "tags": [
+          "Identity and access"
+        ],
+        "summary": "getOrganization",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Resource authorization is enforced on every request. Organization defaults and project grants are additive. Unreachable resources return 404; reachable resources with insufficient permission return 403. Administrator membership changes serialize and preserve the last Admin. API keys cannot administer other credentials and are capped by their current issuer permissions.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Organization"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated or expired/revoked token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permission or CSRF",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not reachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict or last organization Admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Metadata unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/{org}/members": {
+      "get": {
+        "operationId": "listOrganizationMembers",
+        "tags": [
+          "Identity and access"
+        ],
+        "summary": "listOrganizationMembers",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Resource authorization is enforced on every request. Organization defaults and project grants are additive. Unreachable resources return 404; reachable resources with insufficient permission return 403. Administrator membership changes serialize and preserve the last Admin. API keys cannot administer other credentials and are capped by their current issuer permissions.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationMemberPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated or expired/revoked token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permission or CSRF",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not reachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict or last organization Admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Metadata unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "provisionLocalMember",
+        "tags": [
+          "Identity and access"
+        ],
+        "summary": "provisionLocalMember",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          }
+        ],
+        "description": "Resource authorization is enforced on every request. Organization defaults and project grants are additive. Unreachable resources return 404; reachable resources with insufficient permission return 403. Administrator membership changes serialize and preserve the last Admin. API keys cannot administer other credentials and are capped by their current issuer permissions.",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrganizationMember"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated or expired/revoked token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permission or CSRF",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not reachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict or last organization Admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Metadata unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/{org}/members/{member}": {
+      "patch": {
+        "operationId": "updateOrganizationMember",
+        "tags": [
+          "Identity and access"
+        ],
+        "summary": "updateOrganizationMember",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "member",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          }
+        ],
+        "description": "Resource authorization is enforced on every request. Organization defaults and project grants are additive. Unreachable resources return 404; reachable resources with insufficient permission return 403. Administrator membership changes serialize and preserve the last Admin. API keys cannot administer other credentials and are capped by their current issuer permissions.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberChanged"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated or expired/revoked token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permission or CSRF",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not reachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict or last organization Admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Metadata unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MemberRole"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "removeOrganizationMember",
+        "tags": [
+          "Identity and access"
+        ],
+        "summary": "removeOrganizationMember",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "member",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          }
+        ],
+        "description": "Resource authorization is enforced on every request. Organization defaults and project grants are additive. Unreachable resources return 404; reachable resources with insufficient permission return 403. Administrator membership changes serialize and preserve the last Admin. API keys cannot administer other credentials and are capped by their current issuer permissions.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberChanged"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated or expired/revoked token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permission or CSRF",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not reachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict or last organization Admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Metadata unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/permissions": {
+      "get": {
+        "operationId": "listProjectPermissions",
+        "tags": [
+          "Identity and access"
+        ],
+        "summary": "listProjectPermissions",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Resource authorization is enforced on every request. Organization defaults and project grants are additive. Unreachable resources return 404; reachable resources with insufficient permission return 403. Administrator membership changes serialize and preserve the last Admin. API keys cannot administer other credentials and are capped by their current issuer permissions.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectPermissionPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated or expired/revoked token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permission or CSRF",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not reachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict or last organization Admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Metadata unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/permissions/{member}": {
+      "put": {
+        "operationId": "setProjectPermission",
+        "tags": [
+          "Identity and access"
+        ],
+        "summary": "setProjectPermission",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "member",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          }
+        ],
+        "description": "Resource authorization is enforced on every request. Organization defaults and project grants are additive. Unreachable resources return 404; reachable resources with insufficient permission return 403. Administrator membership changes serialize and preserve the last Admin. API keys cannot administer other credentials and are capped by their current issuer permissions.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectPermissionChanged"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated or expired/revoked token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permission or CSRF",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not reachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict or last organization Admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Metadata unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectPermissionChange"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "revokeProjectPermission",
+        "tags": [
+          "Identity and access"
+        ],
+        "summary": "revokeProjectPermission",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "member",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          }
+        ],
+        "description": "Resource authorization is enforced on every request. Organization defaults and project grants are additive. Unreachable resources return 404; reachable resources with insufficient permission return 403. Administrator membership changes serialize and preserve the last Admin. API keys cannot administer other credentials and are capped by their current issuer permissions.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectPermissionChanged"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated or expired/revoked token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permission or CSRF",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not reachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict or last organization Admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Metadata unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/api-keys": {
+      "get": {
+        "operationId": "listPersonalAPIKeys",
+        "tags": [
+          "Identity and access"
+        ],
+        "summary": "listPersonalAPIKeys",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [],
+        "description": "Resource authorization is enforced on every request. Organization defaults and project grants are additive. Unreachable resources return 404; reachable resources with insufficient permission return 403. Administrator membership changes serialize and preserve the last Admin. API keys cannot administer other credentials and are capped by their current issuer permissions.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIKeyPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated or expired/revoked token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permission or CSRF",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not reachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict or last organization Admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Metadata unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createPersonalAPIKey",
+        "tags": [
+          "Identity and access"
+        ],
+        "summary": "createPersonalAPIKey",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/csrf"
+          }
+        ],
+        "description": "Resource authorization is enforced on every request. Organization defaults and project grants are additive. Unreachable resources return 404; reachable resources with insufficient permission return 403. Administrator membership changes serialize and preserve the last Admin. API keys cannot administer other credentials and are capped by their current issuer permissions.",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIKeyCreated"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated or expired/revoked token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permission or CSRF",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not reachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict or last organization Admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Metadata unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/APIKeyCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/api-keys/{key}": {
+      "delete": {
+        "operationId": "revokePersonalAPIKey",
+        "tags": [
+          "Identity and access"
+        ],
+        "summary": "revokePersonalAPIKey",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          }
+        ],
+        "description": "Resource authorization is enforced on every request. Organization defaults and project grants are additive. Unreachable resources return 404; reachable resources with insufficient permission return 403. Administrator membership changes serialize and preserve the last Admin. API keys cannot administer other credentials and are capped by their current issuer permissions.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Revocation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated or expired/revoked token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permission or CSRF",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not reachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict or last organization Admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Metadata unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/{org}/api-keys": {
+      "get": {
+        "operationId": "listOrganizationAPIKeys",
+        "tags": [
+          "Identity and access"
+        ],
+        "summary": "listOrganizationAPIKeys",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Resource authorization is enforced on every request. Organization defaults and project grants are additive. Unreachable resources return 404; reachable resources with insufficient permission return 403. Administrator membership changes serialize and preserve the last Admin. API keys cannot administer other credentials and are capped by their current issuer permissions.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIKeyPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated or expired/revoked token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permission or CSRF",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not reachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict or last organization Admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Metadata unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createOrganizationAPIKey",
+        "tags": [
+          "Identity and access"
+        ],
+        "summary": "createOrganizationAPIKey",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          }
+        ],
+        "description": "Resource authorization is enforced on every request. Organization defaults and project grants are additive. Unreachable resources return 404; reachable resources with insufficient permission return 403. Administrator membership changes serialize and preserve the last Admin. API keys cannot administer other credentials and are capped by their current issuer permissions.",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/APIKeyCreated"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated or expired/revoked token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permission or CSRF",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not reachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict or last organization Admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Metadata unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/APIKeyCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/{org}/api-keys/{key}": {
+      "delete": {
+        "operationId": "revokeOrganizationAPIKey",
+        "tags": [
+          "Identity and access"
+        ],
+        "summary": "revokeOrganizationAPIKey",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          }
+        ],
+        "description": "Resource authorization is enforced on every request. Organization defaults and project grants are additive. Unreachable resources return 404; reachable resources with insufficient permission return 403. Administrator membership changes serialize and preserve the last Admin. API keys cannot administer other credentials and are capped by their current issuer permissions.",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Revocation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated or expired/revoked token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permission or CSRF",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not reachable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict or last organization Admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Quota exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Metadata unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/roles": {
+      "get": {
+        "operationId": "GetBranchRoles",
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "List live branch catalog (may cold wake writer)",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Catalog result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/BranchRole"
+                      }
+                    },
+                    "next_cursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Editor or Admin required"
+          },
+          "404": {
+            "description": "Branch or ready writer not available"
+          },
+          "409": {
+            "description": "Idempotency, live object, managed intent or active branch operation conflict"
+          },
+          "422": {
+            "description": "Invalid/protected name, owner or password"
+          },
+          "503": {
+            "description": "Dependency unavailable"
+          }
+        }
+      },
+      "post": {
+        "operationId": "PostBranchRoles",
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "Create a branch-scoped managed BranchRole",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Durable accepted Operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "operation": {
+                      "$ref": "#/components/schemas/Operation"
+                    },
+                    "branch_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Editor or Admin required"
+          },
+          "404": {
+            "description": "Branch or ready writer not available"
+          },
+          "409": {
+            "description": "Idempotency, live object, managed intent or active branch operation conflict"
+          },
+          "422": {
+            "description": "Invalid/protected name, owner or password"
+          },
+          "503": {
+            "description": "Dependency unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "password"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 63
+                  },
+                  "password": {
+                    "type": "string",
+                    "minLength": 12,
+                    "maxLength": 256,
+                    "writeOnly": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "description": "Immutable verifier Secret; queued Operation reconciles PostgreSQL, all branch compute specs, Proxy and metadata. Console/API roles are NOSUPERUSER members of neon_superuser, with CREATEROLE/CREATEDB/BYPASSRLS/REPLICATION. Password is not returned or persisted in control metadata. Existing SQL-created objects are not adopted. Cookie writes require CSRF."
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/roles/{role}": {
+      "delete": {
+        "operationId": "DeleteBranchRole",
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "Delete API-managed BranchRole",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          },
+          {
+            "$ref": "#/components/parameters/role"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Durable accepted Operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "operation": {
+                      "$ref": "#/components/schemas/Operation"
+                    },
+                    "branch_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Editor or Admin required"
+          },
+          "404": {
+            "description": "Branch or ready writer not available"
+          },
+          "409": {
+            "description": "Idempotency, live object, managed intent or active branch operation conflict"
+          },
+          "422": {
+            "description": "Invalid/protected name, owner or password"
+          },
+          "503": {
+            "description": "Dependency unavailable"
+          }
+        },
+        "description": "Ready managed non-system object required. PostgreSQL dependencies and active database connections are preserved as rejection conditions. Operation ID and all attempts are retained. PATCH updates all Writer/Reader cold specs and Proxy verifiers. Cookie writes require CSRF."
+      },
+      "patch": {
+        "operationId": "PatchBranchRole",
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "Rotate managed role password",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          },
+          {
+            "$ref": "#/components/parameters/role"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Durable accepted Operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "operation": {
+                      "$ref": "#/components/schemas/Operation"
+                    },
+                    "branch_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Editor or Admin required"
+          },
+          "404": {
+            "description": "Branch or ready writer not available"
+          },
+          "409": {
+            "description": "Idempotency, live object, managed intent or active branch operation conflict"
+          },
+          "422": {
+            "description": "Invalid/protected name, owner or password"
+          },
+          "503": {
+            "description": "Dependency unavailable"
+          }
+        },
+        "description": "Ready managed non-system object required. PostgreSQL dependencies and active database connections are preserved as rejection conditions. Operation ID and all attempts are retained. PATCH updates all Writer/Reader cold specs and Proxy verifiers. Cookie writes require CSRF.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "password"
+                ],
+                "properties": {
+                  "password": {
+                    "type": "string",
+                    "minLength": 12,
+                    "maxLength": 256,
+                    "writeOnly": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/databases": {
+      "get": {
+        "operationId": "GetBranchDatabases",
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "List live branch catalog (may cold wake writer)",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Catalog result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/BranchDatabase"
+                      }
+                    },
+                    "next_cursor": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Editor or Admin required"
+          },
+          "404": {
+            "description": "Branch or ready writer not available"
+          },
+          "409": {
+            "description": "Idempotency, live object, managed intent or active branch operation conflict"
+          },
+          "422": {
+            "description": "Invalid/protected name, owner or password"
+          },
+          "503": {
+            "description": "Dependency unavailable"
+          }
+        }
+      },
+      "post": {
+        "operationId": "PostBranchDatabases",
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "Create a branch-scoped managed BranchDatabase",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Durable accepted Operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "operation": {
+                      "$ref": "#/components/schemas/Operation"
+                    },
+                    "branch_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Editor or Admin required"
+          },
+          "404": {
+            "description": "Branch or ready writer not available"
+          },
+          "409": {
+            "description": "Idempotency, live object, managed intent or active branch operation conflict"
+          },
+          "422": {
+            "description": "Invalid/protected name, owner or password"
+          },
+          "503": {
+            "description": "Dependency unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "owner"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 63
+                  },
+                  "owner": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 63
+                  }
+                }
+              }
+            }
+          }
+        },
+        "description": "Immutable verifier Secret; queued Operation reconciles PostgreSQL, all branch compute specs, Proxy and metadata. Console/API roles are NOSUPERUSER members of neon_superuser, with CREATEROLE/CREATEDB/BYPASSRLS/REPLICATION. Password is not returned or persisted in control metadata. Existing SQL-created objects are not adopted. Cookie writes require CSRF."
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/databases/{database}": {
+      "delete": {
+        "operationId": "DeleteBranchDatabase",
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "Delete API-managed BranchDatabase",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          },
+          {
+            "$ref": "#/components/parameters/database"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Durable accepted Operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "operation": {
+                      "$ref": "#/components/schemas/Operation"
+                    },
+                    "branch_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Editor or Admin required"
+          },
+          "404": {
+            "description": "Branch or ready writer not available"
+          },
+          "409": {
+            "description": "Idempotency, live object, managed intent or active branch operation conflict"
+          },
+          "422": {
+            "description": "Invalid/protected name, owner or password"
+          },
+          "503": {
+            "description": "Dependency unavailable"
+          }
+        },
+        "description": "Ready managed non-system object required. PostgreSQL dependencies and active database connections are preserved as rejection conditions. Operation ID and all attempts are retained. PATCH updates all Writer/Reader cold specs and Proxy verifiers. Cookie writes require CSRF."
+      }
+    }
+  }
+}

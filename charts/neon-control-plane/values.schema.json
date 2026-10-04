@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["api", "web", "service"],
+  "properties": {
+    "api": {
+      "type": "object", "required": ["image", "replicaCount", "existingSecret", "pgTLSMode"],
+      "properties": {
+        "replicaCount": {"type": "integer", "const": 1},
+        "existingSecret": {"type": "string", "minLength": 1},
+        "pgTLSMode": {"enum": ["verify-full", "lab-insecure"]},
+        "computeImage": {"type": "string", "pattern": "^[a-z0-9./_-]+@sha256:[a-f0-9]{64}$"},
+        "image": {"$ref": "#/definitions/image"}
+      }
+    },
+    "web": {"type": "object", "properties": {"replicaCount": {"type": "integer", "minimum": 1}, "image": {"$ref": "#/definitions/image"}}},
+    "service": {"type": "object", "properties": {"type": {"enum": ["ClusterIP", "NodePort"]}, "nodePort": {"type": "integer", "minimum": 30000, "maximum": 32767}}}
+  },
+  "definitions": {
+    "image": {"type": "object", "required": ["reference", "pullPolicy"], "properties": {
+      "reference": {"type": "string", "pattern": "^[a-z0-9./_-]+@sha256:[a-f0-9]{64}$"},
+      "pullPolicy": {"enum": ["IfNotPresent", "Always", "Never"]}
+    }}
+  }
+}

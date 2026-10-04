@@ -1,0 +1,39 @@
+{{- $name := include "neonControl.name" . -}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}-api
+  labels:
+    {{- include "neonControl.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $name }}-api
+rules:
+  - apiGroups: ['']
+    resources: [secrets, services]
+    verbs: [get, create, update]
+  - apiGroups: ['']
+    resources: [services/proxy]
+    verbs: [get, create]
+  - apiGroups: ['']
+    resources: [pods]
+    verbs: [get]
+  - apiGroups: [apps]
+    resources: [deployments]
+    verbs: [get]
+  - apiGroups: [vm.neon.tech]
+    resources: [virtualmachines]
+    verbs: [get, create, update, patch, delete]
+  - apiGroups: [metrics.k8s.io]
+    resources: [pods]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $name }}-api
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: {{ $name }}-api}
+subjects:
+  - {kind: ServiceAccount, name: {{ $name }}-api, namespace: {{ .Release.Namespace }}}

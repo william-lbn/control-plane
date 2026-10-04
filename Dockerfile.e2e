@@ -1,0 +1,12 @@
+ARG PLAYWRIGHT_IMAGE
+FROM ${PLAYWRIGHT_IMAGE}
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+WORKDIR /workspace/web
+COPY web/package.json web/package-lock.json ./
+RUN npm ci --no-audit --fund=false
+COPY web/playwright*.config.ts ./
+COPY web/e2e ./e2e
+COPY web/recovery ./recovery
+COPY web/scripts ./scripts
+USER 1000:1000
+ENTRYPOINT ["npm", "run", "test:e2e", "--"]

@@ -1,0 +1,6 @@
+The console and API are separate OCI images. Connect through the web Service.
+Do not expose the API Service directly. Database/administrator/HMAC credentials
+are references to an existing Secret and are not included in Helm release values.
+
+This release uses one combined API/worker and Recreate upgrades. It does not
+certify distributed scale-to-zero, HA/DR, PITR, or the additional Backend services.

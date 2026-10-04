@@ -1,0 +1,98 @@
+{{- $name := "neon-compute-management-gateway" -}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}
+  labels: {app.kubernetes.io/name: {{ $name }}, app.kubernetes.io/managed-by: Helm}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $name }}
+rules:
+  - apiGroups: [""]
+    resources: [secrets, services]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $name }}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: {{ $name }}}
+subjects:
+  - {kind: ServiceAccount, name: {{ $name }}, namespace: {{ .Release.Namespace }}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  labels: {app.kubernetes.io/name: {{ $name }}, app.kubernetes.io/managed-by: Helm}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels: {app.kubernetes.io/name: {{ $name }}}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: {maxSurge: 1, maxUnavailable: 0}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: {{ $name }}}
+      annotations:
+        neon-control/binary-sha256: {{ .Values.runtime.binarySha256 | quote }}
+    spec:
+      serviceAccountName: {{ $name }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      terminationGracePeriodSeconds: 25
+      securityContext: {runAsNonRoot: true, runAsUser: 65532, runAsGroup: 65532, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: gateway
+          image: {{ .Values.image.reference | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: [/opt/neon-control/compute-gateway]
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+          ports:
+            - {name: management-tls, containerPort: 8443}
+            - {name: health, containerPort: 8081}
+          env:
+            - name: NEON_KUBE_NAMESPACE
+              value: {{ .Release.Namespace | quote }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          readinessProbe:
+            httpGet: {path: /readyz, port: health}
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /healthz, port: health}
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          {{- if eq .Values.runtime.mode "host-binary" }}
+          volumeMounts:
+            - {name: binary, mountPath: /opt/neon-control/compute-gateway, readOnly: true}
+          {{- end }}
+      {{- if eq .Values.runtime.mode "host-binary" }}
+      volumes:
+        - name: binary
+          hostPath:
+            path: {{ required "host-binary requires an immutable verified binaryHostPath" .Values.runtime.binaryHostPath | quote }}
+            type: File
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  labels: {app.kubernetes.io/name: {{ $name }}, app.kubernetes.io/managed-by: Helm}
+spec:
+  type: {{ .Values.service.type }}
+  selector: {app.kubernetes.io/name: {{ $name }}}
+  ports:
+    - name: management-tls
+      port: 8443
+      targetPort: management-tls
+      {{- if eq .Values.service.type "NodePort" }}
+      nodePort: {{ .Values.service.nodePort }}
+      {{- end }}

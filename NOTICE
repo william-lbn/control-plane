@@ -1,0 +1,12 @@
+Neon Self-hosted Control Plane
+Copyright 2026 the control-plane contributors.
+
+This independent project integrates with Neon open source components.
+Neon and PostgreSQL source repositories and container images retain their own
+licenses and notices. They are external deployment dependencies, not relicensed
+by this repository. No ownership of Neon names or marks is asserted.
+
+Go module dependencies are declared in api/go.mod and api/go.sum.
+Web dependencies are declared in web/package.json and web/package-lock.json.
+Container CI emits per-image SBOM and build provenance. Operators must review
+dependency licenses and security advisories for their own distribution.
