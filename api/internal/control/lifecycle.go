@@ -145,8 +145,16 @@ func (s *server) suspendCompute(ctx context.Context, p suspendPayload) error {
 	if err != nil {
 		return err
 	}
-	for deadline := time.Now().Add(120 * time.Second); time.Now().Before(deadline); {
-		_, err = s.kube.request(ctx, http.MethodGet, vmPath, nil)
+	return s.kube.waitVMGenerationDeletion(ctx, p, uid, 120*time.Second, 2*time.Second)
+}
+
+// A Proxy cold wake can replace the named VM between observations. Seeing an
+// owned successor UID proves the deleted generation is gone, even when the
+// brief 404 was missed. Never delete or wait for the successor to disappear.
+func (k *kubeClient) waitVMGenerationDeletion(ctx context.Context, p suspendPayload, uid string, window, interval time.Duration) error {
+	vmPath := k.path("vm", p.WorkloadName)
+	for deadline := time.Now().Add(window); time.Now().Before(deadline); {
+		vm, err := k.request(ctx, http.MethodGet, vmPath, nil)
 		var ke kubeError
 		if errors.As(err, &ke) && ke.Status == http.StatusNotFound {
 			return nil
@@ -154,10 +162,20 @@ func (s *server) suspendCompute(ctx context.Context, p suspendPayload) error {
 		if err != nil {
 			return err
 		}
+		if !owned(vm, p.ProjectID, p.EndpointID) {
+			return errors.New("VM deletion observation ownership mismatch")
+		}
+		observed := stringVal(nested(vm, "metadata", "uid"))
+		if observed == "" {
+			return errors.New("VM deletion observation UID missing")
+		}
+		if observed != uid {
+			return nil
+		}
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(2 * time.Second):
+		case <-time.After(interval):
 		}
 	}
 	return errors.New("VM deletion was not observed before timeout")

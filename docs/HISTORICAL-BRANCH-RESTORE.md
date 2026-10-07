@@ -143,3 +143,11 @@ The Go suite additionally tests timezone normalization, numeric LSN boundaries,
 authorization, disabled capability, native timestamp result errors, exact
 timeline conflict ownership, metadata isolation, replay and Worker recovery.
 Its storage peer is simulated; it does not substitute for the real Linux UI gate.
+
+The live slice also checks suspension followed by an immediate Proxy cold wake.
+An owned successor VM UID proves the deleted generation disappeared, even if
+the Worker missed its transient 404. Deletion observation never mutates the
+successor. The original suspend Operation must succeed; observing zero in the
+monitor alone is insufficient. Unknown ownership/UID or an old generation that
+still exists remains an error. This local identity fix does not certify full
+cross-instance admission fencing.

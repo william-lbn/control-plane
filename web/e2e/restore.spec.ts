@@ -121,17 +121,29 @@ test('UI historical restore: timestamp, LSN, catalog isolation and cold wake', a
     expect(done.status(), 'UI SQL via Proxy').toBe(200);
     return done.json();
   }
-  async function suspend(endpoint: string) {
+  async function suspend(endpoint: string, awaitCompletion = true) {
     await page.goto(`/#/projects/${project}/compute`);
     await page.locator('select').first().selectOption(endpoint);
     const r = page.waitForResponse(
       (r) => r.url().endsWith(`/endpoints/${endpoint}/suspend`) && r.request().method() === 'POST',
     );
     await page.getByRole('button', { name: '现在缩到 0', exact: true }).click();
-    expect((await r).status()).toBe(202);
+    const accepted = await r;
+    expect(accepted.status()).toBe(202);
+    const operation = (await accepted.json()).operation.id;
     await expect(page.locator('.stats-grid .stat-card strong').first()).toHaveText('已休眠', {
       timeout: 145_000,
     });
+    if (awaitCompletion)
+      await expect
+        .poll(
+          async () => (await get(`/api/v1/projects/${project}/operations/${operation}`)).state,
+          {
+            timeout: 60_000,
+          },
+        )
+        .toBe('succeeded');
+    return operation;
   }
   async function restore(parent: string, kind: 'timestamp' | 'lsn', point: string, name: string) {
     await page.goto(`/#/projects/${project}/restore`);
@@ -248,11 +260,19 @@ test('UI historical restore: timestamp, LSN, catalog isolation and cold wake', a
     await record('historical_data_schema_roles_and_databases_not_overwritten_by_current_catalog');
     await shot('restored-historical-query');
     await sql(writer.id, "INSERT INTO public.restore_receipt VALUES(2,'restored-only')");
-    await suspend(writer.id);
+    const suspension = await suspend(writer.id, false);
     expect((await sql(writer.id, 'SELECT count(*) FROM public.restore_receipt')).rows).toEqual([
       [2],
     ]);
-    await record('restored_endpoint_suspend_and_proxy_cold_wake_preserves_data');
+    await expect
+      .poll(async () => (await get(`/api/v1/projects/${project}/operations/${suspension}`)).state, {
+        timeout: 60_000,
+      })
+      .toBe('succeeded');
+    await record('restored_endpoint_suspend_and_proxy_cold_wake_preserves_data', {
+      suspend_operation: suspension,
+      deleted_generation_operation_succeeded: true,
+    });
     await suspend(writer.id);
     expect(
       (await sql(root.id, 'SELECT marker,count(*) OVER() FROM public.restore_receipt')).rows,
