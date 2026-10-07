@@ -55,6 +55,7 @@ docs/                 架构、对象模型、部署、测试、来源及生产�
 - [生产功能门槛](docs/PRODUCTION-GATES.md)
 - [API/Worker 拆分与升级](docs/WORKER-SPLIT.md)
 - [Go Proxy/Storage 适配器：合同、安全边界与升级](docs/GO-PROXY-ADAPTER.md)
+- [Go 运行链路、Helm 0.1.3 和五套 Linux UI 验收](https://github.com/william-lbn/neon-helm/blob/main/docs/ACCEPTANCE-2026-10-07-GO-ADAPTER.md)
 - [完整 Backend 产品实施合同](docs/FULL-PRODUCT-IMPLEMENTATION.md)
 - [AI Gateway 官网核验、平台配置与动态模型设计](docs/AI-GATEWAY-PLATFORM-DESIGN.md)
 - [原生 Data API 驱动与部署](docs/DATA-API-NATIVE-DRIVER.md)

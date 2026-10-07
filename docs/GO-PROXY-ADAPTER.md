@@ -16,6 +16,20 @@ Go 故障测试已经覆盖认证、所有权、重复唤醒、未知写入结�
 缩零栅栏；版本仍为预览。当前支持锁定单节点、无分片存储布局，不自动接受
 Pageserver 迁移或活跃租户的 Safekeeper generation 重配置。
 
+### 本轮现场验收（2026-10-07）
+
+运行源码锁为 `fba924ff096003d77610069ddd34d2d23a8962d0`，六个正式业务镜像
+由同次 Linux CI 发布。Go/真实 PG 门槛 304 通过、零失败/跳过；统一 Helm 0.1.3
+已部署并发布，五套 Linux Chromium UI 共 60 检查通过，含自动缩零与请求冷醒、
+历史隔离、Data API RLS、邀请与应用凭据授权，以及 Worker 停止/接管恢复。
+原生 Controller 的新通知产生三个 Go receipt，旧 receipt 保留；现场无运行中的
+Python Pod，最终测试 VM/Runner 为 0。后续文档提交不改变该运行源码/digest 锁。
+
+本轮没有新增全新多 Reader 压力/故障矩阵或分布式放行证据。新集群安装、
+完整 storage reconfiguration、跨实例 ledger/fencing 与 HA/TLS 仍须独立验收。
+两次失败（YAML 文件模式解释、超过 32 MiB 的元数据备份输出）及源码/镜像/发布/
+手动复测记录见 [详细验收报告](https://github.com/william-lbn/neon-helm/blob/main/docs/ACCEPTANCE-2026-10-07-GO-ADAPTER.md)。
+
 ## 2. 调用流程
 
 ```mermaid
