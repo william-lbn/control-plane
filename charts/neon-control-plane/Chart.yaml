@@ -2,6 +2,6 @@ apiVersion: v2
 name: neon-control-plane
 description: Go/PostgreSQL Neon control API and independently released React console
 type: application
-version: 0.4.0
-appVersion: 0.7.0-console-invitations
+version: 0.5.0
+appVersion: 0.8.0-historical-branches
 kubeVersion: '>=1.30.0-0'

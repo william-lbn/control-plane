@@ -20,6 +20,7 @@ import { Operations } from '../operations/Operations';
 import { CreateResource } from './CreateResources';
 import { ProjectPermissions } from '../identity/Organizations';
 import { Catalog } from '../catalog/Catalog';
+import { Restore } from '../restore/Restore';
 
 export function Projects({
   organizationId,
@@ -187,6 +188,20 @@ export function ProjectWorkspace({
         message="Viewer 可以查看项目元数据，但不能获取连接串或执行 SQL。"
       />
     );
+  if (page === 'restore')
+    return (
+      <Restore
+        projectId={projectId}
+        branches={branches}
+        canEdit={canEdit}
+        enabled={
+          project.source === 'managed' &&
+          project.state === 'ready' &&
+          !!capabilities?.features.pitr_new_branch?.enabled
+        }
+        onChanged={refresh}
+      />
+    );
   if (page === 'branches' && branchId) {
     const branch = branches.find((item) => item.id === branchId);
     return branch ? (
@@ -234,6 +249,7 @@ export function ProjectWorkspace({
             kind="branch"
             projectId={projectId}
             branches={branches}
+            allowHistorical={!!capabilities?.features.pitr_new_branch?.enabled}
             onClose={() => setShowCreateBranch(false)}
             onDone={(id) => {
               setShowCreateBranch(false);

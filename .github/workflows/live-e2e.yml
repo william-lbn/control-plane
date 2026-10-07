@@ -5,7 +5,7 @@ on:
       suite:
         description: Real Linux UI acceptance slice
         type: choice
-        options: [native-product.spec.ts, data-api.spec.ts, backend-credentials.spec.ts, console-invitations.spec.ts]
+        options: [native-product.spec.ts, restore.spec.ts, data-api.spec.ts, backend-credentials.spec.ts, console-invitations.spec.ts]
         default: native-product.spec.ts
       poll_fault:
         description: Inject transient read failures for native/Data API observation recovery
@@ -49,7 +49,7 @@ jobs:
           test -n "$NEON_E2E_BASE_URL"
           test -n "$ADMIN_PASSWORD"
           case "$NEON_E2E_SUITE" in
-            native-product.spec.ts|data-api.spec.ts|console-invitations.spec.ts) ;;
+            native-product.spec.ts|restore.spec.ts|data-api.spec.ts|console-invitations.spec.ts) ;;
             backend-credentials.spec.ts) [[ "$NEON_E2E_CREDENTIAL_PROJECT" =~ ^prj_[a-f0-9]{16}$ ]] ;;
             *) exit 1 ;;
           esac

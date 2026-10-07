@@ -27,6 +27,8 @@ export function CreateResource({
   branches = [],
   branchId,
   writerExists = false,
+  allowHistorical = false,
+  restoreOnly = false,
   onDone,
   onClose,
 }: {
@@ -36,14 +38,42 @@ export function CreateResource({
   branches?: Branch[];
   branchId?: string;
   writerExists?: boolean;
+  allowHistorical?: boolean;
+  restoreOnly?: boolean;
   onDone: (resourceId: string) => void;
   onClose: () => void;
 }) {
   const [name, setName] = useState('');
   const [defaultBranch, setDefaultBranch] = useState('main');
   const [parent, setParent] = useState(
-    branches.find((b) => b.is_default)?.id || branches[0]?.id || '',
+    branchId || branches.find((b) => b.is_default)?.id || branches[0]?.id || '',
   );
+  const [pointKind, setPointKind] = useState<'current' | 'timestamp' | 'lsn'>(
+    restoreOnly ? 'timestamp' : 'current',
+  );
+  const [point, setPoint] = useState('');
+  const [window, setWindow] = useState<{ min_readable_lsn: string; latest_lsn: string } | null>(
+    null,
+  );
+  const [windowError, setWindowError] = useState('');
+  useEffect(() => {
+    setWindow(null);
+    setWindowError('');
+    if (kind !== 'branch' || pointKind === 'current' || !parent) return;
+    const controller = new AbortController();
+    void api<{ min_readable_lsn: string; latest_lsn: string }>(
+      `${projectPath(projectId || '')}/branches/${encodeURIComponent(parent)}/restore-window`,
+      { signal: controller.signal },
+    )
+      .then((value) => {
+        if (!controller.signal.aborted) setWindow(value);
+      })
+      .catch((reason) => {
+        if (!controller.signal.aborted)
+          setWindowError(reason instanceof Error ? reason.message : String(reason));
+      });
+    return () => controller.abort();
+  }, [kind, parent, pointKind, projectId]);
   const [withEndpoint, setWithEndpoint] = useState(true);
   const [endpointType, setEndpointType] = useState<'read_write' | 'read_only'>(
     writerExists ? 'read_only' : 'read_write',
@@ -68,7 +98,7 @@ export function CreateResource({
   const requestKey = useRef<string>('');
   const titles = {
     project: '创建项目',
-    branch: '创建数据库分支',
+    branch: restoreOnly ? '恢复到新分支' : '创建数据库分支',
     endpoint: '创建 Compute Endpoint',
   };
   const resetKey = () => {
@@ -133,6 +163,11 @@ export function CreateResource({
               name,
               parent_branch_id: parent,
               create_endpoint: withEndpoint,
+              ...(pointKind === 'timestamp'
+                ? { parent_timestamp: point }
+                : pointKind === 'lsn'
+                  ? { parent_lsn: point }
+                  : {}),
               password: withEndpoint ? password : '',
               autoscaling: bounds,
             }
@@ -282,6 +317,52 @@ export function CreateResource({
                     ))}
                 </select>
               </label>
+              {(allowHistorical || restoreOnly) && (
+                <>
+                  <label className="create-field">
+                    分支起点
+                    <select
+                      aria-label="分支起点"
+                      value={pointKind}
+                      onChange={(e) => {
+                        setPointKind(e.target.value as typeof pointKind);
+                        setPoint('');
+                        resetKey();
+                      }}
+                    >
+                      {!restoreOnly && <option value="current">当前状态</option>}
+                      <option value="timestamp">历史时间（UTC）</option>
+                      <option value="lsn">指定 LSN</option>
+                    </select>
+                  </label>
+                  {pointKind !== 'current' && (
+                    <>
+                      <label className="create-field">
+                        {pointKind === 'timestamp' ? '恢复时间（RFC3339，含时区）' : '恢复 LSN'}
+                        <input
+                          aria-label={pointKind === 'timestamp' ? '恢复时间' : '恢复 LSN'}
+                          value={point}
+                          required
+                          maxLength={64}
+                          placeholder={
+                            pointKind === 'timestamp' ? '2026-10-07T06:00:00.000Z' : '0/1A2B3C8'
+                          }
+                          onChange={(e) => {
+                            setPoint(e.target.value);
+                            resetKey();
+                          }}
+                        />
+                      </label>
+                      <div className="subtle-note" role="status">
+                        {windowError ||
+                          (window
+                            ? `可恢复 LSN：${window.min_readable_lsn} 至 ${window.latest_lsn}。提交时重新校验；恢复会创建独立分支和连接入口。`
+                            : '正在读取存储历史边界…')}
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
               <label className="create-check">
                 <input
                   type="checkbox"
@@ -402,7 +483,16 @@ export function CreateResource({
             <button className="button" type="button" onClick={onClose} disabled={busy}>
               关闭
             </button>
-            <button className="button primary" disabled={busy || !!operation}>
+            <button
+              className="button primary"
+              disabled={
+                busy ||
+                !!operation ||
+                (kind === 'branch' &&
+                  pointKind !== 'current' &&
+                  (!window || !point || !!windowError))
+              }
+            >
               {busy ? '正在调谐…' : '创建并验证'}
             </button>
           </div>

@@ -142,6 +142,15 @@ npm run test:e2e -- --config=playwright.recovery.config.ts
 
 ## 4. 扩展验收矩阵
 
+### 历史分支恢复
+
+运行 `npm run test:e2e -- restore.spec.ts`，保护配置与其他 live UI suite 相同。
+先写入并记录 UTC 时间戳/提交 LSN，再写后续数据、角色和数据库，通过“历史恢复”
+创建新分支。验证历史内容、当前目录不被投射、分支隔离、SQL 冷醒、幂等重放和
+保留窗口外拒绝。`NEON_E2E_POLL_FAULT=true` 验证两次 503 GET 只产生一次恢复 POST。
+最终观察所有本次 VM 与 Runner 为 0，保留数据库、凭据、操作与失败记录。
+完整步骤和能力边界见 [HISTORICAL-BRANCH-RESTORE.md](HISTORICAL-BRANCH-RESTORE.md)。
+
 ### 操作查询故障恢复
 
 设置 `NEON_E2E_POLL_FAULT=true` 后运行 native-product.spec.ts 和 data-api.spec.ts。

@@ -241,15 +241,12 @@ func (k *kubeClient) createTimeline(ctx context.Context, tenantID, timelineID, p
 	_, err := k.serviceRequest(ctx, "storage-controller", 1234, "v1/tenant/"+tenantID+"/timeline", http.MethodPost, body)
 	var ke kubeError
 	if errors.As(err, &ke) && ke.Status == http.StatusConflict {
-		item, getErr := k.serviceRequest(ctx, "storage-controller", 1234,
-			"control/v1/tenant/"+tenantID+"/timeline/"+timelineID, http.MethodGet, nil)
+		item, getErr := k.serviceRequest(ctx, "pageserver-managed", 9898,
+			"v1/tenant/"+tenantID+"/timeline/"+timelineID, http.MethodGet, nil)
 		if getErr != nil {
 			return getErr
 		}
-		if parentID != "" && stringVal(item["ancestor_timeline_id"]) != "" && stringVal(item["ancestor_timeline_id"]) != parentID {
-			return errors.New("timeline parent ownership mismatch")
-		}
-		return nil
+		return validateTimelineAncestor(item, parentID, parentLSN)
 	}
 	return err
 }
@@ -334,6 +331,7 @@ type createPayload struct {
 	TimelineID       string `json:"timeline_id"`
 	ParentTimelineID string `json:"parent_timeline_id"`
 	ParentLSN        string `json:"parent_lsn"`
+	RestoreSource    string `json:"restore_source,omitempty"`
 	CatalogSpec      string `json:"-"` // Runtime projection from branch intent; never persisted in Operation.
 	MinCPU           int    `json:"min_cpu_milli"`
 	MaxCPU           int    `json:"max_cpu_milli"`

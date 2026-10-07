@@ -88,6 +88,7 @@ func (s *server) routes() *http.ServeMux {
 	mux.Handle("GET /api/v1/projects/{project}/branches", s.auth(http.HandlerFunc(s.branches), false))
 	mux.Handle("POST /api/v1/projects/{project}/branches", s.auth(http.HandlerFunc(s.createBranch), true))
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}", s.auth(http.HandlerFunc(s.branch), false))
+	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/restore-window", s.auth(http.HandlerFunc(s.readRestoreWindow), false))
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/services", s.auth(http.HandlerFunc(s.branchServices), false))
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/data-api", s.auth(http.HandlerFunc(s.dataAPIRead), false))
 	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/data-api", s.auth(http.HandlerFunc(s.dataAPIMutate), true))
@@ -151,6 +152,7 @@ func (s *server) capabilities(w http.ResponseWriter, r *http.Request) {
 			"vm_scale_to_zero":   map[string]any{"enabled": os.Getenv("NEON_V2_SCALE_ZERO_ENABLED") == "true", "reason": "lab_idle_controller"},
 			"read_replicas":      map[string]any{"enabled": creationEnabled(), "reason": "safekeeper_streaming_validated"},
 			"project_delete":     disabled,
+			"pitr_new_branch":    map[string]any{"enabled": pitrEnabled(), "reason": "retained_timestamp_or_lsn_new_branch"},
 		},
 		"services": map[string]any{"postgres": map[string]any{"enabled": true, "reason": "read_and_query_validated"},
 			"auth": disabled, "object_storage": disabled, "functions": disabled, "ai_gateway": disabled,

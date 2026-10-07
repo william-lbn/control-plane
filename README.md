@@ -5,7 +5,7 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Compute 管理网关
 
 **发行状态：预览版本。已经验证的实验环境功能不等于生产认证，也不等于 Neon 官网全部 Backend 服务。**
 [2026-10-07 交付及验收边界](docs/DELIVERY-2026-10-07.md)记录邀请注册、权限撤销和资源清理。
-Chart 0.4.0 提供独立 API、Worker、Web 进程及可选 Data API、应用凭据和 Console 邀请注册；Worker 使用 PostgreSQL 领导租约。
+Chart 0.5.0 提供独立 API、Worker、Web 进程及可选 Data API、应用凭据、Console 邀请注册与历史分支恢复；Worker 使用 PostgreSQL 领导租约。
 当前只允许一个 API 和一个 Worker，跨实例外部 fencing 与 HA 仍须独立验收。
 旧合并版本升级前必须执行 [停止/排空流程](docs/WORKER-SPLIT.md)。
 运行代码与实际合同见 [OpenAPI](contracts/openapi-v1.json)；本项目使用 `/api/v1`，未声称兼容托管 Neon `/api/v2`。
@@ -21,7 +21,8 @@ Chart 0.4.0 提供独立 API、Worker、Web 进程及可选 Data API、应用凭
 | 数据库、角色与密码轮换 | 分支目录、Compute 原生配置、Proxy spec 调谐 | rename、owner 变更、未知外部 DDL 恢复未完成 |
 | CPU / 内存边界、自动休眠、连接唤醒 | 已实现实验环境控制路径 | 整数 CPU 1→2→1 已验证；小数 CPU、完整内存缩回、跨实例栅栏未验收 |
 | 监控、Operation 步骤、错误与重试 | 已实现 | 长期指标持久化、SLO 告警、完整审计导出未完成 |
-| HA / DR / PITR | 部分租约、恢复工具和接口设计基础 | 未通过独立故障域 HA/DR；用户数据库 PITR 未实现 |
+| 时间点恢复到新分支 | 原生时间戳/LSN、存储保留租约、异步调谐、历史目录隔离、React UI | 默认禁用；仅受管理分支；原地恢复、Time Travel Assist、完整 Backend 一致性恢复未实现 |
+| HA / DR | 部分租约与恢复工具 | 未通过独立故障域 HA/DR；历史新分支恢复不等于完整 DR |
 | Auth、Functions、Object Storage、AI Gateway | 能力与服务模型预留，明确 disabled | 对应 Backend 服务尚未实现，不能作为可用功能宣传 |
 | Data API | 原生 Go Driver、持久 Operation、React UI、分支 JWT Gateway 和固定 PostgREST 镜像 | 默认禁用；须显式 labHTTP，真实 Neon UI 验收独立于 PG CI；RPC/views 等不在首版范围 |
 | 分支应用凭据 | 一次性 Token、范围/到期、轮换/撤销、哈希存储、当前权限检查和 UI | 当前仅 ai_gateway:invoke；凭据不等于 AI 推理服务可用 |
@@ -45,7 +46,7 @@ docs/                 架构、对象模型、部署、测试、来源及生产�
 ```
 
 - [架构与模型](docs/ARCHITECTURE.md)
-- [62 个实际 API 操作](docs/API.md)
+- [63 个实际 API 操作](docs/API.md)
 - [Linux 部署与回滚](docs/DEPLOYMENT.md)
 - [测试与交付标准](docs/TESTING.md)
 - [Fork 来源与镜像对应关系](docs/SOURCE-PROVENANCE.md)
@@ -57,6 +58,8 @@ docs/                 架构、对象模型、部署、测试、来源及生产�
 - [分支应用凭据：模型、API、部署、UI 和验收](docs/BACKEND-CREDENTIALS.md)
 - [控制台成员邀请、受邀注册与复测](docs/CONSOLE-INVITATIONS.md)
 - [异步 Operation 观察恢复与 Linux 故障注入验收](docs/OPERATION-OBSERVATION.md)
+- [历史分支恢复：API、LSN 租约、目录隔离与 UI 复测](docs/HISTORICAL-BRANCH-RESTORE.md)
+- [完整产品逐项实施与交付计划](docs/PRODUCT-COMPLETION-PLAN.md)
 - [2026-10-04 产品切片验收、修复与手动复测](docs/ACCEPTANCE-2026-10-04.md)
 - [贡献规范](CONTRIBUTING.md) / [安全政策](SECURITY.md)
 

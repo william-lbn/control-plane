@@ -79,6 +79,26 @@ func (s *server) reconcileCreate(ctx context.Context, operationID, workerID, act
 		}
 	}
 	ordinal := 0
+	if p.RestoreSource != "" {
+		if action != "create_branch" || p.ParentTimelineID == "" || (p.RestoreSource != "timestamp" && p.RestoreSource != "lsn") {
+			return errors.New("invalid historical branch payload")
+		}
+		if err := s.createStep(ctx, operationID, workerID, ordinal, "pin_restore_point", func(ctx context.Context) error {
+			// A successfully-created child retains its ancestor. Retry must remain
+			// possible after the source retention boundary moves past the fork point.
+			child, err := s.kube.serviceRequest(ctx, "pageserver-managed", 9898, "v1/tenant/"+p.TenantID+"/timeline/"+p.TimelineID, http.MethodGet, nil)
+			if err == nil {
+				return validateTimelineAncestor(child, p.ParentTimelineID, p.ParentLSN)
+			}
+			if !kubeStatusIs(err, http.StatusNotFound) {
+				return err
+			}
+			return s.kube.pinRestoreLSN(ctx, p.TenantID, p.ParentTimelineID, p.ParentLSN)
+		}); err != nil {
+			return err
+		}
+		ordinal++
+	}
 	if action == "create_project" {
 		if err := s.createStep(ctx, operationID, workerID, ordinal, "create_managed_tenant", func(ctx context.Context) error {
 			return s.kube.createTenant(ctx, p.TenantID)

@@ -1,0 +1,49 @@
+# 完整产品实施与逐项验收计划
+
+## 1. 本轮约束
+
+继续执行完整官网 Backend 目标。需要外部账号、模型调用凭据、SMTP 或 OAuth
+应用的真实接入放在后面；这些依赖不阻止我们实现本地服务、API、数据模型、UI、
+隔离测试和部署代码。当前三节点有限资源下每次串行验证一个闭环，基础组件保持
+资源预留；只退休已完成测试的运行资源，数据和证据保留。
+
+实施合同由 FULL-PRODUCT-IMPLEMENTATION.md 和实际 OpenAPI 共同约束。
+下面是顺序及退出条件，不代表所有项目已经实现。
+
+## 2. 不依赖外部凭据的交付序列
+
+| 顺序 | 闭环 | 必须交付和验证 |
+| --- | --- | --- |
+| 1 | 历史点恢复到新分支 | 原生 timestamp/LSN、真实保留边界、LSN lease、历史目录隔离、API/UI、幂等恢复、SQL 与冷醒 |
+| 2 | 完整删除生命周期 | 项目/分支依赖图、保护、入口关闭、服务停用、Compute 回收、tombstone、保留与恢复窗口、安全 GC、竞争与重试 |
+| 3 | 精细资源与多 Reader | 小数 CPU 的真实 Runner 配额、分配/使用区分、完整内存归还、压力/OOM/coldboot、多个 Reader 独立扩缩与写入拒绝 |
+| 4 | Go Adapter 与跨实例栅栏 | 替换兼容原型、Proxy 连接账本、generation/epoch 外部检查、多实例并发、旧 Worker 拒绝、短连接与删除竞争 |
+| 5 | 本地可信传输 | 内部 CA/IP SAN、浏览器/API/SQL/管理入口/元数据/服务校验、证书轮换和失败负例；无公网域名也能完成 |
+| 6 | Managed Auth 基础闭环 | 受限 Better Auth runtime、分支账户/会话/JWT/JWKS、注册登录登出、父子隔离、Data API RLS 与 UI；Console 登录独立 |
+| 7 | 产品 Object Storage | 不可变 blob、随分支清单、S3/SigV4/预签名、ACL/CORS、配额、multipart、共享引用与 GC、上传下载 UI |
+| 8 | Functions | 不可变 Node bundle、隔离资源/网络、HTTP/SSE/WS、版本回滚、env Secret refs、cron/对象触发去重与重试、部署和日志 UI |
+| 9 | 本地恢复、监控与 HA 演练 | 元数据/对象/WAL/Secrets 全栈恢复、实测 RPO/RTO、持续指标/告警、节点与进程故障矩阵；独立物理故障域仍另列门槛 |
+| 10 | 原分支恢复与 Backend 一致性 | 备份分支、连接切换、Time Travel Assist、历史窗口管理、Auth/对象清单/函数版本协调、失败恢复 |
+
+每个闭环提交可编译运行代码、迁移、严格 OpenAPI、React UI、Helm/schema/锁定镜像、
+Linux 正反例与恢复测试、当前交付报告；通过后才更新对应 capability。
+
+## 3. 后置的外部集成
+
+* AI Gateway：先完成供应商配置/Secret adapter、模型目录、协议/流式、
+  分支授权、预算和用量代码；协议测试明确标为测试上游。真实模型推理需要
+  平台运营方在受保护页面接入服务，不能以测试回复替代。
+* Auth：SMTP 送信、邮件验证/密码重置投递、OAuth、OIDC/SSO 与外部 IdP
+  需要真实配置。基础密码登录与分支隔离先行实现，认证协议复用维护中的组件。
+* 独立物理故障域、异地恢复和真实长期负载由部署输入和硬件条件决定，
+  软件自动化与有限实验演练先行，认证结论分别记录。
+
+## 4. 状态与证据规则
+
+1. `设计`、`实现`、`集成验证`、`现场 UI 验收`、`生产准入`分开记录。
+2. 失败记录不可覆盖；重试使用新的 attempt。通过历史版本不自动放行新镜像。
+3. 当前代码即使 Pod Ready 也不等于完整生产认证；独立门槛见 PRODUCTION-GATES.md。
+4. 安全删除只作用于确认完成、归属于当前测试的 VM/Runner/Job；归档后按 UID
+   与版本删除，不能删除 PVC、WAL、对象、业务目录、Secrets 或本项目历史证据。
+5. 本轮首项的准确合同和复测步骤见 HISTORICAL-BRANCH-RESTORE.md；最终结论
+   以该项实际 Linux UI、发布镜像和 Helm 验证回执为准。

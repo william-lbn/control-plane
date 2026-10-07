@@ -23,6 +23,8 @@ api:
   image: {reference: '', pullPolicy: IfNotPresent}
   existingSecret: neon-control-plane-credentials
   creationEnabled: true
+  # Historical restore creates a new branch; source Endpoints are never rewound.
+  pitrEnabled: false
   scaleToZeroEnabled: true
   cookieSecure: true
   proxyHost: proxy.neon.svc.cluster.local

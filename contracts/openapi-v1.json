@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.6.0",
+    "version": "0.7.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -284,6 +284,27 @@
           "created_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "parent_lsn": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "parent_timestamp": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "restore_source": {
+            "type": "string",
+            "enum": [
+              "current",
+              "timestamp",
+              "lsn"
+            ]
           }
         }
       },
@@ -620,7 +641,23 @@
           },
           "autoscaling": {
             "$ref": "#/components/schemas/AutoscalingBounds"
+          },
+          "parent_timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "RFC3339 historical time, mutually exclusive with parent_lsn. Requires pitr_new_branch; only retained, replayed history is accepted."
+          },
+          "parent_lsn": {
+            "type": "string",
+            "pattern": "^[0-9A-Fa-f]{1,8}/[0-9A-Fa-f]{1,8}$",
+            "description": "Retained WAL point, mutually exclusive with parent_timestamp. A distinct branch is created; existing Endpoints are unchanged."
           }
+        },
+        "not": {
+          "required": [
+            "parent_timestamp",
+            "parent_lsn"
+          ]
         }
       },
       "CreateEndpoint": {
@@ -1963,6 +2000,30 @@
           "revoked"
         ],
         "additionalProperties": false
+      },
+      "RestoreWindow": {
+        "type": "object",
+        "required": [
+          "branch_id",
+          "min_readable_lsn",
+          "latest_lsn",
+          "observed_at"
+        ],
+        "properties": {
+          "branch_id": {
+            "type": "string"
+          },
+          "min_readable_lsn": {
+            "type": "string"
+          },
+          "latest_lsn": {
+            "type": "string"
+          },
+          "observed_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
       }
     },
     "responses": {
@@ -6760,6 +6821,47 @@
           }
         },
         "description": "Same-origin POST; new accounts only. Username must match invitation. Existing accounts must sign in to accept, no password reset. Registration and membership and token consumption and audit commit atomically. Login remains a separate step. Invalid/expired/revoked/consumed invitation or demoted inviter returns 422. Shared PG admission cap: 20 per minute per hashed transport peer, including successful requests."
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/restore-window": {
+      "get": {
+        "tags": [
+          "Catalog"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Branch",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RestoreWindow"
+                }
+              }
+            }
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "readBranchRestoreWindow",
+        "summary": "Read actual retained storage LSN boundaries without waking Compute",
+        "description": "Authenticated project Reader access. No history promise is inferred from an applied GC cutoff; min_readable_lsn is authoritative. Timestamp resolution and LSN lease acquisition occur on the subsequent branch creation request. Unsupported/dependency failure returns 503."
       }
     }
   }

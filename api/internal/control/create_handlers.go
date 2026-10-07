@@ -11,6 +11,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -291,17 +292,29 @@ func (s *server) createBranch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Name           string        `json:"name"`
-		ParentBranchID string        `json:"parent_branch_id"`
-		CreateEndpoint *bool         `json:"create_endpoint"`
-		Password       string        `json:"password"`
-		Autoscaling    *createBounds `json:"autoscaling"`
+		Name            string        `json:"name"`
+		ParentBranchID  string        `json:"parent_branch_id"`
+		CreateEndpoint  *bool         `json:"create_endpoint"`
+		Password        string        `json:"password"`
+		Autoscaling     *createBounds `json:"autoscaling"`
+		ParentTimestamp string        `json:"parent_timestamp,omitempty"`
+		ParentLSN       string        `json:"parent_lsn,omitempty"`
 	}
 	if err := readJSON(r, &body); err != nil {
 		fail(w, r, 422, "invalid_request", "Invalid branch request")
 		return
 	}
 	withEndpoint := body.CreateEndpoint == nil || *body.CreateEndpoint
+	historical := body.ParentTimestamp != "" || body.ParentLSN != ""
+	if err := validateRestoreInput(body.ParentTimestamp, body.ParentLSN, time.Now()); err != nil {
+		e := err.(restoreError)
+		fail(w, r, e.status, e.code, "Specify one valid retained timestamp or LSN")
+		return
+	}
+	if historical && !pitrEnabled() {
+		fail(w, r, 503, "pitr_disabled", "Historical branch restore is not enabled")
+		return
+	}
 	bounds := defaults(body.Autoscaling)
 	if !validName(body.Name, 63) || !bounds.valid() || (withEndpoint && (len(body.Password) < 12 || len(body.Password) > 256)) ||
 		(!withEndpoint && body.Password != "") {
@@ -335,12 +348,6 @@ func (s *server) createBranch(w http.ResponseWriter, r *http.Request) {
 	p := creationPayload(r.PathValue("project"), "br_"+suffix, endpointID,
 		stringVal(project["tenant_id"]), stableHex(suffix, "timeline"), bounds)
 	p.ParentTimelineID = stringVal(parent["timeline_id"])
-	if withEndpoint {
-		if err = s.kube.reserveCredentials(r.Context(), p.ProjectID, p.EndpointID, body.Password); err != nil {
-			fail(w, r, 503, "credential_unavailable", "Could not reserve endpoint credentials")
-			return
-		}
-	}
 	tx, err := s.db.Begin(r.Context())
 	if err != nil {
 		fail(w, r, 503, "metadata_unavailable", "Transaction unavailable")
@@ -364,19 +371,43 @@ func (s *server) createBranch(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 409, "branch_operation_in_progress", "Parent catalog operation is active")
 		return
 	}
-	p.ParentLSN, err = s.kube.parentLSN(r.Context(), p.TenantID, p.ParentTimelineID)
+	if historical {
+		p.ParentLSN, err = s.kube.resolveRestorePoint(r.Context(), p.TenantID, p.ParentTimelineID, body.ParentTimestamp, body.ParentLSN)
+		p.RestoreSource = "lsn"
+		if body.ParentTimestamp != "" {
+			p.RestoreSource = "timestamp"
+		}
+	} else {
+		p.ParentLSN, err = s.kube.parentLSN(r.Context(), p.TenantID, p.ParentTimelineID)
+	}
 	if err != nil {
+		var restoreErr restoreError
+		if errors.As(err, &restoreErr) {
+			fail(w, r, restoreErr.status, restoreErr.code, "The requested restore point is not available")
+			return
+		}
 		fail(w, r, 503, "parent_lsn_unavailable", "Could not read parent fork point")
 		return
+	}
+	if withEndpoint {
+		if err = s.kube.reserveCredentials(r.Context(), p.ProjectID, p.EndpointID, body.Password); err != nil {
+			fail(w, r, 503, "credential_unavailable", "Could not reserve endpoint credentials")
+			return
+		}
 	}
 	_, err = tx.Exec(r.Context(), `INSERT INTO branches(id,project_id,name,timeline_id,parent_branch_id,parent_lsn,
 		is_default,protected,state,created_at) VALUES($1,$2,$3,$4,$5,$6,false,false,'creating',now())`,
 		p.BranchID, p.ProjectID, body.Name, p.TimelineID, body.ParentBranchID, p.ParentLSN)
-	if err == nil {
+	if err == nil && historical {
+		_, err = tx.Exec(r.Context(), `UPDATE branches SET restore_source=$2,parent_timestamp=NULLIF($3,'')::timestamptz WHERE id=$1`, p.BranchID, p.RestoreSource, body.ParentTimestamp)
+	}
+	// Historical data must not receive today's catalog DDL or role credentials.
+	// Its physical SQL inventory is observed, rather than copied from metadata.
+	if err == nil && !historical {
 		_, err = tx.Exec(r.Context(), `INSERT INTO branch_roles(branch_id,name,state,credential_ref)
 		SELECT $1,name,'ready',credential_ref FROM branch_roles WHERE branch_id=$2 AND state='ready'`, p.BranchID, body.ParentBranchID)
 	}
-	if err == nil {
+	if err == nil && !historical {
 		_, err = tx.Exec(r.Context(), `INSERT INTO branch_databases(branch_id,name,owner_name,state)
 		SELECT $1,name,owner_name,'ready' FROM branch_databases WHERE branch_id=$2 AND state='ready'`, p.BranchID, body.ParentBranchID)
 	}
@@ -390,7 +421,7 @@ func (s *server) createBranch(w http.ResponseWriter, r *http.Request) {
 	opID := newID("op_")
 	if err == nil {
 		err = addCreateOperation(r.Context(), tx, "create_branch", "branch", p.BranchID, p.ProjectID,
-			opID, userFrom(r).ID, requestID(r), p, key, hash, createSteps("create_branch", withEndpoint))
+			opID, userFrom(r).ID, requestID(r), p, key, hash, branchCreationSteps(withEndpoint, historical))
 	}
 	if err == nil {
 		err = tx.Commit(r.Context())

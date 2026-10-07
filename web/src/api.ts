@@ -20,6 +20,9 @@ export type Branch = {
   project_id: string;
   name: string;
   parent_branch_id: string | null;
+  parent_lsn: string | null;
+  parent_timestamp: string | null;
+  restore_source: 'current' | 'timestamp' | 'lsn';
   is_default: boolean;
   protected: boolean;
   state: string;

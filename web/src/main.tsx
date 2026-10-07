@@ -169,6 +169,9 @@ function App() {
               <a className={page === 'compute' ? 'active' : ''} href={route(projectId, 'compute')}>
                 <span>▣</span>Compute
               </a>
+              <a className={page === 'restore' ? 'active' : ''} href={route(projectId, 'restore')}>
+                <span>↶</span>历史恢复
+              </a>
               <a
                 className={page === 'monitoring' ? 'active' : ''}
                 href={route(projectId, 'monitoring')}

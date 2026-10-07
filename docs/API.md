@@ -1,7 +1,7 @@
 # 实际 API 合同
 
 OpenAPI 3 合同的权威源是 [openapi-v1.json](../contracts/openapi-v1.json)。
-版本 0.6.0，45 个路径、62 个操作，全部拥有稳定且唯一的 operationId。
+版本 0.7.0，46 个路径、63 个操作，全部拥有稳定且唯一的 operationId。
 运行 Swagger 位于 `/api/docs`，JSON 位于 `/api/openapi.json`。
 本合同是自托管 `/api/v1`，不声称兼容 Neon SaaS `/api/v2`。
 
@@ -39,6 +39,7 @@ request_id/operation_id/error_code，再由显式 retry 接口恢复可重试操
 | GET | `/api/v1/projects/{project}/branches` | `listBranches` | 200 |
 | POST | `/api/v1/projects/{project}/branches` | `createBranch` | 202 |
 | GET | `/api/v1/projects/{project}/branches/{branch}` | `getBranch` | 200 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/restore-window` | `readBranchRestoreWindow` | 200 |
 | GET | `/api/v1/projects/{project}/branches/{branch}/services` | `listBranchServices` | 200 |
 | GET | `/api/v1/projects/{project}/endpoints` | `listEndpoints` | 200 |
 | POST | `/api/v1/projects/{project}/endpoints` | `createEndpoint` | 202 |
@@ -91,7 +92,12 @@ request_id/operation_id/error_code，再由显式 retry 接口恢复可重试操
 与文档操作，并检查引用、Session Cookie 和 operationId。
 请求/响应模型在 components/schemas，权限与 bearer 语义在 securitySchemes。
 组织/授权：organizations.go、authorization.go；资源创建：create_handlers.go；
-目录：catalog.go；生命周期：lifecycle.go；SQL/监控：proxy.go、monitor.go。
+目录：catalog.go；生命周期：lifecycle.go；SQL/监控：proxy.go、monitor.go；历史恢复：restore.go。
+
+`createBranch` 可提供 `parent_timestamp` 或 `parent_lsn`，二者互斥。它创建新分支，
+不修改原分支；解析出的固定 `parent_lsn`、`restore_source`、`parent_timestamp` 与
+Operation 一并持久化。时间点、保留窗口、租约、错误与历史目录规则见
+[恢复合同](HISTORICAL-BRANCH-RESTORE.md)。新增读接口不会唤醒 Compute。
 
 新增操作应先实现权限、参数、持久意图、调谐和负例，再更新 OpenAPI 与 UI。
 不能用返回成功的空 handler 宣布未实现服务可用。破坏性合同变更需要新版本与迁移计划。

@@ -14,6 +14,9 @@ if helm template bad charts/neon-control-plane -f charts/neon-control-plane/ci/r
 if helm template bad charts/neon-control-plane -f charts/neon-control-plane/ci/render-values.yaml --set api.image.reference=example.invalid/control-api:latest > artifacts/helm/rejected-tag.log 2>&1; then exit 1; fi
 if grep -q hostPath artifacts/helm/gateway.yaml; then echo 'Image profile must not mount a host binary'; exit 1; fi
 grep -q '/opt/neon-control/control-worker' artifacts/helm/control-plane.yaml
+helm template restore charts/neon-control-plane --namespace neon -f charts/neon-control-plane/ci/render-values.yaml --set api.pitrEnabled=true --set api.creationEnabled=true > artifacts/helm/historical-restore.yaml
+test "$(grep -c NEON_V2_PITR_ENABLED artifacts/helm/historical-restore.yaml)" -eq 2
+if helm template bad charts/neon-control-plane -f charts/neon-control-plane/ci/render-values.yaml --set api.pitrEnabled=true --set api.creationEnabled=false > artifacts/helm/rejected-restore-creation.log 2>&1; then exit 1; fi
 if grep -q '/opt/neon-control/control-worker' artifacts/helm/combined-profile.yaml; then exit 1; fi
 helm package charts/neon-control-plane -d artifacts/helm
 helm package charts/compute-management-gateway -d artifacts/helm

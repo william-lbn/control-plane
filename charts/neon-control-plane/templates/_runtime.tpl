@@ -1,4 +1,7 @@
 {{- define "neonControl.runtimeEnv" -}}
+{{- if and .Values.api.pitrEnabled (not .Values.api.creationEnabled) }}
+{{- fail "Historical branch restore requires api.creationEnabled" }}
+{{- end }}
 {{- if .Values.dataAPI.enabled }}
 {{- if not .Values.dataAPI.labHTTP }}
 {{- fail "Data API native Driver v1 requires explicit dataAPI.labHTTP; trusted TLS has not passed" }}
@@ -10,6 +13,7 @@
 {{- end }}
 - {name: NEON_KUBE_NAMESPACE, value: {{ .Release.Namespace | quote }}}
 - {name: NEON_V2_CREATE_ENABLED, value: {{ .Values.api.creationEnabled | quote }}}
+- {name: NEON_V2_PITR_ENABLED, value: {{ .Values.api.pitrEnabled | quote }}}
 - {name: NEON_V2_SCALE_ZERO_ENABLED, value: {{ .Values.api.scaleToZeroEnabled | quote }}}
 - {name: NEON_COOKIE_SECURE, value: {{ .Values.api.cookieSecure | quote }}}
 - {name: NEON_PROXY_HOST, value: {{ .Values.api.proxyHost | quote }}}

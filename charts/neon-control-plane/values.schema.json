@@ -52,6 +52,9 @@
         },
         "image": {
           "$ref": "#/definitions/image"
+        },
+        "pitrEnabled": {
+          "type": "boolean"
         }
       }
     },

@@ -18,7 +18,7 @@
 | 跨实例缩零栅栏 | DB 租约无法 fence 所有外部动作；缺短连接 ledger | 多 API/Proxy 并发、过期 worker、新连接/删除竞争负例与无误删 |
 | HA | 独立 API/Worker 的领导租约已有代码；两者仍单副本；Metadata/数据面单故障域实验部署 | 独立故障域、主从切换/脑裂矩阵、指标和业务连续性 |
 | DR | 元数据/Secrets/对象/WAL 恢复未形成全栈演练 | 固定镜像与密钥、隔离 restore、真实 PG 数据校验、实测 RPO/RTO |
-| PITR | 当前仅当前状态分支，未实现时间点恢复产品流程 | timeline/LSN/时间映射、保留窗口、GC 边界、安全恢复与 UI |
+| PITR | 已实现按时间戳/LSN 恢复到新分支、原生保留窗口/租约与 UI；原地恢复、Time Travel Assist、完整 Backend 一致性恢复未实现 | 新分支路径按版本做真实 Linux UI 验收；另验原地切换、GC 竞争、服务一致性、长期保留与恢复 |
 | 小数 CPU | 已支持的 bounds 只有整核 | Guest cgroup quota + SQL + 调度竞争/计量实测 |
 | 内存缩回 | 未通过完整 RAM 扩缩闭环 | Guest 状态、压力/回收、OOM 防护、SQL 持续和冷醒完整循环 |
 | 基础设施稳定性 | 同物理盘 VM 存在共同 I/O 竞争 | 分离故障域/IO、持续负载、etcd 延迟与错误预算 |
