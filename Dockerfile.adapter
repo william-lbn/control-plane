@@ -1,0 +1,14 @@
+ARG GO_BUILDER_IMAGE
+FROM ${GO_BUILDER_IMAGE} AS build
+WORKDIR /src/api
+COPY api/go.mod api/go.sum ./
+RUN go mod download
+COPY api/cmd ./cmd
+COPY api/internal ./internal
+RUN CGO_ENABLED=0 GOMAXPROCS=2 go build -p=2 -trimpath -buildvcs=false -o /control-adapter ./cmd/control-adapter
+FROM scratch
+COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY --from=build /control-adapter /opt/neon-control/control-adapter
+USER 65532:65532
+EXPOSE 8080
+ENTRYPOINT ["/opt/neon-control/control-adapter"]

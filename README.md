@@ -1,6 +1,6 @@
 # Neon 自托管控制面
 
-Go + PostgreSQL 控制 API、React + TypeScript 控制台、Compute 管理网关及 Helm Chart。
+Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适配器、Compute 管理网关及 Helm Chart。
 许可证：Apache-2.0。项目由自托管维护者开发，与 Neon 托管服务独立。
 
 **发行状态：预览版本。已经验证的实验环境功能不等于生产认证，也不等于 Neon 官网全部 Backend 服务。**
@@ -29,13 +29,15 @@ Chart 0.5.0 提供独立 API、Worker、Web 进程及可选 Data API、应用凭
 
 **外部依赖**：Neon Storage Controller、Pageserver、Safekeeper、Proxy、持久对象存储、
 NeonVM、Autoscaling Agent/Scheduler，以及与本版合同匹配的 Proxy/Storage adapter。
-当前实验环境 adapter 仍为外部单实例原型；该原型及 Python 验证代码不在此仓库。
+Proxy/Storage adapter 的 Go 实现、镜像入口和故障测试现已包含在本仓库；统一部署 Chart 位于 neon-helm 仓库。
+Go 实现的部署验收状态以当次交付报告为准；仍限单实例，不能据此放行跨实例缩零或 HA。
+Python SSH、采证和历史验证工具属于维护者私有工具，不进入本产品源码或业务镜像。
 控制面、管理网关与 Data API Chart 不替代完整 Neon/Autoscaling 基础设施。
 
 ## 2. 目录与合同
 
 ```text
-api/                  Go module：API/Worker、Compute/Data API Gateway、DR 工具、SQL migrations
+api/                  Go module：API/Worker、Proxy/Storage Adapter、Compute/Data API Gateway、DR 工具、SQL migrations
 web/                  React/TypeScript：控制台、Node 回归测试、Playwright 真实 UI 测试
 contracts/            版本化 OpenAPI；路由与引用由 Go 测试校验
 charts/               控制面、Compute 管理网关与 Data API 认证入口 Helm Chart
@@ -52,6 +54,7 @@ docs/                 架构、对象模型、部署、测试、来源及生产�
 - [Fork 来源与镜像对应关系](docs/SOURCE-PROVENANCE.md)
 - [生产功能门槛](docs/PRODUCTION-GATES.md)
 - [API/Worker 拆分与升级](docs/WORKER-SPLIT.md)
+- [Go Proxy/Storage 适配器：合同、安全边界与升级](docs/GO-PROXY-ADAPTER.md)
 - [完整 Backend 产品实施合同](docs/FULL-PRODUCT-IMPLEMENTATION.md)
 - [AI Gateway 官网核验、平台配置与动态模型设计](docs/AI-GATEWAY-PLATFORM-DESIGN.md)
 - [原生 Data API 驱动与部署](docs/DATA-API-NATIVE-DRIVER.md)
@@ -84,7 +87,7 @@ CI 在 Linux 执行 gofmt、vet、race、真实 PG 集成、OpenAPI 路由/引�
 
 ## 4. 镜像与部署
 
-可信分支通过质量门槛后发布 `control-api`、`control-web`、`control-gateway`、`control-dataapi`、`control-postgrest`。
+可信分支通过质量门槛后发布 `control-api`、`control-web`、`control-gateway`、`control-dataapi`、`control-postgrest`、`control-adapter`。
 原生 Data API 的数据库权限、RLS、服务开关及现场测试见
 [Driver 手册](docs/DATA-API-NATIVE-DRIVER.md)。默认禁用，不能用 Ready Pod 代替实际数据访问验收。
 tag 使用 `sha-<full-commit>-r<run-id>-a<attempt>`，重跑产生新 tag；部署固定 registry manifest digest，不能使用 `latest`。
