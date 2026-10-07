@@ -1,0 +1,10 @@
+ARG NODE_BUILDER_IMAGE
+FROM ${NODE_BUILDER_IMAGE}
+WORKDIR /app
+ENV NODE_ENV=production
+COPY services/auth/package.json services/auth/package-lock.json ./
+RUN npm ci --omit=dev --ignore-scripts --no-audit --fund=false && npm cache clean --force
+COPY services/auth/src ./src
+USER 65532:65532
+EXPOSE 9082
+ENTRYPOINT ["node", "src/main.ts"]

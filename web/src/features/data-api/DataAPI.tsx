@@ -205,6 +205,27 @@ export function DataAPI({
       if (epoch.current === currentEpoch) setSending(false);
     }
   }
+  async function useBranchAuth() {
+    const currentEpoch = epoch.current;
+    setBusy(true);
+    try {
+      const auth = await api<{ state: string; issuer: string; audience: string }>(
+        `${projectPath(projectId)}/branches/${encodeURIComponent(branch)}/auth`,
+      );
+      if (auth.state !== 'active') throw new Error('先启用当前分支 Auth');
+      const response = await fetch(`/auth/v1/${branch}/jwks`, { credentials: 'same-origin' });
+      if (!response.ok) throw new Error('当前分支 Auth JWKS 不可用');
+      const keys = await response.json();
+      if (epoch.current !== currentEpoch) return;
+      setIssuer(auth.issuer);
+      setAudience(auth.audience);
+      setJWKS(JSON.stringify(keys, null, 2));
+    } catch (error) {
+      if (epoch.current === currentEpoch) showError(error);
+    } finally {
+      if (epoch.current === currentEpoch) setBusy(false);
+    }
+  }
   if (!branches.length)
     return <Empty title="先创建数据库分支" message="Data API 绑定分支的读写 Endpoint。" />;
   return (
@@ -238,6 +259,14 @@ export function DataAPI({
       </div>
       <section className="table-card backend-panel" style={{ padding: 24 }}>
         <h3>身份与数据库</h3>
+        <button
+          className="button"
+          type="button"
+          disabled={!canEdit || busy || instance?.state === 'active'}
+          onClick={() => void useBranchAuth()}
+        >
+          使用当前分支 Auth
+        </button>
         <p>
           先通过 SQL 工作台准备专用应用 schema，并为每张表启用 ENABLE / FORCE ROW LEVEL
           SECURITY。避免授予 PUBLIC 访问权限。请求角色：

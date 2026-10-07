@@ -88,6 +88,9 @@ func (s *server) authorizeRoute(w http.ResponseWriter, r *http.Request, u user) 
 		if strings.HasSuffix(r.URL.Path, "/protection") || strings.HasSuffix(r.URL.Path, "/recover") {
 			required = 3
 		}
+		if strings.HasSuffix(r.URL.Path, "/auth") || strings.HasSuffix(r.URL.Path, "/auth/users") {
+			required = 3 // Application identity configuration and PII require a project administrator.
+		}
 		var state string
 		if err := s.db.QueryRow(r.Context(), "SELECT state FROM projects WHERE id=$1", project).Scan(&state); err != nil {
 			fail(w, r, 503, "metadata_unavailable", "Could not check lifecycle")

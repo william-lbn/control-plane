@@ -21,6 +21,7 @@ Chart 0.6.1 提供独立 API、Worker、Web 进程及可选 Data API、应用凭
 | 数据库、角色与密码轮换 | 分支目录、Compute 原生配置、Proxy spec 调谐 | rename、owner 变更、未知外部 DDL 恢复未完成 |
 | CPU / 内存边界、自动休眠、连接唤醒 | 已实现实验环境控制路径 | 整数 CPU 1→2→1 已验证；小数 CPU、完整内存缩回、跨实例栅栏未验收 |
 | 监控、Operation 步骤、错误与重试 | 已实现 | 长期指标持久化、SLO 告警、完整审计导出未完成 |
+| 分支 Managed Auth | Go/TS/React 代码、真实 PostgreSQL 注册/会话/JWT/克隆隔离与 CI 已实现 | Neon UI 以独立 Auth 交付报告为准；邮件/OAuth/MFA/TLS/HA 不虚标 |
 | 时间点恢复到新分支 | 原生时间戳/LSN、存储保留租约、异步调谐、历史目录隔离、React UI | 默认禁用；仅受管理分支；原地恢复、Time Travel Assist、完整 Backend 一致性恢复未实现 |
 | 项目/分支保留删除 | 保护/依赖图、关闭 Proxy 和服务、回收 Compute、tombstone、七天项目恢复、React UI | 物理 GC 与跨实例栅栏未开放；仅就绪 managed 资源；详见 [删除手册](docs/RETAINED-DELETION.md) |
 | HA / DR | 部分租约与恢复工具 | 未通过独立故障域 HA/DR；历史新分支恢复不等于完整 DR |
@@ -58,6 +59,7 @@ docs/                 架构、对象模型、部署、测试、来源及生产�
 - [Go Proxy/Storage 适配器：合同、安全边界与升级](docs/GO-PROXY-ADAPTER.md)
 - [Go 运行链路、Helm 0.1.3 和五套 Linux UI 验收](https://github.com/william-lbn/neon-helm/blob/main/docs/ACCEPTANCE-2026-10-07-GO-ADAPTER.md)
 - [统一 Helm 0.1.4、保留恢复和六套正式镜像 UI 验收](https://github.com/william-lbn/neon-helm/blob/v0.1.4/docs/ACCEPTANCE-2026-10-08-LIFECYCLE.md)
+- [分支 Managed Auth：Go Driver、TypeScript 运行时、React UI、分支隔离与复测](docs/MANAGED-AUTH.md)
 - [完整 Backend 产品实施合同](docs/FULL-PRODUCT-IMPLEMENTATION.md)
 - [AI Gateway 官网核验、平台配置与动态模型设计](docs/AI-GATEWAY-PLATFORM-DESIGN.md)
 - [原生 Data API 驱动与部署](docs/DATA-API-NATIVE-DRIVER.md)

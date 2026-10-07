@@ -282,7 +282,7 @@ func (s *server) admitDeletion(w http.ResponseWriter, r *http.Request, recoverin
 	}
 	if !recovering {
 		var unsupported bool
-		err = tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM branch_service_instances WHERE branch_id=ANY($1::text[]) AND service_kind NOT IN ('postgres','data_api') AND desired_state<>'disabled')`, p.BranchIDs).Scan(&unsupported)
+		err = tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM branch_service_instances WHERE branch_id=ANY($1::text[]) AND service_kind NOT IN ('postgres','data_api','auth') AND desired_state<>'disabled')`, p.BranchIDs).Scan(&unsupported)
 		if err != nil || unsupported {
 			fail(w, r, 409, "service_retirement_driver_required", "Every enabled branch service must have a verified retirement driver")
 			return
@@ -408,6 +408,7 @@ func (k *kubeClient) setDeletionRoutes(ctx context.Context, p deletionPayload, o
 				route["deletion_operation_id"] = operationID
 				if roles, ok := route["roles"].(map[string]any); ok {
 					delete(roles, dataAPILogin(branch))
+					delete(roles, managedAuthLogin(branch))
 				}
 			}
 		}
@@ -492,6 +493,15 @@ func (s *server) reconcileDeletion(ctx context.Context, id, worker, action strin
 			}
 			for _, v := range items {
 				if err = s.retireDeletionDataAPI(ctx, dataAPIPayload{ProjectID: p.ProjectID, BranchID: stringVal(v["branch_id"]), EndpointID: stringVal(v["endpoint_id"])}); err != nil {
+					return err
+				}
+			}
+			authItems, err := s.many(ctx, `SELECT branch_id,endpoint_id FROM managed_auth_instances WHERE project_id=$1 AND branch_id=ANY($2::text[])`, p.ProjectID, p.BranchIDs)
+			if err != nil {
+				return err
+			}
+			for _, v := range authItems {
+				if err = s.retireDeletionManagedAuth(ctx, managedAuthPayload{ProjectID: p.ProjectID, BranchID: stringVal(v["branch_id"]), EndpointID: stringVal(v["endpoint_id"])}); err != nil {
 					return err
 				}
 			}
@@ -628,6 +638,9 @@ func (s *server) commitDeletion(ctx context.Context, id, worker, action string, 
 		if _, err = tx.Exec(ctx, `UPDATE data_api_instances SET state='disabled',updated_at=now() WHERE branch_id=ANY($1::text[])`, p.BranchIDs); err != nil {
 			return err
 		}
+		if _, err = tx.Exec(ctx, `UPDATE managed_auth_instances SET state='disabled',updated_at=now() WHERE branch_id=ANY($1::text[])`, p.BranchIDs); err != nil {
+			return err
+		}
 		if _, err = tx.Exec(ctx, `UPDATE branch_service_instances SET desired_state='disabled',observed_state='disabled',public_endpoint=NULL,version=version+1,last_observed_at=now() WHERE branch_id=ANY($1::text[])`, p.BranchIDs); err != nil {
 			return err
 		}
@@ -672,6 +685,47 @@ func (s *server) retireDeletionDataAPI(ctx context.Context, p dataAPIPayload) er
 		}
 		if !ownedDataAPI(item, p) {
 			return errors.New("Data API ownership changed during retirement")
+		}
+		if number(nested(item, "status", "observedGeneration")) >= number(nested(item, "metadata", "generation")) && number(nested(item, "status", "replicas")) == 0 {
+			return nil
+		}
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(2 * time.Second):
+		}
+	}
+}
+
+func (s *server) retireDeletionManagedAuth(ctx context.Context, p managedAuthPayload) error {
+	path := s.kube.path("deployment", managedAuthName(p.BranchID))
+	item, err := s.kube.request(ctx, http.MethodGet, path, nil)
+	if kubeStatusIs(err, 404) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if !ownedManagedAuth(item, p) {
+		return errors.New("deletion Managed Auth workload ownership mismatch")
+	}
+	spec, ok := item["spec"].(map[string]any)
+	if !ok {
+		return errors.New("Managed Auth spec missing")
+	}
+	if number(spec["replicas"]) != 0 {
+		spec["replicas"] = 0
+		if _, err = s.kube.request(ctx, http.MethodPut, path, item); err != nil {
+			return err
+		}
+	}
+	for {
+		item, err = s.kube.request(ctx, http.MethodGet, path, nil)
+		if err != nil {
+			return err
+		}
+		if !ownedManagedAuth(item, p) {
+			return errors.New("Managed Auth ownership changed during retirement")
 		}
 		if number(nested(item, "status", "observedGeneration")) >= number(nested(item, "metadata", "generation")) && number(nested(item, "status", "replicas")) == 0 {
 			return nil

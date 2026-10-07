@@ -116,6 +116,15 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 			if stepErr == nil {
 				stepErr = s.reconcileDataAPI(runCtx, id, workerID, action, p)
 			}
+		case "enable_managed_auth", "disable_managed_auth":
+			var p managedAuthPayload
+			stepErr = json.Unmarshal(payload, &p)
+			if stepErr == nil && (p.ProjectID != projectID || p.BranchID != resourceID) {
+				stepErr = errors.New("Managed Auth operation scope mismatch")
+			}
+			if stepErr == nil {
+				stepErr = s.reconcileManagedAuth(runCtx, id, workerID, action, p)
+			}
 		case "create_role", "rotate_role_password", "delete_role", "create_database", "delete_database":
 			var p catalogPayload
 			if err := json.Unmarshal(payload, &p); err != nil {
@@ -249,6 +258,11 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 		return err
 	}
 	if state == "failed" {
+		if action == "enable_managed_auth" || action == "disable_managed_auth" {
+			if _, err = finishTx.Exec(ctx, `UPDATE managed_auth_instances SET state='degraded',updated_at=now() WHERE branch_id=$1 AND project_id=$2 AND generation=(SELECT (payload->>'generation')::bigint FROM operations WHERE id=$3)`, resourceID, projectID, id); err != nil {
+				return err
+			}
+		}
 		if action == "enable_data_api" || action == "disable_data_api" {
 			if _, err = finishTx.Exec(ctx, `UPDATE data_api_instances SET state='degraded',updated_at=now()
 				WHERE branch_id=$1 AND project_id=$2 AND generation=(SELECT (payload->>'generation')::bigint FROM operations WHERE id=$3)`, resourceID, projectID, id); err != nil {

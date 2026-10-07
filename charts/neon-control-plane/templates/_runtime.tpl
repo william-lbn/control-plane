@@ -1,4 +1,13 @@
 {{- define "neonControl.runtimeEnv" -}}
+{{- if .Values.managedAuth.enabled }}
+{{- if or (not .Values.managedAuth.labHTTP) (not .Values.managedAuth.publicOrigin) }}
+{{- fail "Managed Auth v1 requires explicit managedAuth.labHTTP and publicOrigin; trusted TLS has not passed" }}
+{{- end }}
+- {name: NEON_AUTH_ENABLED, value: 'true'}
+- {name: NEON_AUTH_LAB_HTTP, value: 'true'}
+- {name: NEON_AUTH_RUNTIME_IMAGE, value: {{ .Values.managedAuth.runtimeImage | quote }}}
+- {name: NEON_AUTH_PUBLIC_ORIGIN, value: {{ .Values.managedAuth.publicOrigin | quote }}}
+{{- end }}
 {{- if and .Values.api.pitrEnabled (not .Values.api.creationEnabled) }}
 {{- fail "Historical branch restore requires api.creationEnabled" }}
 {{- end }}

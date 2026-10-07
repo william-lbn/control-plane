@@ -208,6 +208,10 @@ func (s *server) publishDataAPIIdentity(ctx context.Context, p dataAPIPayload, e
 			return err
 		}
 	}
+	return s.publishBranchServiceIdentity(ctx, p.ProjectID, p.BranchID, p.EndpointID, dataAPILogin(p.BranchID), verifier, enable)
+}
+
+func (s *server) publishBranchServiceIdentity(ctx context.Context, project, branch, endpoint, login, verifier string, enable bool) error {
 	for attempt := 0; attempt < 6; attempt++ {
 		secret, err := s.kube.request(ctx, http.MethodGet, s.kube.path("secret", routesSecret), nil)
 		if err != nil {
@@ -221,18 +225,18 @@ func (s *server) publishDataAPIIdentity(ctx context.Context, p dataAPIPayload, e
 		if err = json.Unmarshal([]byte(raw), &routes); err != nil {
 			return err
 		}
-		route := routes[selector(p.EndpointID)]
-		if route == nil || route["project_id"] != p.ProjectID || route["branch_id"] != p.BranchID {
-			return errors.New("Data API writer route ownership mismatch")
+		route := routes[selector(endpoint)]
+		if route == nil || route["project_id"] != project || route["branch_id"] != branch {
+			return errors.New("Branch service writer route ownership mismatch")
 		}
 		roles, ok := route["roles"].(map[string]any)
 		if !ok {
 			return errors.New("writer route role registry unavailable")
 		}
 		if enable {
-			roles[dataAPILogin(p.BranchID)] = verifier
+			roles[login] = verifier
 		} else {
-			delete(roles, dataAPILogin(p.BranchID))
+			delete(roles, login)
 		}
 		b, _ := json.Marshal(routes)
 		secret["data"].(map[string]any)["routes.json"] = base64.StdEncoding.EncodeToString(b)
@@ -243,7 +247,7 @@ func (s *server) publishDataAPIIdentity(ctx context.Context, p dataAPIPayload, e
 		}
 		return err
 	}
-	return errors.New("Data API credential registry conflict")
+	return errors.New("Branch service credential registry conflict")
 }
 
 func dataAPIDeployment(p dataAPIPayload, namespace string, enable bool) map[string]any {

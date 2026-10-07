@@ -171,6 +171,54 @@
           }
         }
       ]
+    },
+    "managedAuth": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "labHTTP",
+        "runtimeImage",
+        "publicOrigin"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "labHTTP": {
+          "type": "boolean"
+        },
+        "runtimeImage": {
+          "type": "string"
+        },
+        "publicOrigin": {
+          "type": "string"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "labHTTP": {
+                "const": true
+              },
+              "runtimeImage": {
+                "pattern": "^[a-z0-9./_-]+@sha256:[a-f0-9]{64}$"
+              },
+              "publicOrigin": {
+                "pattern": "^https?://[^/\\s*?#@]+$"
+              }
+            }
+          }
+        }
+      ]
     }
   },
   "definitions": {

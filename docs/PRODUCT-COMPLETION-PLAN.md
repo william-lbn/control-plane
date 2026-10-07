@@ -57,3 +57,10 @@ Linux 正反例与恢复测试、当前交付报告；通过后才更新对应 c
    与版本删除，不能删除 PVC、WAL、对象、业务目录、Secrets 或本项目历史证据。
 5. 本轮首项的准确合同和复测步骤见 HISTORICAL-BRANCH-RESTORE.md；最终结论
    以该项实际 Linux UI、发布镜像和 Helm 验证回执为准。
+
+
+## 2026-10-08 增量：Managed Auth
+
+已进入 Managed Auth 基础闭环实现，具体合同见 [MANAGED-AUTH.md](MANAGED-AUTH.md)。
+Better Auth 1.7.7 与 pg 8.23.1 由 Linux 查询注册表后锁定；新增 metadata migration 016、四个管理 API、分支公共 Auth 入口、独立 TS runtime、Go leased Driver、自动子分支 companion Operation、Auth/删除恢复与 Data API 联动、React 体验页面和第七个发布镜像。
+337 个 Go/真实 PostgreSQL 测试和库集成通过；真实 Neon UI 需单独留证。原有跨实例外部栅栏、可信 TLS、HA/DR、Functions、产品 Object Storage 和 AI 推理门槛继续保持未通过；本增量不将它们变成已完成状态。

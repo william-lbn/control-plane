@@ -22,7 +22,7 @@ rules:
     verbs: [get]
   - apiGroups: [apps]
     resources: [deployments]
-    {{- if .Values.dataAPI.enabled }}
+    {{- if or .Values.dataAPI.enabled .Values.managedAuth.enabled }}
     verbs: [get, create, update]
     {{- else }}
     verbs: [get]

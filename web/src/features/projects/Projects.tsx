@@ -14,6 +14,7 @@ import { Compute } from '../compute/Compute';
 import { Monitoring } from '../monitoring/Monitoring';
 import { Connections } from '../connect/Connections';
 import { DataAPI } from '../data-api/DataAPI';
+import { ManagedAuth } from '../auth/ManagedAuth';
 import { BackendCredentials } from '../credentials/BackendCredentials';
 import { Workbench } from '../sql/Workbench';
 import { Operations } from '../operations/Operations';
@@ -175,6 +176,15 @@ export function ProjectWorkspace({
   const canEdit =
     project.effective_permission === 'admin' || project.effective_permission === 'editor';
   const canAdmin = project.effective_permission === 'admin';
+  if (page === 'auth')
+    return (
+      <ManagedAuth
+        projectId={projectId}
+        branches={branches}
+        canAdmin={canAdmin}
+        showError={showError}
+      />
+    );
   if (page === 'data-api')
     return (
       <DataAPI projectId={projectId} branches={branches} canEdit={canEdit} showError={showError} />

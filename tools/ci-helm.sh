@@ -38,3 +38,10 @@ grep -q 'NEON_BACKEND_CREDENTIAL_KEYS_FILE' artifacts/helm/backend-credentials.y
 if helm template bad charts/neon-control-plane -f charts/neon-control-plane/ci/render-values.yaml --set backendCredentials.enabled=true --set backendCredentials.labHTTP=true > artifacts/helm/rejected-backend-secret.log 2>&1; then exit 1; fi
 if helm template bad charts/neon-control-plane -f charts/neon-control-plane/ci/render-values.yaml --set backendCredentials.enabled=true --set backendCredentials.existingSecret=backend-keys --set api.cookieSecure=false > artifacts/helm/rejected-backend-http.log 2>&1; then exit 1; fi
 sha256sum artifacts/helm/*.tgz > artifacts/helm/SHA256SUMS
+helm template native-auth charts/neon-control-plane --namespace neon -f charts/neon-control-plane/ci/render-values.yaml \
+  --set managedAuth.enabled=true --set managedAuth.labHTTP=true \
+  --set managedAuth.publicOrigin=http://192.0.2.1:30788 \
+  --set "managedAuth.runtimeImage=example.invalid/auth@sha256:$(printf 'c%.0s' {1..64})" > artifacts/helm/native-auth.yaml
+grep -q 'NEON_AUTH_RUNTIME_IMAGE' artifacts/helm/native-auth.yaml
+if helm template bad charts/neon-control-plane -f charts/neon-control-plane/ci/render-values.yaml --set managedAuth.enabled=true > artifacts/helm/rejected-auth-default.log 2>&1; then exit 1; fi
+if helm template bad charts/neon-control-plane -f charts/neon-control-plane/ci/render-values.yaml --set managedAuth.enabled=true --set managedAuth.labHTTP=true --set managedAuth.publicOrigin=http://192.0.2.1:30788 --set managedAuth.runtimeImage=example.invalid/auth:latest > artifacts/helm/rejected-auth-tag.log 2>&1; then exit 1; fi

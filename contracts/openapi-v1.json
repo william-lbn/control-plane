@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.8.0",
+    "version": "0.9.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -2298,6 +2298,92 @@
           "version": {
             "type": "integer",
             "minimum": 1
+          }
+        }
+      },
+      "ManagedAuthSpec": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "database",
+          "allowed_origins"
+        ],
+        "properties": {
+          "database": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          },
+          "allowed_origins": {
+            "type": "array",
+            "maxItems": 8,
+            "items": {
+              "type": "string",
+              "format": "uri",
+              "description": "Exact trusted browser origin; no wildcard, credentials, path, query or fragment."
+            }
+          }
+        }
+      },
+      "ManagedAuthInstance": {
+        "type": "object",
+        "required": [
+          "branch_id",
+          "generation",
+          "state",
+          "driver_enabled",
+          "public_endpoint",
+          "issuer",
+          "audience"
+        ],
+        "properties": {
+          "branch_id": {
+            "type": "string"
+          },
+          "generation": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "disabled",
+              "provisioning",
+              "active",
+              "disabling",
+              "degraded"
+            ]
+          },
+          "driver_enabled": {
+            "type": "boolean"
+          },
+          "endpoint_id": {
+            "type": "string"
+          },
+          "public_endpoint": {
+            "type": "string",
+            "format": "uri"
+          },
+          "issuer": {
+            "type": "string",
+            "format": "uri"
+          },
+          "audience": {
+            "type": "string"
+          },
+          "spec": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ManagedAuthSpec"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "runtime": {
+            "type": "object",
+            "additionalProperties": true
           }
         }
       }
@@ -7921,6 +8007,402 @@
                 "$ref": "#/components/schemas/LifecycleConfirmation"
               }
             }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/auth": {
+      "get": {
+        "tags": [
+          "Managed Auth"
+        ],
+        "operationId": "getManagedAuth",
+        "summary": "Read configuration and runtime without SQL cold wake",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current instance; ETag is the generation",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ManagedAuthInstance"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient project permission"
+          },
+          "404": {
+            "description": "Project or branch not visible"
+          },
+          "409": {
+            "description": "Conflicting active Operation, audience or service state"
+          },
+          "412": {
+            "description": "Generation changed"
+          },
+          "422": {
+            "description": "Invalid provider configuration"
+          },
+          "428": {
+            "description": "If-Match required"
+          },
+          "503": {
+            "description": "Driver disabled or metadata unavailable"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Managed Auth"
+        ],
+        "operationId": "enableManagedAuth",
+        "summary": "Enable branch Managed Auth through an asynchronous native Driver",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Quoted numeric generation returned by GET; replay of the same key and input returns its original Operation"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Stable durable Operation and branch ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "branch_id",
+                    "operation"
+                  ],
+                  "properties": {
+                    "branch_id": {
+                      "type": "string"
+                    },
+                    "operation": {
+                      "$ref": "#/components/schemas/Operation"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient project permission"
+          },
+          "404": {
+            "description": "Project or branch not visible"
+          },
+          "409": {
+            "description": "Conflicting active Operation, audience or service state"
+          },
+          "412": {
+            "description": "Generation changed"
+          },
+          "422": {
+            "description": "Invalid provider configuration"
+          },
+          "428": {
+            "description": "If-Match required"
+          },
+          "503": {
+            "description": "Driver disabled or metadata unavailable"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ManagedAuthSpec"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Managed Auth"
+        ],
+        "operationId": "disableManagedAuth",
+        "summary": "Stop runtime and withdraw Proxy identity; retain application data",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Quoted numeric generation returned by GET; replay of the same key and input returns its original Operation"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Stable durable Operation and branch ID",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "branch_id",
+                    "operation"
+                  ],
+                  "properties": {
+                    "branch_id": {
+                      "type": "string"
+                    },
+                    "operation": {
+                      "$ref": "#/components/schemas/Operation"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient project permission"
+          },
+          "404": {
+            "description": "Project or branch not visible"
+          },
+          "409": {
+            "description": "Conflicting active Operation, audience or service state"
+          },
+          "412": {
+            "description": "Generation changed"
+          },
+          "422": {
+            "description": "Invalid provider configuration"
+          },
+          "428": {
+            "description": "If-Match required"
+          },
+          "503": {
+            "description": "Driver disabled or metadata unavailable"
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ]
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/auth/users": {
+      "post": {
+        "operationId": "inspectManagedAuthUsers",
+        "tags": [
+          "Data API"
+        ],
+        "summary": "Read up to 100 application identities from the active branch",
+        "description": "Project administrators only. Explicit SQL read may cold wake Compute. Never returns password hashes, sessions, tokens or signing keys.",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Bounded user records",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "items",
+                    "limit",
+                    "branch_id"
+                  ],
+                  "properties": {
+                    "branch_id": {
+                      "type": "string"
+                    },
+                    "limit": {
+                      "type": "integer",
+                      "const": 100
+                    },
+                    "items": {
+                      "type": "array",
+                      "maxItems": 100,
+                      "items": {
+                        "type": "object",
+                        "required": [
+                          "id",
+                          "name",
+                          "email"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "email": {
+                            "type": "string"
+                          },
+                          "email_verified": {
+                            "type": "boolean"
+                          },
+                          "created_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid Console session"
+          },
+          "403": {
+            "description": "Insufficient privilege or API key"
+          },
+          "404": {
+            "description": "Branch outside project"
+          },
+          "422": {
+            "description": "Invalid request"
+          },
+          "503": {
+            "description": "Metadata unavailable"
           }
         }
       }

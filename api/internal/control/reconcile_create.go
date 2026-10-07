@@ -241,6 +241,11 @@ func (s *server) reconcileCreate(ctx context.Context, operationID, workerID, act
 			WHERE branch_id=$1 AND service_kind='postgres'`, p.BranchID); err != nil {
 			return err
 		}
+		if p.EndpointID != "" && p.EndpointType != "read_only" {
+			if err = s.queueInheritedManagedAuthTx(ctx, tx, operationID, p); err != nil {
+				return err
+			}
+		}
 		return tx.Commit(ctx)
 	})
 }

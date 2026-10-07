@@ -1,4 +1,7 @@
 Neon Self-hosted Control Plane
+Managed Auth integrates Better Auth 1.7.7 (MIT) and node-postgres 8.23.1 (MIT).
+Sources: https://github.com/better-auth/better-auth and https://github.com/brianc/node-postgres.
+Installed dependency packages retain their upstream license notices.
 Copyright 2026 the control-plane contributors.
 
 This independent project integrates with Neon open source components.

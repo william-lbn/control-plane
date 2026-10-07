@@ -1,4 +1,11 @@
 fullnameOverride: neon-control
+managedAuth:
+  enabled: false
+  # Version 1 requires the explicit lab HTTP profile. It is not a trusted TLS gate.
+  labHTTP: false
+  runtimeImage: ''
+  # Exact browser-facing origin; no path, trailing slash, wildcard or credentials.
+  publicOrigin: ''
 backendCredentials:
   enabled: false
   existingSecret: ''
