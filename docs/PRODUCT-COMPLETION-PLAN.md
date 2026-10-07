@@ -10,10 +10,10 @@
 实施合同由 FULL-PRODUCT-IMPLEMENTATION.md 和实际 OpenAPI 共同约束。
 下面是顺序及退出条件，不代表所有项目已经实现。
 
-运行语言收敛已完成本轮闭环：原生 Go Proxy/Storage adapter、统一 Helm 0.1.3
-已部署，304 Go 测试和五套真实 Linux UI（60 检查）通过；现场没有运行中的 Python
+运行语言收敛与保留生命周期已完成本轮闭环：原生 Go Proxy/Storage adapter、统一 Helm 0.1.4
+已部署，327 Go 测试和六套真实 Linux UI（83 检查）通过；现场没有运行中的 Python
 Pod。私有 Python 测试工具不是产品后端。源码/镜像锁和失败修复记录见
-[本轮验收](https://github.com/william-lbn/neon-helm/blob/main/docs/ACCEPTANCE-2026-10-07-GO-ADAPTER.md)。
+[本轮验收](https://github.com/william-lbn/neon-helm/blob/v0.1.4/docs/ACCEPTANCE-2026-10-08-LIFECYCLE.md)。
 此迁移不等于第 4 项的连接账本、跨实例栅栏和 HA 已经完成。
 本次增加第 2 项的项目/叶分支保护、保留删除、七天项目恢复和两个 Reader 的独立
 休眠/冷醒测试。准确合同见 [保留删除](RETAINED-DELETION.md)；是否通过现场测试以

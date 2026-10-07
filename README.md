@@ -4,7 +4,7 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 许可证：Apache-2.0。项目由自托管维护者开发，与 Neon 托管服务独立。
 
 **发行状态：预览版本。已经验证的实验环境功能不等于生产认证，也不等于 Neon 官网全部 Backend 服务。**
-[2026-10-07 交付及验收边界](docs/DELIVERY-2026-10-07.md)记录邀请注册、权限撤销和资源清理。
+[2026-10-08 正式交付](docs/DELIVERY-2026-10-08.md)记录六镜像、统一 Helm 0.1.4、六套 Linux UI 和剩余门槛；[历史交付](docs/DELIVERY-2026-10-07.md)保留先前邀请注册与资源清理证据。
 Chart 0.6.1 提供独立 API、Worker、Web 进程及可选 Data API、应用凭据、Console 邀请注册、历史分支恢复与保留删除；Worker 使用 PostgreSQL 领导租约。
 当前只允许一个 API 和一个 Worker，跨实例外部 fencing 与 HA 仍须独立验收。
 旧合并版本升级前必须执行 [停止/排空流程](docs/WORKER-SPLIT.md)。
@@ -49,7 +49,7 @@ docs/                 架构、对象模型、部署、测试、来源及生产�
 ```
 
 - [架构与模型](docs/ARCHITECTURE.md)
-- [63 个实际 API 操作](docs/API.md)
+- [69 个实际 API 操作](docs/API.md)
 - [Linux 部署与回滚](docs/DEPLOYMENT.md)
 - [测试与交付标准](docs/TESTING.md)
 - [Fork 来源与镜像对应关系](docs/SOURCE-PROVENANCE.md)
@@ -57,6 +57,7 @@ docs/                 架构、对象模型、部署、测试、来源及生产�
 - [API/Worker 拆分与升级](docs/WORKER-SPLIT.md)
 - [Go Proxy/Storage 适配器：合同、安全边界与升级](docs/GO-PROXY-ADAPTER.md)
 - [Go 运行链路、Helm 0.1.3 和五套 Linux UI 验收](https://github.com/william-lbn/neon-helm/blob/main/docs/ACCEPTANCE-2026-10-07-GO-ADAPTER.md)
+- [统一 Helm 0.1.4、保留恢复和六套正式镜像 UI 验收](https://github.com/william-lbn/neon-helm/blob/v0.1.4/docs/ACCEPTANCE-2026-10-08-LIFECYCLE.md)
 - [完整 Backend 产品实施合同](docs/FULL-PRODUCT-IMPLEMENTATION.md)
 - [AI Gateway 官网核验、平台配置与动态模型设计](docs/AI-GATEWAY-PLATFORM-DESIGN.md)
 - [原生 Data API 驱动与部署](docs/DATA-API-NATIVE-DRIVER.md)
