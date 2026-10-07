@@ -35,6 +35,40 @@ test('Data API: native UI, RLS, identity isolation, disable and cold wake', asyn
   let writer = '';
   let branch = '';
   let result = 'running';
+  const pollFault = process.env.NEON_E2E_POLL_FAULT === 'true';
+  let faultArmed = false;
+  let injectedReads = 0;
+  let enableMutations = 0;
+  if (pollFault) {
+    page.on('request', (request) => {
+      if (
+        faultArmed &&
+        request.method() === 'POST' &&
+        new URL(request.url()).pathname.endsWith('/data-api')
+      )
+        enableMutations++;
+    });
+    await page.route('**/api/v1/projects/*/operations/*', async (route) => {
+      if (
+        faultArmed &&
+        route.request().method() === 'GET' &&
+        /^\/api\/v1\/projects\/[^/]+\/operations\/[^/]+$/.test(
+          new URL(route.request().url()).pathname,
+        ) &&
+        injectedReads < 2
+      ) {
+        injectedReads++;
+        await route.fulfill({
+          status: 503,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            code: 'metadata_unavailable',
+            message: 'Controlled observation outage',
+          }),
+        });
+      } else await route.continue();
+    });
+  }
   async function save() {
     await writeFile(
       testInfo.outputPath('result.json'),
@@ -170,7 +204,17 @@ test('Data API: native UI, RLS, identity isolation, disable and cold wake', asyn
       .getByLabel('Provider JWKS', { exact: true })
       .fill(JSON.stringify({ keys: [provider] }));
     await page.getByLabel('Data API 允许来源', { exact: true }).fill('https://app.example.test');
+    faultArmed = pollFault;
     const accepted = await service(false);
+    if (pollFault) {
+      expect(injectedReads).toBe(2);
+      expect(enableMutations).toBe(1);
+      await record('ui_data_api_recovers_transient_observation_without_repeating_enable', {
+        injected_reads: injectedReads,
+        enable_mutations: enableMutations,
+      });
+    }
+    faultArmed = false;
     // Replay the exact UI request: neither another service nor credentials
     // may be created; reusing its key with changed input must fail.
     const headers = accepted.request().headers();

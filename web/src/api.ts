@@ -1,3 +1,5 @@
+import { retryAfterSeconds } from './shared/followOperation';
+
 export type User = { id: string; username: string; role: string };
 export type Organization = { id: string; name: string; slug: string; role: string; state: string };
 export type Page<T> = { items: T[]; next_cursor: string | null };
@@ -143,6 +145,7 @@ export class ApiError extends Error {
     public code: string,
     message: string,
     public requestId?: string,
+    public retryAfterSeconds?: number,
   ) {
     super(message);
   }
@@ -166,6 +169,7 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
       String(data.code || 'request_failed'),
       String(data.message || `HTTP ${response.status}`),
       String(data.request_id || ''),
+      retryAfterSeconds(response.headers.get('Retry-After')),
     );
   return data as T;
 }

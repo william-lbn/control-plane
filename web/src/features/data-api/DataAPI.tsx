@@ -3,6 +3,7 @@ import { api, projectPath } from '../../api';
 import type { Branch, Operation, Runtime } from '../../api';
 import { Empty, PageHeading, status } from '../../shared/ui';
 import { newRequestKey } from '../../shared/requestKey';
+import { followOperation } from '../../shared/followOperation';
 
 type Spec = {
   database: string;
@@ -45,6 +46,8 @@ export function DataAPI({
   const [jwks, setJWKS] = useState('');
   const [origins, setOrigins] = useState('');
   const [operation, setOperation] = useState<Operation | null>(null);
+  const [trackingNotice, setTrackingNotice] = useState('');
+  const polling = useRef<AbortController | null>(null);
   const [busy, setBusy] = useState(false);
   const [token, setToken] = useState('');
   const [resource, setResource] = useState('notes');
@@ -56,11 +59,13 @@ export function DataAPI({
   const path = `${projectPath(projectId)}/branches/${encodeURIComponent(branch)}/data-api`;
 
   useEffect(() => {
+    polling.current?.abort();
     const current = ++epoch.current;
     setInstance(null);
     setToken('');
     setResponse('');
     setOperation(null);
+    setTrackingNotice('');
     setDatabase('postgres');
     setSchema('app_data');
     setIssuer('');
@@ -88,11 +93,56 @@ export function DataAPI({
         });
     return () => {
       epoch.current++;
+      polling.current?.abort();
     };
   }, [path]);
 
+  async function observe(id: string, currentEpoch: number) {
+    polling.current?.abort();
+    const controller = new AbortController();
+    polling.current = controller;
+    const current = await followOperation({
+      id,
+      signal: controller.signal,
+      read: (signal) => api<Operation>(`${projectPath(projectId)}/operations/${id}`, { signal }),
+      onValue: (value) => {
+        if (epoch.current === currentEpoch) {
+          setOperation(value);
+          setTrackingNotice('');
+        }
+      },
+      onUnavailable: () => {
+        if (epoch.current === currentEpoch)
+          setTrackingNotice('服务暂时不可用，正在继续查询已受理的操作。');
+      },
+    });
+    if (epoch.current !== currentEpoch) return;
+    if (!current) throw new Error('状态查询暂未完成，可继续查询原操作。');
+    const updated = await api<Instance>(path, {
+      signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10_000)]),
+    });
+    if (epoch.current !== currentEpoch) return;
+    setInstance(updated);
+    if (current.state !== 'succeeded')
+      throw new Error(`${current.error_message || '操作未成功'} · ${id}`);
+  }
+
+  async function continueTracking() {
+    if (!operation || busy) return;
+    const currentEpoch = epoch.current;
+    setBusy(true);
+    try {
+      await observe(operation.id, currentEpoch);
+    } catch (error) {
+      if (epoch.current === currentEpoch) showError(error);
+    } finally {
+      if (epoch.current === currentEpoch) setBusy(false);
+    }
+  }
+
   async function mutate(disable: boolean) {
-    if (!instance) return;
+    if (!instance || (operation && ['queued', 'running', 'retry_wait'].includes(operation.state)))
+      return;
     const currentEpoch = epoch.current;
     setBusy(true);
     try {
@@ -115,23 +165,8 @@ export function DataAPI({
         ...(disable ? {} : { body: JSON.stringify(spec) }),
       });
       if (epoch.current !== currentEpoch) return;
-      let current = accepted.operation;
-      setOperation(current);
-      const deadline = Date.now() + 480000;
-      while (['queued', 'running', 'retry_wait'].includes(current.state)) {
-        if (Date.now() > deadline)
-          throw new Error(`操作仍在执行，请在操作记录中查看 ${current.id}`);
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-        if (epoch.current !== currentEpoch) return;
-        current = await api<Operation>(`${projectPath(projectId)}/operations/${current.id}`);
-        if (epoch.current !== currentEpoch) return;
-        setOperation(current);
-      }
-      const updated = await api<Instance>(path);
-      if (epoch.current !== currentEpoch) return;
-      setInstance(updated);
-      if (current.state !== 'succeeded')
-        throw new Error(`${current.error_message || '调谐失败'} · ${current.id}`);
+      setOperation(accepted.operation);
+      await observe(accepted.operation.id, currentEpoch);
     } catch (error) {
       if (epoch.current === currentEpoch) showError(error);
     } finally {
@@ -291,6 +326,7 @@ export function DataAPI({
               className="button primary"
               disabled={
                 busy ||
+                (!!operation && ['queued', 'running', 'retry_wait'].includes(operation.state)) ||
                 !canEdit ||
                 !instance?.driver_enabled ||
                 !['disabled'].includes(instance?.state || '')
@@ -303,6 +339,7 @@ export function DataAPI({
               className="button"
               disabled={
                 busy ||
+                (!!operation && ['queued', 'running', 'retry_wait'].includes(operation.state)) ||
                 !canEdit ||
                 !instance ||
                 ['disabled', 'provisioning', 'disabling'].includes(instance.state)
@@ -316,6 +353,12 @@ export function DataAPI({
         {operation && (
           <div role="status" data-testid="data-api-operation">
             {operation.id} · {operation.state}
+            {trackingNotice && <p>{trackingNotice}</p>}
+            {!busy && ['queued', 'running', 'retry_wait'].includes(operation.state) && (
+              <button className="button" onClick={continueTracking}>
+                继续查询操作
+              </button>
+            )}
           </div>
         )}
         {instance && (

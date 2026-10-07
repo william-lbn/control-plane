@@ -40,6 +40,37 @@ test('native UI: project, timeline branch, writer, Proxy SQL and cold resume', a
   let result = 'running';
   const expectSplit = process.env.NEON_E2E_EXPECT_SPLIT === 'true';
   const workerFault = process.env.NEON_E2E_WORKER_FAULT === 'true';
+  const pollFault = process.env.NEON_E2E_POLL_FAULT === 'true';
+  let injectedReads = 0;
+  let projectMutations = 0;
+  if (pollFault) {
+    page.on('request', (request) => {
+      if (
+        request.method() === 'POST' &&
+        new URL(request.url()).pathname === '/api/v1/organizations/local/projects'
+      )
+        projectMutations++;
+    });
+    await page.route('**/api/v1/projects/*/operations/*', async (route) => {
+      if (
+        route.request().method() === 'GET' &&
+        /^\/api\/v1\/projects\/[^/]+\/operations\/[^/]+$/.test(
+          new URL(route.request().url()).pathname,
+        ) &&
+        injectedReads < 2
+      ) {
+        injectedReads++;
+        await route.fulfill({
+          status: 503,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            code: 'metadata_unavailable',
+            message: 'Controlled observation outage',
+          }),
+        });
+      } else await route.continue();
+    });
+  }
   let workerQueueRecorded = false;
 
   async function save() {
@@ -177,6 +208,14 @@ test('native UI: project, timeline branch, writer, Proxy SQL and cold resume', a
     const parent = listed[0].branch_id;
     endpoints.add(writer);
     await record('ui_native_project_ready', { writer, parent });
+    if (pollFault) {
+      expect(injectedReads).toBe(2);
+      expect(projectMutations).toBe(1);
+      await record('ui_recovers_transient_operation_reads_without_repeating_project_creation', {
+        injected_reads: injectedReads,
+        project_mutations: projectMutations,
+      });
+    }
     await shot('project-created');
     await sql(
       writer,

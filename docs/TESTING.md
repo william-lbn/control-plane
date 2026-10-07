@@ -142,6 +142,13 @@ npm run test:e2e -- --config=playwright.recovery.config.ts
 
 ## 4. 扩展验收矩阵
 
+### 操作查询故障恢复
+
+设置 `NEON_E2E_POLL_FAULT=true` 后运行 native-product.spec.ts 和 data-api.spec.ts。
+两组 Linux UI 分别注入已受理操作的两次 503 读取失败，仍须只有一次 UI 创建/启用请求，
+同一个 Operation 完成。只对 GET 观察重试；操作、SQL 或 Data API 应用请求不自动重放。
+读超时、权限失效、取消、Retry-After 和卸载语义见 [OPERATION-OBSERVATION.md](OPERATION-OBSERVATION.md)。
+
 Reader：至少两实例，WAL 可见、拒绝写、独立 Selector/UID、两轮自动 idle/冷醒。
 Scaling：运行态 Guest CPU quota/online 与 RAM、负载/SLO、SQL/UID、冷醒边界一致。
 Catalog：Writer + 两 Reader，密码轮换正反例、目录删除保护、分支继承、冷醒一致。

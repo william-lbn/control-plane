@@ -56,6 +56,7 @@ docs/                 架构、对象模型、部署、测试、来源及生产�
 - [原生 Data API 驱动与部署](docs/DATA-API-NATIVE-DRIVER.md)
 - [分支应用凭据：模型、API、部署、UI 和验收](docs/BACKEND-CREDENTIALS.md)
 - [控制台成员邀请、受邀注册与复测](docs/CONSOLE-INVITATIONS.md)
+- [异步 Operation 观察恢复与 Linux 故障注入验收](docs/OPERATION-OBSERVATION.md)
 - [2026-10-04 产品切片验收、修复与手动复测](docs/ACCEPTANCE-2026-10-04.md)
 - [贡献规范](CONTRIBUTING.md) / [安全政策](SECURITY.md)
 

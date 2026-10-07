@@ -1,8 +1,9 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { api, projectPath } from '../../api';
 import type { Branch, Operation } from '../../api';
 import { newRequestKey } from '../../shared/requestKey';
+import { followOperation } from '../../shared/followOperation';
 
 type Kind = 'project' | 'branch' | 'endpoint';
 type Bounds = {
@@ -54,6 +55,16 @@ export function CreateResource({
   const [resourceId, setResourceId] = useState('');
   const [operationProject, setOperationProject] = useState('');
   const [error, setError] = useState('');
+  const [trackingNotice, setTrackingNotice] = useState('');
+  const polling = useRef<AbortController | null>(null);
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      polling.current?.abort();
+    };
+  }, []);
   const requestKey = useRef<string>('');
   const titles = {
     project: '创建项目',
@@ -69,20 +80,32 @@ export function CreateResource({
   };
 
   async function follow(project: string, id: string, resource: string) {
-    for (let i = 0; i < 240; i++) {
-      const current = await api<Operation>(`${projectPath(project)}/operations/${id}`);
-      setOperation(current);
-      if (current.state === 'succeeded') {
-        onDone(resource);
-        return;
-      }
-      if (current.state === 'failed') {
-        setError(current.error_message || '调谐失败。可在操作记录中查看步骤并重试。');
-        return;
-      }
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+    polling.current?.abort();
+    const controller = new AbortController();
+    polling.current = controller;
+    const current = await followOperation({
+      id,
+      signal: controller.signal,
+      read: (signal) => api<Operation>(`${projectPath(project)}/operations/${id}`, { signal }),
+      onValue: (value) => {
+        setOperation(value);
+        setTrackingNotice('');
+      },
+      onUnavailable: () => setTrackingNotice('服务暂时不可用，正在继续查询已受理的操作。'),
+    });
+    if (!current) {
+      setError('状态查询暂未完成，可继续查询或在操作记录中跟踪。');
+      return;
     }
-    setError('操作仍在运行，请在操作记录中继续跟踪。');
+    if (current.state === 'succeeded') {
+      onDone(resource);
+      return;
+    }
+    setError(
+      current.state === 'cancelled'
+        ? '操作已取消，可在操作记录中查看。'
+        : current.error_message || '调谐失败。可在操作记录中查看步骤并重试。',
+    );
   }
 
   async function submit(event: FormEvent) {
@@ -139,9 +162,9 @@ export function CreateResource({
         accepted.resource.id,
       );
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : String(reason));
+      if (mounted.current) setError(reason instanceof Error ? reason.message : String(reason));
     } finally {
-      setBusy(false);
+      if (mounted.current) setBusy(false);
     }
   }
 
@@ -158,6 +181,19 @@ export function CreateResource({
       setError(reason instanceof Error ? reason.message : String(reason));
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function continueTracking() {
+    if (!operation || !operationProject || busy) return;
+    setBusy(true);
+    setError('');
+    try {
+      await follow(operationProject, operation.id, resourceId);
+    } catch (reason) {
+      if (mounted.current) setError(reason instanceof Error ? reason.message : String(reason));
+    } finally {
+      if (mounted.current) setBusy(false);
     }
   }
 
@@ -384,6 +420,12 @@ export function CreateResource({
                 {step.name}
               </div>
             ))}
+            {trackingNotice && <p role="status">{trackingNotice}</p>}
+            {!busy && ['queued', 'running', 'retry_wait'].includes(operation.state) && (
+              <button className="button" onClick={continueTracking}>
+                继续查询操作
+              </button>
+            )}
             {operation.state === 'failed' && operation.retryable && (
               <button className="button" onClick={retry} disabled={busy}>
                 重试原操作
