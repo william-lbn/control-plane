@@ -20,8 +20,13 @@
         "replicaCount": {
           "type": "integer",
           "const": 1
+        },
+        "resources": {
+          "type": "object",
+          "additionalProperties": true
         }
-      }
+      },
+      "additionalProperties": false
     },
     "api": {
       "type": "object",
@@ -51,12 +56,57 @@
           "pattern": "^[a-z0-9./_-]+@sha256:[a-f0-9]{64}$"
         },
         "image": {
-          "$ref": "#/definitions/image"
+          "$ref": "#/definitions/image",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "reference": {
+              "type": "string"
+            },
+            "pullPolicy": {
+              "type": "string"
+            }
+          }
+        },
+        "creationEnabled": {
+          "type": "boolean"
+        },
+        "scaleToZeroEnabled": {
+          "type": "boolean"
+        },
+        "cookieSecure": {
+          "type": "boolean"
+        },
+        "proxyHost": {
+          "type": "string"
+        },
+        "proxyPort": {
+          "type": "integer"
+        },
+        "publicProxyHost": {
+          "type": "string"
+        },
+        "publicProxyPort": {
+          "type": "integer"
+        },
+        "pgCASecret": {
+          "type": "string"
+        },
+        "computeGatewayURL": {
+          "type": "string"
+        },
+        "computeControlHost": {
+          "type": "string"
+        },
+        "resources": {
+          "type": "object",
+          "additionalProperties": true
         },
         "pitrEnabled": {
           "type": "boolean"
         }
-      }
+      },
+      "additionalProperties": false
     },
     "web": {
       "type": "object",
@@ -66,9 +116,24 @@
           "minimum": 1
         },
         "image": {
-          "$ref": "#/definitions/image"
+          "$ref": "#/definitions/image",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "reference": {
+              "type": "string"
+            },
+            "pullPolicy": {
+              "type": "string"
+            }
+          }
+        },
+        "resources": {
+          "type": "object",
+          "additionalProperties": true
         }
-      }
+      },
+      "additionalProperties": false
     },
     "service": {
       "type": "object",
@@ -83,8 +148,12 @@
           "type": "integer",
           "minimum": 30000,
           "maximum": 32767
+        },
+        "port": {
+          "type": "integer"
         }
-      }
+      },
+      "additionalProperties": false
     },
     "dataAPI": {
       "type": "object",
@@ -131,7 +200,8 @@
             }
           }
         }
-      ]
+      ],
+      "additionalProperties": false
     },
     "backendCredentials": {
       "type": "object",
@@ -170,7 +240,46 @@
             }
           }
         }
-      ]
+      ],
+      "additionalProperties": false
+    },
+    "fullnameOverride": {
+      "type": "string"
+    },
+    "imagePullSecrets": {
+      "type": "array"
+    },
+    "nodeSelector": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "tolerations": {
+      "type": "array"
+    },
+    "priorityClassName": {
+      "type": "string"
+    },
+    "ingress": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "className": {
+          "type": "string"
+        },
+        "host": {
+          "type": "string"
+        },
+        "annotations": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "tls": {
+          "type": "array"
+        }
+      }
     },
     "managedAuth": {
       "type": "object",
@@ -179,7 +288,10 @@
         "enabled",
         "labHTTP",
         "runtimeImage",
-        "publicOrigin"
+        "publicOrigin",
+        "pgCASecret",
+        "pgCAKey",
+        "pgServerName"
       ],
       "properties": {
         "enabled": {
@@ -193,6 +305,19 @@
         },
         "publicOrigin": {
           "type": "string"
+        },
+        "pgCASecret": {
+          "type": "string",
+          "pattern": "^$|^[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?$"
+        },
+        "pgCAKey": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9._-]{1,253}$"
+        },
+        "pgServerName": {
+          "type": "string",
+          "maxLength": 253,
+          "pattern": "^$|^[a-zA-Z0-9.-]+$"
         }
       },
       "allOf": [
@@ -242,5 +367,6 @@
         }
       }
     }
-  }
+  },
+  "additionalProperties": false
 }

@@ -15,6 +15,10 @@ func TestManagedAuthSQLPrivilegeAndGeneration(t *testing.T) {
 	if dsn == "" {
 		t.Skip("dedicated PostgreSQL is required")
 	}
+	config, err := pgx.ParseConfig(dsn)
+	if err != nil || config.Database != "control_ci" {
+		t.Fatal("Managed Auth SQL tests require the dedicated control_ci PostgreSQL")
+	}
 	ctx := context.Background()
 	admin, err := pgx.Connect(ctx, dsn)
 	if err != nil {

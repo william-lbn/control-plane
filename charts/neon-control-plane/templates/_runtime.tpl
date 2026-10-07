@@ -3,10 +3,16 @@
 {{- if or (not .Values.managedAuth.labHTTP) (not .Values.managedAuth.publicOrigin) }}
 {{- fail "Managed Auth v1 requires explicit managedAuth.labHTTP and publicOrigin; trusted TLS has not passed" }}
 {{- end }}
+{{- if or (not .Values.managedAuth.pgCASecret) (not .Values.managedAuth.pgServerName) }}
+{{- fail "Managed Auth requires an explicit SQL CA Secret and certificate DNS identity" }}
+{{- end }}
 - {name: NEON_AUTH_ENABLED, value: 'true'}
 - {name: NEON_AUTH_LAB_HTTP, value: 'true'}
 - {name: NEON_AUTH_RUNTIME_IMAGE, value: {{ .Values.managedAuth.runtimeImage | quote }}}
 - {name: NEON_AUTH_PUBLIC_ORIGIN, value: {{ .Values.managedAuth.publicOrigin | quote }}}
+- {name: NEON_AUTH_PG_CA_SECRET, value: {{ .Values.managedAuth.pgCASecret | quote }}}
+- {name: NEON_AUTH_PG_CA_KEY, value: {{ .Values.managedAuth.pgCAKey | quote }}}
+- {name: NEON_AUTH_PG_SERVER_NAME, value: {{ .Values.managedAuth.pgServerName | quote }}}
 {{- end }}
 {{- if and .Values.api.pitrEnabled (not .Values.api.creationEnabled) }}
 {{- fail "Historical branch restore requires api.creationEnabled" }}

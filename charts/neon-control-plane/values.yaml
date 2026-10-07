@@ -6,6 +6,11 @@ managedAuth:
   runtimeImage: ''
   # Exact browser-facing origin; no path, trailing slash, wildcard or credentials.
   publicOrigin: ''
+  # Public CA certificate only; never project the Proxy private key.
+  pgCASecret: ''
+  pgCAKey: ca.crt
+  # Exact certificate DNS identity, independent of the connection/service DNS.
+  pgServerName: ''
 backendCredentials:
   enabled: false
   existingSecret: ''

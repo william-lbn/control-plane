@@ -115,7 +115,11 @@ test('Managed Auth: UI identity, native branch isolation, Data API RLS and cold 
     await expect(page.getByTestId('auth-app-result')).toContainText('应用用户登录成功', {
       timeout: 190000,
     });
-    await expect(page.getByLabel('应用密码', { exact: true })).toHaveValue('');
+    expect(
+      await page
+        .getByLabel('应用密码', { exact: true })
+        .evaluate((input) => (input as HTMLInputElement).value.length),
+    ).toBe(0);
   }
   async function applicationToken(branch: string) {
     const value = await page.evaluate(async (id) => {
@@ -197,7 +201,23 @@ test('Managed Auth: UI identity, native branch isolation, Data API RLS and cold 
     await record('ui_created_real_neon_project_with_bounded_compute');
     await sql('GRANT CREATE, CONNECT ON DATABASE postgres TO control_probe WITH GRANT OPTION');
     await authPage(root);
+    await page.getByLabel('Auth 可信来源').fill('https://app.example.test');
     await mutateAuth(root, false);
+    const preflight = await context.request.fetch(`/auth/v1/${root}/sign-up/email`, {
+      method: 'OPTIONS',
+      headers: {
+        Origin: 'https://app.example.test',
+        'Access-Control-Request-Method': 'POST',
+        'Access-Control-Request-Headers': 'content-type',
+      },
+    });
+    expect(preflight.status()).toBe(204);
+    expect(preflight.headers()['access-control-allow-origin']).toBe('https://app.example.test');
+    const deniedOrigin = await context.request.get(`/auth/v1/${root}/get-session`, {
+      headers: { Origin: 'https://unrelated.example.test' },
+    });
+    expect(deniedOrigin.status()).toBe(403);
+    await record('real_auth_relay_allows_exact_cors_preflight_and_rejects_untrusted_origins');
     await page.getByLabel('应用姓名').fill('Synthetic parent');
     await page.getByLabel('应用邮箱', { exact: true }).fill(email);
     await page.getByLabel('应用密码', { exact: true }).fill(appPassword);
@@ -205,7 +225,11 @@ test('Managed Auth: UI identity, native branch isolation, Data API RLS and cold 
     await expect(page.getByTestId('auth-app-result')).toContainText('应用用户注册成功', {
       timeout: 190000,
     });
-    await expect(page.getByLabel('应用密码', { exact: true })).toHaveValue('');
+    expect(
+      await page
+        .getByLabel('应用密码', { exact: true })
+        .evaluate((input) => (input as HTMLInputElement).value.length),
+    ).toBe(0);
     await page.getByRole('button', { name: '检查应用会话', exact: true }).click();
     await expect(page.getByTestId('auth-app-result')).toContainText('应用会话有效');
     await page.getByRole('button', { name: '读取应用用户', exact: true }).click();
@@ -222,6 +246,8 @@ test('Managed Auth: UI identity, native branch isolation, Data API RLS and cold 
     expect(claims.aud).toBe(root);
     expect(claims.sub).toBe(user);
     expect(claims.branch_id).toBe(root);
+    expect(claims.exp - claims.iat).toBeLessThanOrEqual(300);
+    expect(claims.email).toBeUndefined();
     await record('actual_branch_scoped_jwt_has_bounded_expiry_and_public_jwks');
     for (const statement of [
       'CREATE SCHEMA app_auth',
@@ -239,6 +265,12 @@ test('Managed Auth: UI identity, native branch isolation, Data API RLS and cold 
     await expect(page.getByTestId('data-api-response')).not.toContainText('hidden auth row');
     await record('ui_auth_jwt_data_api_real_postgres_rls_read_isolation');
     await authPage(root);
+    const dependency = page.waitForResponse(
+      (r) => r.url().endsWith(`/branches/${root}/auth`) && r.request().method() === 'DELETE',
+    );
+    await page.getByRole('button', { name: '禁用 Auth', exact: true }).click();
+    expect((await dependency).status()).toBe(409);
+    await record('ui_blocks_disabling_auth_while_its_data_api_dependency_is_active');
     await page.getByRole('button', { name: '退出应用', exact: true }).click();
     await expect(page.getByTestId('auth-app-result')).toContainText('应用会话已撤销');
     await page.getByRole('button', { name: '检查应用会话', exact: true }).click();
@@ -306,6 +338,13 @@ test('Managed Auth: UI identity, native branch isolation, Data API RLS and cold 
     await record('ui_rejects_parent_and_child_jwt_cross_branch_data_access');
     await suspend(childWriter);
     await record('ui_auth_enabled_compute_suspends_to_zero');
+    const sleepingPreflight = await context.request.fetch(`/auth/v1/${child}/sign-in/email`, {
+      method: 'OPTIONS',
+      headers: { Origin: 'https://app.example.test', 'Access-Control-Request-Method': 'POST' },
+    });
+    expect(sleepingPreflight.status()).toBe(204);
+    await expect(page.locator('.stats-grid .stat-card strong').first()).toHaveText('已休眠');
+    await record('auth_preflight_does_not_wake_suspended_compute');
     await loginApp(child);
     await record('ui_auth_password_login_cold_wakes_actual_neon_writer');
     await page.goto(`/#/projects/${project}/compute`);

@@ -1,16 +1,57 @@
 package control
 
 import (
+	"encoding/json"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 )
 
 var managedAuthRelaySlots = make(chan struct{}, 32)
 var managedAuthActions = map[string]bool{"sign-up/email": true, "sign-in/email": true, "sign-out": true, "get-session": true, "token": true, "jwks": true, "list-sessions": true, "revoke-session": true, "revoke-sessions": true, "revoke-other-sessions": true, "change-password": true, "update-user": true}
+
+// Preflight does not contact the branch database or acquire a SQL admission.
+// Credentials require an exact configured origin; reflection and wildcards
+// would expose application sessions to unrelated browser applications.
+func managedAuthCORS(w http.ResponseWriter, r *http.Request, spec ManagedAuthSpec, publicOrigin string) bool {
+	w.Header().Add("Vary", "Origin")
+	origin := r.Header.Get("Origin")
+	allowed := origin == publicOrigin
+	for _, trusted := range spec.AllowedOrigins {
+		allowed = allowed || origin == trusted
+	}
+	if (origin != "" && !allowed) || (r.Method == "OPTIONS" && origin == "") {
+		fail(w, r, 403, "auth_origin_denied", "Origin is not trusted by this branch")
+		return true
+	}
+	if origin != "" {
+		w.Header().Set("Access-Control-Allow-Origin", origin)
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+	}
+	if r.Method != "OPTIONS" {
+		return false
+	}
+	method := r.Header.Get("Access-Control-Request-Method")
+	if method != "GET" && method != "POST" {
+		fail(w, r, 403, "auth_origin_denied", "Unsupported application method")
+		return true
+	}
+	for _, header := range strings.Split(r.Header.Get("Access-Control-Request-Headers"), ",") {
+		if name := strings.TrimSpace(header); name != "" && !strings.EqualFold(name, "content-type") {
+			fail(w, r, 403, "auth_origin_denied", "Unsupported application request header")
+			return true
+		}
+	}
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+	w.Header().Set("Access-Control-Max-Age", "300")
+	w.WriteHeader(http.StatusNoContent)
+	return true
+}
 
 // This application-identity boundary deliberately excludes Console cookies,
 // authorization/CSRF headers and caller-controlled forwarding headers. Only a
@@ -30,8 +71,17 @@ func (s *server) managedAuthRelay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var endpoint string
-	if err := s.db.QueryRow(r.Context(), `SELECT a.endpoint_id FROM managed_auth_instances a JOIN branches b ON b.id=a.branch_id JOIN projects p ON p.id=a.project_id WHERE a.branch_id=$1 AND a.state='active' AND b.state='ready' AND b.deleted_at IS NULL AND p.state='ready' AND p.deleted_at IS NULL`, branch).Scan(&endpoint); err != nil {
+	var rawSpec []byte
+	if err := s.db.QueryRow(r.Context(), `SELECT a.endpoint_id,a.spec FROM managed_auth_instances a JOIN branches b ON b.id=a.branch_id JOIN projects p ON p.id=a.project_id WHERE a.branch_id=$1 AND a.state='active' AND b.state='ready' AND b.deleted_at IS NULL AND p.state='ready' AND p.deleted_at IS NULL`, branch).Scan(&endpoint, &rawSpec); err != nil {
 		http.NotFound(w, r)
+		return
+	}
+	var spec ManagedAuthSpec
+	if json.Unmarshal(rawSpec, &spec) != nil {
+		fail(w, r, 503, "auth_unavailable", "Branch Auth configuration unavailable")
+		return
+	}
+	if managedAuthCORS(w, r, spec, os.Getenv("NEON_AUTH_PUBLIC_ORIGIN")) {
 		return
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 16384)
@@ -57,6 +107,11 @@ func (s *server) managedAuthRelay(w http.ResponseWriter, r *http.Request) {
 		pr.Out.Header.Set("X-Forwarded-Proto", base.Scheme)
 	}, Transport: &http.Transport{Proxy: nil, ResponseHeaderTimeout: 130 * time.Second, MaxConnsPerHost: 8, DisableKeepAlives: true},
 		ModifyResponse: func(response *http.Response) error {
+			for name := range response.Header {
+				if strings.HasPrefix(strings.ToLower(name), "access-control-") {
+					response.Header.Del(name)
+				}
+			}
 			cookies := response.Cookies()
 			response.Header.Del("Set-Cookie")
 			for _, c := range cookies {

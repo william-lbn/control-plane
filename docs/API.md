@@ -1,7 +1,7 @@
 # 实际 API 合同
 
 OpenAPI 3 合同的权威源是 [openapi-v1.json](../contracts/openapi-v1.json)。
-版本 0.8.0，50 个路径、69 个操作，全部拥有稳定且唯一的 operationId。
+版本 0.9.0，52 个路径、73 个操作，全部拥有稳定且唯一的 operationId。
 运行 Swagger 位于 `/api/docs`，JSON 位于 `/api/openapi.json`。
 本合同是自托管 `/api/v1`，不声称兼容 Neon SaaS `/api/v2`。
 
@@ -94,6 +94,12 @@ request_id/operation_id/error_code，再由显式 retry 接口恢复可重试操
 | POST | `/api/v1/projects/{project}/branches/{branch}/credentials/{credential}/rotate` | `rotateBackendCredential` | 200 |
 | DELETE | `/api/v1/projects/{project}/branches/{branch}/credentials/{credential}` | `revokeBackendCredential` | 200 |
 | POST | `/api/v1/projects/{project}/branches/{branch}/data-api/request` | `testDataAPIConsoleRequest` | 200 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/auth` | `getManagedAuth` | 200 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/auth` | `enableManagedAuth` | 202 |
+| DELETE | `/api/v1/projects/{project}/branches/{branch}/auth` | `disableManagedAuth` | 202 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/auth/users` | `listManagedAuthUsers` | 200 |
+
+分支应用协议 `/auth/v1/{branch}/...` 不使用 Console session 或 `/api/v1` 权限语义；受限协议及 cookie/JWT/数据库边界见 [Managed Auth 合同](MANAGED-AUTH.md)。
 
 ## 3. 实现映射与演进
 

@@ -1,15 +1,19 @@
 import { createServer } from 'node:http';
+import { createSecureContext } from 'node:tls';
 import { toNodeHandler } from 'better-auth/node';
 import pg from 'pg';
 import { createAuth } from './auth.ts';
 import { loadConfig } from './config.ts';
+import { databaseOptions } from './database.ts';
 
 const config = loadConfig();
 // max=1 and a one-second idle lifetime leave no permanent database session.
 // Health probes inspect process configuration, never wake a suspended Compute.
-const pool = new pg.Pool({ connectionString: config.databaseURL, max: 1,
-  idleTimeoutMillis: 1000, connectionTimeoutMillis: 120000,
-});
+const options = databaseOptions(config);
+// Invalid/missing CA material must fail startup before any endpoint is served.
+createSecureContext(options.ssl as Parameters<typeof createSecureContext>[0]);
+const pool = new pg.Pool(options);
+pool.on('error', () => { console.error('{"event":"auth_database_idle_error"}'); });
 const auth = createAuth(config, pool);
 const handler = toNodeHandler(auth);
 const allowed = new Set(['sign-up/email', 'sign-in/email', 'sign-out', 'get-session',

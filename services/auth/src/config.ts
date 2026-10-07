@@ -8,6 +8,7 @@ export interface AuthConfig {
   secret: string;
   trustedOrigins: string[];
   allowLabHTTP: boolean;
+  databaseTLS: { caFile: '/run/auth-ca/ca.crt'; serverName: string };
 }
 
 // Both the URL and SQL credential come from an immutable, owned Secret file.
@@ -33,7 +34,12 @@ export function parseConfig(value: unknown): AuthConfig {
   const sql = new URL(c.databaseURL);
   if (sql.protocol !== 'postgresql:' || !sql.username || !sql.password ||
       !sql.searchParams.get('options')?.match(/^endpoint=ep-[a-f0-9]{16}$/) ||
-      sql.searchParams.get('sslmode') !== 'require') throw new Error('Invalid SQL route');
+      sql.searchParams.get('sslmode') !== 'verify-full' || sql.hash ||
+      [...sql.searchParams.keys()].some(k => !['sslmode', 'options'].includes(k))) throw new Error('Invalid SQL route');
+  if (c.databaseTLS?.caFile !== '/run/auth-ca/ca.crt' ||
+      typeof c.databaseTLS.serverName !== 'string' || c.databaseTLS.serverName.length > 253 ||
+      !c.databaseTLS.serverName.split('.').every(label => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/i.test(label)))
+    throw new Error('An explicit database CA and certificate identity are required');
   return c;
 }
 export function loadConfig(): AuthConfig {

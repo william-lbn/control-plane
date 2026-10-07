@@ -3,16 +3,22 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { randomBytes } from 'node:crypto';
 import pg from 'pg';
-import { createAuth } from '../src/auth.ts';
+import { authOptions, createAuth } from '../src/auth.ts';
 import { parseConfig, type AuthConfig } from '../src/config.ts';
+import { databaseOptions } from '../src/database.ts';
 
 const database = process.env.AUTH_TEST_DATABASE_URL;
 if (!database) throw new Error('AUTH_TEST_DATABASE_URL is required; Auth tests must not skip real PostgreSQL');
+const disposable = new URL(database);
+if (disposable.pathname !== '/auth_ci' || disposable.username !== 'auth_ci' ||
+    !['127.0.0.1', 'localhost', '[::1]'].includes(disposable.hostname) || disposable.searchParams.has('options'))
+  throw new Error('Auth tests require the dedicated local auth_ci user/database, never a Neon endpoint');
 const schemaSQL = readFileSync(new URL('../../../api/internal/control/assets/auth-schema.sql', import.meta.url), 'utf8');
 const branch = 'br_0123456789abcdef';
 const config: AuthConfig = { version: 1, branchID: branch,
   baseURL: `https://auth.example.test/auth/v1/${branch}`, secret: randomBytes(48).toString('base64url'),
-  databaseURL: 'postgresql://synthetic:synthetic@proxy.example.test/postgres?sslmode=require&options=endpoint%3Dep-0123456789abcdef',
+  databaseURL: 'postgresql://synthetic:synthetic@proxy.example.test/postgres?sslmode=verify-full&options=endpoint%3Dep-0123456789abcdef',
+  databaseTLS: { caFile: '/run/auth-ca/ca.crt', serverName: 'proxy.example.test' },
   trustedOrigins: [], allowLabHTTP: false };
 
 test('configuration rejects floating routing, weak secrets and untrusted origins', () => {
@@ -21,8 +27,29 @@ test('configuration rejects floating routing, weak secrets and untrusted origins
     { baseURL: 'http://auth.example.test/auth/v1/' + branch },
     { baseURL: config.baseURL + '?origin=evil' },
     { trustedOrigins: ['https://*.example.test'] }, { trustedOrigins: ['https://a.example.test/path'] },
+    { databaseTLS: { caFile: '/private/operator.key', serverName: 'proxy.example.test' } },
+    { databaseTLS: { caFile: '/run/auth-ca/ca.crt', serverName: '*.example.test' } },
+    { databaseURL: config.databaseURL + '&uselibpqcompat=true' },
     { databaseURL: 'postgresql://u:p@proxy.example.test/postgres?sslmode=disable' }])
     assert.throws(() => parseConfig({ ...config, ...change }));
+});
+
+test('SQL certificate verification survives HTTP laboratory configuration', () => {
+  const ca = Buffer.from('synthetic-public-certificate');
+  const options = databaseOptions({ ...config, allowLabHTTP: true }, ca);
+  assert.equal(new URL(options.connectionString!).searchParams.get('sslmode'), null);
+  assert.equal(new URL(options.connectionString!).searchParams.get('options'), 'endpoint=ep-0123456789abcdef');
+  assert.deepEqual(options.ssl, { ca, servername: 'proxy.example.test', rejectUnauthorized: true });
+});
+
+test('HTTPS cookies stay secure when the laboratory exception is acknowledged', async () => {
+  const pool = new pg.Pool({ connectionString: database });
+  try {
+    assert.equal(authOptions({ ...config, allowLabHTTP: true }, pool).advanced.useSecureCookies, true);
+    assert.equal(authOptions({ ...config, allowLabHTTP: true }, pool).advanced.defaultCookieAttributes.sameSite, 'none');
+    assert.equal(authOptions({ ...config, allowLabHTTP: true,
+      baseURL: 'http://192.0.2.1:30788/auth/v1/' + branch }, pool).advanced.useSecureCookies, false);
+  } finally { await pool.end(); }
 });
 
 test('maintained Better Auth persists accounts, revokes sessions and isolates cloned identities', async () => {

@@ -52,6 +52,8 @@ flowchart LR
 
 Go 入口剔除 Console cookie、Authorization/CSRF 和调用方伪造的转发头；只转发此分支的应用 session cookie。仅固定且处于 active 的 live 分支运行时可达。返回 cookie 限于此分支名称、路径、HttpOnly 和无跨域 Domain。
 
+CORS 只接受部署 publicOrigin 或当前分支的精确 allowed_origins，绝不反射任意来源或使用通配符。预检只读控制元数据，不连接分支 SQL，也不唤醒 Compute；只接受 GET/POST 与 Content-Type。HTTPS cookie 使用 Secure/HttpOnly/SameSite=None，HTTP 实验室 cookie 使用 SameSite=Lax，只能按同站点/同源方式复测。第三方 cookie 被浏览器禁用时，应用需在自己来源下部署受控反向代理；CORS 不是绕过浏览器 cookie 政策的手段。
+
 ## 4. 分支复制、密钥与生命周期
 
 ```mermaid
@@ -82,12 +84,17 @@ JWT 有效期五分钟。登出撤销数据库会话并阻止继续发 JWT，**�
 
 canonical chart 参数：`managedAuth.enabled/labHTTP/runtimeImage/publicOrigin`。v1 要求显式实验室 HTTP 例外；不是生产 TLS 认证。镜像必须取发行版已验证 digest，不可使用 latest。publicOrigin 必须为精确 scheme/host/port，无路径、尾斜杠、通配符或凭据。
 
+SQL 连接独立要求 `managedAuth.pgCASecret/pgCAKey/pgServerName`：只投影公开 CA 证书，保持证书链与名称验证开启。Node 驱动不依赖含糊的 sslmode=require 兼容解释，也不会通过 HTTP 例外关闭 SQL TLS 校验。现有实验室 Proxy 证书名称是 lab.neon.local；连接地址仍可为内部 Service DNS，TLS 校验使用显式证书身份。此项不证明浏览器、控制库、管理入口或所有内部链路已具备可信 TLS。
+
 ```yaml
 managedAuth:
   enabled: true
   labHTTP: true
   runtimeImage: docker.io/williamluckyli/control-auth@sha256:<发行版验证的 digest>
   publicOrigin: http://192.168.146.100:30788
+  pgCASecret: neon-proxy-tls
+  pgCAKey: tls.crt
+  pgServerName: lab.neon.local
 ```
 
 API/Worker 接收一致参数。Auth Pod 无 ServiceAccount token、特权和 hostNetwork，根文件系统只读，只挂载自己分支的配置文件；请求 50m CPU/64Mi 内存，限制 500m/256Mi。数据库触发器在多个 API 之间限制最多八个非 disabled 实例；有限环境中及时停用无用服务。
@@ -110,9 +117,20 @@ cd services/auth
 npm ci --ignore-scripts --no-audit --fund=false
 npm audit --audit-level=high
 npm run typecheck
-AUTH_TEST_DATABASE_URL='postgres://disposable-user:disposable-password@127.0.0.1:5432/disposable-auth' npm test
+AUTH_TEST_DATABASE_URL='postgres://auth_ci:ci-disposable-password@127.0.0.1:5432/auth_ci' npm test
 ```
 
 上述命令只能指向专用临时 PostgreSQL。测试创建/删除随机隔离 schema，不能使用用户库或控制库。Go 测试只在专用 CI 数据库服务器创建/移除其随机 Auth database/role；CI 不允许悄悄跳过集成测试。
+
+TLS 人工检查可在 Linux 从仓库根目录执行下列命令，只发送 PostgreSQL SSLRequest，不发送登录、密码或 SQL，不唤醒 Compute。公开 CA 证书由操作员保存为只读文件。错误名称或缺失信任根必须被拒绝；不是通过 --insecure 掩盖错误。
+
+```sh
+node tools/verify-postgres-tls.mjs --host 192.168.146.100 --port 30432 \
+  --server-name lab.neon.local --ca-file /secure/operator/proxy-ca.crt \
+  --verify-negative-cases
+node --test tools/tests/*.test.mjs
+```
+
+升级早期 Auth 候选版时，先停用依赖的 Data API 和 Auth，配置 CA 后显式重新启用，产生新 generation 的不可变配置。不要修改旧 Secret 或清除账户表。重新启用后在 Data API UI 刷新 JWKS。
 
 公开 `web/e2e/managed-auth.spec.ts` 从 React Console 开始，真实创建 Neon 项目，启用 Auth、注册用户、验证 Data API/RLS、创建独立子 Timeline、验证继承与隔离、自动缩零/冷唤醒、重新启用保留用户。最后仅停用自有服务和 Compute，保留数据与重放凭据。Linux 受保护测试输入见 [TESTING.md](TESTING.md)。交付报告单独记录每次失败和最终通过的版本/证据；本地产品验收不等于全官网或生产准入。

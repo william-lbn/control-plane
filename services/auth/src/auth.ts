@@ -14,8 +14,11 @@ export function authOptions(c: AuthConfig, database: Pool) {
     session: { expiresIn: 86400, updateAge: 3600, cookieCache: { enabled: false } },
     advanced: {
       cookiePrefix: `neon_app_${c.branchID}`,
-      useSecureCookies: !c.allowLabHTTP,
-      defaultCookieAttributes: { httpOnly: true, sameSite: 'lax' as const, path: `/auth/v1/${c.branchID}` },
+      // The explicit laboratory HTTP exception must never weaken HTTPS cookies.
+      useSecureCookies: new URL(c.baseURL).protocol === 'https:',
+      // HTTPS applications may use an exact trusted origin on another site.
+      // HTTP lab mode remains first-party; SameSite=None requires Secure.
+      defaultCookieAttributes: { httpOnly: true, sameSite: new URL(c.baseURL).protocol === 'https:' ? 'none' as const : 'lax' as const, path: `/auth/v1/${c.branchID}` },
       crossSubDomainCookies: { enabled: false },
       // Only the authenticated Go relay supplies this header, never the caller.
       ipAddress: { ipAddressHeaders: ['x-neon-client-ip'] },

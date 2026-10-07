@@ -5,7 +5,7 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 
 **发行状态：预览版本。已经验证的实验环境功能不等于生产认证，也不等于 Neon 官网全部 Backend 服务。**
 [2026-10-08 正式交付](docs/DELIVERY-2026-10-08.md)记录六镜像、统一 Helm 0.1.4、六套 Linux UI 和剩余门槛；[历史交付](docs/DELIVERY-2026-10-07.md)保留先前邀请注册与资源清理证据。
-Chart 0.6.1 提供独立 API、Worker、Web 进程及可选 Data API、应用凭据、Console 邀请注册、历史分支恢复与保留删除；Worker 使用 PostgreSQL 领导租约。
+Chart 0.7.0 提供独立 API、Worker、Web 进程及可选 Data API、应用凭据、Console 邀请注册、历史分支恢复与保留删除；Worker 使用 PostgreSQL 领导租约。
 当前只允许一个 API 和一个 Worker，跨实例外部 fencing 与 HA 仍须独立验收。
 旧合并版本升级前必须执行 [停止/排空流程](docs/WORKER-SPLIT.md)。
 运行代码与实际合同见 [OpenAPI](contracts/openapi-v1.json)；本项目使用 `/api/v1`，未声称兼容托管 Neon `/api/v2`。
@@ -25,7 +25,7 @@ Chart 0.6.1 提供独立 API、Worker、Web 进程及可选 Data API、应用凭
 | 时间点恢复到新分支 | 原生时间戳/LSN、存储保留租约、异步调谐、历史目录隔离、React UI | 默认禁用；仅受管理分支；原地恢复、Time Travel Assist、完整 Backend 一致性恢复未实现 |
 | 项目/分支保留删除 | 保护/依赖图、关闭 Proxy 和服务、回收 Compute、tombstone、七天项目恢复、React UI | 物理 GC 与跨实例栅栏未开放；仅就绪 managed 资源；详见 [删除手册](docs/RETAINED-DELETION.md) |
 | HA / DR | 部分租约与恢复工具 | 未通过独立故障域 HA/DR；历史新分支恢复不等于完整 DR |
-| Auth、Functions、Object Storage、AI Gateway | 能力与服务模型预留，明确 disabled | 对应 Backend 服务尚未实现，不能作为可用功能宣传 |
+| Functions、产品 Object Storage、AI Gateway 推理 | 能力与服务模型预留，明确 disabled | 对应 Backend 服务尚未实现，不能作为可用功能宣传 |
 | Data API | 原生 Go Driver、持久 Operation、React UI、分支 JWT Gateway 和固定 PostgREST 镜像 | 默认禁用；须显式 labHTTP，真实 Neon UI 验收独立于 PG CI；RPC/views 等不在首版范围 |
 | 分支应用凭据 | 一次性 Token、范围/到期、轮换/撤销、哈希存储、当前权限检查和 UI | 当前仅 ai_gateway:invoke；凭据不等于 AI 推理服务可用 |
 
@@ -50,7 +50,7 @@ docs/                 架构、对象模型、部署、测试、来源及生产�
 ```
 
 - [架构与模型](docs/ARCHITECTURE.md)
-- [69 个实际 API 操作](docs/API.md)
+- [73 个实际 API 操作](docs/API.md)
 - [Linux 部署与回滚](docs/DEPLOYMENT.md)
 - [测试与交付标准](docs/TESTING.md)
 - [Fork 来源与镜像对应关系](docs/SOURCE-PROVENANCE.md)
@@ -74,7 +74,7 @@ docs/                 架构、对象模型、部署、测试、来源及生产�
 
 ## 3. Linux 开发与 CI
 
-固定工具链：Go 1.27.1、Node 24.19.0；Web 锁文件提交到仓库。
+固定工具链：Go 1.27.1、Node 24.19.0；Web 与 Auth 锁文件提交到仓库。
 测试使用专用可丢弃 PostgreSQL，不能把生产数据库 DSN 注入 CI。
 
 ```bash
@@ -93,7 +93,7 @@ CI 在 Linux 执行 gofmt、vet、race、真实 PG 集成、OpenAPI 路由/引�
 
 ## 4. 镜像与部署
 
-可信分支通过质量门槛后发布 `control-api`、`control-web`、`control-gateway`、`control-dataapi`、`control-postgrest`、`control-adapter`。
+可信分支通过质量门槛后发布 `control-api`、`control-web`、`control-gateway`、`control-dataapi`、`control-postgrest`、`control-adapter`、`control-auth`。
 原生 Data API 的数据库权限、RLS、服务开关及现场测试见
 [Driver 手册](docs/DATA-API-NATIVE-DRIVER.md)。默认禁用，不能用 Ready Pod 代替实际数据访问验收。
 tag 使用 `sha-<full-commit>-r<run-id>-a<attempt>`，重跑产生新 tag；部署固定 registry manifest digest，不能使用 `latest`。

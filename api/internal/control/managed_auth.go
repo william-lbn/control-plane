@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -32,7 +33,19 @@ func managedAuthBase(branch string) string {
 	return os.Getenv("NEON_AUTH_PUBLIC_ORIGIN") + "/auth/v1/" + branch
 }
 func managedAuthEnabled() bool {
-	return os.Getenv("NEON_AUTH_ENABLED") == "true" && os.Getenv("NEON_AUTH_LAB_HTTP") == "true" && digestImage.MatchString(os.Getenv("NEON_AUTH_RUNTIME_IMAGE")) && validAuthOrigin(os.Getenv("NEON_AUTH_PUBLIC_ORIGIN"))
+	return os.Getenv("NEON_AUTH_ENABLED") == "true" && os.Getenv("NEON_AUTH_LAB_HTTP") == "true" && digestImage.MatchString(os.Getenv("NEON_AUTH_RUNTIME_IMAGE")) && validAuthOrigin(os.Getenv("NEON_AUTH_PUBLIC_ORIGIN")) && managedAuthSQLTrustConfigured()
+}
+func managedAuthSQLTrustConfigured() bool {
+	secret, key, name := os.Getenv("NEON_AUTH_PG_CA_SECRET"), os.Getenv("NEON_AUTH_PG_CA_KEY"), os.Getenv("NEON_AUTH_PG_SERVER_NAME")
+	if !regexp.MustCompile(`^[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?$`).MatchString(secret) || !regexp.MustCompile(`^[a-zA-Z0-9._-]{1,253}$`).MatchString(key) || len(name) == 0 || len(name) > 253 {
+		return false
+	}
+	for _, label := range strings.Split(name, ".") {
+		if !regexp.MustCompile(`^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$`).MatchString(label) {
+			return false
+		}
+	}
+	return true
 }
 func validAuthOrigin(origin string) bool {
 	u, e := url.Parse(origin)

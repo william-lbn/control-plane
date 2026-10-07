@@ -11,7 +11,8 @@
 | Web | npm ci / format:check / test / build | CSPRNG fallback 回归、strict TS、Vite 静态产物 |
 | Workflows | 固定 actionlint 1.7.12 / Linux ShellCheck | 校验全部 CI/live workflow；拒绝非法上下文和 shell 问题 |
 | Helm | tools/ci-helm.sh | lint/template；拒绝多 API 副本、缺 CA、浮动 tag；gateway 无 hostPath |
-| Image | protected main/tag after gates | 固定 builder、SHA tag、API/Web/Gateway/DataAPI/PostgREST/Adapter 六镜像、SBOM/provenance、digest receipt |
+| Auth | 独立 auth_ci PostgreSQL + Better Auth；原生 Node TLS 测试 | 注册/密码/会话/JWT/克隆身份，严格配置与 cookie、CA/名称负例；零 skipped |
+| Image | protected main/tag after gates | 固定 builder、SHA tag、API/Web/Gateway/DataAPI/PostgREST/Adapter/Auth 七镜像、SBOM/provenance、digest receipt |
 
 ```bash
 export NEON_V2_TEST_DATABASE_URL='postgres://ci:ci-disposable@127.0.0.1:5432/control_ci?sslmode=disable'
@@ -20,6 +21,9 @@ bash tools/install-postgrest.sh /tmp/neon-postgrest
 export NEON_DATA_API_TEST_POSTGREST=/tmp/neon-postgrest/postgrest
 make test web
 PATH="/tmp/neon-helm:$PATH" make helm
+# Auth 使用另一个独立、只供 CI 使用的本机 PostgreSQL：auth_ci 用户/数据库。
+export AUTH_TEST_DATABASE_URL='postgres://auth_ci:ci-disposable-password@127.0.0.1:55438/auth_ci'
+make auth
 ```
 
 每次测试使用新的 schema/attempt；失败 evidence 保留。
@@ -62,6 +66,10 @@ npm run test:e2e -- native-product.spec.ts
    受控 Worker 故障模式见 [拆分手册](WORKER-SPLIT.md)。
 8. 失败时保留 fixture 和 Job/日志，使用其中 Endpoint ID 正常 suspend，
 不能删除数据、Secrets、WAL 或证据。
+
+## 分支 Managed Auth 真实 UI
+
+完成 [Managed Auth 部署](MANAGED-AUTH.md) 和公开 CA/证书名称设置后，使用相同受保护输入执行 `npm run test:e2e -- managed-auth.spec.ts`。`NEON_E2E_BASE_URL` 必须为部署 `managedAuth.publicOrigin`，不能改为另一个未声明的 Service Origin。该测试从 React 创建项目和 Auth，验证真实 Neon 中的注册、会话撤销、JWT/JWKS、用户继承、子分支隔离、Data API RLS、手动/自动缩零和 Auth 冷唤醒，再停用自己创建的服务和 Compute。重测必须使用新 attempt，失败资源可按保存的 ID/Operation 观察和正常停用；不清除账户或数据。
 
 ### 2.0 保护、删除与恢复
 
