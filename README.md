@@ -5,7 +5,7 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 
 **发行状态：预览版本。已经验证的实验环境功能不等于生产认证，也不等于 Neon 官网全部 Backend 服务。**
 [2026-10-07 交付及验收边界](docs/DELIVERY-2026-10-07.md)记录邀请注册、权限撤销和资源清理。
-Chart 0.6.0 提供独立 API、Worker、Web 进程及可选 Data API、应用凭据、Console 邀请注册、历史分支恢复与保留删除；Worker 使用 PostgreSQL 领导租约。
+Chart 0.6.1 提供独立 API、Worker、Web 进程及可选 Data API、应用凭据、Console 邀请注册、历史分支恢复与保留删除；Worker 使用 PostgreSQL 领导租约。
 当前只允许一个 API 和一个 Worker，跨实例外部 fencing 与 HA 仍须独立验收。
 旧合并版本升级前必须执行 [停止/排空流程](docs/WORKER-SPLIT.md)。
 运行代码与实际合同见 [OpenAPI](contracts/openapi-v1.json)；本项目使用 `/api/v1`，未声称兼容托管 Neon `/api/v2`。

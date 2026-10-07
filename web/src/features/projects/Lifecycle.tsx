@@ -50,6 +50,7 @@ export function Lifecycle({ projectId }: { projectId: string }) {
   const [busy, setBusy] = useState(false);
   const [operation, setOperation] = useState<Operation | null>(null);
   const abort = useRef<AbortController | null>(null);
+  const requestKey = useRef('');
   const base = projectPath(projectId);
   async function refresh() {
     setData(await api<Snapshot>(base + '/lifecycle'));
@@ -69,6 +70,8 @@ export function Lifecycle({ projectId }: { projectId: string }) {
     };
   }, [projectId]);
   function choose(resource: Resource, kind: Action['kind'], next: Action['action']) {
+    requestKey.current = '';
+    setOperation(null);
     setAction({ resource, kind, action: next });
     setConfirm('');
     setError('');
@@ -97,6 +100,7 @@ export function Lifecycle({ projectId }: { projectId: string }) {
     setError('');
     setOperation(null);
     try {
+      if (!requestKey.current) requestKey.current = newRequestKey();
       const path =
         base +
         (action.kind === 'branch' ? '/branches/' + encodeURIComponent(action.resource.id) : '');
@@ -107,7 +111,7 @@ export function Lifecycle({ projectId }: { projectId: string }) {
           method: protection ? 'PATCH' : action.action === 'recover' ? 'POST' : 'DELETE',
           headers: {
             'If-Match': `"${action.resource.version}"`,
-            'Idempotency-Key': newRequestKey(),
+            'Idempotency-Key': requestKey.current,
           },
           body: JSON.stringify({
             confirm_name: confirm,
@@ -358,6 +362,11 @@ export function Lifecycle({ projectId }: { projectId: string }) {
                 ? '确认后将关闭访问并断开此资源的连接。请先停止应用写入。'
                 : '请核对资源名称和当前状态。'}
             </p>
+            {operation?.state === 'failed' && (
+              <p role="alert">
+                {operation.error_code}：{operation.error_message}
+              </p>
+            )}
             <label>
               输入完整名称确认
               <input
@@ -372,9 +381,14 @@ export function Lifecycle({ projectId }: { projectId: string }) {
               <button className="button" disabled={busy} onClick={() => setAction(null)}>
                 取消
               </button>
+              {operation?.state === 'failed' && operation.retryable && (
+                <button className="button primary" disabled={busy} onClick={() => void retry()}>
+                  重试既有操作
+                </button>
+              )}
               <button
                 className="button primary"
-                disabled={busy || confirm !== action.resource.name}
+                disabled={busy || !!operation || confirm !== action.resource.name}
                 onClick={() => void submit()}
               >
                 {busy ? '操作进行中…' : '确认执行'}

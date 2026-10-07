@@ -19,6 +19,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - run: bash tools/install-actionlint.sh "$RUNNER_TEMP/neon-actionlint"
       - run: '"$RUNNER_TEMP/neon-actionlint/actionlint" -color'
+      - run: node --check tools/lifecycle-recovery-fault.mjs
   go:
     name: Go + real PostgreSQL
     runs-on: ubuntu-24.04

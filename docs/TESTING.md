@@ -179,6 +179,36 @@ Production：独立故障域、TLS、DR/PITR、并发 fencing 与持续 SLO，�
 
 ## 5. 交付证据
 
+### 保留删除的受控恢复重试
+
+正常 `lifecycle.spec.ts` 覆盖项目/叶分支保护和删除、两个 Reader、七天恢复、
+Data API 与已撤销凭据。需要在恢复弹窗验证同 Operation 重试时，显式设置
+`NEON_E2E_LIFECYCLE_RECOVERY_FAULT=true`。此场景另须受信 operator，不能
+将 Kubernetes 或数据库管理凭据提供给浏览器。两进程在 Linux 使用同一私有
+fixture 目录（0700，浏览器用户可写）与各自新的 evidence 目录。
+
+```bash
+# 受信 operator 终端，运行于已具备授权 KUBECONFIG 的 Linux 主机。
+# 明确核对正在使用的集群；不要与其他 live suite 并发。
+export KUBECTL_BIN=/path/to/verified/kubectl
+export NEON_E2E_KUBE_SERVER=https://YOUR_KUBERNETES_API:6443
+node tools/lifecycle-recovery-fault.mjs \
+  --fixture-dir /secure/e2e/attempt/private \
+  --evidence-dir /secure/e2e/attempt/operator-evidence
+
+# 浏览器终端：BASE_URL、ADMIN_PASSWORD_FILE、PRIVATE_DIR、ARTIFACTS 同前。
+export NEON_E2E_LIFECYCLE_RECOVERY_FAULT=true
+npm --prefix web run test:e2e -- lifecycle.spec.ts
+```
+
+operator 仅接受本次 `ci-lifecycle-*`、已完成删除的 managed 项目；要求队列清空、
+单个 Ready Worker，通过 UID/resourceVersion CAS 暂停，确认原 recover Operation
+仍 queued 且未持有 lease 后注入 `controlled_test_failure`，再恢复 Worker 并核验
+leader epoch 增长。异常/信号退出会恢复原 UID 的 Worker；若无法恢复必须先处理
+operator report，不能继续其他 suite。服务/项目名目前明确绑定该实验室部署，
+其他命名环境须先调整工具配置并重新验收。SQL 数据、WAL、Secret 和证据不删除。
+这是受控 terminal-status 注入，不能标记为存储服务故障、跨实例栅栏或 HA 认证。
+
 记录 commit、image digest、Helm revision、schema version、测试环境与时间、
 资源身份、通过/失败/未测列表及脱敏错误。私密凭据与公开总结分开。
 历史报告按其版本保留；新报告不能把旧场景自动登记为本版通过。

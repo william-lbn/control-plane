@@ -552,11 +552,10 @@ func (s *server) createEndpoint(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) retryOperation(w http.ResponseWriter, r *http.Request) {
-	project, ok := s.requireProject(w, r)
-	if !ok {
-		return
-	}
-	_ = project
+	// Authorization already resolves the parent and limits tombstone access
+	// to Admin. Recovery may fail while deleted_at is retained; requiring a
+	// live project here would make that durable recovery Operation impossible
+	// to retry. PostgreSQL's lifecycle guard rejects unrelated work on tombstones.
 	if err := s.retryFailed(r.Context(), r.PathValue("operation"), r.PathValue("project")); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			fail(w, r, 409, "operation_not_retryable", "Operation is not failed and retryable")

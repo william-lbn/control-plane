@@ -116,6 +116,10 @@ Delete 持有项目/分支锁，检查整个项目没有 queued/running/retry_wa
 缺少版本 428，版本冲突 412，名字确认失败 422，保护/子分支/运行操作/恢复期限冲突 409。
 相同请求和 Idempotency-Key 返回同一 Operation；同 Key 不同输入返回 409。
 `POST .../operations/{operation}/retry` 仅重试 durable scope，不创建另一删除请求。
+失败的创建项目/分支允许重试原 Operation（资源可为 `error`）；失败恢复允许
+Admin 在仍保留 `deleted_at` 时重试。migration 015 修正这些准入边界，014 保持
+不可变；其他工作仍由数据库 lifecycle 锁和触发器拒绝。Console 恢复弹窗在
+失败后提供“重试既有操作”，原确认按钮锁定；观察错误不会生成新的请求 Key。
 
 ## 5. 人工 UI 复测
 
@@ -148,6 +152,9 @@ Go 的 deletion_integration_test 使用隔离真实 PostgreSQL 与模拟 Kube/�
 这些故障注入结果不能替代真实 Linux UI 的 native storage 验证。
 本 suite 的 Reader 验收覆盖手动休眠和 SQL 冷醒；两个 Reader 的自动 idle、
 长事务、热点负载和多实例冷醒竞争仍在独立伸缩矩阵中，不由这些断言代替。
+额外的显式故障场景见 TESTING.md：受信 Linux operator 暂停单个 Worker，
+只对本次已排队恢复注入 terminal status；浏览器在原弹窗重试相同 Operation。
+它验证 UI/授权/准入/重试闭环，不代替原生存储 outage 或 HA 的真实故障认证。
 
 ## 6. 后续 Gate
 

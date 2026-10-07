@@ -27,6 +27,7 @@ test('UI lifecycle: protections, dependency graph, retained delete and seven-day
   const endpoints = new Set<string>();
   const checks: { name: string; [key: string]: unknown }[] = [];
   const operations: { id: string; action: string }[] = [];
+  let recoveryFault = process.env.NEON_E2E_LIFECYCLE_RECOVERY_FAULT === 'true';
   async function save() {
     await writeFile(
       testInfo.outputPath('result.json'),
@@ -93,6 +94,35 @@ test('UI lifecycle: protections, dependency graph, retained delete and seven-day
     await expect(page.getByTestId('project-lifecycle')).toBeVisible();
   }
   async function action(button: string, name: string, branch = ''): Promise<Response> {
+    const injectRecovery = button === '恢复项目' && recoveryFault;
+    if (injectRecovery) {
+      // Trusted Linux orchestrator pauses the Worker, then injects a terminal
+      // failure only into this fixture's queued recovery Operation. This is a
+      // UI/admission recovery test, not a native storage failure certification.
+      await writeFile(
+        path.join(privateRoot, 'lifecycle-recovery-prepare.json'),
+        JSON.stringify({ project_id: project }),
+        { mode: 0o600, flag: 'wx' },
+      );
+      await expect
+        .poll(
+          async () => {
+            try {
+              return JSON.parse(
+                await readFile(
+                  path.join(privateRoot, 'lifecycle-recovery-worker-paused.json'),
+                  'utf8',
+                ),
+              ).project_id;
+            } catch (e) {
+              if ((e as NodeJS.ErrnoException).code === 'ENOENT') return '';
+              throw e;
+            }
+          },
+          { timeout: 150_000 },
+        )
+        .toBe(project);
+    }
     const target = branch
       ? page.getByTestId('lifecycle-' + branch)
       : page.getByTestId('project-lifecycle');
@@ -111,6 +141,34 @@ test('UI lifecycle: protections, dependency graph, retained delete and seven-day
       const v = await response.json();
       operations.push({ id: v.operation.id, action: v.operation.action });
       await save();
+      if (injectRecovery) {
+        await writeFile(
+          path.join(privateRoot, 'lifecycle-recovery-queued.json'),
+          JSON.stringify({ project_id: project, operation_id: v.operation.id }),
+          { mode: 0o600, flag: 'wx' },
+        );
+        const retry = page
+          .locator('.lifecycle-modal')
+          .getByRole('button', { name: '重试既有操作', exact: true });
+        await expect(retry).toBeEnabled({ timeout: 180_000 });
+        await expect(
+          page.locator('.lifecycle-modal').getByRole('button', { name: '确认执行', exact: true }),
+        ).toBeDisabled();
+        const pending = page.waitForResponse(
+          (r) =>
+            r.url().endsWith('/operations/' + v.operation.id + '/retry') &&
+            r.request().method() === 'POST',
+        );
+        await retry.click();
+        const retried = await pending;
+        expect(retried.status()).toBe(202);
+        expect((await retried.json()).id).toBe(v.operation.id);
+        recoveryFault = false;
+        await record('ui_failed_retained_recovery_retries_same_operation_inside_modal', {
+          operation_id: v.operation.id,
+          fault: 'operator_injected_terminal_status',
+        });
+      }
     }
     await expect(page.locator('.lifecycle-modal')).not.toBeVisible({ timeout: 480_000 });
     return response;

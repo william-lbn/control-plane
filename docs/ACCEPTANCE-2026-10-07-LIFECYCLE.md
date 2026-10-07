@@ -85,3 +85,32 @@ report 改成成功。统一 Helm 工具增加独立远端导出时限、唯一 
 每次使用新的 attempt，保存 Operation/Endpoint IDs、镜像 digest 和版本。
 失败先读原 Operation/日志，明确 retryable 后重试原操作，不能盲目重新 POST。
 测试结束只退休已归属且完成的运行资源；数据库、对象、WAL、凭据与证据不清理。
+
+## 6. 创建与恢复重试修复候选
+
+进一步复查发现原始重试准入会拒绝 `error` 状态的原 create_project/create_branch，
+以及仍有 `deleted_at` 的失败 recover_project。前向 migration 015 修复数据库
+准入，移除 handler 的重复 live-project 约束，仍由权限中间件和数据库 parent
+锁/触发器拒绝不相关工作。014 未修改。恢复弹窗提供同 Operation 重试并锁定
+重复确认；未知 HTTP 结果保留原请求 Key。Canonical Chart 为 0.6.1/runtime 0.8.1。
+
+| Gate | 结果与身份 |
+| --- | --- |
+| Linux Go/真实 PG | 327 pass / 0 fail / 0 skip；dataapi-quality-20261007152520 |
+| Linux Web | 13 tests、格式、严格 TS、Vite 与三个 Chart 门槛通过；restore-web-1791387032 |
+| 候选升级 | migration 15；deploy-154206；完整旧 values/Secrets/PVC 保留 |
+| 扩展 UI | 23 checks，publication-ui-20261007154828；Pod UID dfc6a955-e227-4190-9c9c-d24072b30f05；prj_b0f9b3a1ae4ef1ef |
+| 受控失败 | 原 recover Operation op_0b2bbbdc89ebda07887d90c5 在恢复弹窗重试后成功；Worker epoch 52→53 |
+| 最终资源 | VM/Runner 0；保留 SQL 数据、对象、WAL、凭据及全部测试文件 |
+
+修复候选 API digest `e9236409f4b8c4a7da110740791eca9e42db240d07153d1322c7cf18b6d32a5d`，
+Web digest `0e942b351ebf81617e236d39281ae56a6bd9b8fb6c10b0c41515114296dccf9d`。
+这是提交前候选；六个公开同源镜像、最终 Helm 锁与该版本回归另记正式交付报告。
+
+public `tools/lifecycle-recovery-fault.mjs` 是独立受信 Linux operator；浏览器没有
+Kubernetes Token。它暂停同 UID/版本的单个 Worker，仅将新 fixture 已 queued 的
+恢复 Operation 注入 terminal status，随后恢复 Worker。此场景不认证原生存储
+outage 或跨实例 HA。第一次工具误将 Pod component 标签用于 Deployment 校验，
+在任何 scale/SQL 修改前失败；现场核对相同 UID、replicas=1、ready=1，原 UI
+因未收到 ack 超时。两个失败记录和原 Pod 证据均保留。修复后使用新 attempt
+和新项目完成上述 23 项，不覆盖失败报告。

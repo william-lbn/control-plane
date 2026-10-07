@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 type boundsPayload struct {
@@ -296,15 +297,16 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 }
 
 func (s *server) retryFailed(ctx context.Context, id, project string) error {
+	// The migration-owned trigger serializes admission with parent lifecycle
+	// locks, including failed creation. A second readiness predicate here would
+	// incorrectly forbid retrying the original create_project in state=error.
 	tag, err := s.db.Exec(ctx, `UPDATE operations SET state='queued',finished_at=NULL,error_code=NULL,error_message=NULL,
-		lease_owner=NULL,lease_expires_at=NULL WHERE id=$1 AND project_id=$2 AND state='failed' AND retryable
-		AND (action IN ('delete_project','delete_branch','recover_project') OR EXISTS (
-			SELECT 1 FROM projects p WHERE p.id=$2 AND p.state='ready' AND p.deleted_at IS NULL
-			AND NOT EXISTS (SELECT 1 FROM branches b WHERE b.project_id=$2
-				AND b.id=COALESCE(operations.payload->>'branch_id',
-					(SELECT e.branch_id FROM endpoints e WHERE e.id=operations.resource_id))
-				AND (b.deleted_at IS NOT NULL OR b.state='deleting'))))`, id, project)
+		lease_owner=NULL,lease_expires_at=NULL WHERE id=$1 AND project_id=$2 AND state='failed' AND retryable`, id, project)
 	if err != nil {
+		var denied *pgconn.PgError
+		if errors.As(err, &denied) && denied.Code == "23514" {
+			return pgx.ErrNoRows // Lifecycle denial is a conflict, not a transient DB failure.
+		}
 		return err
 	}
 	if tag.RowsAffected() == 0 {

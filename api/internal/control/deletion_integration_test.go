@@ -3,6 +3,7 @@ package control
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -119,6 +120,7 @@ func TestRetainedDeletionIntegration(t *testing.T) {
 		request("admin_delete", "PATCH", base+"/branches/br_leaf/protection", `{"confirm_name":"leaf","protected":false}`, "", "\"2\"", 200)
 	})
 	var leafOp string
+	exec(`INSERT INTO operations(id,project_id,resource_type,resource_id,action,state,retryable,actor_id,request_id,payload) VALUES('op_leaf_old','prj_delete','branch','br_leaf','create_branch','failed',true,'editor_delete','test','{"branch_id":"br_leaf"}')`)
 	t.Run("leaf_delete_is_durable_and_idempotent", func(t *testing.T) {
 		v := request("editor_delete", "DELETE", base+"/branches/br_leaf", `{"confirm_name":"leaf"}`, "delete-leaf", "\"3\"", 202)
 		leafOp = v["operation"].(map[string]any)["id"].(string)
@@ -141,6 +143,7 @@ func TestRetainedDeletionIntegration(t *testing.T) {
 		if e == nil {
 			t.Fatal("operation admitted for tombstone")
 		}
+		request("editor_delete", "POST", base+"/operations/op_leaf_old/retry", "", "", "", 409)
 	})
 	t.Run("project_protection_and_protected_branches_are_separate", func(t *testing.T) {
 		request("admin_delete", "DELETE", base, `{"confirm_name":"Delete project"}`, "delete-project", "\"1\"", 409)
@@ -218,6 +221,55 @@ func TestRetainedDeletionIntegration(t *testing.T) {
 		_ = json.Unmarshal(raw, &p)
 		if e := s.reconcileDeletion(ctx, projectOp, "stale-worker", "delete_project", p); e == nil {
 			t.Fatal("stale deletion accepted after recovery")
+		}
+		exec(`UPDATE operations SET state='succeeded',lease_owner=NULL,lease_expires_at=NULL WHERE id=$1`, projectOp)
+	})
+	t.Run("failed_recovery_is_retryable_while_project_tombstone_is_retained", func(t *testing.T) {
+		version := func() string {
+			v := request("admin_delete", "GET", base+"/lifecycle", "", "", "", 200)
+			return fmt.Sprintf("\"%.0f\"", v["project"].(map[string]any)["version"].(float64))
+		}
+		v := request("admin_delete", "DELETE", base, `{"confirm_name":"Delete project"}`, "delete-again", version(), 202)
+		deleteID := v["operation"].(map[string]any)["id"].(string)
+		if e := s.workOnce(ctx, "delete-again-worker"); e != nil {
+			t.Fatal(e)
+		}
+		if v = request("admin_delete", "GET", base+"/operations/"+deleteID, "", "", "", 200); v["state"] != "succeeded" {
+			t.Fatal(v)
+		}
+		v = request("admin_delete", "POST", base+"/recover", `{"confirm_name":"Delete project"}`, "recover-again", version(), 202)
+		id := v["operation"].(map[string]any)["id"].(string)
+		exec(`UPDATE operations SET state='failed',retryable=true WHERE id=$1`, id)
+		request("viewer_delete", "POST", base+"/operations/"+id+"/retry", "", "", "", 404)
+		v = request("admin_delete", "POST", base+"/operations/"+id+"/retry", "", "", "", 202)
+		if v["id"] != id || v["state"] != "queued" {
+			t.Fatal("Recovery retry changed identity", v)
+		}
+		if e := s.workOnce(ctx, "recover-again-worker"); e != nil {
+			t.Fatal(e)
+		}
+		if v = request("admin_delete", "GET", base+"/operations/"+id, "", "", "", 200); v["state"] != "succeeded" {
+			t.Fatal(v)
+		}
+	})
+	t.Run("original_failed_project_and_branch_creation_remain_retryable", func(t *testing.T) {
+		exec(`INSERT INTO projects(id,org_id,name,tenant_id,region_id,postgres_version,state,source,created_at,updated_at) VALUES('prj_failed','org_delete','Failed project','eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee','rke2-lab',16,'provisioning','managed',now(),now())`)
+		exec(`INSERT INTO operations(id,project_id,resource_type,resource_id,action,state,retryable,attempts,actor_id,request_id,payload) VALUES('op_project_failed','prj_failed','project','prj_failed','create_project','failed',true,3,'admin_delete','test','{}')`)
+		exec(`UPDATE projects SET state='error' WHERE id='prj_failed'`)
+		v := request("admin_delete", "POST", "/api/v1/projects/prj_failed/operations/op_project_failed/retry", "", "", "", 202)
+		if v["id"] != "op_project_failed" || v["state"] != "queued" || v["attempts"] != float64(3) {
+			t.Fatal("Original creation retry lost identity", v)
+		}
+		exec(`INSERT INTO branches(id,project_id,name,timeline_id,parent_branch_id,state,created_at) VALUES('br_failed','prj_delete','failed','ffffffffffffffffffffffffffffffff','br_root','creating',now())`)
+		exec(`INSERT INTO operations(id,project_id,resource_type,resource_id,action,state,retryable,actor_id,request_id,payload) VALUES('op_branch_failed','prj_delete','branch','br_failed','create_branch','failed',true,'admin_delete','test','{"branch_id":"br_failed"}')`)
+		exec(`UPDATE branches SET state='error' WHERE id='br_failed'`)
+		v = request("admin_delete", "POST", base+"/operations/op_branch_failed/retry", "", "", "", 202)
+		if v["id"] != "op_branch_failed" || v["state"] != "queued" {
+			t.Fatal("Original branch retry lost identity", v)
+		}
+		_, e := db.Exec(ctx, `INSERT INTO operations(id,project_id,resource_type,resource_id,action,state,actor_id,request_id,payload) VALUES('op_not_creation','prj_delete','branch_catalog','br_failed','create_role','queued','admin_delete','test','{"branch_id":"br_failed"}')`)
+		if e == nil {
+			t.Fatal("Unrelated work admitted on failed branch")
 		}
 	})
 }
