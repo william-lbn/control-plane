@@ -11,7 +11,7 @@
 | Web | npm ci / format:check / test / build | CSPRNG fallback 回归、strict TS、Vite 静态产物 |
 | Workflows | 固定 actionlint 1.7.12 / Linux ShellCheck | 校验全部 CI/live workflow；拒绝非法上下文和 shell 问题 |
 | Helm | tools/ci-helm.sh | lint/template；拒绝多 API 副本、缺 CA、浮动 tag；gateway 无 hostPath |
-| Image | protected main/tag after gates | 固定 builder、SHA tag、API/Web/Gateway/DataAPI/PostgREST 五镜像、SBOM/provenance、digest receipt |
+| Image | protected main/tag after gates | 固定 builder、SHA tag、API/Web/Gateway/DataAPI/PostgREST/Adapter 六镜像、SBOM/provenance、digest receipt |
 
 ```bash
 export NEON_V2_TEST_DATABASE_URL='postgres://ci:ci-disposable@127.0.0.1:5432/control_ci?sslmode=disable'
@@ -63,7 +63,17 @@ npm run test:e2e -- native-product.spec.ts
 8. 失败时保留 fixture 和 Job/日志，使用其中 Endpoint ID 正常 suspend，
 不能删除数据、Secrets、WAL 或证据。
 
-### 2.0 Console 邀请与注册
+### 2.0 保护、删除与恢复
+
+项目/分支保护与保留删除：相同 Linux 参数下运行
+`npm run test:e2e -- lifecycle.spec.ts`，只删除新建的 `ci-lifecycle-*` 测试资源。
+测试确认 root/child 依赖保护、活跃 VM 回收、幂等 replay、七天项目恢复、原 Proxy
+凭据冷醒和原数据保留、先前已删除的分支不复活。另创建两个只读 Compute，
+验证真实 Replica、写入拒绝、各自 1→0→1、WAL 可见及项目恢复后的原 Selector；
+详见 RETAINED-DELETION.md。手动缩零通过不能代替多个 Reader 自动 idle 竞争验收。
+所有历史证据和底层数据库/对象/WAL/Secrets 保留，最终 Compute 缩到 0。
+
+### 2.1 Console 邀请与注册
 
 同一组 Linux 浏览器环境变量下，可单独运行
 `npm run test:e2e -- console-invitations.spec.ts`。该测试从实际 UI 登录开始，
@@ -75,7 +85,7 @@ npm run test:e2e -- native-product.spec.ts
 这些断言覆盖原生资源与分支/连接闭环，**不等于完整权限、自动 idle、
 Reader、热伸缩、目录、HA/DR 的全面现场回归**。扩展每项测试时须分别列明结果。
 
-### 2.1 监控状态与采样边界
+### 2.2 监控状态与采样边界
 
 监控页面同时只读获取 Endpoint 的 Kubernetes runtime 和历史 metrics，均不调用 SQL 唤醒。
 当前状态来自 runtime，历史图表保留原样；数据库大小明确标识最后采样时间。

@@ -57,7 +57,7 @@ func (s *server) projectAccess(ctx context.Context, project, actor string) (reso
         FROM projects p JOIN organizations o ON o.id=p.org_id AND o.state='active'
         JOIN organization_members m ON m.org_id=p.org_id AND m.user_id=$2
         LEFT JOIN project_grants g ON g.project_id=p.id AND g.user_id=m.user_id
-        WHERE p.id=$1 AND p.deleted_at IS NULL`, project, actor).Scan(&a.OrganizationID, &a.OrganizationRole, &grant)
+        WHERE p.id=$1`, project, actor).Scan(&a.OrganizationID, &a.OrganizationRole, &grant)
 	a.Level = effectivePermission(a.OrganizationRole, grant)
 	return a, err
 }
@@ -83,6 +83,21 @@ func (s *server) authorizeRoute(w http.ResponseWriter, r *http.Request, u user) 
 			return r, false
 		}
 		if strings.Contains(r.URL.Path, "/permissions") || (r.Method == http.MethodDelete && r.PathValue("branch") == "" && r.PathValue("endpoint") == "") {
+			required = 3
+		}
+		if strings.HasSuffix(r.URL.Path, "/protection") || strings.HasSuffix(r.URL.Path, "/recover") {
+			required = 3
+		}
+		var state string
+		if err := s.db.QueryRow(r.Context(), "SELECT state FROM projects WHERE id=$1", project).Scan(&state); err != nil {
+			fail(w, r, 503, "metadata_unavailable", "Could not check lifecycle")
+			return r, false
+		}
+		if state == "deleted" || state == "deleting" || state == "recovering" {
+			if !lifecycleReadAllowed(r) || a.Level < 3 {
+				fail(w, r, 404, "not_found", "Project not found")
+				return r, false
+			}
 			required = 3
 		}
 		if strings.HasSuffix(r.URL.Path, "/connection-info") {

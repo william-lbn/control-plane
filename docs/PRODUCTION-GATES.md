@@ -24,7 +24,7 @@
 | 基础设施稳定性 | 同物理盘 VM 存在共同 I/O 竞争 | 分离故障域/IO、持续负载、etcd 延迟与错误预算 |
 | TLS / 网络 | 实验入口有 HTTP/lab-insecure 例外 | 域名、可信证书、verify-full、管理网络隔离及 NetworkPolicy |
 | 目录完整性 | rename/owner、外部 DDL 回收、默认身份迁移未完成 | API/UI 实际 PG 验证，密码轮换全部 Endpoint 冷醒/分支一致 |
-| 生命周期完整性 | project/branch delete、reset/restore 等缺口 | 所有权/保护/GC/计费/幂等/恢复与 UI 负例 |
+| 生命周期完整性 | 已有保护/依赖、保留删除、Compute 回收、tombstone、七天项目恢复代码；物理 GC、失败创建资源删除、TTL、独立 Endpoint 删除和原分支 reset 仍缺 | 按当前镜像验证 UI 正反例、服务关闭/凭据撤销、恢复/并发；物理 GC 与分布式栅栏另设 Gate |
 | 监控与运营 | 长期指标、告警、审计、容量/计量不足 | SLO、持久 TSDB、告警测试、预算与容量恢复 |
 | 发布供应链 | 镜像公开性和 registry 凭据需独立确认 | 固定 SHA/digest、SBOM/provenance、匿名拉取、回滚镜像保留 |
 

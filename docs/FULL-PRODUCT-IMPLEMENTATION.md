@@ -9,7 +9,8 @@ Data API 已加入原生 Go Driver、持久 Operation、最小权限数据库身
 默认禁用，具体合同和真实 Neon 验收边界见 DATA-API-NATIVE-DRIVER.md。
 分支应用凭据管理及当前权限检查已有实现，见 BACKEND-CREDENTIALS.md；AI 推理仍未启用。
 PITR 已实现历史恢复到新分支的代码切片，见 HISTORICAL-BRANCH-RESTORE.md；
-原地恢复、完整 Backend 一致性恢复、完整删除、细粒度资源回收、HA/DR 和跨实例 fencing
+保护、依赖图、保留删除和七天项目恢复已有 Go/React 实现，见 RETAINED-DELETION.md。
+原地恢复、完整 Backend 一致性恢复、物理 GC 与完整删除、细粒度资源回收、HA/DR 和跨实例 fencing
 仍需独立开发与测试。逐项实施顺序见 PRODUCT-COMPLETION-PLAN.md。
 API/Worker 拆分已有源码和 Chart，验收方法见 WORKER-SPLIT.md。
 控制台受邀注册、组织邀请/撤销和已有账号接受已有 Go/React/API/迁移与测试代码；

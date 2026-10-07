@@ -1,7 +1,7 @@
 # 实际 API 合同
 
 OpenAPI 3 合同的权威源是 [openapi-v1.json](../contracts/openapi-v1.json)。
-版本 0.7.0，46 个路径、63 个操作，全部拥有稳定且唯一的 operationId。
+版本 0.8.0，50 个路径、69 个操作，全部拥有稳定且唯一的 operationId。
 运行 Swagger 位于 `/api/docs`，JSON 位于 `/api/openapi.json`。
 本合同是自托管 `/api/v1`，不声称兼容 Neon SaaS `/api/v2`。
 
@@ -20,6 +20,9 @@ request_id/operation_id/error_code，再由显式 retry 接口恢复可重试操
 
 ## 2. 操作索引
 
+保护、删除与恢复的新合同见 [保留删除手册](RETAINED-DELETION.md)。
+项目回收列表使用 `deleted=true`，只向有效 Admin 返回已删除项目。
+
 | Method | Path | operationId | Success responses |
 | --- | --- | --- | --- |
 | GET | `/healthz` | `getHealth` | 200 |
@@ -36,9 +39,15 @@ request_id/operation_id/error_code，再由显式 retry 接口恢复可重试操
 | GET | `/api/v1/organizations/{org}/projects` | `listProjects` | 200 |
 | POST | `/api/v1/organizations/{org}/projects` | `createProject` | 202 |
 | GET | `/api/v1/projects/{project}` | `getProject` | 200 |
+| DELETE | `/api/v1/projects/{project}` | `DeleteProject` | 202 |
+| GET | `/api/v1/projects/{project}/lifecycle` | `GetProjectLifecycle` | 200 |
+| PATCH | `/api/v1/projects/{project}/protection` | `SetProjectProtection` | 200 |
+| POST | `/api/v1/projects/{project}/recover` | `RecoverProject` | 202 |
 | GET | `/api/v1/projects/{project}/branches` | `listBranches` | 200 |
 | POST | `/api/v1/projects/{project}/branches` | `createBranch` | 202 |
 | GET | `/api/v1/projects/{project}/branches/{branch}` | `getBranch` | 200 |
+| DELETE | `/api/v1/projects/{project}/branches/{branch}` | `DeleteBranch` | 202 |
+| PATCH | `/api/v1/projects/{project}/branches/{branch}/protection` | `SetBranchProtection` | 200 |
 | GET | `/api/v1/projects/{project}/branches/{branch}/restore-window` | `readBranchRestoreWindow` | 200 |
 | GET | `/api/v1/projects/{project}/branches/{branch}/services` | `listBranchServices` | 200 |
 | GET | `/api/v1/projects/{project}/endpoints` | `listEndpoints` | 200 |
@@ -92,7 +101,8 @@ request_id/operation_id/error_code，再由显式 retry 接口恢复可重试操
 与文档操作，并检查引用、Session Cookie 和 operationId。
 请求/响应模型在 components/schemas，权限与 bearer 语义在 securitySchemes。
 组织/授权：organizations.go、authorization.go；资源创建：create_handlers.go；
-目录：catalog.go；生命周期：lifecycle.go；SQL/监控：proxy.go、monitor.go；历史恢复：restore.go。
+目录：catalog.go；Compute 生命周期：lifecycle.go；保留删除/恢复：deletion.go；
+SQL/监控：proxy.go、monitor.go；历史恢复：restore.go。
 
 `createBranch` 可提供 `parent_timestamp` 或 `parent_lsn`，二者互斥。它创建新分支，
 不修改原分支；解析出的固定 `parent_lsn`、`restore_source`、`parent_timestamp` 与

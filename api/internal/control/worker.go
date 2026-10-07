@@ -97,6 +97,15 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 			}
 		}()
 		switch action {
+		case "delete_project", "delete_branch", "recover_project":
+			var p deletionPayload
+			stepErr = json.Unmarshal(payload, &p)
+			if stepErr == nil && p.ProjectID != projectID {
+				stepErr = errors.New("deletion operation scope mismatch")
+			}
+			if stepErr == nil {
+				stepErr = s.reconcileDeletion(runCtx, id, workerID, action, p)
+			}
 		case "enable_data_api", "disable_data_api":
 			var p dataAPIPayload
 			stepErr = json.Unmarshal(payload, &p)
@@ -288,7 +297,13 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 
 func (s *server) retryFailed(ctx context.Context, id, project string) error {
 	tag, err := s.db.Exec(ctx, `UPDATE operations SET state='queued',finished_at=NULL,error_code=NULL,error_message=NULL,
-        lease_owner=NULL,lease_expires_at=NULL WHERE id=$1 AND project_id=$2 AND state='failed' AND retryable`, id, project)
+		lease_owner=NULL,lease_expires_at=NULL WHERE id=$1 AND project_id=$2 AND state='failed' AND retryable
+		AND (action IN ('delete_project','delete_branch','recover_project') OR EXISTS (
+			SELECT 1 FROM projects p WHERE p.id=$2 AND p.state='ready' AND p.deleted_at IS NULL
+			AND NOT EXISTS (SELECT 1 FROM branches b WHERE b.project_id=$2
+				AND b.id=COALESCE(operations.payload->>'branch_id',
+					(SELECT e.branch_id FROM endpoints e WHERE e.id=operations.resource_id))
+				AND (b.deleted_at IS NOT NULL OR b.state='deleting'))))`, id, project)
 	if err != nil {
 		return err
 	}

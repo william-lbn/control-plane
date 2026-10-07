@@ -21,6 +21,7 @@ import { CreateResource } from './CreateResources';
 import { ProjectPermissions } from '../identity/Organizations';
 import { Catalog } from '../catalog/Catalog';
 import { Restore } from '../restore/Restore';
+import { Lifecycle } from './Lifecycle';
 
 export function Projects({
   organizationId,
@@ -35,11 +36,14 @@ export function Projects({
 }) {
   const [items, setItems] = useState<Project[] | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+  const [trash, setTrash] = useState(false);
   useEffect(() => {
-    api<Page<Project>>(`/api/v1/organizations/${encodeURIComponent(organizationId)}/projects`)
+    api<Page<Project>>(
+      `/api/v1/organizations/${encodeURIComponent(organizationId)}/projects?deleted=${trash}`,
+    )
       .then((data) => setItems(data.items))
       .catch(showError);
-  }, [organizationId, showError]);
+  }, [organizationId, showError, trash]);
   return (
     <>
       <PageHeading
@@ -83,7 +87,10 @@ export function Projects({
         </div>
       </div>
       <div className="section-header">
-        <h2>全部项目</h2>
+        <h2>{trash ? '已删除项目' : '全部项目'}</h2>
+        <button className="button" onClick={() => setTrash(!trash)}>
+          {trash ? '查看活动项目' : '查看已删除项目'}
+        </button>
         <span>{items?.length ?? '—'} 个项目</span>
       </div>
       {items === null ? (
@@ -93,7 +100,11 @@ export function Projects({
       ) : (
         <div className="project-grid">
           {items.map((project) => (
-            <a className="project-card" href={route(project.id)} key={project.id}>
+            <a
+              className="project-card"
+              href={route(project.id, project.state === 'ready' ? '' : 'lifecycle')}
+              key={project.id}
+            >
               <div className="card-top">
                 <div className="project-icon">◈</div>
                 {status(project.state)}
@@ -134,6 +145,7 @@ export function ProjectWorkspace({
   const [loading, setLoading] = useState(true);
   const [showCreateBranch, setShowCreateBranch] = useState(false);
   const refresh = async () => {
+    if (page === 'lifecycle') return;
     try {
       const [p, b, e, o] = await Promise.all([
         api<Project>(projectPath(projectId)),
@@ -155,7 +167,8 @@ export function ProjectWorkspace({
     void refresh();
     const timer = setInterval(() => void refresh(), 30000);
     return () => clearInterval(timer);
-  }, [projectId]);
+  }, [projectId, page]);
+  if (page === 'lifecycle') return <Lifecycle projectId={projectId} />;
   if (loading) return <div className="skeleton" />;
   if (!project) return <Empty title="项目不可用" message="请检查 API、权限或元数据库状态。" />;
   const branchName = (id: string) => branches.find((branch) => branch.id === id)?.name || short(id);

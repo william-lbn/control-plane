@@ -85,9 +85,15 @@ func (s *server) routes() *http.ServeMux {
 	mux.Handle("GET /api/v1/organizations/{org}/projects", s.auth(http.HandlerFunc(s.projects), false))
 	mux.Handle("POST /api/v1/organizations/{org}/projects", s.auth(http.HandlerFunc(s.createProject), true))
 	mux.Handle("GET /api/v1/projects/{project}", s.auth(http.HandlerFunc(s.project), false))
+	mux.Handle("DELETE /api/v1/projects/{project}", s.auth(http.HandlerFunc(s.deleteResource), true))
+	mux.Handle("GET /api/v1/projects/{project}/lifecycle", s.auth(http.HandlerFunc(s.lifecycleOverview), false))
+	mux.Handle("PATCH /api/v1/projects/{project}/protection", s.auth(http.HandlerFunc(s.setResourceProtection), true))
+	mux.Handle("POST /api/v1/projects/{project}/recover", s.auth(http.HandlerFunc(s.recoverProject), true))
 	mux.Handle("GET /api/v1/projects/{project}/branches", s.auth(http.HandlerFunc(s.branches), false))
 	mux.Handle("POST /api/v1/projects/{project}/branches", s.auth(http.HandlerFunc(s.createBranch), true))
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}", s.auth(http.HandlerFunc(s.branch), false))
+	mux.Handle("DELETE /api/v1/projects/{project}/branches/{branch}", s.auth(http.HandlerFunc(s.deleteResource), true))
+	mux.Handle("PATCH /api/v1/projects/{project}/branches/{branch}/protection", s.auth(http.HandlerFunc(s.setResourceProtection), true))
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/restore-window", s.auth(http.HandlerFunc(s.readRestoreWindow), false))
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/services", s.auth(http.HandlerFunc(s.branchServices), false))
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/data-api", s.auth(http.HandlerFunc(s.dataAPIRead), false))
@@ -151,7 +157,8 @@ func (s *server) capabilities(w http.ResponseWriter, r *http.Request) {
 			"neonvm_autoscaling": map[string]any{"enabled": true, "reason": "validated_on_vm_lab"},
 			"vm_scale_to_zero":   map[string]any{"enabled": os.Getenv("NEON_V2_SCALE_ZERO_ENABLED") == "true", "reason": "lab_idle_controller"},
 			"read_replicas":      map[string]any{"enabled": creationEnabled(), "reason": "safekeeper_streaming_validated"},
-			"project_delete":     disabled,
+			"project_delete":     map[string]any{"enabled": creationEnabled(), "reason": "retained_deletion_no_physical_gc"},
+			"branch_delete":      map[string]any{"enabled": creationEnabled(), "reason": "protected_leaf_retained_deletion"},
 			"pitr_new_branch":    map[string]any{"enabled": pitrEnabled(), "reason": "retained_timestamp_or_lsn_new_branch"},
 		},
 		"services": map[string]any{"postgres": map[string]any{"enabled": true, "reason": "read_and_query_validated"},
@@ -186,31 +193,46 @@ func (s *server) requireEndpoint(w http.ResponseWriter, r *http.Request) (record
 		}
 		return nil, false
 	}
+	if item["state"] == "deleting" || item["state"] == "deleted" {
+		fail(w, r, 410, "resource_deleted", "Compute admission is closed")
+		return nil, false
+	}
 	return item, true
 }
 func page(items []record) map[string]any { return map[string]any{"items": items, "next_cursor": nil} }
 
 func (s *server) projects(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r)
+	trash := r.URL.Query().Get("deleted") == "true"
+	if value := r.URL.Query().Get("deleted"); value != "" && value != "true" && value != "false" {
+		fail(w, r, 422, "invalid_filter", "deleted must be true or false")
+		return
+	}
 	items, err := s.many(r.Context(), `SELECT p.*,m.role AS organization_role,COALESCE(g.role,'') AS project_role
 		FROM projects p JOIN organization_members m ON m.org_id=p.org_id AND m.user_id=$2
 		LEFT JOIN project_grants g ON g.project_id=p.id AND g.user_id=m.user_id
-		WHERE p.org_id=$1 AND p.deleted_at IS NULL AND ($3='' OR p.id=$3)
-		AND (m.role<>'collaborator' OR g.role IS NOT NULL) ORDER BY p.created_at DESC LIMIT 100`, r.PathValue("org"), u.ID, u.KeyProject)
+		WHERE p.org_id=$1 AND ((NOT $4 AND p.deleted_at IS NULL) OR ($4 AND p.deleted_at IS NOT NULL
+		AND (m.role IN ('owner','admin') OR g.role='admin'))) AND ($3='' OR p.id=$3)
+		AND (m.role<>'collaborator' OR g.role IS NOT NULL) ORDER BY p.created_at DESC LIMIT 100`, r.PathValue("org"), u.ID, u.KeyProject, trash)
 	if err != nil {
 		fail(w, r, 503, "metadata_unavailable", "Could not list projects")
 		return
 	}
+	visible := []record{}
 	for _, item := range items {
 		level := effectivePermission(stringVal(item["organization_role"]), stringVal(item["project_role"]))
 		if u.APIKey {
 			level = min(level, roleLevel(u.KeyRole))
 		}
+		if trash && level < 3 {
+			continue
+		}
 		item["effective_permission"] = permissionName(level)
 		delete(item, "organization_role")
 		delete(item, "project_role")
+		visible = append(visible, item)
 	}
-	jsonResponse(w, 200, page(items))
+	jsonResponse(w, 200, page(visible))
 }
 func (s *server) project(w http.ResponseWriter, r *http.Request) {
 	item, ok := s.requireProject(w, r)
@@ -337,9 +359,8 @@ func (s *server) operationRecord(ctx context.Context, id, project string) (recor
 	return item, nil
 }
 func (s *server) operations(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.requireProject(w, r); !ok {
-		return
-	}
+	// The authorization middleware exposes retained project Operations only
+	// to an effective Admin. Do not require a live project after deletion.
 	rows, err := s.many(r.Context(), "SELECT id FROM operations WHERE project_id=$1 ORDER BY created_at DESC LIMIT 100", r.PathValue("project"))
 	if err != nil {
 		fail(w, r, 503, "metadata_unavailable", "Could not list operations")

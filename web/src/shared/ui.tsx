@@ -16,6 +16,9 @@ export const stateLabel = (value: string) =>
       unknown: '未知',
       starting: '启动中',
       provisioning: '创建中',
+      deleting: '删除中',
+      deleted: '已删除',
+      recovering: '恢复中',
     }) as Record<string, string>
   )[value] || value;
 export const status = (value: string) => (

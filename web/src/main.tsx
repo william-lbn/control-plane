@@ -173,6 +173,12 @@ function App() {
                 <span>↶</span>历史恢复
               </a>
               <a
+                className={page === 'lifecycle' ? 'active' : ''}
+                href={route(projectId, 'lifecycle')}
+              >
+                <span>♧</span>保护与删除
+              </a>
+              <a
                 className={page === 'monitoring' ? 'active' : ''}
                 href={route(projectId, 'monitoring')}
               >

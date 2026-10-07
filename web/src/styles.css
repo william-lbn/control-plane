@@ -1361,3 +1361,39 @@ textarea:focus {
 .invitation-secret input {
   font-family: ui-monospace, monospace;
 }
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0;
+}
+.button.danger {
+  color: #ffb9b4;
+  border-color: #764342;
+  background: #351f23;
+}
+.button.danger:hover:not(:disabled) {
+  border-color: #b66660;
+  background: #49262b;
+}
+.lifecycle-modal label {
+  display: grid;
+  gap: 12px;
+  margin-top: 24px;
+}
+.lifecycle-modal p,
+.lifecycle-project p {
+  color: #a4b9b9;
+  line-height: 1.7;
+}
+.lifecycle-operation {
+  margin-top: 24px;
+}
+.status-deleted {
+  color: #a3adb2;
+}
+.status-deleting,
+.status-recovering {
+  color: #f4c477;
+}
