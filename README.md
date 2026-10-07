@@ -4,7 +4,8 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Compute 管理网关
 许可证：Apache-2.0。项目由自托管维护者开发，与 Neon 托管服务独立。
 
 **发行状态：预览版本。已经验证的实验环境功能不等于生产认证，也不等于 Neon 官网全部 Backend 服务。**
-Chart 0.3.0 提供独立 API、Worker、Web 进程及可选 Data API、应用凭据；Worker 使用 PostgreSQL 领导租约。
+[2026-10-07 交付及验收边界](docs/DELIVERY-2026-10-07.md)记录邀请注册、权限撤销和资源清理。
+Chart 0.4.0 提供独立 API、Worker、Web 进程及可选 Data API、应用凭据和 Console 邀请注册；Worker 使用 PostgreSQL 领导租约。
 当前只允许一个 API 和一个 Worker，跨实例外部 fencing 与 HA 仍须独立验收。
 旧合并版本升级前必须执行 [停止/排空流程](docs/WORKER-SPLIT.md)。
 运行代码与实际合同见 [OpenAPI](contracts/openapi-v1.json)；本项目使用 `/api/v1`，未声称兼容托管 Neon `/api/v2`。
@@ -14,6 +15,7 @@ Chart 0.3.0 提供独立 API、Worker、Web 进程及可选 Data API、应用凭
 | 功能 | 本仓库代码 | 当前边界 |
 | --- | --- | --- |
 | 组织、成员、项目授权、API Key | 已实现，真实 PostgreSQL 集成测试 | 加法式项目授权；完整生产安全审计、SSO/MFA 未完成 |
+| Console 邀请与受邀注册 | 账号绑定、一次性凭据、幂等/过期/撤销、事务审计、Go/React/PG 测试 | 手动安全交付邀请；邮件验证/OIDC/MFA 未完成，独立于 Managed Auth |
 | 项目、当前时间点分支、Writer、多个 Reader | 已实现，异步 Operation + SQL 就绪探针 | 单集群、单 Region、PG16；不支持所有项目/分支删除与恢复动作 |
 | PostgreSQL 连接与 SQL 工作台 | 通过独立 Neon Proxy 和 Endpoint selector | 应用不能直接连接控制 API；生产入口必须配置可信 TLS |
 | 数据库、角色与密码轮换 | 分支目录、Compute 原生配置、Proxy spec 调谐 | rename、owner 变更、未知外部 DDL 恢复未完成 |
@@ -43,7 +45,7 @@ docs/                 架构、对象模型、部署、测试、来源及生产�
 ```
 
 - [架构与模型](docs/ARCHITECTURE.md)
-- [57 个实际控制 API 操作](docs/API.md)
+- [62 个实际 API 操作](docs/API.md)
 - [Linux 部署与回滚](docs/DEPLOYMENT.md)
 - [测试与交付标准](docs/TESTING.md)
 - [Fork 来源与镜像对应关系](docs/SOURCE-PROVENANCE.md)
@@ -53,6 +55,7 @@ docs/                 架构、对象模型、部署、测试、来源及生产�
 - [AI Gateway 官网核验、平台配置与动态模型设计](docs/AI-GATEWAY-PLATFORM-DESIGN.md)
 - [原生 Data API 驱动与部署](docs/DATA-API-NATIVE-DRIVER.md)
 - [分支应用凭据：模型、API、部署、UI 和验收](docs/BACKEND-CREDENTIALS.md)
+- [控制台成员邀请、受邀注册与复测](docs/CONSOLE-INVITATIONS.md)
 - [2026-10-04 产品切片验收、修复与手动复测](docs/ACCEPTANCE-2026-10-04.md)
 - [贡献规范](CONTRIBUTING.md) / [安全政策](SECURITY.md)
 

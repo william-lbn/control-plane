@@ -10,6 +10,8 @@ Data API 已加入原生 Go Driver、持久 Operation、最小权限数据库身
 分支应用凭据管理及当前权限检查已有实现，见 BACKEND-CREDENTIALS.md；AI 推理仍未启用。
 PITR、完整删除、细粒度资源回收、HA/DR 和跨实例 fencing 仍需独立开发与测试。
 API/Worker 拆分已有源码和 Chart，验收方法见 WORKER-SPLIT.md。
+控制台受邀注册、组织邀请/撤销和已有账号接受已有 Go/React/API/迁移与测试代码；
+详见 CONSOLE-INVITATIONS.md。这是 Console 身份功能，Managed Auth 服务仍未实现。
 
 依据 `neondatabase/website` 快照 `c0d49cbb6979b2ce79ea502d62dbc40780a923b0`：
 

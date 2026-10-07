@@ -248,6 +248,7 @@ func (s *server) cleanSessions(ctx context.Context) {
 		case <-ticker.C:
 			_, _ = s.db.Exec(ctx, "DELETE FROM sessions WHERE expires_at < now()")
 			_, _ = s.db.Exec(ctx, "DELETE FROM login_failures WHERE occurred_at < now()-interval '1 day'")
+			s.cleanRegistrationLimits(ctx)
 		}
 	}
 }

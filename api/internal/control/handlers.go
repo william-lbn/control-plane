@@ -58,6 +58,8 @@ func (s *server) routes() *http.ServeMux {
 		jsonResponse(w, 200, map[string]string{"status": "ready"})
 	})
 	mux.HandleFunc("POST /auth/login", s.login)
+	mux.HandleFunc("POST /auth/signup", s.signup)
+	mux.Handle("POST /api/v1/invitations/accept", s.auth(http.HandlerFunc(s.acceptInvitation), true))
 	mux.Handle("POST /auth/logout", s.auth(http.HandlerFunc(s.logout), true))
 	mux.Handle("GET /api/v1/session", s.auth(http.HandlerFunc(s.session), false))
 	mux.Handle("GET /api/v1/capabilities", s.auth(http.HandlerFunc(s.capabilities), false))
@@ -65,6 +67,9 @@ func (s *server) routes() *http.ServeMux {
 	mux.Handle("POST /api/v1/organizations", s.auth(http.HandlerFunc(s.organizations), true))
 	mux.Handle("GET /api/v1/organizations/{org}", s.auth(http.HandlerFunc(s.organizationDetail), false))
 	mux.Handle("GET /api/v1/organizations/{org}/members", s.auth(http.HandlerFunc(s.organizationMembers), false))
+	mux.Handle("GET /api/v1/organizations/{org}/invitations", s.auth(http.HandlerFunc(s.consoleInvitations), false))
+	mux.Handle("POST /api/v1/organizations/{org}/invitations", s.auth(http.HandlerFunc(s.consoleInvitations), true))
+	mux.Handle("DELETE /api/v1/organizations/{org}/invitations/{invitation}", s.auth(http.HandlerFunc(s.revokeConsoleInvitation), true))
 	mux.Handle("POST /api/v1/organizations/{org}/members", s.auth(http.HandlerFunc(s.organizationMembers), true))
 	mux.Handle("PATCH /api/v1/organizations/{org}/members/{member}", s.auth(http.HandlerFunc(s.changeMember), true))
 	mux.Handle("DELETE /api/v1/organizations/{org}/members/{member}", s.auth(http.HandlerFunc(s.changeMember), true))
@@ -135,6 +140,7 @@ func (s *server) capabilities(w http.ResponseWriter, r *http.Request) {
 		"cluster_id": "rke2-lab", "observed_at": time.Now().UTC(),
 		"runtime": s.runtimeStatus(r.Context()),
 		"features": map[string]any{
+			"console_invitations":  map[string]any{"enabled": true, "reason": "account_bound_invitation_registration"},
 			"tenant_authorization": map[string]any{"enabled": true, "reason": "organization_and_additive_project_policy"},
 			"api_keys":             map[string]any{"enabled": true, "reason": "hashed_scoped_revocable_credentials"},
 			"backend_credentials":  map[string]any{"enabled": s.backendKeys != nil, "reason": "branch_scoped_credentials_inference_independent"},

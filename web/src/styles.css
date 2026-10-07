@@ -1346,3 +1346,18 @@ textarea:focus {
     grid-template-columns: 1fr;
   }
 }
+.invitation-secret {
+  margin: 20px 0;
+  padding: 18px;
+  border: 1px solid #3c8066;
+  border-radius: 12px;
+  background: #182923;
+}
+.invitation-secret label {
+  display: grid;
+  gap: 10px;
+  max-width: 640px;
+}
+.invitation-secret input {
+  font-family: ui-monospace, monospace;
+}

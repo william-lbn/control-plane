@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.5.0",
+    "version": "0.6.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -1651,6 +1651,318 @@
             ]
           }
         }
+      },
+      "ConsoleInvitation": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "org_id": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "invited_by": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "editor",
+              "viewer",
+              "collaborator"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "accepted_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "revoked_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "accepted_by": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "expired",
+              "accepted",
+              "revoked"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "org_id",
+          "username",
+          "invited_by",
+          "role",
+          "created_at",
+          "expires_at",
+          "accepted_at",
+          "revoked_at",
+          "accepted_by",
+          "state"
+        ],
+        "additionalProperties": false
+      },
+      "ConsoleInvitationCreated": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "org_id": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "invited_by": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "editor",
+              "viewer",
+              "collaborator"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "accepted_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "revoked_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "accepted_by": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "expired",
+              "accepted",
+              "revoked"
+            ]
+          },
+          "secret_available": {
+            "type": "boolean"
+          },
+          "token": {
+            "type": "string",
+            "format": "password",
+            "readOnly": true
+          }
+        },
+        "required": [
+          "id",
+          "org_id",
+          "username",
+          "invited_by",
+          "role",
+          "created_at",
+          "expires_at",
+          "accepted_at",
+          "revoked_at",
+          "accepted_by",
+          "state",
+          "secret_available"
+        ],
+        "additionalProperties": false
+      },
+      "ConsoleInvitationPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConsoleInvitation"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "ConsoleInvitationCreate": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.@+-]{2,127}$"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "editor",
+              "viewer",
+              "collaborator"
+            ]
+          },
+          "expires_hours": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 168
+          }
+        },
+        "required": [
+          "username",
+          "role",
+          "expires_hours"
+        ],
+        "additionalProperties": false
+      },
+      "ConsoleSignup": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.@+-]{2,127}$"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "minLength": 12,
+            "maxLength": 256,
+            "writeOnly": true
+          },
+          "token": {
+            "type": "string",
+            "format": "password",
+            "pattern": "^ncp_inv_[a-f0-9]{64}$",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "username",
+          "password",
+          "token"
+        ],
+        "additionalProperties": false
+      },
+      "ConsoleInvitationAccept": {
+        "type": "object",
+        "properties": {
+          "token": {
+            "type": "string",
+            "format": "password",
+            "pattern": "^ncp_inv_[a-f0-9]{64}$",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "additionalProperties": false
+      },
+      "ConsoleRegistrationResult": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "type": "string"
+          },
+          "username": {
+            "type": "string"
+          },
+          "organization_id": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "admin",
+              "editor",
+              "viewer",
+              "collaborator"
+            ]
+          },
+          "sign_in_required": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "user_id",
+          "username",
+          "organization_id",
+          "role",
+          "sign_in_required"
+        ],
+        "additionalProperties": false
+      },
+      "ConsoleInvitationRevoked": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "revoked": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "id",
+          "revoked"
+        ],
+        "additionalProperties": false
       }
     },
     "responses": {
@@ -6124,6 +6436,330 @@
             "description": "Metadata unavailable"
           }
         }
+      }
+    },
+    "/api/v1/organizations/{org}/invitations": {
+      "get": {
+        "operationId": "listConsoleInvitations",
+        "summary": "List invitation history (no tokens or hashes)",
+        "tags": [
+          "Identity"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleInvitationPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createConsoleInvitation",
+        "summary": "Create a one-time, account-bound Console invitation",
+        "tags": [
+          "Identity"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleInvitationCreated"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          },
+          "200": {
+            "description": "Idempotent replay: same resource, secret_available=false, no token. Lost plaintext requires revoke and reissue.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleInvitationCreated"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsoleInvitationCreate"
+              }
+            }
+          }
+        },
+        "description": "Organization Admin Console session required. 256-bit token returned once, hash only persisted. Expires in 1-168 hours. Not Managed Auth or email verification. Duplicate pending account returns 409; changed payload with same key returns 409."
+      }
+    },
+    "/api/v1/organizations/{org}/invitations/{invitation}": {
+      "delete": {
+        "operationId": "revokeConsoleInvitation",
+        "summary": "Revoke a pending invitation idempotently",
+        "tags": [
+          "Identity"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "invitation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleInvitationRevoked"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/invitations/accept": {
+      "post": {
+        "operationId": "acceptConsoleInvitation",
+        "summary": "Accept invitation as its authenticated existing account",
+        "tags": [
+          "Identity"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/csrf"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleRegistrationResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsoleInvitationAccept"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/signup": {
+      "post": {
+        "operationId": "registerInvitedConsoleAccount",
+        "summary": "Create a local Console account with a valid invitation",
+        "tags": [
+          "Identity"
+        ],
+        "security": [],
+        "parameters": [],
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleRegistrationResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsoleSignup"
+              }
+            }
+          }
+        },
+        "description": "Same-origin POST; new accounts only. Username must match invitation. Existing accounts must sign in to accept, no password reset. Registration and membership and token consumption and audit commit atomically. Login remains a separate step. Invalid/expired/revoked/consumed invitation or demoted inviter returns 422. Shared PG admission cap: 20 per minute per hashed transport peer, including successful requests."
       }
     }
   }

@@ -112,7 +112,7 @@ func (s *server) authorizeRoute(w http.ResponseWriter, r *http.Request, u user) 
 		case strings.HasSuffix(r.URL.Path, "/projects") && r.Method == http.MethodPost:
 			// Viewers can create their own projects and receive an Admin grant.
 			required = 1
-		case strings.Contains(r.URL.Path, "/members") || strings.Contains(r.URL.Path, "/api-keys"):
+		case strings.Contains(r.URL.Path, "/members") || strings.Contains(r.URL.Path, "/api-keys") || strings.Contains(r.URL.Path, "/invitations"):
 			required = 3
 		case r.Method != http.MethodGet:
 			required = 3
@@ -127,6 +127,10 @@ func (s *server) authorizeRoute(w http.ResponseWriter, r *http.Request, u user) 
 		return r.WithContext(context.WithValue(r.Context(), resourceAccessKey{}, a)), true
 	}
 	if u.APIKey {
+		if strings.Contains(r.URL.Path, "/invitations") {
+			fail(w, r, 403, "forbidden", "Console sessions required for invitations")
+			return r, false
+		}
 		if r.Method != http.MethodGet && roleLevel(u.KeyRole) < 2 {
 			fail(w, r, 403, "forbidden", "Read-only API key cannot mutate resources")
 			return r, false

@@ -61,7 +61,16 @@ npm run test:e2e -- native-product.spec.ts
    使用 NEON_E2E_EXPECT_SPLIT=true 时，另检查独立 API/Worker 和 Worker 心跳；
    受控 Worker 故障模式见 [拆分手册](WORKER-SPLIT.md)。
 8. 失败时保留 fixture 和 Job/日志，使用其中 Endpoint ID 正常 suspend，
-   不能删除数据、Secrets、WAL 或证据。
+不能删除数据、Secrets、WAL 或证据。
+
+### 2.0 Console 邀请与注册
+
+同一组 Linux 浏览器环境变量下，可单独运行
+`npm run test:e2e -- console-invitations.spec.ts`。该测试从实际 UI 登录开始，
+验证一次性邀请、幂等 replay 不返密钥、受邀注册/登录、跨组织 404、Viewer 无管理权、
+已有账号本人接受且不能重置密码、撤销邀请与移除成员立即失权。
+只创建元数据账号/组织/邀请，不启动 Compute；资料与凭据 fixture 保留在私有目录。
+完整手动步骤、失败语义与生产边界见 CONSOLE-INVITATIONS.md。
 
 这些断言覆盖原生资源与分支/连接闭环，**不等于完整权限、自动 idle、
 Reader、热伸缩、目录、HA/DR 的全面现场回归**。扩展每项测试时须分别列明结果。

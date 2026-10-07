@@ -1,7 +1,7 @@
 # 实际 API 合同
 
 OpenAPI 3 合同的权威源是 [openapi-v1.json](../contracts/openapi-v1.json)。
-版本 0.5.0，41 个路径、57 个操作，全部拥有稳定且唯一的 operationId。
+版本 0.6.0，45 个路径、62 个操作，全部拥有稳定且唯一的 operationId。
 运行 Swagger 位于 `/api/docs`，JSON 位于 `/api/openapi.json`。
 本合同是自托管 `/api/v1`，不声称兼容 Neon SaaS `/api/v2`。
 
@@ -10,6 +10,8 @@ OpenAPI 3 合同的权威源是 [openapi-v1.json](../contracts/openapi-v1.json)�
 Session：POST /auth/login，浏览器保存 Session/CSRF Cookie。Cookie 写请求
 携带 X-CSRF-Token；Bearer API Key 使用独立的 scope/role/expiry/revoke 校验。
 公开健康检查和登录没有会话前提，业务接口进行服务端组织/项目授权。
+受邀注册由有效的账号绑定邀请准入；Console 邀请管理要求管理员 Cookie Session，
+已有账号接受要求受邀者本人 Session。详细合同见 CONSOLE-INVITATIONS.md。
 
 资源创建需要 Idempotency-Key；创建返回 202 + resource + operation。
 资源并未因为 202 自动就绪；查询 Operation 等待 succeeded，failed 时保存
@@ -24,6 +26,11 @@ request_id/operation_id/error_code，再由显式 retry 接口恢复可重试操
 | GET | `/readyz` | `getReadiness` | 200 |
 | POST | `/auth/login` | `login` | 200 |
 | POST | `/auth/logout` | `logout` | 200 |
+| POST | `/auth/signup` | `registerInvitedConsoleAccount` | 201 |
+| POST | `/api/v1/invitations/accept` | `acceptConsoleInvitation` | 201 |
+| GET | `/api/v1/organizations/{org}/invitations` | `listConsoleInvitations` | 200 |
+| POST | `/api/v1/organizations/{org}/invitations` | `createConsoleInvitation` | 201 / 200 replay |
+| DELETE | `/api/v1/organizations/{org}/invitations/{invitation}` | `revokeConsoleInvitation` | 200 |
 | GET | `/api/v1/session` | `getSession` | 200 |
 | GET | `/api/v1/capabilities` | `getCapabilities` | 200 |
 | GET | `/api/v1/organizations/{org}/projects` | `listProjects` | 200 |

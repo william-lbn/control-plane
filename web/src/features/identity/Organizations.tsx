@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import { api, projectPath } from '../../api';
 import type { Organization, Page, Project } from '../../api';
 import { Empty, PageHeading } from '../../shared/ui';
+import { Invitations } from './Invitations';
 
 type Member = { user_id: string; username: string; role: string };
 type Key = {
@@ -36,7 +37,6 @@ export function Organizations({
   const [busy, setBusy] = useState(false);
   const [members, setMembers] = useState<Member[]>([]);
   const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
   const [role, setRole] = useState('collaborator');
   const isAdmin = organization?.role === 'admin' || organization?.role === 'owner';
   const orgPath = `/api/v1/organizations/${encodeURIComponent(organization?.id || '')}`;
@@ -45,7 +45,6 @@ export function Organizations({
   }
   useEffect(() => {
     setMembers([]);
-    setPassword('');
     if (isAdmin) void reloadMembers().catch(showError);
   }, [organization?.id, isAdmin]);
   async function create(event: FormEvent) {
@@ -70,9 +69,8 @@ export function Organizations({
     try {
       await api(orgPath + '/members', {
         method: 'POST',
-        body: JSON.stringify({ username, password, role }),
+        body: JSON.stringify({ username, password: '', role }),
       });
-      setPassword('');
       setUsername('');
       await reloadMembers();
     } catch (error) {
@@ -132,6 +130,13 @@ export function Organizations({
               <div className="section-header">
                 <h3>组织成员</h3>
                 <span>{members.length} 人</span>
+                <button
+                  className="button"
+                  disabled={busy}
+                  onClick={() => void reloadMembers().catch(showError)}
+                >
+                  刷新成员
+                </button>
               </div>
               <div className="table-wrap">
                 <table>
@@ -189,16 +194,6 @@ export function Organizations({
                   />
                 </label>
                 <label>
-                  初始密码（仅新账号）
-                  <input
-                    aria-label="新成员初始密码"
-                    type="password"
-                    value={password}
-                    autoComplete="new-password"
-                    onChange={(e) => setPassword(e.target.value)}
-                  />
-                </label>
-                <label>
                   组织角色
                   <select
                     aria-label="新成员组织角色"
@@ -213,12 +208,12 @@ export function Organizations({
                   </select>
                 </label>
                 <button className="button primary" disabled={busy}>
-                  添加本地成员
+                  添加已有本地账号
                 </button>
               </form>
               <p className="muted">
-                新本地账号密码至少 12
-                字符；已有账号不填写密码。组织管理员不能重置共享账号密码。至少保留一位 Admin。
+                新用户请使用成员邀请并自行设置密码。组织管理员不能重置共享账号密码。至少保留一位
+                Admin。
               </p>
             </>
           ) : (
@@ -228,6 +223,12 @@ export function Organizations({
           )}
         </section>
       )}
+      <Invitations
+        key={organization?.id || 'no-org'}
+        organization={organization}
+        onAccepted={onCreated}
+        showError={showError}
+      />
       {organization && isAdmin && <APIKeys organization={organization} showError={showError} />}
       <APIKeys showError={showError} />
     </>

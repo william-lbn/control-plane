@@ -209,6 +209,16 @@ func (s *server) changeMember(w http.ResponseWriter, r *http.Request) {
 	} else {
 		_, err = tx.Exec(r.Context(), `UPDATE organization_members SET role=$3 WHERE org_id=$1 AND user_id=$2`, org, uid, body.Role)
 	}
+	// Demotion/removal retires outstanding delegated invitations in the same
+	// membership transaction. A later promotion must not reactivate old tokens.
+	if err == nil && (r.Method == http.MethodDelete || roleLevel(body.Role) < 3) {
+		_, err = tx.Exec(r.Context(), `WITH retired AS (
+			UPDATE console_invitations SET revoked_at=now() WHERE org_id=$1 AND invited_by=$2
+			AND accepted_at IS NULL AND revoked_at IS NULL RETURNING id)
+			INSERT INTO audit_events(actor_id,action,resource_type,resource_id,outcome,request_id)
+			SELECT $3,'invalidate_console_invitation','console_invitation',id,'succeeded',$4 FROM retired`,
+			org, uid, userFrom(r).ID, requestID(r))
+	}
 	if err == nil {
 		err = tx.Commit(r.Context())
 	}

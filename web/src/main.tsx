@@ -5,6 +5,7 @@ import type { Capabilities, User, Organization, Page } from './api';
 import { short } from './shared/ui';
 import { Projects, ProjectWorkspace } from './features/projects/Projects';
 import { Organizations } from './features/identity/Organizations';
+import { Signup } from './features/identity/Invitations';
 import './styles.css';
 
 function useHash() {
@@ -86,7 +87,7 @@ function App() {
     return () => clearTimeout(id);
   }, [toast]);
   if (user === undefined) return <div className="boot">正在连接控制面…</div>;
-  if (!user) return <Login onLogin={setUser} />;
+  if (!user) return parts[0] === 'signup' ? <Signup /> : <Login onLogin={setUser} />;
   const page = parts[2] || 'overview';
   const branchId = page === 'branches' ? parts[3] : undefined;
   const organization = organizations.find((item) => item.id === organizationId) || null;
@@ -334,7 +335,7 @@ function Login({ onLogin }: { onLogin: (user: User) => void }) {
         <form className="login-card" onSubmit={submit}>
           <span className="eyebrow">欢迎回来</span>
           <h2>登录控制台</h2>
-          <p>使用当前实验环境的管理员凭据。</p>
+          <p>使用你的控制台账号登录。</p>
           <label>
             用户名
             <input
@@ -362,6 +363,9 @@ function Login({ onLogin }: { onLogin: (user: User) => void }) {
           <button className="button primary full" disabled={busy}>
             {busy ? '正在登录…' : '登录控制台 →'}
           </button>
+          <a className="text-button" href="#/signup">
+            受邀注册
+          </a>
           <small>当前为受控实验环境。生产版身份与权限仍在实施中。</small>
         </form>
       </div>
