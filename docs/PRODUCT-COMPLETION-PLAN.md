@@ -10,7 +10,7 @@
 实施合同由 FULL-PRODUCT-IMPLEMENTATION.md 和实际 OpenAPI 共同约束。
 下面是顺序及退出条件，不代表所有项目已经实现。
 
-运行语言收敛与保留生命周期已完成本轮闭环：原生 Go Proxy/Storage adapter、统一 Helm 0.1.4
+历史 0.1.4 基线的运行语言收敛与保留生命周期已完成其版本闭环：原生 Go Proxy/Storage adapter、统一 Helm 0.1.4
 已部署，327 Go 测试和六套真实 Linux UI（83 检查）通过；现场没有运行中的 Python
 Pod。私有 Python 测试工具不是产品后端。源码/镜像锁和失败修复记录见
 [本轮验收](https://github.com/william-lbn/neon-helm/blob/v0.1.4/docs/ACCEPTANCE-2026-10-08-LIFECYCLE.md)。
@@ -64,3 +64,9 @@ Linux 正反例与恢复测试、当前交付报告；通过后才更新对应 c
 已进入 Managed Auth 基础闭环实现，具体合同见 [MANAGED-AUTH.md](MANAGED-AUTH.md)。
 Better Auth 1.7.7 与 pg 8.23.1 由 Linux 查询注册表后锁定；新增 metadata migration 016、四个管理 API、分支公共 Auth 入口、独立 TS runtime、Go leased Driver、自动子分支 companion Operation、Auth/删除恢复与 Data API 联动、React 体验页面和第七个发布镜像。
 本次 SQL TLS 与标准 JWKS 兼容修复后的 Linux 开发门槛为 354 个 Go/真实 PostgreSQL 测试（race、vet、零跳过）、5 个 Auth 测试及 1 个原生 TLS 测试、13 个 Web 测试；真实 Neon UI 需单独留证。此前候选版的 UI 注册分别暴露 CA 信任和 pg 覆盖主机名问题，失败证据保留，不能用传输层检查冒充产品通过。Auth UI 测试失败时会有界停用自有服务/Compute，记录原 Operation/幂等键并保留数据库和凭据。原有跨实例外部栅栏、全链路可信 TLS、HA/DR、Functions、产品 Object Storage 和 AI 推理门槛继续保持未通过；本增量不将它们变成已完成状态。
+
+`2dcd7d2` 的基础 Auth 已通过真实 Neon React UI 23 项检查，包含账号复制与会话/JWT 隔离、Data API RLS、自动缩零和登录冷唤醒。最新证据和失败修复边界见 [Auth 交付](DELIVERY-2026-10-08-MANAGED-AUTH.md)。此项已可复测；顺序 7 的产品对象存储和顺序 8 的 Functions 仍需从实际服务实现开始。
+
+当前 0.1.5 / `2dcd7d2` 的七套真实 Linux UI 共 106 检查通过，另有原 Reader
+失败操作的五项 UI 恢复检查；每套 managed VM/Runner 归零。统一 Helm 与复测
+证据以最新 Auth 交付报告为准。共享宿主磁盘停顿根因未定位，仍阻止生产准入。

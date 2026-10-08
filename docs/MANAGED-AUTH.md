@@ -8,7 +8,7 @@
 
 已实现：邮箱/密码注册登录、HttpOnly 签名 cookie、数据库会话、检查/列举/撤销会话、退出、修改密码、基础用户更新、五分钟 Ed25519 JWT、公开 JWKS、管理员读取最近 100 个用户、启停与重新启用、分支身份复制、保留删除恢复和 Data API 配置联动。
 
-Linux 开发验收包括 337 个 Go 测试（零跳过）、13 个前端测试、真实 PostgreSQL 的 Auth 库集成和 Helm 渲染/拒绝测试。**真实 Neon UI 验收以独立交付报告为准；代码与临时 PostgreSQL 测试不等于已部署验收。**
+`2dcd7d2` 的 Linux 开发验收包括 354 个 Go 测试（race/vet、零跳过）、13 个前端测试、5 个 Auth 测试和 1 个原生 TLS 测试，以及真实 PostgreSQL 的 Auth 库集成和 Helm 渲染/拒绝测试。真实 Neon 的 React UI 已通过 23 个检查，覆盖注册登录、分支身份、JWT/RLS、自动缩零和冷唤醒；见 [本次交付](DELIVERY-2026-10-08-MANAGED-AUTH.md)。这些结果不等于完整生产准入。
 
 尚未验收或实现：SMTP、邮箱所有权验证/重置投递、OAuth、MFA/SSO、定制 Auth 域名、完整用户分页/管理员生命周期、KMS 密钥轮换、动态 Data API JWKS 刷新、分布式入口限流认证、全链路可信 TLS、HA/DR、外部 SQL 缩零栅栏。注册成功不代表邮箱已验证。
 

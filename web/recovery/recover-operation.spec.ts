@@ -7,6 +7,10 @@ type Fixture = {
   writer_id: string;
   child_endpoint_id: string;
   database_password_file: string;
+  // Opt-in recovery of a known failed lifecycle reader. Keep the original
+  // writable-branch recovery contract unchanged when this field is absent.
+  purpose?: 'lifecycle-reader';
+  previous_attempts?: number;
 };
 
 test('UI recovers the existing operation after infrastructure failure', async ({
@@ -19,6 +23,21 @@ test('UI recovers the existing operation after infrastructure failure', async ({
   if (!source || !adminFile || !baseURL)
     throw new Error('Explicit recovery fixture and trusted login required');
   const fixture: Fixture = JSON.parse(await readFile(source, 'utf8'));
+  if (
+    !/^prj_[a-f0-9]{16}$/.test(fixture.project_id) ||
+    !/^op_[a-f0-9]+$/.test(fixture.operation_id) ||
+    ![fixture.writer_id, fixture.child_endpoint_id].every((id) => /^ep_[a-f0-9]{16}$/.test(id)) ||
+    fixture.writer_id === fixture.child_endpoint_id ||
+    (fixture.purpose !== undefined && fixture.purpose !== 'lifecycle-reader')
+  )
+    throw new Error('Invalid explicit recovery identity');
+  if (
+    fixture.purpose === 'lifecycle-reader' &&
+    (!Number.isSafeInteger(fixture.previous_attempts) ||
+      fixture.previous_attempts! < 1 ||
+      fixture.previous_attempts! > 10)
+  )
+    throw new Error('Reader recovery requires the observed failed attempt count');
   const password = (await readFile(fixture.database_password_file, 'utf8')).trim();
   const adminPassword = (await readFile(adminFile, 'utf8')).trim();
   const checks: string[] = [];
@@ -33,6 +52,7 @@ test('UI recovers the existing operation after infrastructure failure', async ({
           checks,
           project_id: fixture.project_id,
           operation_id: fixture.operation_id,
+          purpose: fixture.purpose || 'writable-branch',
           credentials_in_report: false,
         },
         null,
@@ -81,6 +101,31 @@ test('UI recovers the existing operation after infrastructure failure', async ({
     await page.getByLabel('用户名').fill('admin');
     await page.getByLabel('密码', { exact: true }).fill(adminPassword);
     await page.getByRole('button', { name: '登录控制台 →', exact: true }).click();
+    await expect(page.getByRole('button', { name: '＋ 创建项目', exact: true })).toBeVisible();
+    const original = await context.request.get(
+      baseURL + '/api/v1/projects/' + fixture.project_id + '/operations/' + fixture.operation_id,
+    );
+    expect(original.status()).toBe(200);
+    const failed = await original.json();
+    expect(failed.state).toBe('failed');
+    expect(failed.retryable).toBe(true);
+    expect(failed.resource_id).toBe(fixture.child_endpoint_id);
+    expect(failed.action).toBe('create_endpoint');
+    if (fixture.purpose === 'lifecycle-reader') {
+      expect(failed.attempts).toBe(fixture.previous_attempts);
+      const response = await context.request.get(
+        baseURL + '/api/v1/projects/' + fixture.project_id + '/endpoints',
+      );
+      expect(response.status()).toBe(200);
+      const endpoints = (await response.json()).items;
+      const reader = endpoints.find((e: { id: string }) => e.id === fixture.child_endpoint_id);
+      const writer = endpoints.find((e: { id: string }) => e.id === fixture.writer_id);
+      expect(reader.endpoint_type).toBe('read_only');
+      expect(writer.endpoint_type).toBe('read_write');
+      expect(reader.branch_id).toBe(writer.branch_id);
+      checks.push('explicit_failed_reader_and_writer_identity_verified_before_retry');
+      await save();
+    }
     await page.goto('/#/projects/' + fixture.project_id + '/operations');
     await page
       .getByRole('button', { name: '查看操作 ' + fixture.operation_id + ' 的步骤', exact: true })
@@ -105,10 +150,41 @@ test('UI recovers the existing operation after infrastructure failure', async ({
     const recovered = await operation.json();
     expect(recovered.id).toBe(fixture.operation_id);
     expect(recovered.resource_id).toBe(fixture.child_endpoint_id);
-    expect(recovered.attempts).toBe(2);
+    expect(recovered.attempts).toBe((fixture.previous_attempts ?? 1) + 1);
     checks.push('same_operation_and_endpoint_recovered_from_ui');
     await save();
     await shot('operation-recovered');
+
+    if (fixture.purpose === 'lifecycle-reader') {
+      expect(
+        (await sql(fixture.child_endpoint_id, 'SELECT id, marker FROM public.lifecycle_probe'))
+          .rows,
+      ).toEqual([[1, 'retained-parent']]);
+      expect(
+        (
+          await sql(
+            fixture.child_endpoint_id,
+            "SELECT pg_is_in_recovery(),current_setting('transaction_read_only')",
+          )
+        ).rows,
+      ).toEqual([[true, 'on']]);
+      checks.push('recovered_reader_inherits_retained_data_and_is_read_only');
+      await save();
+      await suspend(fixture.child_endpoint_id);
+      expect(
+        (await sql(fixture.writer_id, 'SELECT id, marker FROM public.lifecycle_probe')).rows,
+      ).toEqual([[1, 'retained-parent']]);
+      await suspend(fixture.writer_id);
+      checks.push('writer_cold_wake_retains_data_and_both_computes_return_to_zero');
+      await page.goto('/#/projects/' + fixture.project_id + '/monitoring');
+      await expect(
+        page.getByRole('heading', { name: '监控与运行洞察', exact: true }),
+      ).toBeVisible();
+      await shot('monitoring-after-recovery');
+      checks.push('monitoring_after_recovery');
+      result = 'pass';
+      return;
+    }
 
     expect(
       (await sql(fixture.child_endpoint_id, 'SELECT id, marker FROM public.ui_release_probe')).rows,

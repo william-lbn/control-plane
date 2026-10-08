@@ -4,7 +4,7 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 许可证：Apache-2.0。项目由自托管维护者开发，与 Neon 托管服务独立。
 
 **发行状态：预览版本。已经验证的实验环境功能不等于生产认证，也不等于 Neon 官网全部 Backend 服务。**
-[2026-10-08 正式交付](docs/DELIVERY-2026-10-08.md)记录六镜像、统一 Helm 0.1.4、六套 Linux UI 和剩余门槛；[历史交付](docs/DELIVERY-2026-10-07.md)保留先前邀请注册与资源清理证据。
+[最新 Managed Auth 交付](docs/DELIVERY-2026-10-08-MANAGED-AUTH.md)记录七镜像、统一 Helm 0.1.5、真实分支身份/缩零 UI 和剩余门槛；[生命周期基线](docs/DELIVERY-2026-10-08.md)与[历史交付](docs/DELIVERY-2026-10-07.md)保留先前版本证据。
 Chart 0.7.0 提供独立 API、Worker、Web 进程及可选 Data API、应用凭据、Console 邀请注册、历史分支恢复与保留删除；Worker 使用 PostgreSQL 领导租约。
 当前只允许一个 API 和一个 Worker，跨实例外部 fencing 与 HA 仍须独立验收。
 旧合并版本升级前必须执行 [停止/排空流程](docs/WORKER-SPLIT.md)。
@@ -21,7 +21,7 @@ Chart 0.7.0 提供独立 API、Worker、Web 进程及可选 Data API、应用凭
 | 数据库、角色与密码轮换 | 分支目录、Compute 原生配置、Proxy spec 调谐 | rename、owner 变更、未知外部 DDL 恢复未完成 |
 | CPU / 内存边界、自动休眠、连接唤醒 | 已实现实验环境控制路径 | 整数 CPU 1→2→1 已验证；小数 CPU、完整内存缩回、跨实例栅栏未验收 |
 | 监控、Operation 步骤、错误与重试 | 已实现 | 长期指标持久化、SLO 告警、完整审计导出未完成 |
-| 分支 Managed Auth | Go/TS/React 代码、真实 PostgreSQL 注册/会话/JWT/克隆隔离与 CI 已实现 | Neon UI 以独立 Auth 交付报告为准；邮件/OAuth/MFA/TLS/HA 不虚标 |
+| 分支 Managed Auth | Go/TS/React、真实 PG 与 Neon UI 注册/会话/JWT/克隆隔离/RLS/自动缩零通过 | 邮件/OAuth/MFA、完整身份管理、密钥轮换、全链路 TLS/HA 未完成；见本版交付 |
 | 时间点恢复到新分支 | 原生时间戳/LSN、存储保留租约、异步调谐、历史目录隔离、React UI | 默认禁用；仅受管理分支；原地恢复、Time Travel Assist、完整 Backend 一致性恢复未实现 |
 | 项目/分支保留删除 | 保护/依赖图、关闭 Proxy 和服务、回收 Compute、tombstone、七天项目恢复、React UI | 物理 GC 与跨实例栅栏未开放；仅就绪 managed 资源；详见 [删除手册](docs/RETAINED-DELETION.md) |
 | HA / DR | 部分租约与恢复工具 | 未通过独立故障域 HA/DR；历史新分支恢复不等于完整 DR |
@@ -60,6 +60,7 @@ docs/                 架构、对象模型、部署、测试、来源及生产�
 - [Go 运行链路、Helm 0.1.3 和五套 Linux UI 验收](https://github.com/william-lbn/neon-helm/blob/main/docs/ACCEPTANCE-2026-10-07-GO-ADAPTER.md)
 - [统一 Helm 0.1.4、保留恢复和六套正式镜像 UI 验收](https://github.com/william-lbn/neon-helm/blob/v0.1.4/docs/ACCEPTANCE-2026-10-08-LIFECYCLE.md)
 - [分支 Managed Auth：Go Driver、TypeScript 运行时、React UI、分支隔离与复测](docs/MANAGED-AUTH.md)
+- [七镜像、Auth 23 项 UI、环境诊断和本版回归](docs/DELIVERY-2026-10-08-MANAGED-AUTH.md)
 - [完整 Backend 产品实施合同](docs/FULL-PRODUCT-IMPLEMENTATION.md)
 - [AI Gateway 官网核验、平台配置与动态模型设计](docs/AI-GATEWAY-PLATFORM-DESIGN.md)
 - [原生 Data API 驱动与部署](docs/DATA-API-NATIVE-DRIVER.md)

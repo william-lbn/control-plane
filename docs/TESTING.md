@@ -158,6 +158,40 @@ npm run test:e2e -- --config=playwright.recovery.config.ts
 子分支继承与写入、父分支冷醒且隔离、两台 Compute 回到 0、监控可见。
 复测时根据已发生的写入和 attempts 制定后续断言，不能覆盖原始证据或盲目重跑。
 
+### 已失败的生命周期 Reader 恢复
+
+`recovery/recover-operation.spec.ts` 还支持明确的 `purpose: "lifecycle-reader"`。
+这是对已经存在的失败 Operation 的复测，不创建新项目或 Endpoint。
+运营方先保留原失败报告、Operation ID、Endpoint ID 和数据库密码私有文件，
+确认项目与 Reader 属于该测试、基础服务恢复健康后提供以下 fixture：
+
+```json
+{
+  "purpose": "lifecycle-reader",
+  "project_id": "prj_REPLACE_WITH_RETAINED_ID",
+  "operation_id": "op_REPLACE_WITH_FAILED_ID",
+  "writer_id": "ep_REPLACE_WITH_WRITER_ID",
+  "child_endpoint_id": "ep_REPLACE_WITH_READER_ID",
+  "previous_attempts": 2,
+  "database_password_file": "/secure/e2e/original-database-password"
+}
+```
+
+示例 ID 是占位符，必须替换为原报告中的真实 ID；`previous_attempts` 必须与当前
+失败记录完全相符。测试先核验 failed/retryable/create_endpoint、原资源和同分支
+Writer/Reader 类型，再从 UI 点击“重试原操作”，确认原 ID 和 attempts 增加一。
+该 fixture 的原数据库必须含 `public.lifecycle_probe` 的 `(1, 'retained-parent')`。
+真实 SQL 确认 Reader 处于 recovery/read-only、Writer 冷醒保留数据，两者从 UI
+缩零后监控仍可查看。数据已被后续修改时应设计新的显式断言，不能套用此 fixture。
+
+```bash
+export NEON_E2E_RECOVERY_FIXTURE=/secure/e2e/reader-recovery.json
+npm --prefix web run test:e2e -- --config=playwright.recovery.config.ts
+```
+
+登录完成和受信管理员会话必须先确认，再查询 Operation；恢复测试没有登录 API
+绕过。新报告与原失败报告分别保留，已通过恢复不把原失败改成成功。
+
 ## 4. 扩展验收矩阵
 
 ### 历史分支恢复
