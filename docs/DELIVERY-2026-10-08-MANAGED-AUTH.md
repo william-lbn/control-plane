@@ -172,3 +172,25 @@ Auth 邮件验证/找回、SSO/MFA、完整用户管理、动态 JWKS 轮换仍�
 对抗、HA/DR、长期 SLO/告警及全链路可信 TLS 仍未获得独立准入。
 当前依赖 singleton/local-path、HTTP Console 和实验室信任配置。
 按照 [逐项实施计划](PRODUCT-COMPLETION-PLAN.md)继续逐个闭环，不虚标可用。
+
+
+## 7. 不可变发布与最终核验回执
+
+* 恢复测试和本报告已推送源码 `599afb1b76e1c304a1ba370aee396a329002c003`；
+  [Linux CI 37796055203](https://github.com/william-lbn/control-plane/actions/runs/37796055203)
+  五类门槛及七镜像发布全部成功。此提交只增加恢复测试/文档，当前已验收的
+  运行镜像继续使用 `2dcd7d2` 的原 digest。
+* 统一 Helm 的不可变 `v0.1.5` 对应
+  `7a6c8ef5f8b9effec16af3a5d23dd83b520db5cd`，
+  [发布 CI 37796404838](https://github.com/william-lbn/neon-helm/actions/runs/37796404838)
+  成功；[发布资产](https://github.com/william-lbn/neon-helm/releases/tag/v0.1.5)
+  包含十个 `.tgz`、index、SHA256SUMS 和来源锁。
+* Linux 使用无凭据 Git clone 该精确 Helm 提交，源合同和八个安装 release 的
+  manifest/image/PVC/Secret 审计全部通过；再次确认 managed VM/Runner 为零。
+* Linux 从标准 Helm repo 匿名拉取十包及 index，所有 SHA256SUMS 校验通过。
+  用户不需要 GitHub 或镜像发布 Token 才能下载此版本。
+* 三节点临时 loopback 18790 转发已关闭；两个本次生命周期故障控制器已退出，
+  Worker 正常。未遗留后台 operator、测试浏览器或本地 8787/8788 旧服务。
+
+上述后续回执不移动 `v0.1.5` 标签，也不改变已验证的运行镜像锁。
+原始证据、失败、备份和私有凭据由部署运营方保留；公开文档只登记脱敏结论。
