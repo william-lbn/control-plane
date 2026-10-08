@@ -142,3 +142,43 @@ Linux 浏览器测试；测试在真实 UI 创建后检查 Operation state=queue
 由新 Worker 完成；12 个浏览器检查事件通过，两台受测 Compute 最终正常休眠。
 146 个 Go 测试事件（含子测试）零跳过；TypeScript 和 Helm split/combined 门槛通过。
 该证据只放行本次进程拆分与受测恢复路径，不放行多 API、HA/DR 或外部缩零栅栏。
+
+
+### 5.2 PostgreSQL 会话锁释放的测试同步
+
+客户端 `pgx` 关闭连接或 `pg_terminate_backend` 返回，并不保证另一个会话立刻
+观察到 advisory lock 已释放。生产 Worker 对 `pg_try_advisory_lock=false`
+保持 standby，按现有有界循环重试。集成测试也应观察服务端状态后验证交接；
+不能要求客户端 close 的返回时刻就同步完成新 lease。
+
+`TestControllerLeadershipIntegration` 记录前任 PostgreSQL PID，等待 `pg_locks`
+中该会话的 advisory lock 消失，最多五秒，再验证 successor epoch、旧心跳拒绝、
+失联接管和旧 generation 关闭保护。该等待只存在于测试，不改变运行时超时、
+租约、互斥、外部栅栏或 HA 门槛。等待超时仍失败，不能用无限重试掩盖遗留锁。
+
+2026-10-08 最后文档提交的 CI `37797382865` 曾在即时 takeover 断言失败。
+原日志和测试 JSON 保留；此前功能 CI 与现场 Worker epoch 67→68、71→72
+确已通过。此次纠正测试的服务端同步，不修改 Neon 数据面或生产 Worker。
+复测应在独立临时 PostgreSQL 中使用每轮新 schema，禁止运行于产品元数据库。
+
+
+修正后的 Linux 全量 Go/race/vet 测试 354 项通过、零失败/跳过；另在同一独立
+临时 PG 上用十个新 schema 连续复测交接，共 60 个检查通过。复测示例：
+
+```bash
+# 只使用专用、可丢弃的 CI PostgreSQL；不得指向任何产品元数据库。
+set -euo pipefail
+: "${NEON_V2_TEST_DATABASE_URL:?Dedicated disposable PostgreSQL required}"
+cd api
+task_attempt="$(date -u +%Y%m%d%H%M%S)"
+task_evidence="../artifacts/leadership-$task_attempt"
+mkdir -m 0700 "$task_evidence"
+for task_iteration in $(seq 1 10); do
+  export NEON_V2_TEST_SCHEMA="v2_migration_handoff_${task_attempt}_${task_iteration}"
+  go test -race -count=1 -run '^TestControllerLeadershipIntegration$' \
+    -json ./internal/control > "$task_evidence/$task_iteration.jsonl"
+done
+```
+
+每轮 schema 均不同；保留原失败和 JSON 结果，失败时停止后续轮次。
+源协议依据为锁定的 `pgx v5.9.2` 的 `pgconn.Close` 与 PostgreSQL 会话锁状态。

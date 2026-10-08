@@ -89,7 +89,7 @@ TypeScript 服务及受限 SQL 身份已集成。应用账号保存在用户分�
 转发，串行 `ctr images pull --local` 并核对 CRI；没有跳过 TLS、改全局 hosts、
 重启 RKE2、删除缓存或修改基础网络。临时转发结束后关闭；新生产节点仍需可靠出口。
 
-已归档并按 UID/resourceVersion 清理 48 个终态测试 Job 和 5 个独立终态探测 Pod；
+已归档并按 UID/resourceVersion 清理 49 个终态测试 Job 和 5 个独立终态探测 Pod；
 新增验收资源按相同原则退休。最终全命名空间快照无活动故障，
 没有 Pending/Error/CrashLoopBackOff；只保留 RKE2 的一个已成功 CNI 安装 Job。
 三节点 Ready、API/Worker/Web Ready、managed VM/Runner 为零，当前 I/O PSI avg10 为零。终态 Pod 本身不再运行容器，清理主要避免状态噪声；
@@ -194,3 +194,20 @@ Auth 邮件验证/找回、SSO/MFA、完整用户管理、动态 JWKS 轮换仍�
 
 上述后续回执不移动 `v0.1.5` 标签，也不改变已验证的运行镜像锁。
 原始证据、失败、备份和私有凭据由部署运营方保留；公开文档只登记脱敏结论。
+
+
+## 8. CI 交接测试的确定性修正
+
+最终纯文档提交触发的 [37797382865](https://github.com/william-lbn/control-plane/actions/runs/37797382865)
+在 `TestControllerLeadershipIntegration` 的即时 takeover 断言失败。
+`pgx v5.9.2` close 返回和服务端 advisory lock 释放之间存在异步窗口，
+旧测试把客户端关闭当作服务端锁已同步释放。生产 Worker 已对未取得锁的情况
+保持 standby 并重试；此次仅修改测试同步，没有改变租约、超时或运行业务代码。
+
+测试记录前任 PID，并有界观察 `pg_locks` 中原会话锁的释放，再执行原来的
+successor epoch、旧心跳/旧代次拒绝及失联接管断言。Linux 全量 354 Go 检查
+再次通过，十个独立 schema 连续交接的 60 检查通过，均零失败/跳过；见
+[交接复测步骤](WORKER-SPLIT.md#52-postgresql-会话锁释放的测试同步)。
+该失败日志、GitHub artifact SHA256 与新成功报告均保留；新增临时 CI Job
+也已归档并按 UID/resourceVersion 退休，累计 49 Job、5 独立探测 Pod。
+不可变 Helm 0.1.5 和已验收运行源码 `2dcd7d2` 继续保留，不因测试修正重部署。

@@ -63,7 +63,9 @@ func TestControllerLeadershipIntegration(t *testing.T) {
 		}
 	})
 	firstEpoch := first.epoch
+	firstPID := first.connection.Conn().PgConn().PID()
 	first.close()
+	waitForControllerLockRelease(t, ctx, db, firstPID)
 	second, err := acquireControllerLease(ctx, db, roleWorker)
 	if err != nil || second == nil {
 		t.Fatalf("takeover failed: %v", err)
@@ -77,9 +79,10 @@ func TestControllerLeadershipIntegration(t *testing.T) {
 			t.Fatal("closed predecessor may renew")
 		}
 	})
+	secondPID := second.connection.Conn().PgConn().PID()
 	t.Run("terminated_session_fails_closed", func(t *testing.T) {
 		var terminated bool
-		if err := db.QueryRow(ctx, "SELECT pg_terminate_backend($1)", second.connection.Conn().PgConn().PID()).Scan(&terminated); err != nil || !terminated {
+		if err := db.QueryRow(ctx, "SELECT pg_terminate_backend($1)", secondPID).Scan(&terminated); err != nil || !terminated {
 			t.Fatalf("terminate dedicated test leader: %v", err)
 		}
 		if err := second.heartbeat(ctx); !errors.Is(err, errControllerLeadershipLost) {
@@ -87,6 +90,7 @@ func TestControllerLeadershipIntegration(t *testing.T) {
 		}
 	})
 	second.close()
+	waitForControllerLockRelease(t, ctx, db, secondPID)
 	third, err := acquireControllerLease(ctx, db, roleWorker)
 	if err != nil || third == nil {
 		t.Fatalf("post-disconnect takeover failed: %v", err)
@@ -113,4 +117,32 @@ func TestControllerLeadershipIntegration(t *testing.T) {
 			t.Fatalf("old close modified successor generation: %v", err)
 		}
 	})
+}
+
+// pgx Close sends Terminate and closes the client socket; PostgreSQL releases
+// session locks asynchronously. Observe the server's lock retirement instead
+// of assuming a synchronous handoff. The production Worker already treats an
+// unavailable advisory lock as standby and retries its bounded acquisition.
+func waitForControllerLockRelease(t *testing.T, ctx context.Context, db *pgxpool.Pool, pid uint32) {
+	t.Helper()
+	retirement, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+	for {
+		var held bool
+		if err := db.QueryRow(retirement, `SELECT EXISTS (
+			SELECT 1 FROM pg_locks WHERE pid=$1 AND locktype='advisory'
+		)`, pid).Scan(&held); err != nil {
+			t.Fatalf("observe predecessor advisory lock retirement: %v", err)
+		}
+		if !held {
+			return
+		}
+		select {
+		case <-retirement.Done():
+			t.Fatal("predecessor advisory lock was not released within the test deadline")
+		case <-ticker.C:
+		}
+	}
 }
