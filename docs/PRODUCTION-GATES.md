@@ -1,6 +1,6 @@
 # 生产门槛与官网对齐
 
-状态截至 2026-10-07；这是一份缺口清单，未通过项不能被 Ready Pod 或 CI build 替代。
+状态截至 2026-10-08；这是一份缺口清单，未通过项不能被 Ready Pod 或 CI build 替代。
 
 ## 1. 已实现路径
 
@@ -22,7 +22,7 @@
 | 小数 CPU | 已支持的 bounds 只有整核 | Guest cgroup quota + SQL + 调度竞争/计量实测 |
 | 内存缩回 | 未通过完整 RAM 扩缩闭环 | Guest 状态、压力/回收、OOM 防护、SQL 持续和冷醒完整循环 |
 | 基础设施稳定性 | 同物理盘 VM 存在共同 I/O 竞争 | 分离故障域/IO、持续负载、etcd 延迟与错误预算 |
-| TLS / 网络 | 实验入口有 HTTP/lab-insecure 例外 | 域名、可信证书、verify-full、管理网络隔离及 NetworkPolicy |
+| TLS / 网络 | Auth→Proxy 已实现显式 CA/证书名称验证及真实 TLS 正反例；浏览器、控制库、Storage 等仍有实验传输例外 | 域名、可信证书、verify-full、管理网络隔离及 NetworkPolicy |
 | 目录完整性 | rename/owner、外部 DDL 回收、默认身份迁移未完成 | API/UI 实际 PG 验证，密码轮换全部 Endpoint 冷醒/分支一致 |
 | 生命周期完整性 | 已有保护/依赖、保留删除、Compute 回收、tombstone、七天项目恢复代码；物理 GC、失败创建资源删除、TTL、独立 Endpoint 删除和原分支 reset 仍缺 | 按当前镜像验证 UI 正反例、服务关闭/凭据撤销、恢复/并发；物理 GC 与分布式栅栏另设 Gate |
 | 监控与运营 | 长期指标、告警、审计、容量/计量不足 | SLO、持久 TSDB、告警测试、预算与容量恢复 |
@@ -33,7 +33,9 @@
 
 ## 3. 官网 Backend 服务
 
-Auth、Functions、Object Storage、AI Gateway 尚未实现服务。Data API 已有原生 Driver、
+Managed Auth 已有 Go Driver、Better Auth 1.7.7 运行时、React UI、注册/会话/JWT/分支隔离与 PostgreSQL CI，详细见 [Auth 合同](MANAGED-AUTH.md)。真实 Neon UI 结果按版本交付报告记录；SMTP/OAuth/MFA、完整恢复/删除一致性、生产隔离与 HA 仍须独立实现/验收。
+
+Functions、产品 Object Storage 和 AI Gateway 推理尚未实现服务。Data API 已有原生 Driver、
 异步生命周期、最小权限角色、PostgREST、UI 和 RLS 集成测试；默认禁用、仅实验传输开关。
 现场 Neon UI 验收与生产 TLS/HA 是独立门槛，具体结果以该版本交付证据为准。
 应用凭据管理及分支/模型授权检查已有代码和真实 PostgreSQL 验收；不代表 AI 推理可用。

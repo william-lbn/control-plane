@@ -84,7 +84,7 @@ JWT 有效期五分钟。登出撤销数据库会话并阻止继续发 JWT，**�
 
 canonical chart 参数：`managedAuth.enabled/labHTTP/runtimeImage/publicOrigin`。v1 要求显式实验室 HTTP 例外；不是生产 TLS 认证。镜像必须取发行版已验证 digest，不可使用 latest。publicOrigin 必须为精确 scheme/host/port，无路径、尾斜杠、通配符或凭据。
 
-SQL 连接独立要求 `managedAuth.pgCASecret/pgCAKey/pgServerName`：只投影公开 CA 证书，保持证书链与名称验证开启。Node 驱动不依赖含糊的 sslmode=require 兼容解释，也不会通过 HTTP 例外关闭 SQL TLS 校验。现有实验室 Proxy 证书名称是 lab.neon.local；连接地址仍可为内部 Service DNS，TLS 校验使用显式证书身份。此项不证明浏览器、控制库、管理入口或所有内部链路已具备可信 TLS。
+SQL 连接独立要求 `managedAuth.pgCASecret/pgCAKey/pgServerName`：只投影公开 CA 证书，保持证书链与名称验证开启。Node 驱动不依赖含糊的 sslmode=require 兼容解释，也不会通过 HTTP 例外关闭 SQL TLS 校验。现有实验室 Proxy 证书名称是 lab.neon.local；连接地址仍可为内部 Service DNS，TLS 校验使用显式证书身份。`pg` 会把 `ssl.servername` 覆盖为 TCP DNS 主机名，因此适配器通过 `checkServerIdentity` 调用 Node 标准名称检查，证书链仍由 `rejectUnauthorized: true` 验证。`test/database-tls.test.ts` 使用实际 pg、真实 STARTTLS 与 PostgreSQL startup 验证这个不同名称的路径，并拒绝错误名称和错误 CA。原生 SSLRequest 工具仅验证传输层，不能替代驱动或产品端到端验收。此项不证明浏览器、控制库、管理入口或所有内部链路已具备可信 TLS。
 
 ```yaml
 managedAuth:
@@ -108,7 +108,7 @@ API/Worker 接收一致参数。Auth Pod 无 ServiceAccount token、特权和 ho
 2. 打开 **Auth**，选择分支/数据库/可信来源，启用并观察原 Operation。
 3. 在应用体验面板注册、登录、检查会话、签发 JWT 和退出。密码执行后清空，仅临时存在页面/HTTPS 请求；不写控制库或测试报告。
 4. 按 [Data API Driver](DATA-API-NATIVE-DRIVER.md) 准备业务 schema、ENABLE/FORCE RLS 和授权。不自动猜测业务策略。
-5. Data API 点击 **使用当前分支 Auth**，加载 issuer/audience/公开 JWKS；应用从 `/token` 获取 JWT 调用 Data API。不要把数据库 owner 用作 RLS runtime 角色。
+5. Data API 点击 **使用当前分支 Auth**，加载 issuer/audience/公开 JWKS；应用从 `/token` 获取 JWT 调用 Data API。不要把数据库 owner 用作 RLS runtime 角色。Better Auth 的 Ed25519 公钥省略可选 `use`，符合 [RFC 7517 §4.2](https://www.rfc-editor.org/rfc/rfc7517#section-4.2)。Data API 允许省略此字段；存在时必须为 `sig`，算法/曲线必须符合允许列表，`key_ops` 只能为 `verify`，未知字段和私钥仍被拒绝。
 
 ## 6. Linux 复测与发布
 

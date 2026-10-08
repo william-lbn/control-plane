@@ -274,3 +274,38 @@ func TestConfigurationFailClosed(t *testing.T) {
 		t.Fatal("unknown config fields accepted")
 	}
 }
+
+func TestPublicSigningJWKOptionalUse(t *testing.T) {
+	f := makeFixture(t, "http://127.0.0.1:1")
+	var set struct {
+		Keys []map[string]any `json:"keys"`
+	}
+	if err := json.Unmarshal(f.config.Routes[0].JWKS, &set); err != nil {
+		t.Fatal(err)
+	}
+	delete(set.Keys[0], "use")
+	data, _ := json.Marshal(set)
+	if _, err := parseJWKS(data); err != nil {
+		t.Fatalf("RFC 7517 public signing key without optional use rejected: %v", err)
+	}
+	for name, value := range map[string]any{"null": nil, "empty": "", "number": 1} {
+		t.Run("invalid_use_"+name, func(t *testing.T) {
+			set.Keys[0]["use"] = value
+			data, _ := json.Marshal(set)
+			delete(set.Keys[0], "use")
+			if _, err := parseJWKS(data); err == nil {
+				t.Fatal("Present use must be the string sig")
+			}
+		})
+	}
+	for name, field := range map[string]any{"use": "enc", "key_ops": []string{"sign"}, "d": "private"} {
+		t.Run(name, func(t *testing.T) {
+			set.Keys[0][name] = field
+			data, _ := json.Marshal(set)
+			delete(set.Keys[0], name)
+			if _, err := parseJWKS(data); err == nil {
+				t.Fatal("Encryption, signing capability or private key accepted")
+			}
+		})
+	}
+}

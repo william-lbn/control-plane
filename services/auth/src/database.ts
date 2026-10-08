@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { checkServerIdentity } from 'node:tls';
 import type { PoolConfig } from 'pg';
 import type { AuthConfig } from './config.ts';
 
@@ -10,5 +11,10 @@ export function databaseOptions(c: AuthConfig, ca = readFileSync(c.databaseTLS.c
   url.searchParams.delete('sslmode');
   return { connectionString: url.toString(), max: 1, idleTimeoutMillis: 1000,
     connectionTimeoutMillis: 120000,
-    ssl: { ca, servername: c.databaseTLS.serverName, rejectUnauthorized: true } };
+    ssl: { ca, servername: c.databaseTLS.serverName, rejectUnauthorized: true,
+      // pg replaces servername with the TCP host for DNS connections. Service
+      // routing may differ from the operator's certificate identity; verify
+      // that configured identity while retaining mandatory CA chain checks.
+      checkServerIdentity: (_driverHost, certificate) =>
+        checkServerIdentity(c.databaseTLS.serverName, certificate) } };
 }

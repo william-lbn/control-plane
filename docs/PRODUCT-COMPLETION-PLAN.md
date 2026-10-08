@@ -63,4 +63,4 @@ Linux 正反例与恢复测试、当前交付报告；通过后才更新对应 c
 
 已进入 Managed Auth 基础闭环实现，具体合同见 [MANAGED-AUTH.md](MANAGED-AUTH.md)。
 Better Auth 1.7.7 与 pg 8.23.1 由 Linux 查询注册表后锁定；新增 metadata migration 016、四个管理 API、分支公共 Auth 入口、独立 TS runtime、Go leased Driver、自动子分支 companion Operation、Auth/删除恢复与 Data API 联动、React 体验页面和第七个发布镜像。
-337 个 Go/真实 PostgreSQL 测试和库集成通过；真实 Neon UI 需单独留证。原有跨实例外部栅栏、可信 TLS、HA/DR、Functions、产品 Object Storage 和 AI 推理门槛继续保持未通过；本增量不将它们变成已完成状态。
+本次 SQL TLS 与标准 JWKS 兼容修复后的 Linux 开发门槛为 354 个 Go/真实 PostgreSQL 测试（race、vet、零跳过）、5 个 Auth 测试及 1 个原生 TLS 测试、13 个 Web 测试；真实 Neon UI 需单独留证。此前候选版的 UI 注册分别暴露 CA 信任和 pg 覆盖主机名问题，失败证据保留，不能用传输层检查冒充产品通过。Auth UI 测试失败时会有界停用自有服务/Compute，记录原 Operation/幂等键并保留数据库和凭据。原有跨实例外部栅栏、全链路可信 TLS、HA/DR、Functions、产品 Object Storage 和 AI 推理门槛继续保持未通过；本增量不将它们变成已完成状态。

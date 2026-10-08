@@ -39,7 +39,11 @@ test('SQL certificate verification survives HTTP laboratory configuration', () =
   const options = databaseOptions({ ...config, allowLabHTTP: true }, ca);
   assert.equal(new URL(options.connectionString!).searchParams.get('sslmode'), null);
   assert.equal(new URL(options.connectionString!).searchParams.get('options'), 'endpoint=ep-0123456789abcdef');
-  assert.deepEqual(options.ssl, { ca, servername: 'proxy.example.test', rejectUnauthorized: true });
+  assert.ok(options.ssl && typeof options.ssl === 'object');
+  assert.equal(options.ssl.ca, ca);
+  assert.equal(options.ssl.servername, 'proxy.example.test');
+  assert.equal(options.ssl.rejectUnauthorized, true);
+  assert.equal(typeof options.ssl.checkServerIdentity, 'function');
 });
 
 test('HTTPS cookies stay secure when the laboratory exception is acknowledged', async () => {

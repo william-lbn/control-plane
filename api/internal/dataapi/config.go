@@ -142,15 +142,15 @@ func compileRoutes(config Config) (map[string]*route, error) {
 func parseJWKS(data []byte) (map[string]providerKey, error) {
 	var set struct {
 		Keys []struct {
-			KID string   `json:"kid"`
-			KTY string   `json:"kty"`
-			Use string   `json:"use"`
-			Alg string   `json:"alg"`
-			Ops []string `json:"key_ops"`
-			CRV string   `json:"crv"`
-			X   string   `json:"x"`
-			N   string   `json:"n"`
-			E   string   `json:"e"`
+			KID string          `json:"kid"`
+			KTY string          `json:"kty"`
+			Use json.RawMessage `json:"use"`
+			Alg string          `json:"alg"`
+			Ops []string        `json:"key_ops"`
+			CRV string          `json:"crv"`
+			X   string          `json:"x"`
+			N   string          `json:"n"`
+			E   string          `json:"e"`
 		} `json:"keys"`
 	}
 	if len(data) > 65536 || decodeStrict(data, &set) != nil || len(set.Keys) == 0 || len(set.Keys) > 32 {
@@ -158,7 +158,12 @@ func parseJWKS(data []byte) (map[string]providerKey, error) {
 	}
 	keys := map[string]providerKey{}
 	for _, key := range set.Keys {
-		if !validText(key.KID, 128) || keys[key.KID].public != nil || key.Use != "sig" {
+		// RFC 7517 makes use optional. Better Auth emits signature JWKs without
+		// it; a present value must still be sig. Algorithm, curve and private-key
+		// rejection remain mandatory, so encryption keys cannot be used.
+		var use string
+		invalidUse := len(key.Use) != 0 && (json.Unmarshal(key.Use, &use) != nil || use != "sig")
+		if !validText(key.KID, 128) || keys[key.KID].public != nil || invalidUse {
 			return nil, errors.New("provider key identity or use is invalid")
 		}
 		if len(key.Ops) > 1 || (len(key.Ops) == 1 && key.Ops[0] != "verify") {

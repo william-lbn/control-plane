@@ -6,7 +6,7 @@
 
 目标是依据 Neon 官网对象模型实现自托管 Backend，同时保持开源数据面可用。
 本文件定义后续实现合同；它不改变 `/api/v1/capabilities` 的实际能力开关。
-Auth、Functions、Object Storage、AI Gateway 尚未实现服务。
+Managed Auth 基础服务已有实现，见 MANAGED-AUTH.md；Functions、产品 Object Storage 与 AI Gateway 推理尚未实现服务。
 Data API 已加入原生 Go Driver、持久 Operation、最小权限数据库身份、PostgREST 调谐及 UI；
 默认禁用，具体合同和真实 Neon 验收边界见 DATA-API-NATIVE-DRIVER.md。
 分支应用凭据管理及当前权限检查已有实现，见 BACKEND-CREDENTIALS.md；AI 推理仍未启用。
@@ -16,7 +16,7 @@ PITR 已实现历史恢复到新分支的代码切片，见 HISTORICAL-BRANCH-RE
 仍需独立开发与测试。逐项实施顺序见 PRODUCT-COMPLETION-PLAN.md。
 API/Worker 拆分已有源码和 Chart，验收方法见 WORKER-SPLIT.md。
 控制台受邀注册、组织邀请/撤销和已有账号接受已有 Go/React/API/迁移与测试代码；
-详见 CONSOLE-INVITATIONS.md。这是 Console 身份功能，Managed Auth 服务仍未实现。
+详见 CONSOLE-INVITATIONS.md。这是 Console 身份功能；Managed Auth 使用独立的分支账户、会话、签名与协议，不能复用 Console cookie。
 
 依据 `neondatabase/website` 快照 `c0d49cbb6979b2ce79ea502d62dbc40780a923b0`：
 
