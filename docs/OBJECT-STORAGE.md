@@ -224,6 +224,8 @@ passwords are excluded from result.json/screenshots. Private fixtures remain
 outside the checkout. Run the Go real-PG/race, frontend, Helm and source boundary
 gates before promoting images; never equate these gates with HA/DR/TLS approval.
 
+The successful initial Linux UI run verified 19 checks; continuation of the original retained failure verified four recovery checks without rewriting it. Later image revisions require their own repeatable acceptance report.
+
 ## 7. Next increments
 
 1. Unified `storage:read`/`storage:write` encrypted credentials, revocation and
@@ -235,3 +237,7 @@ gates before promoting images; never equate these gates with HA/DR/TLS approval.
 
 Functions and real AI inference remain separate services. Reusing a backing S3
 bucket for files does not implement either service.
+
+## 8. Explicit failed-fixture continuation
+
+`object-storage-recovery.spec.ts` accepts `NEON_E2E_STORAGE_RECOVERY_FIXTURE`, a protected JSON file containing the original project/name, parent/child IDs and child name, writer IDs and original failure Job. It creates no new project. The suite re-enables the retained services through UI, verifies original bytes and edge security headers, tests retained deletion/recovery, disables services, suspends writers and leaves a retained tombstone. Validate fixture identity against the original report; never rewrite a failure or blindly create another fixture at quota capacity.

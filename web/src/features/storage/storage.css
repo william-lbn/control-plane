@@ -1,0 +1,67 @@
+.storage-workspace {
+  display: grid;
+  gap: 20px;
+}
+.storage-workspace > .page-heading {
+  margin-bottom: 0;
+}
+.storage-panel > .panel-heading {
+  margin-bottom: 20px;
+}
+.storage-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 14px;
+  margin: 20px 0;
+}
+.storage-actions > label {
+  flex: 1 1 220px;
+  margin: 0;
+}
+.storage-actions > label:has(input[type='checkbox']) {
+  flex: 0 1 auto;
+  flex-direction: row;
+  align-items: center;
+  min-height: 38px;
+}
+.storage-actions input[type='checkbox'] {
+  width: auto;
+  accent-color: #4ee1af;
+}
+.storage-actions input[type='file']::file-selector-button {
+  margin-right: 12px;
+  padding: 6px 10px;
+  border: 1px solid #3b4c4e;
+  border-radius: 5px;
+  color: #e5efee;
+  background: #20292c;
+  cursor: pointer;
+}
+.storage-notice {
+  padding: 12px 16px;
+  border: 1px solid #35584d;
+  border-radius: 8px;
+  color: #bbded2;
+  background: #17352c;
+  font-size: 12px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.storage-panel table {
+  table-layout: fixed;
+}
+.storage-panel td {
+  overflow-wrap: anywhere;
+}
+.storage-panel td .button + .button {
+  margin-left: 8px;
+}
+@media (max-width: 900px) {
+  .storage-actions > label {
+    flex-basis: 100%;
+  }
+  .storage-panel td .button {
+    margin: 4px 0;
+  }
+}

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import './storage.css';
 import { api, projectPath } from '../../api';
 import type { Branch, Operation } from '../../api';
 import { PageHeading, status } from '../../shared/ui';
@@ -241,48 +242,51 @@ export function ObjectStorage({
   }
   const active = instance?.state === 'active';
   return (
-    <>
+    <div className="storage-workspace">
       <PageHeading
         kicker="BRANCH FILES"
         title="Object Storage"
         description="文件与数据库共享分支快照；父子分支修改彼此隔离。"
       />
-      <section className="panel">
+      <section className="panel pad backend-panel storage-panel">
         <div className="panel-heading">
           <h2>分支对象服务</h2>
           {instance && status(instance.state)}
         </div>
-        <label>
-          存储分支
-          <select
-            aria-label="存储分支"
-            value={branch}
-            disabled={busy}
-            onChange={(e) => setBranch(e.target.value)}
-          >
-            {branches.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          存储数据库
-          <input
-            aria-label="存储数据库"
-            value={database}
-            disabled={busy || !!instance?.spec || !canAdmin}
-            onChange={(e) => setDatabase(e.target.value)}
-          />
-        </label>
+        <div className="backend-form">
+          <label>
+            存储分支
+            <select
+              aria-label="存储分支"
+              value={branch}
+              disabled={busy}
+              onChange={(e) => setBranch(e.target.value)}
+            >
+              {branches.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            存储数据库
+            <input
+              aria-label="存储数据库"
+              value={database}
+              disabled={busy || !!instance?.spec || !canAdmin}
+              onChange={(e) => setDatabase(e.target.value)}
+            />
+          </label>
+        </div>
         <p className="muted">
           REST v1 · 单文件 8 MiB · 分支目录 100 MiB / 1000 个对象 ·
           物理文件保留以保护分支和恢复历史。S3 客户端兼容性仍待实现。
         </p>
-        <div className="actions">
+        <div className="storage-actions">
           {canAdmin && (
             <button
+              className="button"
               disabled={
                 busy || !instance?.driver_enabled || (!!instance && instance.state !== 'disabled')
               }
@@ -292,35 +296,43 @@ export function ObjectStorage({
             </button>
           )}
           {canAdmin && (
-            <button className="danger" disabled={busy || !active} onClick={() => void mutate(true)}>
+            <button
+              className="button danger"
+              disabled={busy || !active}
+              onClick={() => void mutate(true)}
+            >
               禁用对象存储
             </button>
           )}
-          <button disabled={busy || !active} onClick={() => void run(loadBuckets)}>
+          <button
+            className="button"
+            disabled={busy || !active}
+            onClick={() => void run(loadBuckets)}
+          >
             加载存储桶
           </button>
         </div>
         {operation && (
-          <p role="status" data-testid="storage-operation">
+          <p className="storage-notice" role="status" data-testid="storage-operation">
             {operation.id} · {operation.state}
             {operation.error_code && ` · ${operation.error_code}`}
           </p>
         )}
         {notice && (
-          <p role="status" data-testid="storage-notice">
+          <p className="storage-notice" role="status" data-testid="storage-notice">
             {notice}
           </p>
         )}
       </section>
       {active && (
         <>
-          <section className="panel">
+          <section className="panel pad backend-panel storage-panel">
             <div className="panel-heading">
               <h2>存储桶</h2>
               <span className="muted">分支 {branch}</span>
             </div>
             {canEdit && (
-              <div className="actions">
+              <div className="storage-actions">
                 <label>
                   存储桶名称
                   <input
@@ -343,7 +355,11 @@ export function ObjectStorage({
                     <option value="public_read">公共读取 · 匿名可下载</option>
                   </select>
                 </label>
-                <button disabled={busy || !bucketName} onClick={() => void createBucket()}>
+                <button
+                  className="button primary"
+                  disabled={busy || !bucketName}
+                  onClick={() => void createBucket()}
+                >
                   创建存储桶
                 </button>
               </div>
@@ -367,6 +383,7 @@ export function ObjectStorage({
                     <td>{b.bytes} B</td>
                     <td>
                       <button
+                        className="button"
                         disabled={busy}
                         onClick={() => {
                           setBucket(b.name);
@@ -386,11 +403,11 @@ export function ObjectStorage({
             )}
           </section>
           {bucket && (
-            <section className="panel">
+            <section className="panel pad backend-panel storage-panel">
               <div className="panel-heading">
                 <h2>对象目录 · {bucket}</h2>
               </div>
-              <div className="actions">
+              <div className="storage-actions">
                 <label>
                   对象前缀
                   <input
@@ -400,11 +417,16 @@ export function ObjectStorage({
                     onChange={(e) => setPrefix(e.target.value)}
                   />
                 </label>
-                <button disabled={busy} onClick={() => void run((current) => loadObjects(current))}>
+                <button
+                  className="button"
+                  disabled={busy}
+                  onClick={() => void run((current) => loadObjects(current))}
+                >
                   加载对象
                 </button>
                 {after && (
                   <button
+                    className="button"
                     disabled={busy}
                     onClick={() => void run((current) => loadObjects(current, after))}
                   >
@@ -413,7 +435,7 @@ export function ObjectStorage({
                 )}
               </div>
               {canEdit && (
-                <div className="actions">
+                <div className="storage-actions">
                   <label>
                     对象键
                     <input
@@ -448,6 +470,7 @@ export function ObjectStorage({
                     使用当前 ETag 覆盖
                   </label>
                   <button
+                    className="button"
                     disabled={busy || !file || !key || file.size > objectLimit}
                     onClick={() => void upload()}
                   >
@@ -476,12 +499,16 @@ export function ObjectStorage({
                         <code title={item.sha256}>{item.sha256.slice(0, 16)}…</code>
                       </td>
                       <td>
-                        <button disabled={busy || !canEdit} onClick={() => void download(item)}>
+                        <button
+                          className="button"
+                          disabled={busy || !canEdit}
+                          onClick={() => void download(item)}
+                        >
                           下载
                         </button>
                         {canEdit && (
                           <button
-                            className="danger"
+                            className="button danger"
                             disabled={busy}
                             onClick={() => void removeObject(item)}
                           >
@@ -495,7 +522,7 @@ export function ObjectStorage({
               </table>
               {canEdit && (
                 <button
-                  className="danger"
+                  className="button danger"
                   disabled={busy || (buckets.find((b) => b.name === bucket)?.object_count || 0) > 0}
                   onClick={() => {
                     if (!window.confirm(`删除空桶 ${bucket}？`)) return;
@@ -517,6 +544,6 @@ export function ObjectStorage({
           )}
         </>
       )}
-    </>
+    </div>
   );
 }

@@ -1,7 +1,7 @@
 # 实际 API 合同
 
 OpenAPI 3 合同的权威源是 [openapi-v1.json](../contracts/openapi-v1.json)。
-版本 0.9.0，52 个路径、73 个操作，全部拥有稳定且唯一的 operationId。
+版本 0.10.0，58 个路径、86 个操作，全部拥有稳定且唯一的 operationId。
 运行 Swagger 位于 `/api/docs`，JSON 位于 `/api/openapi.json`。
 本合同是自托管 `/api/v1`，不声称兼容 Neon SaaS `/api/v2`。
 
@@ -117,3 +117,23 @@ Operation 一并持久化。时间点、保留窗口、租约、错误与历史�
 
 新增操作应先实现权限、参数、持久意图、调谐和负例，再更新 OpenAPI 与 UI。
 不能用返回成功的空 handler 宣布未实现服务可用。破坏性合同变更需要新版本与迁移计划。
+
+## 5. 分支 Object Storage REST v1
+
+参见 [存储合同](OBJECT-STORAGE.md)。元数据状态读取不唤醒 Compute；目录/文件读取会按需唤醒。公开下载使用短期签名或明确的 public_read ACL。服务配置需要管理员、If-Match 与 Idempotency-Key；文件修改需要内容 ETag 条件。外部 S3 兼容仍为 false。
+
+| Method | Path | operationId |
+| --- | --- | --- |
+| GET | `/api/v1/projects/{project}/branches/{branch}/storage` | `getObjectStorage` |
+| POST | `/api/v1/projects/{project}/branches/{branch}/storage` | `enableObjectStorage` |
+| DELETE | `/api/v1/projects/{project}/branches/{branch}/storage` | `disableObjectStorage` |
+| GET | `/api/v1/projects/{project}/branches/{branch}/storage/buckets` | `listStorageBuckets` |
+| POST | `/api/v1/projects/{project}/branches/{branch}/storage/buckets` | `createStorageBucket` |
+| DELETE | `/api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}` | `deleteStorageBucket` |
+| GET | `/api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/objects` | `getStorageObject` |
+| HEAD | `/api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/objects` | `headStorageObject` |
+| PUT | `/api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/objects` | `putStorageObject` |
+| DELETE | `/api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/objects` | `deleteStorageObject` |
+| POST | `/api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/presign` | `presignStorageDownload` |
+| GET | `/storage/v1/{storageBranch}/{bucket}` | `getPublicStorageObject` |
+| HEAD | `/storage/v1/{storageBranch}/{bucket}` | `headPublicStorageObject` |

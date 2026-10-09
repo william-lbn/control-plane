@@ -8,7 +8,7 @@
 
 目标是依据 Neon 官网对象模型实现自托管 Backend，同时保持开源数据面可用。
 本文件定义后续实现合同；它不改变 `/api/v1/capabilities` 的实际能力开关。
-Managed Auth 基础服务已有实现，见 MANAGED-AUTH.md；Functions、产品 Object Storage 与 AI Gateway 推理尚未实现服务。
+Managed Auth 基础服务已有实现，见 MANAGED-AUTH.md；产品 Object Storage 的 REST v1 已有代码，见 OBJECT-STORAGE.md，完整 S3 产品仍有独立缺口。Functions 与 AI Gateway 推理尚未实现服务。
 Data API 已加入原生 Go Driver、持久 Operation、最小权限数据库身份、PostgREST 调谐及 UI；
 默认禁用，具体合同和真实 Neon 验收边界见 DATA-API-NATIVE-DRIVER.md。
 分支应用凭据管理及当前权限检查已有实现，见 BACKEND-CREDENTIALS.md；AI 推理仍未启用。
@@ -26,7 +26,7 @@ API/Worker 拆分已有源码和 Chart，验收方法见 WORKER-SPLIT.md。
 | --- | --- | --- |
 | Managed Better Auth | 身份、会话、OAuth/JWKS 等在 neon_auth；分支 URL 与 token 隔离 | 固定 Better Auth 1.4.18 兼容起点；独立 TS 服务，Go 控制与配置；不手写 OAuth/password 协议 |
 | Data API | PostgREST compatible、JWT、RLS、HTTP 无长期 TCP | 独立 PostgREST 数据服务；非 owner/non-BYPASSRLS 连接、issuer/audience/JWKS 与 schema allowlist |
-| Functions | Node.js 24 JS/TS、长期服务、SSE/WS、cron/object trigger、随分支部署 | Go 调谐不可变 bundle；Node runtime，容器隔离、egress/limits、调度/事件幂等与日志 |
+| Functions | Node.js 24 JS/TS、microVM per isolate、长期服务、SSE/WS、cron/object trigger、随分支部署 | Go 调谐不可变 bundle；独立 Node runtime 与 microVM 隔离、egress/limits、调度/事件幂等与日志；普通共享控制服务进程执行不满足隔离目标 |
 | Object Storage | S3 compatible、private/public_read、预签名、文件视图随分支 | 产品桶与 Pageserver 桶分开；不可变 blobs + 随 PG Timeline 克隆的对象清单；S3 协议 Driver |
 | AI Gateway | 每分支 endpoint；统一平台凭据、多协议/模型、streaming、用量/预算 | 独立 Go gateway；平台管理员 UI 配置上游/密钥，项目用户使用模型目录和 scoped 凭据；真实上游由运营方接入 |
 
