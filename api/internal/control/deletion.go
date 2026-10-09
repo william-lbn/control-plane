@@ -282,7 +282,7 @@ func (s *server) admitDeletion(w http.ResponseWriter, r *http.Request, recoverin
 	}
 	if !recovering {
 		var unsupported bool
-		err = tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM branch_service_instances WHERE branch_id=ANY($1::text[]) AND service_kind NOT IN ('postgres','data_api','auth') AND desired_state<>'disabled')`, p.BranchIDs).Scan(&unsupported)
+		err = tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM branch_service_instances WHERE branch_id=ANY($1::text[]) AND service_kind NOT IN ('postgres','data_api','auth','object_storage') AND desired_state<>'disabled')`, p.BranchIDs).Scan(&unsupported)
 		if err != nil || unsupported {
 			fail(w, r, 409, "service_retirement_driver_required", "Every enabled branch service must have a verified retirement driver")
 			return
@@ -639,6 +639,9 @@ func (s *server) commitDeletion(ctx context.Context, id, worker, action string, 
 			return err
 		}
 		if _, err = tx.Exec(ctx, `UPDATE managed_auth_instances SET state='disabled',updated_at=now() WHERE branch_id=ANY($1::text[])`, p.BranchIDs); err != nil {
+			return err
+		}
+		if _, err = tx.Exec(ctx, `UPDATE object_storage_instances SET state='disabled',updated_at=now() WHERE branch_id=ANY($1::text[])`, p.BranchIDs); err != nil {
 			return err
 		}
 		if _, err = tx.Exec(ctx, `UPDATE branch_service_instances SET desired_state='disabled',observed_state='disabled',public_endpoint=NULL,version=version+1,last_observed_at=now() WHERE branch_id=ANY($1::text[])`, p.BranchIDs); err != nil {

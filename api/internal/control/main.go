@@ -36,6 +36,7 @@ type server struct {
 	secureCookies  bool
 	backendKeys    *backendKeyring
 	processRole    processRole
+	storage        *storageBlobs
 }
 
 func env(name, fallback string) string {
@@ -148,6 +149,10 @@ func runProcess(ctx context.Context, role processRole) error {
 		proxyPort:     env("NEON_PROXY_PORT", "30432"),
 		secureCookies: os.Getenv("NEON_COOKIE_SECURE") == "true"}
 	s.backendKeys, err = loadBackendKeyring()
+	if err != nil {
+		return err
+	}
+	s.storage, err = loadStorageBlobs()
 	if err != nil {
 		return err
 	}

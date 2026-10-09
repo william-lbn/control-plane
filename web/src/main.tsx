@@ -208,6 +208,9 @@ function App() {
               >
                 <span>⇄</span>Data API
               </a>
+              <a className={page === 'storage' ? 'active' : ''} href={route(projectId, 'storage')}>
+                <span>▱</span>Object Storage
+              </a>
               <a className={page === 'auth' ? 'active' : ''} href={route(projectId, 'auth')}>
                 <span>◈</span>Auth
               </a>

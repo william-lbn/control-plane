@@ -98,6 +98,15 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 			}
 		}()
 		switch action {
+		case "enable_object_storage", "disable_object_storage":
+			var p objectStoragePayload
+			stepErr = json.Unmarshal(payload, &p)
+			if stepErr == nil && (p.ProjectID != projectID || p.BranchID != resourceID) {
+				stepErr = errors.New("Object Storage operation scope mismatch")
+			}
+			if stepErr == nil {
+				stepErr = s.reconcileObjectStorage(runCtx, id, workerID, action, p)
+			}
 		case "delete_project", "delete_branch", "recover_project":
 			var p deletionPayload
 			stepErr = json.Unmarshal(payload, &p)
@@ -258,6 +267,11 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 		return err
 	}
 	if state == "failed" {
+		if action == "enable_object_storage" || action == "disable_object_storage" {
+			if _, err = finishTx.Exec(ctx, `UPDATE object_storage_instances SET state='degraded',updated_at=now() WHERE branch_id=$1 AND project_id=$2 AND generation=(SELECT (payload->>'generation')::bigint FROM operations WHERE id=$3)`, resourceID, projectID, id); err != nil {
+				return err
+			}
+		}
 		if action == "enable_managed_auth" || action == "disable_managed_auth" {
 			if _, err = finishTx.Exec(ctx, `UPDATE managed_auth_instances SET state='degraded',updated_at=now() WHERE branch_id=$1 AND project_id=$2 AND generation=(SELECT (payload->>'generation')::bigint FROM operations WHERE id=$3)`, resourceID, projectID, id); err != nil {
 				return err

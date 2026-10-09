@@ -254,3 +254,8 @@ operator report，不能继续其他 suite。服务/项目名目前明确绑定�
 记录 commit、image digest、Helm revision、schema version、测试环境与时间、
 资源身份、通过/失败/未测列表及脱敏错误。私密凭据与公开总结分开。
 历史报告按其版本保留；新报告不能把旧场景自动登记为本版通过。
+
+
+## Branch Object Storage
+
+Run `web/e2e/object-storage.spec.ts` on the trusted Linux runner with unique protected fixture/evidence directories. Its UI steps and API negative probes are documented in [OBJECT-STORAGE.md](OBJECT-STORAGE.md). Source-only checks do not replace the real Neon+S3 byte/clone/cold-wake receipt.

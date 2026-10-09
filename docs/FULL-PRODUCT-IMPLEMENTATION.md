@@ -1,3 +1,5 @@
+> 2026-10-09 code increment: [Object Storage REST v1](OBJECT-STORAGE.md) defines the implemented boundary. S3/multipart/GC and Functions remain implementation gates. The broad contracts below remain a target where their Driver is absent.
+
 > 当前代码增量说明（2026-10-08）：[Managed Auth v1](MANAGED-AUTH.md) 已有 Go/TS/React/Helm 实现与 Linux 开发验证。本文后面的未来 API 与完整 Backend 设计仍是规划；实际注册的接口以 OpenAPI 0.9.0 为准，真实 Neon UI 以交付报告为准。Better Auth 1.4.18 是原网站快照的起点，本次锁定并测试的实际运行库为 1.7.7。
 
 # 完整产品实施合同与验收顺序

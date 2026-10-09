@@ -1,6 +1,6 @@
 # 生产门槛与官网对齐
 
-状态截至 2026-10-08；这是一份缺口清单，未通过项不能被 Ready Pod 或 CI build 替代。
+状态截至 2026-10-09；这是一份缺口清单，未通过项不能被 Ready Pod 或 CI build 替代。
 
 ## 1. 已实现路径
 
@@ -35,7 +35,9 @@
 
 Managed Auth 已有 Go Driver、Better Auth 1.7.7 运行时、React UI、注册/会话/JWT/分支隔离与 PostgreSQL CI，详细见 [Auth 合同](MANAGED-AUTH.md)。真实 Neon UI 结果按版本交付报告记录；SMTP/OAuth/MFA、完整恢复/删除一致性、生产隔离与 HA 仍须独立实现/验收。
 
-Functions、产品 Object Storage 和 AI Gateway 推理尚未实现服务。Data API 已有原生 Driver、
+产品 Object Storage 已实现分支目录、独立受限对象凭据、Go REST Driver、React UI、条件写入、签名下载和分支继承，详见 [Object Storage 合同](OBJECT-STORAGE.md)。当前是 `neon-object-rest-v1`；Linux 现场 UI 验收待本次发行记录确认，外部 S3 协议兼容、多段上传、物理 GC、分布式网关隔离及 HA/DR 仍未完成。
+
+Functions 和 AI Gateway 推理尚未实现服务。Data API 已有原生 Driver、
 异步生命周期、最小权限角色、PostgREST、UI 和 RLS 集成测试；默认禁用、仅实验传输开关。
 现场 Neon UI 验收与生产 TLS/HA 是独立门槛，具体结果以该版本交付证据为准。
 应用凭据管理及分支/模型授权检查已有代码和真实 PostgreSQL 验收；不代表 AI 推理可用。

@@ -68,7 +68,7 @@ func (s *server) authorizeRoute(w http.ResponseWriter, r *http.Request, u user) 
 	project, org := r.PathValue("project"), r.PathValue("org")
 	a := resourceAccess{}
 	required := 1
-	if r.Method != http.MethodGet {
+	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		required = 2
 	}
 	if project != "" {
@@ -90,6 +90,9 @@ func (s *server) authorizeRoute(w http.ResponseWriter, r *http.Request, u user) 
 		}
 		if strings.HasSuffix(r.URL.Path, "/auth") || strings.HasSuffix(r.URL.Path, "/auth/users") {
 			required = 3 // Application identity configuration and PII require a project administrator.
+		}
+		if strings.HasSuffix(r.URL.Path, "/storage") && r.Method != http.MethodGet {
+			required = 3
 		}
 		var state string
 		if err := s.db.QueryRow(r.Context(), "SELECT state FROM projects WHERE id=$1", project).Scan(&state); err != nil {
@@ -149,7 +152,7 @@ func (s *server) authorizeRoute(w http.ResponseWriter, r *http.Request, u user) 
 			fail(w, r, 403, "forbidden", "Console sessions required for invitations")
 			return r, false
 		}
-		if r.Method != http.MethodGet && roleLevel(u.KeyRole) < 2 {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead && roleLevel(u.KeyRole) < 2 {
 			fail(w, r, 403, "forbidden", "Read-only API key cannot mutate resources")
 			return r, false
 		}

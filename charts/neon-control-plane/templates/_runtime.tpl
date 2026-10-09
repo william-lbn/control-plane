@@ -1,4 +1,7 @@
 {{- define "neonControl.runtimeEnv" -}}
+{{- if .Values.objectStorage.enabled }}
+- {name: NEON_OBJECT_STORAGE_CONFIG_FILE, value: /run/product-storage/config.json}
+{{- end }}
 {{- if .Values.managedAuth.enabled }}
 {{- if or (not .Values.managedAuth.labHTTP) (not .Values.managedAuth.publicOrigin) }}
 {{- fail "Managed Auth v1 requires explicit managedAuth.labHTTP and publicOrigin; trusted TLS has not passed" }}

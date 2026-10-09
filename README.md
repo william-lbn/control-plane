@@ -115,3 +115,8 @@ helm upgrade --install neon-control charts/neon-control-plane -n neon \
 Postgres 下包含一个 Writer、多个 Readers、数据库、角色和 Data API。
 具体实现受能力门槛约束，所有新增服务必须提供实际驱动、API、UI、负例和 Linux 现场测试。
 独立 HA/fencing、容量、TLS、备份恢复门槛完成后再发布生产就绪声明。
+
+
+## 2026-10-09 Object Storage increment
+
+[Branch Object Storage REST v1](docs/OBJECT-STORAGE.md) adds Go manifest/immutable-blob access, React bucket/file management, migration 017 and OpenAPI 0.10.0. It preserves native timeline inheritance and branch isolation. Linux development gates passed; the matching image deployment and real UI receipt are required before promotion. Public S3 compatibility, multipart and physical GC are not implemented yet. Functions, inference, HA/DR, external cross-instance fencing and whole-chain TLS remain unqualified. Previous delivery reports are historical evidence, not the current image source lock.

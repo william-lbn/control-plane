@@ -293,6 +293,15 @@ func (s *server) catalogMutation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !isRole && r.Method == http.MethodDelete {
+		var retainedStorage bool
+		if err = tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM object_storage_instances WHERE branch_id=$1 AND spec->>'database'=$2)`, branch, name).Scan(&retainedStorage); err != nil {
+			fail(w, r, 503, "metadata_unavailable", "Could not check retained storage directory")
+			return
+		}
+		if retainedStorage {
+			fail(w, r, 409, "storage_database_retained", "Object manifests are retained in this database; deleting it requires a separately verified storage purge workflow")
+			return
+		}
 		if err = tx.QueryRow(r.Context(), "SELECT owner_name FROM branch_databases WHERE branch_id=$1 AND name=$2", branch, name).Scan(&p.Owner); err != nil {
 			fail(w, r, 503, "metadata_unavailable", "Could not read database owner intent")
 			return

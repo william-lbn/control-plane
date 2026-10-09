@@ -1,3 +1,10 @@
+# Product object bytes require an operator-provisioned dedicated S3 bucket.
+# config.json holds endpoint/bucket/region/access_key/secret_key/lab_http.
+# Use a bucket-restricted credential, never the MinIO root or Pageserver identity.
+objectStorage:
+  enabled: false
+  existingSecret: ''
+
 fullnameOverride: neon-control
 managedAuth:
   enabled: false

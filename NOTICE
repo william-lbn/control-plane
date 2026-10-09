@@ -20,3 +20,5 @@ https://github.com/PostgREST/postgrest/blob/v16.4/LICENSE is retained in
 third_party/licenses/PostgREST-16.4-MIT.txt and copied into that image at
 /usr/share/licenses/postgrest/LICENSE. Apache-2.0 applies to this control plane's
 own source, not to the upstream PostgREST executable or its dependencies.
+
+Product blob access uses github.com/minio/minio-go/v7 v7.2.0 (Apache-2.0), checksum-pinned in api/go.sum. Its S3 signing client is an internal transport; this release does not claim an external S3 gateway.

@@ -61,6 +61,9 @@ spec:
             - {name: NEON_WORKER_BIND, value: ':8789'}
             {{- include "neonControl.runtimeEnv" . | nindent 12 }}
           volumeMounts:
+            {{- if .Values.objectStorage.enabled }}
+            - {name: product-storage, mountPath: /run/product-storage, readOnly: true}
+            {{- end }}
             - {name: credentials, mountPath: /run/neon-secrets, readOnly: true}
             {{- if .Values.api.pgCASecret }}
             - {name: pg-ca, mountPath: /run/pg-ca, readOnly: true}
@@ -69,6 +72,13 @@ spec:
           readinessProbe: {httpGet: {path: /readyz, port: health}, periodSeconds: 5, timeoutSeconds: 4, failureThreshold: 3}
           livenessProbe: {httpGet: {path: /healthz, port: health}, periodSeconds: 15, timeoutSeconds: 3, failureThreshold: 3}
       volumes:
+        {{- if .Values.objectStorage.enabled }}
+        - name: product-storage
+          secret:
+            secretName: {{ required "objectStorage.existingSecret is required" .Values.objectStorage.existingSecret }}
+            defaultMode: 0440
+            items: [{key: config.json, path: config.json}]
+        {{- end }}
         - name: credentials
           secret:
             secretName: {{ .Values.api.existingSecret }}

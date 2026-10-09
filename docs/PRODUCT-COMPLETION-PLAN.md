@@ -70,3 +70,8 @@ Better Auth 1.7.7 与 pg 8.23.1 由 Linux 查询注册表后锁定；新增 meta
 当前 0.1.5 / `2dcd7d2` 的七套真实 Linux UI 共 106 检查通过，另有原 Reader
 失败操作的五项 UI 恢复检查；每套 managed VM/Runner 归零。统一 Helm 与复测
 证据以最新 Auth 交付报告为准。共享宿主磁盘停顿根因未定位，仍阻止生产准入。
+
+
+## 2026-10-09 increment: branch file management
+
+See [OBJECT-STORAGE.md](OBJECT-STORAGE.md) for the actual REST v1 contract, data model, concurrency, diagram, deployment and manual/automated UI acceptance. This implements the first real product file path with independent backing credentials; the public S3 protocol is still false. Independent next gates: unified storage scopes/SigV4, multipart and CORS, file-trigger outbox, reference-safe physical GC, standalone restricted gateway, physical quotas and restore drills. The source changes do not implement Functions or inference and do not relax HA/TLS/fence gates.

@@ -242,6 +242,9 @@ func (s *server) reconcileCreate(ctx context.Context, operationID, workerID, act
 			return err
 		}
 		if p.EndpointID != "" && p.EndpointType != "read_only" {
+			if err = s.queueInheritedObjectStorageTx(ctx, tx, operationID, p); err != nil {
+				return err
+			}
 			if err = s.queueInheritedManagedAuthTx(ctx, tx, operationID, p); err != nil {
 				return err
 			}

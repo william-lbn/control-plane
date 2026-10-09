@@ -96,6 +96,19 @@ func (s *server) routes() *http.ServeMux {
 	mux.Handle("PATCH /api/v1/projects/{project}/branches/{branch}/protection", s.auth(http.HandlerFunc(s.setResourceProtection), true))
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/restore-window", s.auth(http.HandlerFunc(s.readRestoreWindow), false))
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/services", s.auth(http.HandlerFunc(s.branchServices), false))
+	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/storage", s.auth(http.HandlerFunc(s.objectStorageRead), false))
+	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/storage", s.auth(http.HandlerFunc(s.objectStorageMutate), true))
+	mux.Handle("DELETE /api/v1/projects/{project}/branches/{branch}/storage", s.auth(http.HandlerFunc(s.objectStorageMutate), true))
+	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/storage/buckets", s.auth(http.HandlerFunc(s.storageBuckets), false))
+	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/storage/buckets", s.auth(http.HandlerFunc(s.storageBuckets), true))
+	mux.Handle("DELETE /api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}", s.auth(http.HandlerFunc(s.storageBucketDelete), true))
+	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/objects", s.auth(http.HandlerFunc(s.storageObjects), false))
+	mux.Handle("HEAD /api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/objects", s.auth(http.HandlerFunc(s.storageObjects), false))
+	mux.Handle("PUT /api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/objects", s.auth(http.HandlerFunc(s.storageObjects), true))
+	mux.Handle("DELETE /api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/objects", s.auth(http.HandlerFunc(s.storageObjects), true))
+	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/presign", s.auth(http.HandlerFunc(s.storagePresign), true))
+	mux.HandleFunc("GET /storage/v1/{storageBranch}/{bucket}", s.storagePublic)
+	mux.HandleFunc("HEAD /storage/v1/{storageBranch}/{bucket}", s.storagePublic)
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/data-api", s.auth(http.HandlerFunc(s.dataAPIRead), false))
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/auth", s.auth(http.HandlerFunc(s.managedAuthRead), false))
 	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/auth", s.auth(http.HandlerFunc(s.managedAuthMutate), true))
@@ -167,7 +180,7 @@ func (s *server) capabilities(w http.ResponseWriter, r *http.Request) {
 			"pitr_new_branch":    map[string]any{"enabled": pitrEnabled(), "reason": "retained_timestamp_or_lsn_new_branch"},
 		},
 		"services": map[string]any{"postgres": map[string]any{"enabled": true, "reason": "read_and_query_validated"},
-			"auth": map[string]any{"enabled": managedAuthEnabled(), "reason": "better_auth_branch_identity_lab_transport"}, "object_storage": disabled, "functions": disabled, "ai_gateway": disabled,
+			"auth": map[string]any{"enabled": managedAuthEnabled(), "reason": "better_auth_branch_identity_lab_transport"}, "object_storage": map[string]any{"enabled": s.storage != nil, "reason": "branch_object_rest_v1_s3_gate_pending"}, "functions": disabled, "ai_gateway": disabled,
 			"data_api": map[string]any{"enabled": dataAPIEnabled(), "reason": "native_driver_lab_transport_gate"}},
 		"limits": map[string]any{"min_cpu_milli": 1000, "max_cpu_milli": 2000, "min_memory_mib": 1024, "max_memory_mib": 3072, "supported_memory_slot_mib": []int{1024}},
 	})
@@ -291,7 +304,7 @@ func (s *server) branchServices(w http.ResponseWriter, r *http.Request) {
 	items := []record{}
 	for _, kind := range []string{"postgres", "auth", "object_storage", "functions", "ai_gateway", "data_api"} {
 		if item, ok := byKind[kind]; ok {
-			item["enabled"] = (kind == "postgres" || kind == "data_api" && dataAPIEnabled() || kind == "auth" && managedAuthEnabled()) && item["observed_state"] == "active"
+			item["enabled"] = (kind == "postgres" || kind == "data_api" && dataAPIEnabled() || kind == "auth" && managedAuthEnabled() || kind == "object_storage" && s.storage != nil) && item["observed_state"] == "active"
 			item["reason"] = ""
 			if item["enabled"] != true {
 				item["reason"] = "not_ready_or_driver_not_implemented"
