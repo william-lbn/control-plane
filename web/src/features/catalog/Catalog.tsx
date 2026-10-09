@@ -91,8 +91,10 @@ export function Catalog({
         body: body ? JSON.stringify(body) : undefined,
         headers: { 'Idempotency-Key': newRequestKey() },
       });
-      setPassword('');
-      setRotatePassword('');
+      if (kind === 'roles' && method === 'POST')
+        setPassword((value) => (value === body?.password ? '' : value));
+      if (kind.startsWith('roles/') && method === 'PATCH')
+        setRotatePassword((value) => (value === body?.password ? '' : value));
       setOperation(result.operation);
       const deadline = Date.now() + 490000;
       let current = result.operation;
@@ -105,8 +107,12 @@ export function Catalog({
       if (current.state === 'failed')
         throw new Error(`${current.error_message || '调谐失败'} · ${current.id}`);
       await load();
-      setRoleName('');
-      setDatabaseName('');
+      // A completed role refresh must not erase a database form entered while
+      // load() is pending. Clear only the submitted form, retaining newer edits.
+      if (kind === 'roles' && method === 'POST')
+        setRoleName((value) => (value === body?.name ? '' : value));
+      if (kind === 'databases' && method === 'POST')
+        setDatabaseName((value) => (value === body?.name ? '' : value));
     } catch (e) {
       showError(e);
     } finally {

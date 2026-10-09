@@ -67,7 +67,7 @@ Better Auth 1.7.7 与 pg 8.23.1 由 Linux 查询注册表后锁定；新增 meta
 
 `2dcd7d2` 的基础 Auth 已通过真实 Neon React UI 23 项检查，包含账号复制与会话/JWT 隔离、Data API RLS、自动缩零和登录冷唤醒。最新证据和失败修复边界见 [Auth 交付](DELIVERY-2026-10-08-MANAGED-AUTH.md)。此项已可复测；顺序 7 的产品对象存储和顺序 8 的 Functions 仍需从实际服务实现开始。
 
-当前 0.1.5 / `2dcd7d2` 的七套真实 Linux UI 共 106 检查通过，另有原 Reader
+历史 0.1.5 / `2dcd7d2` 的七套真实 Linux UI 共 106 检查通过，另有原 Reader
 失败操作的五项 UI 恢复检查；每套 managed VM/Runner 归零。统一 Helm 与复测
 证据以最新 Auth 交付报告为准。共享宿主磁盘停顿根因未定位，仍阻止生产准入。
 
@@ -75,3 +75,19 @@ Better Auth 1.7.7 与 pg 8.23.1 由 Linux 查询注册表后锁定；新增 meta
 ## 2026-10-09 increment: branch file management
 
 See [OBJECT-STORAGE.md](OBJECT-STORAGE.md) for the actual REST v1 contract, data model, concurrency, diagram, deployment and manual/automated UI acceptance. This implements the first real product file path with independent backing credentials; the public S3 protocol is still false. Independent next gates: unified storage scopes/SigV4, multipart and CORS, file-trigger outbox, reference-safe physical GC, standalone restricted gateway, physical quotas and restore drills. The source changes do not implement Functions or inference and do not relax HA/TLS/fence gates.
+
+`d4549a8` / unified Helm 0.1.6 has been deployed with seven matching images and
+passes the 19-check real Linux Object Storage UI suite. The original failed file
+fixture has a separate four-check recovery receipt. This closes the first REST
+slice of item 7, not its full S3/GC contract. The exact current regression matrix,
+retained failures and environment boundary are in
+[the current delivery](DELIVERY-2026-10-09-OBJECT-STORAGE.md).
+
+The next local service implementation is item 8: actual isolated Functions,
+following `content/docs/compute/functions/overview.md` (snapshot update
+2026-09-22) and `reference/runtime-limits.md` (2026-09-16). A Node.js process in
+a shared Kubernetes Pod is insufficient to claim the documented microVM-per-
+isolate boundary. First implement immutable bundle/version/intent and a NeonVM
+isolated runner with bounded HTTP invocation; then branching, zero/wake, secrets,
+streaming and triggers. Each increment must have real execution/tenant negatives,
+standard APIs, UI, Helm and retained recovery evidence before capability enablement.

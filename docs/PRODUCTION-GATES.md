@@ -35,7 +35,7 @@
 
 Managed Auth 已有 Go Driver、Better Auth 1.7.7 运行时、React UI、注册/会话/JWT/分支隔离与 PostgreSQL CI，详细见 [Auth 合同](MANAGED-AUTH.md)。真实 Neon UI 结果按版本交付报告记录；SMTP/OAuth/MFA、完整恢复/删除一致性、生产隔离与 HA 仍须独立实现/验收。
 
-产品 Object Storage 已实现分支目录、独立受限对象凭据、Go REST Driver、React UI、条件写入、签名下载和分支继承，详见 [Object Storage 合同](OBJECT-STORAGE.md)。当前是 `neon-object-rest-v1`；Linux 现场 UI 验收待本次发行记录确认，外部 S3 协议兼容、多段上传、物理 GC、分布式网关隔离及 HA/DR 仍未完成。
+产品 Object Storage 已实现分支目录、独立受限对象凭据、Go REST Driver、React UI、条件写入、签名下载和分支继承，详见 [Object Storage 合同](OBJECT-STORAGE.md)。当前是 `neon-object-rest-v1`；`d4549a8` Linux 现场 UI 19 项已通过，原失败项目另有 4 项恢复。实际版本与其余回归见 [当前交付](DELIVERY-2026-10-09-OBJECT-STORAGE.md)。外部 S3 协议兼容、多段上传、物理 GC、分布式网关隔离及 HA/DR 仍未完成。
 
 Functions 和 AI Gateway 推理尚未实现服务。Data API 已有原生 Driver、
 异步生命周期、最小权限角色、PostgREST、UI 和 RLS 集成测试；默认禁用、仅实验传输开关。

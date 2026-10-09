@@ -18,7 +18,7 @@ items. Do not call this release complete Neon parity or production qualified.
 
 Official baseline: the local website snapshot `c0d49cbb6979b2ce79ea502d62dbc40780a923b0`,
 `content/docs/storage/{overview,buckets,objects,authentication,s3-compatibility}.md`,
-updated 2026-09-16. The official [Object Storage architecture](https://neon.com/blog/building-neon-object-storage)
+with page updates on 2026-09-16 and 2026-09-18. The official [Object Storage architecture](https://neon.com/blog/building-neon-object-storage)
 describes branch inheritance and copy-on-write file semantics. The official
 [S3 compatibility contract](https://neon.com/docs/storage/s3-compatibility)
 also contains operations this increment deliberately does not advertise.

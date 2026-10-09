@@ -259,3 +259,79 @@ operator report，不能继续其他 suite。服务/项目名目前明确绑定�
 ## Branch Object Storage
 
 Run `web/e2e/object-storage.spec.ts` on the trusted Linux runner with unique protected fixture/evidence directories. Its UI steps and API negative probes are documented in [OBJECT-STORAGE.md](OBJECT-STORAGE.md). Source-only checks do not replace the real Neon+S3 byte/clone/cold-wake receipt.
+
+### 恢复已失败的对象存储验收
+
+`object-storage-recovery.spec.ts` 专门恢复 2026-10-09 的已保留故障项目。
+它要求 `NEON_E2E_STORAGE_RECOVERY_FIXTURE` 指向受保护 JSON，包含原始
+`project_id`、`project_name`、`branch_id`、`child_id`、`child_name`、
+`writer_id`、`child_writer_id` 和 `original_failure_job`。实际字段以测试开头的
+fixture 类型及其严格校验为准，不能用新项目代替原失败身份。
+恢复会检查原父/子文件、安全头、保留删除/恢复和再次启用，最后保留数据并释放
+测试运行资源与逻辑配额。该用例绑定已发生的原始写入；其他故障必须按各自
+私有 fixture 和当前状态另写显式恢复断言，不能盲目套用。
+
+```bash
+export NEON_E2E_STORAGE_RECOVERY_FIXTURE=/secure/e2e/original-storage-fixture.json
+export NEON_E2E_PRIVATE_DIR=/secure/e2e/storage-recovery-unique
+export NEON_E2E_ARTIFACTS=/var/lib/neon-evidence/storage-recovery-unique
+npm --prefix web run test:e2e -- object-storage-recovery.spec.ts
+```
+
+管理员文件和 BASE_URL 沿用前述安全输入；公开 artifact 不包含 fixture、密码或
+下载 token。失败和恢复各保留一份回执。受信 Linux 运维人员还须运行统一 Helm
+仓库的 `tools/verify-product-storage-access.mjs`，确认产品 bucket 可列举、数据库
+bucket 明确 AccessDenied；错误网络连接不能算 IAM 隔离通过。
+
+### 当前发行的完整串行回归
+
+按最新交付报告的源码与镜像锁，依次运行 object-storage、native-product、
+backend-credentials、data-api、restore、lifecycle、console-invitations 和
+managed-auth。凭据测试指定已验收且未删除的测试项目，不再创建 Compute。
+每组完成都核对 VM/runner 为零、停用本组服务，并保存原 Operation。
+只有确名、具有通过回执的自有项目才可执行 CAS 保留删除以释放 50 项目配额；
+七天 UI 恢复窗口与永久保留物理数据是不同合同。绝不通过增加配额、清库或
+删除对象/WAL/Secrets 来使回归通过。测试门槛与生产门槛分别记录。
+
+### Data API 原失败项目恢复
+
+`data-api-recovery.spec.ts` 只接收 `NEON_E2E_DATA_API_RECOVERY_FIXTURE` 指定的
+既有失败项目，JSON 字段为 project_id、project_name、branch_id、writer_id、
+original_failure_job、database_password_file。名字必须与原失败 Job 匹配，原分支
+须只有该 Writer，服务须为 active，原 `app_data.notes` 的三条已验证行必须存在。
+数据库密码保存在原私有文件，不能写入 JSON 明文、环境变量或公开 artifact。
+
+此场景原签名私钥只在已退出的测试进程内存中，故恢复**显式从 UI 停用/重新启用
+并轮换测试 JWKS**，不是找回旧签名密钥。先用原 SQL 凭据确认数据，再检查真实
+RLS 请求、手动/自动零后的冷醒，最后从 UI 停用服务、缩零和保留删除以释放配额。
+所有原 SQL/RLS、WAL、Secrets、失败证据仍保留。其他失败阶段不能直接套用。
+
+```bash
+export NEON_E2E_DATA_API_RECOVERY_FIXTURE=/secure/e2e/original-data-api-fixture.json
+export NEON_E2E_PRIVATE_DIR=/secure/e2e/data-api-recovery-unique
+export NEON_E2E_ARTIFACTS=/var/lib/neon-evidence/data-api-recovery-unique
+npm --prefix web run test:e2e -- data-api-recovery.spec.ts
+```
+
+不要并发运行另一 suite；先确认环境压力恢复。恢复五项通过仍不改写原失败，
+新的完整 data-api.spec.ts 需要另一个 attempt/项目和独立回执。
+
+### 恢复目录表单阶段失败的历史恢复测试
+
+`restore.spec.ts` 支持受保护的 `NEON_E2E_RESTORE_RECOVERY_FIXTURE`：
+project_id、project_name、branch_id、writer_id、original_failure_job 和
+database_password_file。它只接受原 `restore-publication-ui-*` 项目仍 ready、
+仅一个原分支/Writer 的阶段；已创建恢复分支的失败不能套用这个模式。
+使用原密码，创建新唯一表/角色/数据库与**新的历史目标点**，不修改或清空原测试
+表、不声称重新取得丢失的历史 LSN。新名字/时间戳/LSN 及时保存在新私有 fixture，
+原失败和旧数据完整保留。继续完整历史点与目录隔离、冷醒和幂等断言。
+
+```bash
+export NEON_E2E_RESTORE_RECOVERY_FIXTURE=/secure/e2e/original-restore-fixture.json
+export NEON_E2E_PRIVATE_DIR=/secure/e2e/restore-recovery-unique
+export NEON_E2E_ARTIFACTS=/var/lib/neon-evidence/restore-recovery-unique
+npm --prefix web run test:e2e -- restore.spec.ts
+```
+
+测试显式延迟角色成功后的只读目录刷新，确认用户同时填入的数据库名称仍保留。
+该测试暴露的实际 UI 缺陷修复只清理已提交表单，不清理其他表单或较新的编辑。

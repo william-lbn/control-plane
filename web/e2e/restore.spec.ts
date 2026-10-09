@@ -18,7 +18,39 @@ test('UI historical restore: timestamp, LSN, catalog isolation and cold wake', a
   const protectedRoot = privateDir;
   const attempt = process.env.NEON_E2E_ATTEMPT || new Date().toISOString().replace(/[^0-9]/g, '');
   if (!/^[a-z0-9_-]+$/.test(attempt)) throw new Error('Invalid attempt');
-  const password = randomBytes(30).toString('base64url');
+  const recoveryFile = process.env.NEON_E2E_RESTORE_RECOVERY_FIXTURE;
+  const recovery = recoveryFile
+    ? (JSON.parse(await readFile(recoveryFile, 'utf8')) as {
+        project_id: string;
+        project_name: string;
+        branch_id: string;
+        writer_id: string;
+        original_failure_job: string;
+        database_password_file: string;
+      })
+    : null;
+  if (
+    recovery &&
+    (!/^publication-ui-\d+$/.test(recovery.original_failure_job) ||
+      recovery.project_name !== 'restore-' + recovery.original_failure_job ||
+      !/^prj_[a-f0-9]{16}$/.test(recovery.project_id) ||
+      !/^br_[a-f0-9]{16}$/.test(recovery.branch_id) ||
+      !/^ep_[a-f0-9]{16}$/.test(recovery.writer_id))
+  )
+    throw new Error('Explicit original restore fixture identity required');
+  const password = recovery
+    ? (await readFile(recovery.database_password_file, 'utf8')).trim()
+    : randomBytes(30).toString('base64url');
+  // Fresh names permit an explicit new target in a retained partial fixture;
+  // existing tables/roles and the original failed receipt remain untouched.
+  const suffix = randomBytes(6).toString('hex');
+  const names = {
+    receipt: 'restore_receipt_' + suffix,
+    laterTable: 'created_after_restore_' + suffix,
+    laterRole: 'role_after_restore_' + suffix,
+    laterDatabase: 'database_after_restore_' + suffix,
+  };
+  let sourcePoint: { timestamp: string; lsn: string } | null = null;
   await mkdir(privateDir, { recursive: true, mode: 0o700 });
   await writeFile(path.join(privateDir, attempt + '-database-password'), password, {
     mode: 0o600,
@@ -37,14 +69,26 @@ test('UI historical restore: timestamp, LSN, catalog isolation and cold wake', a
     await writeFile(
       testInfo.outputPath('result.json'),
       JSON.stringify(
-        { result, project_id: project, checks, operations, credentials_in_report: false },
+        {
+          result,
+          project_id: project,
+          checks,
+          operations,
+          original_failure_job: recovery?.original_failure_job,
+          creates_new_project: !recovery,
+          credentials_in_report: false,
+        },
         null,
         2,
       ) + '\n',
     );
     await writeFile(
       path.join(protectedRoot, attempt + '-fixture.json'),
-      JSON.stringify({ project_id: project, endpoints: [...endpoints] }, null, 2) + '\n',
+      JSON.stringify(
+        { project_id: project, endpoints: [...endpoints], names, sourcePoint },
+        null,
+        2,
+      ) + '\n',
       { mode: 0o600 },
     );
   }
@@ -165,20 +209,34 @@ test('UI historical restore: timestamp, LSN, catalog isolation and cold wake', a
     await page.getByLabel('用户名').fill('admin');
     await page.getByLabel('密码', { exact: true }).fill((await readFile(adminFile, 'utf8')).trim());
     await page.getByRole('button', { name: '登录控制台 →', exact: true }).click();
-    await page.getByRole('button', { name: '＋ 创建项目', exact: true }).click();
-    await page.getByLabel('项目名称').fill('restore-' + attempt);
-    await page.locator('.create-modal input[type="password"]').fill(password);
-    await page.getByLabel('最大 CPU', { exact: true }).selectOption('1000');
-    await page.getByLabel('最大内存', { exact: true }).selectOption('1024');
-    project = (await submit('/api/v1/organizations/local/projects')).resource.id;
+    await expect(page.getByRole('button', { name: '＋ 创建项目', exact: true })).toBeVisible();
+    if (!recovery) {
+      await page.getByRole('button', { name: '＋ 创建项目', exact: true }).click();
+      await page.getByLabel('项目名称').fill('restore-' + attempt);
+      await page.locator('.create-modal input[type="password"]').fill(password);
+      await page.getByLabel('最大 CPU', { exact: true }).selectOption('1000');
+      await page.getByLabel('最大内存', { exact: true }).selectOption('1024');
+      project = (await submit('/api/v1/organizations/local/projects')).resource.id;
+    } else {
+      project = recovery.project_id;
+      const lifecycle = await get(`/api/v1/projects/${project}/lifecycle`);
+      expect(lifecycle.project.name).toBe(recovery.project_name);
+      expect(lifecycle.project.source).toBe('managed');
+      expect(lifecycle.project.state).toBe('ready');
+      expect(lifecycle.branches.map((b: { id: string }) => b.id)).toEqual([recovery.branch_id]);
+      const existing = (await get(`/api/v1/projects/${project}/endpoints`)).items;
+      expect(existing.map((e: { id: string }) => e.id)).toEqual([recovery.writer_id]);
+      expect(existing[0].branch_id).toBe(recovery.branch_id);
+      await record('original_partial_restore_project_reused_without_erasing_its_data');
+    }
     const root = (await get(`/api/v1/projects/${project}/endpoints`)).items[0];
     endpoints.add(root.id);
     expect((await get('/api/v1/capabilities')).features.pitr_new_branch.enabled).toBe(true);
     await sql(
       root.id,
-      'CREATE TABLE public.restore_receipt(id integer PRIMARY KEY,marker text NOT NULL)',
+      `CREATE TABLE public.${names.receipt}(id integer PRIMARY KEY,marker text NOT NULL)`,
     );
-    await sql(root.id, "INSERT INTO public.restore_receipt VALUES(1,'before')");
+    await sql(root.id, `INSERT INTO public.${names.receipt} VALUES(1,'before')`);
     const point = (
       await sql(
         root.id,
@@ -187,19 +245,43 @@ test('UI historical restore: timestamp, LSN, catalog isolation and cold wake', a
     ).rows[0];
     const timestamp = String(point[0]);
     const lsn = String(point[1]);
-    await sql(root.id, "UPDATE public.restore_receipt SET marker='after'");
-    await sql(root.id, 'CREATE TABLE public.created_after_restore(id integer)');
+    sourcePoint = { timestamp, lsn };
+    await save();
+    await sql(root.id, `UPDATE public.${names.receipt} SET marker='after'`);
+    await sql(root.id, `CREATE TABLE public.${names.laterTable}(id integer)`);
     // Create managed catalog intent after the point: history must not inherit it.
     await page.goto(`/#/projects/${project}/databases`);
     await page.getByLabel('管理分支').selectOption(root.branch_id);
-    await page.getByLabel('新角色名称').fill('role_after_restore');
+    // Hold the post-role refresh long enough to type into the other form.
+    // A completed role Operation must not clear that unsubmitted database name.
+    let roleAccepted = false;
+    let heldRefresh = false;
+    page.on('response', (response) => {
+      if (
+        response.url().endsWith(`/branches/${root.branch_id}/roles`) &&
+        response.request().method() === 'POST' &&
+        response.status() === 202
+      )
+        roleAccepted = true;
+    });
+    await page.route('**/api/v1/projects/*/branches/*/roles', async (route) => {
+      if (roleAccepted && !heldRefresh && route.request().method() === 'GET') {
+        heldRefresh = true;
+        await new Promise((resolve) => setTimeout(resolve, 1200));
+      }
+      await route.continue();
+    });
+    await page.getByLabel('新角色名称').fill(names.laterRole);
     await page.getByLabel('新角色密码').fill(randomBytes(24).toString('base64url'));
     await page.getByRole('button', { name: '创建角色', exact: true }).click();
     await expect(page.locator('.catalog-operation strong')).toHaveText('操作状态：succeeded', {
       timeout: 190_000,
     });
-    await page.getByLabel('新数据库名称').fill('database_after_restore');
-    await page.getByLabel('数据库 Owner').selectOption('role_after_restore');
+    await page.getByLabel('新数据库名称').fill(names.laterDatabase);
+    await page.getByLabel('数据库 Owner').selectOption(names.laterRole);
+    expect(heldRefresh).toBe(true);
+    await expect(page.getByLabel('新数据库名称')).toHaveValue(names.laterDatabase);
+    await record('catalog_role_refresh_preserves_unsubmitted_database_form');
     await page.getByRole('button', { name: '创建数据库', exact: true }).click();
     await expect(page.locator('.catalog-operation strong')).toHaveText('操作状态：succeeded', {
       timeout: 190_000,
@@ -247,21 +329,21 @@ test('UI historical restore: timestamp, LSN, catalog isolation and cold wake', a
       });
     }
     expect(
-      (await sql(writer.id, 'SELECT marker FROM public.restore_receipt WHERE id=1')).rows,
+      (await sql(writer.id, `SELECT marker FROM public.${names.receipt} WHERE id=1`)).rows,
     ).toEqual([['before']]);
     expect(
       (
         await sql(
           writer.id,
-          "SELECT to_regclass('public.created_after_restore') IS NULL, NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='role_after_restore'), NOT EXISTS(SELECT 1 FROM pg_database WHERE datname='database_after_restore')",
+          `SELECT to_regclass('public.${names.laterTable}') IS NULL, NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='${names.laterRole}'), NOT EXISTS(SELECT 1 FROM pg_database WHERE datname='${names.laterDatabase}')`,
         )
       ).rows,
     ).toEqual([[true, true, true]]);
     await record('historical_data_schema_roles_and_databases_not_overwritten_by_current_catalog');
     await shot('restored-historical-query');
-    await sql(writer.id, "INSERT INTO public.restore_receipt VALUES(2,'restored-only')");
+    await sql(writer.id, `INSERT INTO public.${names.receipt} VALUES(2,'restored-only')`);
     const suspension = await suspend(writer.id, false);
-    expect((await sql(writer.id, 'SELECT count(*) FROM public.restore_receipt')).rows).toEqual([
+    expect((await sql(writer.id, `SELECT count(*) FROM public.${names.receipt}`)).rows).toEqual([
       [2],
     ]);
     await expect
@@ -275,7 +357,7 @@ test('UI historical restore: timestamp, LSN, catalog isolation and cold wake', a
     });
     await suspend(writer.id);
     expect(
-      (await sql(root.id, 'SELECT marker,count(*) OVER() FROM public.restore_receipt')).rows,
+      (await sql(root.id, `SELECT marker,count(*) OVER() FROM public.${names.receipt}`)).rows,
     ).toEqual([['after', 1]]);
     await record('restored_branch_changes_do_not_modify_source');
     await suspend(root.id);
@@ -285,7 +367,7 @@ test('UI historical restore: timestamp, LSN, catalog isolation and cold wake', a
     );
     endpoints.add(writerLSN.id);
     expect(restoredLSN.resource.restore_source).toBe('lsn');
-    expect((await sql(writerLSN.id, 'SELECT marker FROM public.restore_receipt')).rows).toEqual([
+    expect((await sql(writerLSN.id, `SELECT marker FROM public.${names.receipt}`)).rows).toEqual([
       ['before'],
     ]);
     await record('explicit_lsn_restores_same_historical_data', {

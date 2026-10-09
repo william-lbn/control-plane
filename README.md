@@ -4,7 +4,7 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 许可证：Apache-2.0。项目由自托管维护者开发，与 Neon 托管服务独立。
 
 **发行状态：预览版本。已经验证的实验环境功能不等于生产认证，也不等于 Neon 官网全部 Backend 服务。**
-[最新 Managed Auth 交付](docs/DELIVERY-2026-10-08-MANAGED-AUTH.md)记录七镜像、统一 Helm 0.1.5、真实分支身份/缩零 UI 和剩余门槛；[生命周期基线](docs/DELIVERY-2026-10-08.md)与[历史交付](docs/DELIVERY-2026-10-07.md)保留先前版本证据。
+[当前 Object Storage 交付](docs/DELIVERY-2026-10-09-OBJECT-STORAGE.md)记录七镜像、统一 Helm 0.1.6、真实文件/分支/缩零 UI、串行回归和剩余门槛；[先前 Managed Auth](docs/DELIVERY-2026-10-08-MANAGED-AUTH.md)、[生命周期基线](docs/DELIVERY-2026-10-08.md)与[历史交付](docs/DELIVERY-2026-10-07.md)保留先前版本证据。
 Chart 0.8.0 提供独立 API、Worker、Web 进程及可选 Data API、应用凭据、Console 邀请注册、历史分支恢复与保留删除；Worker 使用 PostgreSQL 领导租约。
 当前只允许一个 API 和一个 Worker，跨实例外部 fencing 与 HA 仍须独立验收。
 旧合并版本升级前必须执行 [停止/排空流程](docs/WORKER-SPLIT.md)。
@@ -122,4 +122,4 @@ Postgres 下包含一个 Writer、多个 Readers、数据库、角色和 Data AP
 
 ## 2026-10-09 Object Storage increment
 
-[Branch Object Storage REST v1](docs/OBJECT-STORAGE.md) adds Go manifest/immutable-blob access, React bucket/file management, migration 017 and OpenAPI 0.10.0. It preserves native timeline inheritance and branch isolation. Linux development gates passed; the matching image deployment and real UI receipt are required before promotion. Public S3 compatibility, multipart and physical GC are not implemented yet. Functions, inference, HA/DR, external cross-instance fencing and whole-chain TLS remain unqualified. Previous delivery reports are historical evidence, not the current image source lock.
+[Branch Object Storage REST v1](docs/OBJECT-STORAGE.md) adds Go manifest/immutable-blob access, React bucket/file management, migration 017 and OpenAPI 0.10.0. It preserves native timeline inheritance and branch isolation. The matching seven-image deployment and 19 real Linux UI checks passed; exact versions, regressions and retained failures are recorded in the [current delivery](docs/DELIVERY-2026-10-09-OBJECT-STORAGE.md). Public S3 compatibility, multipart and physical GC are not implemented yet. Functions and inference remain unimplemented; HA/DR, external cross-instance fencing and whole-chain TLS remain unqualified. Previous delivery reports are historical evidence, not the current image source lock.
