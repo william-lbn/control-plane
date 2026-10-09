@@ -6,7 +6,7 @@ toolchain go1.27.1
 
 require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
-	github.com/jackc/pgx/v5 v5.9.2
+	github.com/jackc/pgx/v5 v5.11.0
 	github.com/minio/minio-go/v7 v7.2.0
 	golang.org/x/crypto v0.56.0
 )
