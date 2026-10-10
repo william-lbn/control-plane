@@ -99,3 +99,10 @@ isolate boundary. First implement immutable bundle/version/intent and a NeonVM
 isolated runner with bounded HTTP invocation; then branching, zero/wake, secrets,
 streaming and triggers. Each increment must have real execution/tenant negatives,
 standard APIs, UI, Helm and retained recovery evidence before capability enablement.
+
+The Functions source foundation now contains immutable ZIP validation and sealed
+installation, manager HMAC/boot-generation scope, bounded HTTP/SSE forwarding,
+shutdown recovery, guest UID/cgroup/egress primitives and actual Node Fetch/SSE/
+waitUntil execution. The internal contract and outstanding F1–F4 exits are in
+[FUNCTIONS-IMPLEMENTATION.md](FUNCTIONS-IMPLEMENTATION.md). It remains disabled
+until the real microVM, native Driver, Console and zero/wake acceptance exist.

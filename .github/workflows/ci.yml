@@ -105,9 +105,22 @@ jobs:
       - run: npm test
         env: {AUTH_TEST_DATABASE_URL: 'postgres://auth_ci:auth-ci-disposable@127.0.0.1:5432/auth_ci'}
       - run: node --test ../../tools/tests/*.test.mjs
+  functions:
+    name: Functions runtime foundations
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    defaults:
+      run: {working-directory: services/functions}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with: {node-version: '24.19.0'}
+      # Native Node modules only; no network dependency install is required.
+      - run: npm run check
+      - run: npm test
   publish:
     name: Publish ${{ matrix.component }}
-    needs: [go, web, helm, workflows, auth]
+    needs: [go, web, helm, workflows, auth, functions]
     if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-24.04
     timeout-minutes: 20

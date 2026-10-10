@@ -1,0 +1,11 @@
+{
+  "name": "@selfhosted-neon/functions-runtime",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "engines": { "node": ">=24 <25" },
+  "scripts": {
+    "check": "node --check runtime/context.mjs && node --check runtime/server.mjs && node --check runtime/boot.mjs",
+    "test": "node --test --test-concurrency=1 tests/*.test.mjs"
+  }
+}
