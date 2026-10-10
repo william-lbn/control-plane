@@ -17,7 +17,7 @@ Pod。私有 Python 测试工具不是产品后端。源码/镜像锁和失败�
 此迁移不等于第 4 项的连接账本、跨实例栅栏和 HA 已经完成。
 本次增加第 2 项的项目/叶分支保护、保留删除、七天项目恢复和两个 Reader 的独立
 休眠/冷醒测试。准确合同见 [保留删除](RETAINED-DELETION.md)；是否通过现场测试以
-对应版本交付报告为准。第 2 项的物理 GC、TTL、失败创建清理和独立 Endpoint 删除，
+对应版本交付报告为准。第 2 项的物理 GC、TTL、失败创建清理，
 以及第 3/4 项的资源和分布式门槛，仍须独立实现与验收。
 
 ## 2. 不依赖外部凭据的交付序列
@@ -86,8 +86,10 @@ retained failures and environment boundary are in
 The independent Compute deletion increment in
 [ENDPOINT-DELETION.md](ENDPOINT-DELETION.md) first closes a remaining part of
 item 2: owned VM/Runner retirement, branch data retention, replacement credentials,
-dependency blocking and exact Operation replay. Physical GC/TTL and external
-fencing remain independent gates; live acceptance is reported separately.
+dependency blocking and exact Operation replay. Current source 0ba1732 passes
+the 19-check endpoint slice, nine full suites (146 checks) and 23 separate
+original-operation recovery checks; see the current Compute lifecycle delivery.
+Physical GC/TTL and external fencing remain independent gates.
 
 The next local service implementation is item 8: actual isolated Functions,
 following `content/docs/compute/functions/overview.md` (snapshot update

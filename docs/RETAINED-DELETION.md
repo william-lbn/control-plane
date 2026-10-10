@@ -100,7 +100,10 @@ Delete 持有项目/分支锁，检查整个项目没有 queued/running/retry_wa
 跨进程 Proxy 连接账本与外部 epoch 栅栏仍是独立生产 Gate；本版本不得宣称 HA
 或多实例删除/冷醒竞态已经生产认证。基础平台内部管理网络仍需可信 TLS Gate。
 
-## 4. API 合同（OpenAPI 0.8.0）
+## 4. API 合同（当前 OpenAPI 0.10.1）
+
+以下为保留删除子集；完整 87 操作见 API.md。独立 Compute DELETE 的额外合同和
+原密码重建流程见 ENDPOINT-DELETION.md，当前现场验收见 Compute 生命周期交付。
 
 所有 API 都有当前租户权限检查；Console 写入额外要求 CSRF。
 项目删除、恢复及保护修改要求 Admin；叶分支删除要求 Editor 或 Admin。
@@ -162,6 +165,6 @@ Go 的 deletion_integration_test 使用隔离真实 PostgreSQL 与模拟 Kube/�
 
 ## 6. 后续 Gate
 
-物理 GC、滞留服务/失败创建资源删除、TTL 分支自动过期、独立 Endpoint 删除、
+物理 GC、滞留服务/失败创建资源删除、TTL 分支自动过期、
 多实例连接账本、长事务/冷醒/控制器故障完整矩阵，以及所有未来 Backend Driver
 的协调删除仍须独立开发和验收。当前受保护数据保留约束阻止启用破坏性的 purge。

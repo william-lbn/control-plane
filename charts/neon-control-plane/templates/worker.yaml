@@ -15,6 +15,31 @@ roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: {{ $name }}-api
 subjects:
   - {kind: ServiceAccount, name: {{ $name }}-worker, namespace: {{ .Release.Namespace }}}
 ---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $name }}-worker-observer
+  labels:
+    {{- include "neonControl.labels" . | nindent 4 }}
+rules:
+  # Independent Endpoint retirement observes normal NeonVM Runner GC by
+  # label selector. Kubernetes RBAC cannot scope list by labels; the Driver
+  # verifies project/Endpoint ownership of every result before accepting it.
+  # This role is namespace-scoped and grants no Pod mutation or deletion.
+  - apiGroups: ['']
+    resources: [pods]
+    verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $name }}-worker-observer
+  labels:
+    {{- include "neonControl.labels" . | nindent 4 }}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: {{ $name }}-worker-observer}
+subjects:
+  - {kind: ServiceAccount, name: {{ $name }}-worker, namespace: {{ .Release.Namespace }}}
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:

@@ -133,7 +133,8 @@ planning and backups.
 
 ## 4. API contract
 
-The executable contract is `contracts/openapi-v1.json` (0.10.0); Swagger is
+The REST storage slice was added in 0.10.0. The current complete executable
+contract is `contracts/openapi-v1.json` (0.10.1); Swagger is
 `/api/docs`. Every registered operation has a matching contract entry.
 
 | Path below `/api/v1/projects/{project}/branches/{branch}/storage` | Method | Result |

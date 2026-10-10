@@ -1,0 +1,8 @@
+{
+  "name": "neon-control-tools",
+  "private": true,
+  "version": "0.10.1",
+  "type": "module",
+  "engines": { "node": ">=24 <25" },
+  "dependencies": { "yaml": "2.8.1" }
+}

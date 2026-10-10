@@ -19,7 +19,13 @@ rules:
     verbs: [get, create]
   - apiGroups: ['']
     resources: [pods]
+    {{- if .Values.worker.enabled }}
     verbs: [get]
+    {{- else }}
+    # The legacy combined process also runs the retirement observer. Split
+    # mode keeps list permission on the independent Worker alone.
+    verbs: [get, list]
+    {{- end }}
   - apiGroups: [apps]
     resources: [deployments]
     {{- if or .Values.dataAPI.enabled .Values.managedAuth.enabled }}

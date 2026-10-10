@@ -5,6 +5,8 @@ mkdir -p artifacts/helm
 helm lint charts/neon-control-plane --strict -f charts/neon-control-plane/ci/render-values.yaml
 helm template neon-control charts/neon-control-plane --namespace neon -f charts/neon-control-plane/ci/render-values.yaml > artifacts/helm/control-plane.yaml
 helm template combined charts/neon-control-plane --namespace neon -f charts/neon-control-plane/ci/render-values.yaml --set worker.enabled=false > artifacts/helm/combined-profile.yaml
+node tools/check-helm-rbac.mjs artifacts/helm/control-plane.yaml artifacts/helm/combined-profile.yaml
+node --test tools/helm-tests/*.test.mjs
 helm lint charts/compute-management-gateway --strict -f charts/compute-management-gateway/ci/render-values.yaml
 helm template neon-gateway charts/compute-management-gateway --namespace neon -f charts/compute-management-gateway/ci/render-values.yaml > artifacts/helm/gateway.yaml
 # These are security/reconciliation gates, not successful deployment evidence.

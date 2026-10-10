@@ -1,0 +1,114 @@
+{
+  "scope": "self-hosted-compute-lifecycle-functional-acceptance",
+  "runtime_source_commit": "0ba173262d53d9bd634b52347ce417ae83033a85",
+  "runtime_chart_source_commit": "28183a5a552bccadd9f386721d89453bf03cbc0a",
+  "unified_chart_version": "0.1.7",
+  "openapi_version": "0.10.1",
+  "paths": 58,
+  "operations": 87,
+  "production_admitted": false,
+  "official_feature_parity": false,
+  "serial": true,
+  "playwright_workers": 1,
+  "playwright_retries": 0,
+  "ui_checks": 146,
+  "suites": [
+    {
+      "suite": "endpoint-deletion",
+      "job": "publication-ui-20261010145208",
+      "checks": 19,
+      "scope": "独立 Reader/Writer 删除、lost 202 重放、依赖阻止、原密码重建、空分支和项目恢复",
+      "receipt": "endpoint-console-ui-attempt4"
+    },
+    {
+      "suite": "restore",
+      "job": "publication-ui-20261010193607",
+      "checks": 13,
+      "scope": "timestamp/LSN、历史 SQL/数据库/角色隔离、原失败项目复用、请求观察故障与冷醒",
+      "receipt": "endpoint-restore-regression-attempt3"
+    },
+    {
+      "suite": "lifecycle",
+      "job": "publication-ui-20261010194145",
+      "checks": 23,
+      "scope": "双 Reader WAL/只读/独立零与唤醒、服务关闭、保留删除/恢复、原 Operation 重试",
+      "receipt": "endpoint-lifecycle-regression-attempt1"
+    },
+    {
+      "suite": "data-api",
+      "job": "publication-ui-20261010194605",
+      "checks": 21,
+      "scope": "真实 PostgREST/RLS、主体隔离、缩零和请求唤醒、启用服务阻止 Writer 删除",
+      "receipt": "endpoint-dataapi-regression-attempt1"
+    },
+    {
+      "suite": "managed-auth",
+      "job": "publication-ui-20261010195003",
+      "checks": 23,
+      "scope": "实际注册/会话/JWT/JWKS、分支账户继承与会话隔离、RLS、自动零和登录唤醒",
+      "receipt": "endpoint-auth-regression-attempt1"
+    },
+    {
+      "suite": "object-storage",
+      "job": "publication-ui-20261010195432",
+      "checks": 19,
+      "scope": "真实 bytes/SHA、ACL/HEAD/Range/304、ETag 并发、父子隔离、保留恢复和冷醒",
+      "receipt": "endpoint-storage-regression-attempt1"
+    },
+    {
+      "suite": "native-product",
+      "job": "publication-ui-20261010200951",
+      "checks": 14,
+      "scope": "项目/纯数据分支/Writer、真实 Proxy SQL、分支隔离、监控、Worker 接续与 GET 故障",
+      "receipt": "endpoint-native-regression-attempt2"
+    },
+    {
+      "suite": "backend-credentials",
+      "job": "publication-ui-20261010201117",
+      "checks": 8,
+      "scope": "一次凭据、分支/模型范围、轮换、撤销、失权；不等于真实推理",
+      "receipt": "endpoint-credentials-regression-attempt1"
+    },
+    {
+      "suite": "console-invitations",
+      "job": "publication-ui-20261010201138",
+      "checks": 6,
+      "scope": "邀请注册、跨组织与 Viewer 负例、撤销；无 Compute",
+      "receipt": "endpoint-invitations-regression-attempt1"
+    }
+  ],
+  "recovery_checks": 23,
+  "recoveries": [
+    {
+      "purpose": "endpoint-deletion",
+      "job": "publication-ui-20261010144941",
+      "operation_id": "op_d705da98ae7d7d988d0493fc",
+      "checks": 6,
+      "receipt": "endpoint-original-operation-recovery-ui-attempt2"
+    },
+    {
+      "purpose": "historical-restore",
+      "job": "publication-ui-20261010150932",
+      "operation_id": "op_d54628ebe36ea30b368917c4",
+      "checks": 5,
+      "receipt": "endpoint-original-restore-recovery-ui-attempt2"
+    },
+    {
+      "purpose": "catalog-database",
+      "job": "publication-ui-20261010193502",
+      "operation_id": "op_b4eec787ad9883365f1aab55",
+      "checks": 6,
+      "receipt": "endpoint-original-catalog-recovery-ui-attempt2"
+    },
+    {
+      "purpose": "native-writer",
+      "job": "publication-ui-20261010200832",
+      "operation_id": "op_7ef4861403e1f20965e17489",
+      "checks": 6,
+      "receipt": "endpoint-original-native-recovery-ui-attempt1"
+    }
+  ],
+  "secrets_included": false,
+  "failed_attempts_retained": true,
+  "fork_runtime_changed": false
+}

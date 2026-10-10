@@ -8,6 +8,7 @@ test:
 web:
 	cd web && npm ci && npm run format:check && npm test && npm run build
 helm:
+	npm ci --prefix tools --ignore-scripts --no-audit --fund=false
 	bash tools/ci-helm.sh
 auth:
 	cd services/auth && npm ci --ignore-scripts --no-audit --fund=false && npm audit --audit-level=high && npm run typecheck && npm test

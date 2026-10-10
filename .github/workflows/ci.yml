@@ -76,6 +76,7 @@ jobs:
         with: {node-version: '24.19.0'}
       - run: bash tools/install-helm.sh "$RUNNER_TEMP/neon-helm"
       - run: echo "$RUNNER_TEMP/neon-helm" >> "$GITHUB_PATH"
+      - run: npm ci --prefix tools --ignore-scripts --no-audit --fund=false
       - run: bash tools/ci-helm.sh
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()

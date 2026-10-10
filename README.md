@@ -4,13 +4,13 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 许可证：Apache-2.0。项目由自托管维护者开发，与 Neon 托管服务独立。
 
 **发行状态：预览版本。已经验证的实验环境功能不等于生产认证，也不等于 Neon 官网全部 Backend 服务。**
-[当前 Object Storage 交付](docs/DELIVERY-2026-10-09-OBJECT-STORAGE.md)记录七镜像、统一 Helm 0.1.6、真实文件/分支/缩零 UI、串行回归和剩余门槛；[先前 Managed Auth](docs/DELIVERY-2026-10-08-MANAGED-AUTH.md)、[生命周期基线](docs/DELIVERY-2026-10-08.md)与[历史交付](docs/DELIVERY-2026-10-07.md)保留先前版本证据。
-Chart 0.8.0 提供独立 API、Worker、Web 进程及可选 Data API、应用凭据、Console 邀请注册、历史分支恢复与保留删除；Worker 使用 PostgreSQL 领导租约。
+[当前 Compute 生命周期交付](docs/DELIVERY-2026-10-10-COMPUTE-LIFECYCLE.md)记录七镜像、统一 Helm 0.1.7、九套真实 Linux UI 共 146 项与 23 项原失败恢复检查；[先前 Object Storage](docs/DELIVERY-2026-10-09-OBJECT-STORAGE.md)、[Managed Auth](docs/DELIVERY-2026-10-08-MANAGED-AUTH.md)及历史报告保留各版本证据。
+Chart 0.8.1 提供独立 API、Worker、Web 进程及可选 Data API、应用凭据、Console 邀请注册、历史分支恢复、保留删除与独立 Compute 退休；Worker 使用 PostgreSQL 领导租约和只读 Runner observer。
 当前只允许一个 API 和一个 Worker，跨实例外部 fencing 与 HA 仍须独立验收。
 旧合并版本升级前必须执行 [停止/排空流程](docs/WORKER-SPLIT.md)。
 运行代码与实际合同见 [OpenAPI](contracts/openapi-v1.json)；本项目使用 `/api/v1`，未声称兼容托管 Neon `/api/v2`。
 
-[Object Storage REST v1](docs/OBJECT-STORAGE.md) 已增加真实分支文件服务；实际合同为 OpenAPI 0.10.0。现场验收按版本记录，仍未开放外部 S3 协议兼容。
+[Object Storage REST v1](docs/OBJECT-STORAGE.md) 已增加真实分支文件服务；当前完整合同为 OpenAPI 0.10.1。现场验收按版本记录，仍未开放外部 S3 协议兼容。
 
 ## 1. 功能范围
 
@@ -25,7 +25,7 @@ Chart 0.8.0 提供独立 API、Worker、Web 进程及可选 Data API、应用凭
 | 监控、Operation 步骤、错误与重试 | 已实现 | 长期指标持久化、SLO 告警、完整审计导出未完成 |
 | 分支 Managed Auth | Go/TS/React、真实 PG 与 Neon UI 注册/会话/JWT/克隆隔离/RLS/自动缩零通过 | 邮件/OAuth/MFA、完整身份管理、密钥轮换、全链路 TLS/HA 未完成；见本版交付 |
 | 时间点恢复到新分支 | 原生时间戳/LSN、存储保留租约、异步调谐、历史目录隔离、React UI | 默认禁用；仅受管理分支；原地恢复、Time Travel Assist、完整 Backend 一致性恢复未实现 |
-| 项目/分支保留删除 | 保护/依赖图、关闭 Proxy 和服务、回收 Compute、tombstone、七天项目恢复、React UI | 物理 GC 与跨实例栅栏未开放；仅就绪 managed 资源；详见 [删除手册](docs/RETAINED-DELETION.md) |
+| 项目/分支保留删除与独立 Compute 删除 | 保护/依赖图、关闭 Proxy 和服务、正常 Runner 回收、held tombstone、项目恢复、原密码重建与 React UI | 物理 GC、TTL、失败创建回收与跨实例栅栏未开放；详见 [删除手册](docs/RETAINED-DELETION.md)和本版交付 |
 | HA / DR | 部分租约与恢复工具 | 未通过独立故障域 HA/DR；历史新分支恢复不等于完整 DR |
 | 产品 Object Storage | Go REST Driver、独立受限 bucket、随分支目录、上传下载 UI、条件写入、预签名与保留恢复 | REST v1 真实 UI 19 项及原失败项目恢复 4 项通过；完整 S3/multipart/GC/HA/TLS 仍未完成 |
 | Functions、AI Gateway 推理 | 能力与服务模型预留，明确 disabled | 对应执行服务尚未实现；Functions 须符合 Node.js 24 microVM 隔离；推理需真实上游 |
@@ -54,7 +54,8 @@ docs/                 架构、对象模型、部署、测试、来源及生产�
 
 - [独立 Compute 删除、重建与保留数据](docs/ENDPOINT-DELETION.md)
 - [架构与模型](docs/ARCHITECTURE.md)
-- [86 个实际 API 操作](docs/API.md)
+- [87 个实际 API 操作](docs/API.md)
+- [原 Operation 恢复与未知 DDL 的受控修复](docs/OPERATION-RECOVERY.md)
 - [Linux 部署与回滚](docs/DEPLOYMENT.md)
 - [测试与交付标准](docs/TESTING.md)
 - [Fork 来源与镜像对应关系](docs/SOURCE-PROVENANCE.md)
