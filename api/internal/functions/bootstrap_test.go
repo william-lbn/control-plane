@@ -90,9 +90,11 @@ func TestBootstrapRejectsCredentialScopeAndTrustChanges(t *testing.T) {
 	if _, err := b.ManagerTLS(time.Now().Add(2 * time.Hour)); err == nil {
 		t.Fatal("expired identity accepted")
 	}
-	wrongInstance:=b
-	wrongInstance.Scope.InstanceID="fni_0000000000000009"
-	if _,err:=wrongInstance.ManagerTLS(time.Now());err==nil {t.Fatal("manager TLS identity accepted for another instance")}
+	wrongInstance := b
+	wrongInstance.Scope.InstanceID = "fni_0000000000000009"
+	if _, err := wrongInstance.ManagerTLS(time.Now()); err == nil {
+		t.Fatal("manager TLS identity accepted for another instance")
+	}
 	encoded, _ := json.Marshal(b)
 	if _, err := DecodeBootstrap(encoded); err != nil {
 		t.Fatal(err)
