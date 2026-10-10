@@ -1,6 +1,6 @@
 # 生产门槛与官网对齐
 
-状态截至 2026-10-09；这是一份缺口清单，未通过项不能被 Ready Pod 或 CI build 替代。
+状态截至 2026-10-10；这是一份缺口清单，未通过项不能被 Ready Pod 或 CI build 替代。
 
 ## 1. 已实现路径
 
@@ -22,11 +22,11 @@
 | 小数 CPU | 已支持的 bounds 只有整核 | Guest cgroup quota + SQL + 调度竞争/计量实测 |
 | 内存缩回 | 未通过完整 RAM 扩缩闭环 | Guest 状态、压力/回收、OOM 防护、SQL 持续和冷醒完整循环 |
 | 基础设施稳定性 | 同物理盘 VM 存在共同 I/O 竞争 | 分离故障域/IO、持续负载、etcd 延迟与错误预算 |
-| TLS / 网络 | Auth→Proxy 已实现显式 CA/证书名称验证及真实 TLS 正反例；浏览器、控制库、Storage 等仍有实验传输例外 | 域名、可信证书、verify-full、管理网络隔离及 NetworkPolicy |
+| TLS / 网络 | Auth→Proxy 已实现显式 CA/证书名称验证及真实 TLS 正反例；浏览器、控制库、Storage 等仍有实验传输例外 | 正确域名或 IP SAN、可信证书、verify-full、管理网络隔离及 NetworkPolicy；本地 CA 路径不依赖公网域名 |
 | 目录完整性 | rename/owner、外部 DDL 回收、默认身份迁移未完成 | API/UI 实际 PG 验证，密码轮换全部 Endpoint 冷醒/分支一致 |
 | 生命周期完整性 | 已有保护/依赖、保留删除、Compute 回收、tombstone、七天项目恢复代码；物理 GC、失败创建资源删除、TTL、独立 Endpoint 删除和原分支 reset 仍缺 | 按当前镜像验证 UI 正反例、服务关闭/凭据撤销、恢复/并发；物理 GC 与分布式栅栏另设 Gate |
 | 监控与运营 | 长期指标、告警、审计、容量/计量不足 | SLO、持久 TSDB、告警测试、预算与容量恢复 |
-| 发布供应链 | 镜像公开性和 registry 凭据需独立确认 | 固定 SHA/digest、SBOM/provenance、匿名拉取、回滚镜像保留 |
+| 发布供应链 | 当前七镜像已有同源码公开 CI、匿名 OCI/source 验证及三节点 digest 拉取；长期签名/证明消费策略仍需治理 | 固定 SHA/digest、SBOM/provenance、匿名拉取、回滚镜像保留及独立消费验证 |
 
 首个 e4fd1f3 发行三个镜像已由 Linux CI 发布，Linux 匿名 manifest/config 验证通过。
 后续源码每次修改仍须取得本次提交的独立回执；不能沿用旧版本通过结果。
@@ -35,7 +35,7 @@
 
 Managed Auth 已有 Go Driver、Better Auth 1.7.7 运行时、React UI、注册/会话/JWT/分支隔离与 PostgreSQL CI，详细见 [Auth 合同](MANAGED-AUTH.md)。真实 Neon UI 结果按版本交付报告记录；SMTP/OAuth/MFA、完整恢复/删除一致性、生产隔离与 HA 仍须独立实现/验收。
 
-产品 Object Storage 已实现分支目录、独立受限对象凭据、Go REST Driver、React UI、条件写入、签名下载和分支继承，详见 [Object Storage 合同](OBJECT-STORAGE.md)。当前是 `neon-object-rest-v1`；`d4549a8` Linux 现场 UI 19 项已通过，原失败项目另有 4 项恢复。实际版本与其余回归见 [当前交付](DELIVERY-2026-10-09-OBJECT-STORAGE.md)。外部 S3 协议兼容、多段上传、物理 GC、分布式网关隔离及 HA/DR 仍未完成。
+产品 Object Storage 已实现分支目录、独立受限对象凭据、Go REST Driver、React UI、条件写入、签名下载和分支继承，详见 [Object Storage 合同](OBJECT-STORAGE.md)。当前是 `neon-object-rest-v1`；`7162449` Linux 现场 UI 19 项已通过，原失败项目另有 4 项恢复。实际版本与其余回归见 [当前交付](DELIVERY-2026-10-09-OBJECT-STORAGE.md)。外部 S3 协议兼容、多段上传、物理 GC、分布式网关隔离及 HA/DR 仍未完成。
 
 Functions 和 AI Gateway 推理尚未实现服务。Data API 已有原生 Driver、
 异步生命周期、最小权限角色、PostgREST、UI 和 RLS 集成测试；默认禁用、仅实验传输开关。

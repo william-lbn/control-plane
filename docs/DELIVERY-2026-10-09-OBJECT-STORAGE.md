@@ -12,18 +12,20 @@ S3 协议、物理 GC、HA/DR、外部跨实例栅栏和全链路可信 TLS 未�
 
 | 输入 | 本次锁定值 |
 | --- | --- |
-| 实际运行控制源码 | `d4549a896be96189cc41d2dfb108a1c856030d31` |
-| 公开 Linux CI | [37938229207](https://github.com/william-lbn/control-plane/actions/runs/37938229207)，12 个 Job 成功 |
+| 实际运行控制源码 | `716244956d949120b319007affc1d31e5674540f` |
+| 公开 Linux CI | [37950048773](https://github.com/william-lbn/control-plane/actions/runs/37950048773)，12 个 Job 成功 |
 | 镜像 | 七个控制镜像；同一源码，GHCR/Docker Hub 同 OCI manifest；部署只用 digest |
 | 原生控制 Chart / API | `0.8.0` / OpenAPI `0.10.0`，58 paths / 86 operations |
-| 统一 Helm | `0.1.6`；选择 `locks/control-plane-d4549a8.json`，八阶段安装、十个独立 Chart |
+| 统一 Helm | `0.1.6`；选择 `locks/control-plane-7162449.json`，八阶段安装、十个独立 Chart |
 | metadata migration | `017_object_storage.sql`；用户分支目录是独立受限 SQL schema |
 | Neon / Autoscaling / PG | 原 fork 的 2026-09-30 固定发行，详见统一 Helm SOURCE-PROVENANCE |
 | 环境 | 三台 Linux/RKE2 实验节点、共同宿主 NVMe；非独立故障域 |
 
 本报告后续文档提交不自动改变运行镜像。复测先检查实际 digest/source label，
 不能把文档 HEAD 当作已部署应用源码。先前报告按其历史版本保留，本报告是当前
-Object Storage 增量入口。
+Object Storage 增量入口。最终升级 `unified-154246` 八阶段及完整 manifest/PVC/Secret
+审计成功；七镜像的 Linux 匿名校验与三节点 21 次 CRI digest 拉取均通过。
+此前 `d4549a8` 的现场通过记录保留原版本，不自动标成 `7162449` 的新回执。
 
 ## 2. 运行代码、模型和接口
 
@@ -88,21 +90,29 @@ GetObject/PutObject，不授予删除 blob 或管理权限。
 每个 suite 使用新 attempt，retries=0、workers=1；API 负例是 UI 流程的补充。
 每组末尾实际核对 managed VM/运行 runner 为零。密码、token、cookie 和 private
 fixture 没有进入公开报告/截图；原始失败也不覆盖。
+当前 `7162449` 八个切片共 126 项 UI/真实协议检查通过。基础产品的资源清理原
+失败仍保留，最终同一 Job/Pod UID 续观成功；此汇总是功能验收，非稳定性/SLO 准入。
+Job 名与原始时间用 UTC；本轮续验的用户日期为 2026-10-10（北京时间）。
 
 | Suite | 当前发行结果 | 核心验证 |
 | --- | --- | --- |
-| Object Storage | 19 通过；`publication-ui-20261009140350` | bytes/SHA、ACL/Range/HEAD/304、CAS/并发、父子隔离、冷醒、关闭/恢复/再启用 |
-| native-product | 14 通过；`publication-ui-20261009140617` | UI 创建/SQL/目录/冷醒/监控，Worker 故障接续，操作 GET 故障不重复 POST |
-| backend-credentials | 8 通过；`publication-ui-20261009140855` | 分支/模型范围、一次明文、重放、轮换、撤销；不等于真实 AI 推理 |
-| data-api | 本轮回执待登记 | 真实 PostgREST/RLS、双主体隔离、手动/自动零与请求冷醒 |
-| restore | 本轮回执待登记 | 历史新分支、当前目录不投射、幂等和保留边界 |
-| lifecycle | 本轮回执待登记 | 两 Reader 只读/WAL/独立零与冷醒、服务关闭、保留删除/恢复 |
-| console-invitations | 本轮回执待登记 | 受邀注册、跨组织负例、Viewer、撤销；不启动 Compute |
-| managed-auth | 本轮回执待登记；此前 6d558b0 回归 23 通过 | 实际账号/会话/JWT/RLS、原生继承、分支隔离、自动零/登录冷醒 |
+| Object Storage | `7162449` 19 通过；`publication-ui-20261010122440` | bytes/SHA、ACL/Range/HEAD/304、CAS/并发、父子隔离、冷醒、关闭/恢复/再启用 |
+| native-product | `7162449` UI 14 通过；`publication-ui-20261010122723`；清理 Gate 原失败保留，同 Job/Pod UID 后续只读续观为零并通过 | UI 创建/SQL/目录/冷醒/监控，Worker 故障接续，操作 GET 故障不重复 POST |
+| backend-credentials | `7162449` 8 通过；`publication-ui-20261010124541` | 分支/模型范围、一次明文、重放、轮换、撤销；不等于真实 AI 推理 |
+| data-api | `7162449` 20 通过；`publication-ui-20261010121250` | 真实 PostgREST/RLS、双主体隔离、手动/自动零与请求冷醒 |
+| restore | `7162449` 13 通过；`publication-ui-20261009154408` | 原失败项目复用、目录异步修复、时间/LSN、当前目录不投射、幂等和保留边界 |
+| lifecycle | `7162449` 23 通过；`publication-ui-20261010120808` | 两 Reader 只读/WAL/独立零与冷醒、服务关闭、保留删除/恢复及原 Operation 失败重试 |
+| console-invitations | `7162449` 6 通过；`publication-ui-20261010122324` | 受邀注册、跨组织负例、Viewer、撤销；不启动 Compute |
+| managed-auth | `7162449` 23 通过；`publication-ui-20261010121730` | 实际账号/会话/JWT/RLS、原生继承、分支隔离、自动零/登录冷醒 |
 
 Worker 受控中断期间原创建 Operation `op_289ddbf779d0de02aa1ae53b` queued；
 恢复后 Worker epoch 77→78，原 Operation 成功。该场景验证独立进程接续，不是
 多副本 HA、节点故障或跨实例外部栅栏认证。
+
+2026-10-10（北京时间）继续串行回归。生命周期恢复的终态故障是明确的 operator
+注入；UI 在原 Operation 内恢复，不把注入故障称为自然节点故障。测试结束正常
+停止全部运行实例，再按通过回执确名保留删除，记录 held tombstone 与恢复期限；
+所有数据库/WAL/blob、原身份和证据保留，物理 GC 仍未启用。
 
 ### 4.3 原始失败和恢复保留
 
@@ -116,7 +126,7 @@ Worker 受控中断期间原创建 Operation `op_289ddbf779d0de02aa1ae53b` queue
    头，由 NGINX 提供唯一值，保留应用文件的 sandbox CSP；没有放宽断言。
 4. 原 Job `publication-ui-20261009131515` 与项目 `prj_755cce96dbc9bcc6` 原失败保留。
    `publication-ui-20261009132654` 用原项目/父子分支完成 4 项恢复，不新建替代资源。
-   后续 `6d558b0` 的 19 项和当前 `d4549a8` 的 19 项各有独立回执。
+   后续 `6d558b0` 的 19 项和当时 `d4549a8` 的 19 项各有独立回执。
 5. Data API 的 `publication-ui-20261009141217` 在 15 项通过后，冷醒返回真实
    PGRST000/503。只读采集也失去 Kubernetes 连接；恢复观察原 Pod UID 得到原
    浏览器失败，未重新提交任何业务动作。三个 dedicated etcd 日志尾部样本在
@@ -137,6 +147,8 @@ Worker 受控中断期间原创建 Operation `op_289ddbf779d0de02aa1ae53b` queue
 
 按用户方向，本次暂不调优宿主硬件、不并发进行压力测试；保留硬件限制和失败，
 继续串行功能验证。两组恢复成功仍不把两次完整 Data API 失败改写为成功。
+2026-10-10 后续完整新 attempt `publication-ui-20261010121250` 通过全部 20 项，
+包含自动空闲缩零后的真实 Data API 冷醒；原两次失败和对应恢复回执仍分别保留。
 
 ### 独立目录 UI 缺陷
 
@@ -149,15 +161,33 @@ Operation 已 succeeded，但等待目录刷新时输入的数据库名称被无
 修复只清理实际提交的表单及仍相等的旧字段，保留其他表单和后续编辑；敏感密码
 也只清理对应的已提交动作。新增 live 测试显式延迟只读刷新，验证名称仍保留。
 原项目正常 suspend，数据/原失败保留；恢复模式在同一项目新建唯一探测表及新
-历史目标点，旧表和历史回执不改写。新的七镜像发行与恢复回执单独登记后再放行。
+历史目标点，旧表和历史回执不改写。新发行 `7162449` 已通过全部公开 CI、匿名
+registry、21 次节点拉取及八阶段升级/审计。`publication-ui-20261009154408` 在同一
+项目通过 13 项恢复，包括显式延迟目录刷新时数据库名称保留；时间点/LSN 两种历史
+数据恢复、目录隔离、恢复 Endpoint 冷醒、重放与窗口负例均通过，最终 VM/runner 为零。
 
 ## 5. 资源、复测与交接
 
 基础组件保持资源预留，suite 串行，不并发编译、拉取、压测与真实 SQL。停止 Compute
 不释放组织 50 项目逻辑配额；只对确名、具有通过回执的自有测试 fixture 正常解除
 保护/CAS 保留删除，记录 recover_until 与 held tombstone，保留所有数据和 evidence。
+最终清理 `storage-quality-cleanup-attempt2` 归档并按 UID/resourceVersion 前置条件
+退休 31 个自有终态测试 Job，115 个已不存在；未删除 SQL/WAL/blob/PVC/Secret。
 Endpoint desired=active 表示可接受后续冷醒；observed=suspended 加 VM/runner 缺失
 才是 Compute 为零。不要修改 metadata 把两种状态强行改成相同。
+
+2026-10-10 基础产品 UI Job `publication-ui-20261010122723` 的 14 项通过，原创建
+Operation `op_79353f154422382dec880dce` 在 Worker epoch 88→89 后接续成功。
+最终清理观察仍见旧 Runner `cp-a74568638df31b53-hrhjs`，原 UID
+`c768ed64-d101-4636-b92a-d3099ee4d112`，已处于 Terminating；因此总采集回执为失败。
+同 Job/Pod UID 的只读续观也未在其 120 秒内收敛，不覆盖原失败。node2 API 曾拒绝
+连接，12:27 UTC 后 dedicated etcd 尾部样本 53 次慢 fdatasync，最大 12.503 秒，
+仍约 9 GiB 可用内存。后续 CRI 按原 Pod UID 证明运行容器已经不存在，VM 也为零；
+Kubernetes Pod 记录回收仍须单独通过，不把 CRI 零视为全部 Kubernetes 清理成功。
+操作者没有强制删除 Pod、重启 RKE2 或改写清理时限；硬件/节点稳定性暂后置。
+`storage-native2-original-observation-attempt2` 对同一原 Job/Pod UID 的后续只读观察
+成功，原 14 项 UI 结果不重跑，全部 VM/Runner 记录已正常收敛为零，三节点/控制面
+重新 Ready。原清理失败与第一次续观失败仍保留；不据此批准资源回收延迟 SLO。
 
 受信 Linux 的自动步骤见 [TESTING.md](TESTING.md)，手工对象流程及协议例外见
 [OBJECT-STORAGE.md](OBJECT-STORAGE.md)，完整安装/回滚/容量诊断见统一 Helm runbook。

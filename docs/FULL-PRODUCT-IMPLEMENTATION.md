@@ -1,6 +1,6 @@
-> 2026-10-09 code increment: [Object Storage REST v1](OBJECT-STORAGE.md) defines the implemented boundary. S3/multipart/GC and Functions remain implementation gates. The broad contracts below remain a target where their Driver is absent.
+> 2026-10-09/10 code increment: [Object Storage REST v1](OBJECT-STORAGE.md) defines the implemented boundary. Current registered API is OpenAPI 0.10.0 (58 paths / 86 operations), migration 017. [Current delivery](DELIVERY-2026-10-09-OBJECT-STORAGE.md) identifies the actual source/image and serial UI receipts. S3/multipart/GC and Functions remain implementation gates. The broad contracts below remain a target where their Driver is absent.
 
-> 当前代码增量说明（2026-10-08）：[Managed Auth v1](MANAGED-AUTH.md) 已有 Go/TS/React/Helm 实现与 Linux 开发验证。本文后面的未来 API 与完整 Backend 设计仍是规划；实际注册的接口以 OpenAPI 0.9.0 为准，真实 Neon UI 以交付报告为准。Better Auth 1.4.18 是原网站快照的起点，本次锁定并测试的实际运行库为 1.7.7。
+> 历史代码增量说明（2026-10-08）：[Managed Auth v1](MANAGED-AUTH.md) 已有 Go/TS/React/Helm 实现；当时 API 版本为 0.9.0，当前合同见上面的 0.10.0。本文后面的未来 API 与完整 Backend 设计仍是规划，真实 Neon UI 以对应版本交付报告为准。Better Auth 1.4.18 是原网站快照的起点，实际锁定并测试的运行库为 1.7.7。
 
 # 完整产品实施合同与验收顺序
 
@@ -24,7 +24,7 @@ API/Worker 拆分已有源码和 Chart，验收方法见 WORKER-SPLIT.md。
 
 | 目标服务 | 官网语义 | 实现选择与约束 |
 | --- | --- | --- |
-| Managed Better Auth | 身份、会话、OAuth/JWKS 等在 neon_auth；分支 URL 与 token 隔离 | 固定 Better Auth 1.4.18 兼容起点；独立 TS 服务，Go 控制与配置；不手写 OAuth/password 协议 |
+| Managed Better Auth | 身份、会话、OAuth/JWKS 等在 neon_auth；分支 URL 与 token 隔离 | 实际锁定 Better Auth 1.7.7；独立 TS 服务，Go 控制与配置；不手写 OAuth/password 协议；外部 OAuth/SMTP 另验 |
 | Data API | PostgREST compatible、JWT、RLS、HTTP 无长期 TCP | 独立 PostgREST 数据服务；非 owner/non-BYPASSRLS 连接、issuer/audience/JWKS 与 schema allowlist |
 | Functions | Node.js 24 JS/TS、microVM per isolate、长期服务、SSE/WS、cron/object trigger、随分支部署 | Go 调谐不可变 bundle；独立 Node runtime 与 microVM 隔离、egress/limits、调度/事件幂等与日志；普通共享控制服务进程执行不满足隔离目标 |
 | Object Storage | S3 compatible、private/public_read、预签名、文件视图随分支 | 产品桶与 Pageserver 桶分开；不可变 blobs + 随 PG Timeline 克隆的对象清单；S3 协议 Driver |
