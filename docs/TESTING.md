@@ -1,5 +1,9 @@
 # 测试与交付标准
 
+独立 Compute 删除增量使用 `web/e2e/endpoint-deletion.spec.ts`，手动步骤与实际 API
+合同见 [ENDPOINT-DELETION.md](ENDPOINT-DELETION.md)。从登录/点击验证丢失 202 后
+的原请求重放、服务依赖、Writer/Reader 连续性、完全无 Compute 后重建和项目恢复。
+
 ## 1. Linux CI
 
 普通 GitHub CI 不访问真实集群或用户凭据。

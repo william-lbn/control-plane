@@ -83,6 +83,12 @@ slice of item 7, not its full S3/GC contract. The exact current regression matri
 retained failures and environment boundary are in
 [the current delivery](DELIVERY-2026-10-09-OBJECT-STORAGE.md).
 
+The independent Compute deletion increment in
+[ENDPOINT-DELETION.md](ENDPOINT-DELETION.md) first closes a remaining part of
+item 2: owned VM/Runner retirement, branch data retention, replacement credentials,
+dependency blocking and exact Operation replay. Physical GC/TTL and external
+fencing remain independent gates; live acceptance is reported separately.
+
 The next local service implementation is item 8: actual isolated Functions,
 following `content/docs/compute/functions/overview.md` (snapshot update
 2026-09-22) and `reference/runtime-limits.md` (2026-09-16). A Node.js process in

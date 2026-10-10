@@ -52,6 +52,7 @@ docs/                 架构、对象模型、部署、测试、来源及生产�
 .github/              Linux 质量 CI、镜像发布、受保护的 live UI workflow
 ```
 
+- [独立 Compute 删除、重建与保留数据](docs/ENDPOINT-DELETION.md)
 - [架构与模型](docs/ARCHITECTURE.md)
 - [86 个实际 API 操作](docs/API.md)
 - [Linux 部署与回滚](docs/DEPLOYMENT.md)

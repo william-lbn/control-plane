@@ -1,5 +1,9 @@
 # 项目、分支保护与保留删除
 
+独立 Compute 删除的新增合同见 [ENDPOINT-DELETION.md](ENDPOINT-DELETION.md)。
+迁移 018 扩展 Endpoint tombstone 与 admission；项目恢复不复活之前单独删除的
+Endpoints。下文迁移 014 是项目/分支生命周期的起点。
+
 ## 1. 范围与官方语义
 
 本实现提供 Go API/Worker、PostgreSQL 迁移 014、Console UI、依赖图、

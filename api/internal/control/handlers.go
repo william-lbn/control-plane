@@ -136,6 +136,7 @@ func (s *server) routes() *http.ServeMux {
 	mux.Handle("GET /api/v1/projects/{project}/endpoints", s.auth(http.HandlerFunc(s.endpoints), false))
 	mux.Handle("POST /api/v1/projects/{project}/endpoints", s.auth(http.HandlerFunc(s.createEndpoint), true))
 	mux.Handle("GET /api/v1/projects/{project}/endpoints/{endpoint}", s.auth(http.HandlerFunc(s.endpoint), false))
+	mux.Handle("DELETE /api/v1/projects/{project}/endpoints/{endpoint}", s.auth(http.HandlerFunc(s.deleteEndpoint), true))
 	mux.Handle("GET /api/v1/projects/{project}/endpoints/{endpoint}/connection-info", s.auth(http.HandlerFunc(s.connectionInfo), false))
 	mux.Handle("GET /api/v1/projects/{project}/endpoints/{endpoint}/metrics", s.auth(http.HandlerFunc(s.metrics), false))
 	mux.Handle("GET /api/v1/projects/{project}/operations", s.auth(http.HandlerFunc(s.operations), false))
@@ -177,6 +178,7 @@ func (s *server) capabilities(w http.ResponseWriter, r *http.Request) {
 			"read_replicas":      map[string]any{"enabled": creationEnabled(), "reason": "safekeeper_streaming_validated"},
 			"project_delete":     map[string]any{"enabled": creationEnabled(), "reason": "retained_deletion_no_physical_gc"},
 			"branch_delete":      map[string]any{"enabled": creationEnabled(), "reason": "protected_leaf_retained_deletion"},
+			"endpoint_delete":    map[string]any{"enabled": creationEnabled(), "reason": "owned_compute_retirement_branch_data_retained"},
 			"pitr_new_branch":    map[string]any{"enabled": pitrEnabled(), "reason": "retained_timestamp_or_lsn_new_branch"},
 		},
 		"services": map[string]any{"postgres": map[string]any{"enabled": true, "reason": "read_and_query_validated"},

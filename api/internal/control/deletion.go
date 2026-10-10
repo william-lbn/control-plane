@@ -62,7 +62,7 @@ func (s *server) lifecycleOverview(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 503, "metadata_unavailable", "Could not read tombstones")
 		return
 	}
-	ids, err := s.many(r.Context(), `SELECT id FROM operations WHERE project_id=$1 AND action IN ('delete_project','delete_branch','recover_project') ORDER BY created_at DESC LIMIT 100`, r.PathValue("project"))
+	ids, err := s.many(r.Context(), `SELECT id FROM operations WHERE project_id=$1 AND action IN ('delete_project','delete_branch','delete_endpoint','recover_project') ORDER BY created_at DESC LIMIT 100`, r.PathValue("project"))
 	if err != nil {
 		fail(w, r, 503, "metadata_unavailable", "Could not read lifecycle Operations")
 		return

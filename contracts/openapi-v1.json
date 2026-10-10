@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.10.0",
+    "version": "0.10.1",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -2196,7 +2196,8 @@
             "type": "string",
             "enum": [
               "project",
-              "branch"
+              "branch",
+              "endpoint"
             ]
           },
           "resource_id": {
@@ -2521,6 +2522,21 @@
           "sha256",
           "size"
         ]
+      },
+      "EndpointDeletionConfirmation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "confirm_selector"
+        ],
+        "properties": {
+          "confirm_selector": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "description": "Exact current Endpoint Selector, not the branch name"
+          }
+        }
       }
     },
     "responses": {
@@ -3435,7 +3451,8 @@
             "$ref": "#/components/responses/Error"
           }
         },
-        "operationId": "createEndpoint"
+        "operationId": "createEndpoint",
+        "description": " A replacement writer after independent endpoint deletion requires the existing branch SQL password and reuses retained role/probe verifiers, preserving active read replicas; mismatched password returns 422 branch_password_mismatch. Endpoint creation does not rotate branch roles."
       }
     },
     "/api/v1/projects/{project}/endpoints/{endpoint}": {
@@ -3587,6 +3604,141 @@
         },
         "description": "Queues an idempotent autoscaling soft-bounds update. Reconciliation validates endpoint ownership and immutable NeonVM capacity, persists the Proxy cold-wake template with Secret resourceVersion compare-and-swap, then patches the live VM with UID/resourceVersion checks and verifies the resume template before committing endpoint metadata. Suspended endpoints update their resume template without waking compute. A live VM whose current allocation exceeds the requested maximum rejects the operation; the requested bounds must fit its immutable hard min/max. Partial external failure marks the Operation failed/retryable rather than committing success, and retry converges the same desired bounds. Connection fencing and cross-instance lifecycle races remain an independent production gate.",
         "operationId": "updateEndpoint"
+      },
+      "delete": {
+        "operationId": "DeleteEndpoint",
+        "summary": "Retire one managed Compute while preserving its branch and other Computes",
+        "tags": [
+          "Compute"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/endpoint"
+          },
+          {
+            "$ref": "#/components/parameters/resourceVersion"
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found in current tenant",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Endpoint or parent not ready, active Operation, dependent service or idempotency conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Resource version changed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Exact selector confirmation or input invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "Quoted If-Match required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Metadata or driver unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Accepted persistent lifecycle Operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EndpointDeletionConfirmation"
+              }
+            }
+          }
+        },
+        "description": "Editor/Admin only. A quoted current endpoint version, stable Idempotency-Key and exact selector confirmation are required. Ready managed endpoint and no active project Operation; dependent Data API/Auth/Object Storage services must be disabled first. Admission closes synchronously. A leased Worker closes only this Proxy route using resourceVersion CAS, deletes the owned NeonVM using UID/resourceVersion preconditions, waits for Runner garbage collection, then persists a retained endpoint tombstone. No timeline, role, database, blob, credential Secret or other endpoint is deleted. Replaying the original request returns the same Operation even after deletion; retry uses the original failed Operation. A replacement endpoint has a new selector and reuses branch SQL credentials. This is not physical data GC or distributed connection fencing."
       }
     },
     "/api/v1/projects/{project}/endpoints/{endpoint}/connection-info": {

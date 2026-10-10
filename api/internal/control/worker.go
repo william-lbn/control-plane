@@ -98,6 +98,15 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 			}
 		}()
 		switch action {
+		case "delete_endpoint":
+			var p endpointDeletionPayload
+			stepErr = json.Unmarshal(payload, &p)
+			if stepErr == nil && (p.ProjectID != projectID || p.EndpointID != resourceID) {
+				stepErr = errors.New("endpoint deletion operation scope mismatch")
+			}
+			if stepErr == nil {
+				stepErr = s.reconcileEndpointDeletion(runCtx, id, workerID, p)
+			}
 		case "enable_object_storage", "disable_object_storage":
 			var p objectStoragePayload
 			stepErr = json.Unmarshal(payload, &p)

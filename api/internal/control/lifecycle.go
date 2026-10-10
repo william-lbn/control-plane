@@ -254,7 +254,7 @@ func (s *server) endpointLifecycle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	tag, err := s.db.Exec(r.Context(), `UPDATE endpoints SET scale_to_zero=$3,idle_timeout_seconds=$4,
-		version=version+1,updated_at=now() WHERE id=$1 AND project_id=$2 AND version=$5`,
+		version=version+1,updated_at=now() WHERE id=$1 AND project_id=$2 AND version=$5 AND state='active' AND deleted_at IS NULL`,
 		r.PathValue("endpoint"), r.PathValue("project"), body.ScaleToZero, body.IdleTimeoutSeconds, item["version"])
 	if err != nil {
 		fail(w, r, 503, "metadata_unavailable", "Could not update lifecycle")

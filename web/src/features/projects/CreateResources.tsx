@@ -421,7 +421,10 @@ export function CreateResource({
                   }}
                 />
                 <small>
-                  创建后请保存。控制数据库和 Operation 不保存明文，页面在请求受理后清空输入。
+                  {kind === 'endpoint'
+                    ? '重建已有分支的读写 Compute 时，请使用原数据库角色密码。创建计算不会轮换数据库密码。'
+                    : '创建后请保存。'}
+                  控制数据库和 Operation 不保存明文，页面在请求受理后清空输入。
                 </small>
               </label>
             )}

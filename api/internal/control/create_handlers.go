@@ -505,9 +505,13 @@ func (s *server) createEndpoint(w http.ResponseWriter, r *http.Request) {
 			credentialErr = s.kube.reserveReplicaCredentials(r.Context(), p.ProjectID, p.EndpointID, writerID)
 		}
 	} else {
-		credentialErr = s.kube.reserveCredentials(r.Context(), p.ProjectID, p.EndpointID, body.Password)
+		credentialErr = s.reserveEndpointCredentials(r.Context(), p, body.Password)
 	}
 	if credentialErr != nil {
+		if errors.Is(credentialErr, errBranchPasswordMismatch) {
+			fail(w, r, 422, "branch_password_mismatch", "Use the existing branch SQL password; creating a replacement compute does not rotate database roles")
+			return
+		}
 		fail(w, r, 503, "credential_unavailable", "Could not reserve endpoint credentials")
 		return
 	}
@@ -518,7 +522,14 @@ func (s *server) createEndpoint(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(r.Context())
 	var ready string
-	err = tx.QueryRow(r.Context(), "SELECT state FROM branches WHERE id=$1 AND project_id=$2 FOR UPDATE", p.BranchID, p.ProjectID).Scan(&ready)
+	err = tx.QueryRow(r.Context(), "SELECT state FROM projects WHERE id=$1 AND deleted_at IS NULL FOR UPDATE", p.ProjectID).Scan(&ready)
+	if err == nil && ready != "ready" {
+		fail(w, r, 409, "project_not_ready", "Project is not ready")
+		return
+	}
+	if err == nil {
+		err = tx.QueryRow(r.Context(), "SELECT state FROM branches WHERE id=$1 AND project_id=$2 FOR UPDATE", p.BranchID, p.ProjectID).Scan(&ready)
+	}
 	if err == nil {
 		var pending bool
 		err = tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM operations WHERE resource_type='branch_catalog'

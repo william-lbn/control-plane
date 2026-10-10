@@ -4,6 +4,7 @@ import type { Endpoint, Operation } from '../../api';
 import { fmt, stateLabel, status, PageHeading } from '../../shared/ui';
 import { useEndpointSelection } from '../../shared/useEndpointSelection';
 import { newRequestKey } from '../../shared/requestKey';
+import { DeleteEndpoint } from './DeleteEndpoint';
 
 export function Compute({
   projectId,
@@ -29,6 +30,7 @@ export function Compute({
   const [scaleToZero, setScaleToZero] = useState(false);
   const [idleTimeout, setIdleTimeout] = useState(300);
   const [busy, setBusy] = useState(false);
+  const [deleting, setDeleting] = useState<Endpoint | null>(null);
   useEffect(() => {
     if (!endpoint) return;
     setMinCPU(endpoint.min_cpu_milli || 1000);
@@ -134,6 +136,14 @@ export function Compute({
           </select>
         </label>
       </div>
+      {!endpoint && (
+        <section className="panel pad">
+          <h2>分支数据已保留，当前没有 Compute</h2>
+          <p className="muted">
+            添加 Compute 后可以重新连接数据库。新的 Compute 使用新的连接地址。
+          </p>
+        </section>
+      )}
       {endpoint && (
         <>
           <div className="stats-grid">
@@ -301,7 +311,35 @@ export function Compute({
               </div>
             </section>
           </div>
+          <section className="panel pad">
+            <div className="panel-heading">
+              <div>
+                <h2>删除 Compute</h2>
+                <p className="muted">关闭此计算地址并回收运行资源，保留分支数据和其他 Compute。</p>
+              </div>
+              <button
+                className="button danger"
+                disabled={
+                  readOnly ||
+                  busy ||
+                  endpoint.state !== 'active' ||
+                  endpoint.workload_kind !== 'neonvm'
+                }
+                onClick={() => setDeleting(endpoint)}
+              >
+                删除此 Compute
+              </button>
+            </div>
+          </section>
         </>
+      )}
+      {deleting && (
+        <DeleteEndpoint
+          projectId={projectId}
+          endpoint={deleting}
+          onDeleted={onChanged}
+          onClose={() => setDeleting(null)}
+        />
       )}
     </>
   );

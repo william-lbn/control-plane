@@ -1,3 +1,5 @@
+> 2026-10-10 Compute 生命周期增量：[独立 Endpoint 删除与重建](ENDPOINT-DELETION.md) 提供迁移 018、OpenAPI 0.10.1（58 paths / 87 operations）、Go/React 实现；当前现场部署与验收以该增量交付报告为准。
+
 > 2026-10-09/10 code increment: [Object Storage REST v1](OBJECT-STORAGE.md) defines the implemented boundary. Current registered API is OpenAPI 0.10.0 (58 paths / 86 operations), migration 017. [Current delivery](DELIVERY-2026-10-09-OBJECT-STORAGE.md) identifies the actual source/image and serial UI receipts. S3/multipart/GC and Functions remain implementation gates. The broad contracts below remain a target where their Driver is absent.
 
 > 历史代码增量说明（2026-10-08）：[Managed Auth v1](MANAGED-AUTH.md) 已有 Go/TS/React/Helm 实现；当时 API 版本为 0.9.0，当前合同见上面的 0.10.0。本文后面的未来 API 与完整 Backend 设计仍是规划，真实 Neon UI 以对应版本交付报告为准。Better Auth 1.4.18 是原网站快照的起点，实际锁定并测试的运行库为 1.7.7。
