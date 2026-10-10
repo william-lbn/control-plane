@@ -31,6 +31,7 @@ export function Workbench({
   }, [endpoint?.id]);
   async function execute() {
     if (!endpoint) return;
+    const submittedPassword = password;
     setBusy(true);
     setResult(null);
     try {
@@ -39,10 +40,12 @@ export function Workbench({
         body: JSON.stringify({ password, sql, role, database }),
       });
       setResult(data);
-      setPassword('');
     } catch (e) {
       showError(e);
     } finally {
+      // Passwords are single-request input, including rejected SQL/network
+      // errors. Preserve a different value entered while the request waited.
+      setPassword((current) => (current === submittedPassword ? '' : current));
       setBusy(false);
     }
   }

@@ -84,7 +84,7 @@ test('UI independent Compute deletion, lost reply, replica continuity and retain
     await expect(page.locator('.create-modal')).not.toBeVisible({ timeout: 480000 });
     return value.resource.id as string;
   }
-  async function sql(endpoint: string, statement: string) {
+  async function sql(endpoint: string, statement: string, expectedStatus = 200) {
     await page.goto(`/#/projects/${project}/query`);
     await page.locator('select').first().selectOption(endpoint);
     await page.getByLabel('SQL 查询').fill(statement);
@@ -95,7 +95,8 @@ test('UI independent Compute deletion, lost reply, replica continuity and retain
     );
     await page.getByRole('button', { name: '▶ 执行 SQL', exact: true }).click();
     const response = await pending;
-    expect(response.status()).toBe(200);
+    await expect(page.locator('input[type="password"]')).toHaveValue('');
+    expect(response.status()).toBe(expectedStatus);
     return response.json();
   }
   async function createEndpoint(type: 'read_only' | 'read_write') {
@@ -180,11 +181,16 @@ test('UI independent Compute deletion, lost reply, replica continuity and retain
     const writer = original.id as string;
     branch = original.branch_id;
     endpoints.add(writer);
+    // The SQL workbench uses a single prepared statement per request.
     await sql(
       writer,
-      "CREATE TABLE public.endpoint_retention_probe(id int PRIMARY KEY, value text); INSERT INTO public.endpoint_retention_probe VALUES(1,'retained'); GRANT CREATE ON DATABASE postgres TO control_probe",
+      'CREATE TABLE public.endpoint_retention_probe(id int PRIMARY KEY, value text)',
     );
+    await sql(writer, "INSERT INTO public.endpoint_retention_probe VALUES(1,'retained')");
+    await sql(writer, 'GRANT CREATE ON DATABASE postgres TO control_probe');
     await record('ui_created_native_project_and_persisted_branch_sql');
+    expect((await sql(writer, 'SELECT 1; SELECT 2', 422)).code).toBe('sql_failed');
+    await record('ui_rejected_multi_statement_query_clears_single_request_password');
     const reader1 = await createEndpoint('read_only');
     const reader2 = await createEndpoint('read_only');
     expect(
