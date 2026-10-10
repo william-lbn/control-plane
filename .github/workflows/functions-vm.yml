@@ -48,6 +48,13 @@ jobs:
           fi
           { echo 'tags<<TAGS'; printf '%s\n' "$task_tags"; echo TAGS; } >> "$GITHUB_OUTPUT"
           node tools/build-args.mjs >> "$GITHUB_OUTPUT"
+          node --input-type=module - <<'NODE' >> "$GITHUB_OUTPUT"
+          import fs from 'node:fs';
+          const l = JSON.parse(fs.readFileSync('containers/functions.lock.json'));
+          if (!/^[a-z0-9./-]+@sha256:[a-f0-9]{64}$/.test(l.node_image) || !/^\d{8}T\d{6}Z$/.test(l.debian_snapshot)) throw Error('Unpinned carrier input');
+          console.log(`FUNCTIONS_NODE_BUILDER_IMAGE=${l.node_image}`);
+          console.log(`DEBIAN_SNAPSHOT=${l.debian_snapshot}`);
+          NODE
       - uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772
         with: {registry: ghcr.io, username: '${{ github.actor }}', password: '${{ secrets.GITHUB_TOKEN }}'}
       - uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772
@@ -63,7 +70,9 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: ${{ steps.names.outputs.tags }}
-          build-args: NODE_BUILDER_IMAGE=${{ steps.names.outputs.NODE_BUILDER_IMAGE }}
+          build-args: |
+            NODE_BUILDER_IMAGE=${{ steps.names.outputs.FUNCTIONS_NODE_BUILDER_IMAGE }}
+            DEBIAN_SNAPSHOT=${{ steps.names.outputs.DEBIAN_SNAPSHOT }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
@@ -89,4 +98,6 @@ jobs:
             artifacts/functions-vm/source-commit.txt
             artifacts/functions-vm/guest-packages.txt
             artifacts/functions-vm/inittab.actual
+            artifacts/functions-vm/carrier-contract.log
+            artifacts/functions-vm/carrier-packages.txt
           retention-days: 90

@@ -2,6 +2,20 @@ ARG NODE_BUILDER_IMAGE
 FROM ${NODE_BUILDER_IMAGE}
 # Only the qcow2 carrier runs in the image-loader init container. Guest execution
 # uses its own rootfs, root supervisor and dropped-privilege Node child.
+ARG DEBIAN_SNAPSHOT
+USER root
+# Own NeonVM's immutable controller executes sh/mv/chown/sysctl in this carrier.
+# Install procps from the same signed, dated archive as the guest, then exercise
+# that exact loader command in disposable Linux CI before publication.
+RUN test -n "$DEBIAN_SNAPSHOT" && \
+    . /etc/os-release && test "$VERSION_CODENAME" = bookworm && \
+    rm -f /etc/apt/sources.list.d/debian.sources && \
+    printf 'deb [check-valid-until=no] http://snapshot.debian.org/archive/debian/%s/ bookworm main\n' "$DEBIAN_SNAPSHOT" > /etc/apt/sources.list && \
+    apt-get -o Acquire::Retries=3 update && \
+    apt-get install -y --no-install-recommends procps && \
+    dpkg-query -W -f='${Package}\t${Version}\t${Architecture}\n' > /carrier-packages.txt && \
+    rm -rf /var/lib/apt/lists/* && \
+    command -v sh && command -v mv && command -v chown && command -v sysctl
 COPY disk.qcow2 /disk.qcow2
 COPY guest-packages.txt /guest-packages.txt
 COPY functions-build-inputs.json /functions-build-inputs.json

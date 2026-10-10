@@ -55,4 +55,15 @@ printf '%s\n' "$FUNCTIONS_SOURCE_COMMIT" > "$task_output/source-commit.txt"
 mkdir "$task_output/carrier"
 cp "$task_output/disk.qcow2" "$task_output/guest-packages.txt" "$task_output/carrier/"
 cp containers/functions.lock.json "$task_output/carrier/functions-build-inputs.json"
+# The carrier is also part of the NeonVM startup contract. Exercise the exact
+# own-controller loader command in a disposable network namespace before push;
+# no customer bundle is executed by this privileged, isolated CI check.
+task_carrier="neon-functions-carrier-verified:$FUNCTIONS_SOURCE_COMMIT"
+docker build --platform linux/amd64 -f Dockerfile.functions-vm \
+  --build-arg "NODE_BUILDER_IMAGE=$task_node" \
+  --build-arg "DEBIAN_SNAPSHOT=${task_inputs[4]}" -t "$task_carrier" "$task_output/carrier"
+docker run --rm --privileged --network none --entrypoint /bin/sh "$task_carrier" -ec \
+  'mkdir -p /vm/images; mv /disk.qcow2 /vm/images/rootdisk.qcow2 && chown 36:34 /vm/images/rootdisk.qcow2 && sysctl -w net.ipv4.ip_forward=1; test -s /vm/images/rootdisk.qcow2; test "$(stat -c %u:%g /vm/images/rootdisk.qcow2)" = 36:34' \
+  > "$task_output/carrier-contract.log"
+docker run --rm --entrypoint /bin/cat "$task_carrier" /carrier-packages.txt > "$task_output/carrier-packages.txt"
 # Large intermediate files are CI-local and are deliberately not published.

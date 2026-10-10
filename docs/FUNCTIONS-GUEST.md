@@ -111,7 +111,11 @@ Node base 已通过匿名 registry manifest SHA256 验证。构建只能在 Linu
 3. 通过自有 vm-builder 创建 2G root disk，使用独立 SIGINT shutdown hook。
 4. 使用 qemu-img/debugfs 在 CI 离线替换 `/etc/inittab`；逐字比较写入结果并
    执行 e2fsck，拒绝只依据 debugfs 的 exit code 宣称成功。
-5. 生成 qcow2 SHA256、guest package/inittab/source receipt，再发布 carrier image。
+5. 生成 qcow2 SHA256、guest package/inittab/source receipt。carrier 从相同 Node
+   digest 和 Debian snapshot 安装 procps，并保留独立 carrier package 清单。
+6. 在 disposable Linux CI 独立 network namespace 内执行 own NeonVM 的实际
+   `mv /disk.qcow2 /vm/images/rootdisk.qcow2 && chown 36:34 ... && sysctl -w
+   net.ipv4.ip_forward=1` loader 合同，检查 disk 和 uid/gid，成功才允许发布。
 
 公开源 `2cd2f804` 的质量 CI `38086954494` 全部通过（454 Go/PostgreSQL，0 fail /
 0 skip）。首次 VM pipeline `38087496936` 完成 rootfs、qcow2、inittab compare/
@@ -119,6 +123,15 @@ e2fsck，发布 carrier 的 COPY 被默认 artifact 排除规则阻止；失败�
 已改为显式 `artifacts/functions-vm/carrier` 独立构建上下文，只复制已封存的
 disk、公共 package 清单和锁文件，不放宽仓库的 private/artifact 排除规则。
 它不是成功发布或真实运行验收。
+
+后续源 `0e2a399a` 的质量 CI `38088020808` 全部成功，457 Go/PostgreSQL / 0 fail /
+0 skip；VM 发布 `38088613535` 成功，Docker Hub 匿名 manifest 和三节点 CRI
+digest 已核验。首次真实 VM UID `05cc4ec4-c07b-4661-9060-537c6c4bfa74`
+未进入 guest：实际 init 日志为 `sysctl: not found`，原因是 Debian slim carrier
+缺少 procps。已补齐 carrier 包和上述实际 loader CI 合同，尚待新镜像复测。
+原 init/pod/VM、失败探针、镜像摘要记录保留；该无业务数据的失败 VM 以 UID /
+resourceVersion 前置条件正常回收，bootstrap Secret/Service/全部文件保留。
+这次失败不算 manager、客户 Node、SQL 或 UI 验收。
 
 vm-builder 本身包含自己的 base image/tool 输入；其 digest 与来源锁已保留。
 其已有 Vector 下载没有新 checksum gate，最终 Function init 不启动 Vector。
