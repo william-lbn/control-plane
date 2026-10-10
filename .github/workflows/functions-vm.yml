@@ -34,7 +34,7 @@ jobs:
           const r = JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP + '/quality-run.json'));
           if (r.head_sha !== process.env.GITHUB_SHA || r.conclusion !== 'success' || r.name !== 'Linux quality and images' || r.event !== 'push' || r.head_branch !== 'main') throw Error('Exact source quality admission rejected');
           NODE
-      - uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
       - name: Prepare disposable Linux build tools
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends qemu-utils e2fsprogs
       - run: bash tools/build-functions-vm.sh

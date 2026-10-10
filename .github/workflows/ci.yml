@@ -156,7 +156,7 @@ jobs:
             echo "::notice::Docker Hub secrets absent; only GHCR publication can run"
           fi
           { echo 'tags<<TAGS'; printf '%s\n' "$task_tags"; echo TAGS; } >> "$GITHUB_OUTPUT"
-      - uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2 # v3.10.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772 # v3.4.0
         with: {registry: ghcr.io, username: '${{ github.actor }}', password: '${{ secrets.GITHUB_TOKEN }}'}
       - uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772
