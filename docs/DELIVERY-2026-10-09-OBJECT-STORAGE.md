@@ -23,7 +23,7 @@ S3 协议、物理 GC、HA/DR、外部跨实例栅栏和全链路可信 TLS 未�
 
 本报告后续文档提交不自动改变运行镜像。复测先检查实际 digest/source label，
 不能把文档 HEAD 当作已部署应用源码。先前报告按其历史版本保留，本报告是当前
-Object Storage 增量入口。最终升级 `unified-154246` 八阶段及完整 manifest/PVC/Secret
+Object Storage 增量入口。最终公开源码升级 `20261010/unified-125901` 八阶段及完整 manifest/PVC/Secret
 审计成功；七镜像的 Linux 匿名校验与三节点 21 次 CRI digest 拉取均通过。
 此前 `d4549a8` 的现场通过记录保留原版本，不自动标成 `7162449` 的新回执。
 
@@ -102,7 +102,7 @@ Job 名与原始时间用 UTC；本轮续验的用户日期为 2026-10-10（北�
 | data-api | `7162449` 20 通过；`publication-ui-20261010121250` | 真实 PostgREST/RLS、双主体隔离、手动/自动零与请求冷醒 |
 | restore | `7162449` 13 通过；`publication-ui-20261009154408` | 原失败项目复用、目录异步修复、时间/LSN、当前目录不投射、幂等和保留边界 |
 | lifecycle | `7162449` 23 通过；`publication-ui-20261010120808` | 两 Reader 只读/WAL/独立零与冷醒、服务关闭、保留删除/恢复及原 Operation 失败重试 |
-| console-invitations | `7162449` 6 通过；`publication-ui-20261010122324` | 受邀注册、跨组织负例、Viewer、撤销；不启动 Compute |
+| console-invitations | `7162449` 6 通过；最终公开源码升级后 `publication-ui-20261010130324` | 受邀注册、跨组织负例、Viewer、撤销；不启动 Compute |
 | managed-auth | `7162449` 23 通过；`publication-ui-20261010121730` | 实际账号/会话/JWT/RLS、原生继承、分支隔离、自动零/登录冷醒 |
 
 Worker 受控中断期间原创建 Operation `op_289ddbf779d0de02aa1ae53b` queued；
@@ -194,6 +194,24 @@ Kubernetes Pod 记录回收仍须单独通过，不把 CRI 零视为全部 Kuber
 自动化操作者需要自己已有的 Linux/Kubernetes 与管理员安全输入；公共 clone 不包含
 这些秘密，不能承诺无凭据访问原环境。API contract、锁和代码足以让其他维护者在
 授权环境复现；未知结果先观察原 Operation，不重新创建或自动重放 SQL。
+
+### 5.1 公开发行与部署复现
+
+[统一 Helm v0.1.6](https://github.com/william-lbn/neon-helm/releases/tag/v0.1.6)
+锁定 Chart 源码 `ae2e9013172ccb6e50dd30f547d37f1106a7f3d4`；
+[main CI 38053540900](https://github.com/william-lbn/neon-helm/actions/runs/38053540900)
+和 [tag/release CI 38053672551](https://github.com/william-lbn/neon-helm/actions/runs/38053672551)
+均成功。十个 Chart、index、SHA256SUMS 和版本锁已公开。Linux 不携带 GitHub 或
+registry 凭据的标准 `helm repo add/update/pull` 下载十个包并通过全部 SHA256。
+
+首次匿名 Git 精确源码审计发现 Web 配置校验和 annotation 有差异：私有 Windows
+源码包的 CRLF 与 Git 中 LF 字节不同；解析后的 ConfigMap 数据完全相等，原差异
+及字段 hash 保留。没有忽略严格审计：从已通过公开 CI 的匿名精确 Git 源码进行
+八阶段正式升级 `20261010/unified-125901` 后，独立重新 clone 同 SHA 的完整
+manifest/hooks/镜像/PVC/Secret/零实例审计全部成功。升级后 Linux Chromium 又通过
+六项邀请注册/权限检查，不启动 Compute。操作标准是从 Linux Git/正式 tgz 部署，
+不拿 Windows 脏工作树压缩包代替公开代码。后续仅文档提交不移动已发布标签，
+也不改变实际应用源码 `7162449` 的七镜像锁。
 
 ## 6. 后续实现与独立准入
 
