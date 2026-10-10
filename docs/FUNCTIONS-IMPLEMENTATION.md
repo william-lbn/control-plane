@@ -24,7 +24,7 @@ payload 的确定性 CRC 损坏负例。新增 path `..`、保留键、代次/�
 
 Foundation 提交 `5bb6c5c` 的公开 Linux CI `38084887655` 全部 13 作业成功，
 完整 Go/PostgreSQL 432 pass / 0 fail / 0 skip。后续 supervisor Linux Job
-`functions-foundation-20261010210316` 为 69 Go / 9 Node pass，阶段区分见 guest 文档。
+`functions-foundation-20261010211021` 为 71 Go / 9 Node pass，阶段区分见 guest 文档。
 
 已实现源代码：`api/internal/functions`、`api/cmd/function-supervisor`、
 `services/functions/runtime`、`services/functions/guest` 和各自测试/构建输入。

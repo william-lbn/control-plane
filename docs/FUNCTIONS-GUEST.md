@@ -7,10 +7,10 @@
 `capabilities.functions` 仍为 false；metadata/leased Driver、UI 和真实 VM
 验收未完成前，不允许将这个镜像作为生产 Functions 服务发布。
 
-Linux `functions-foundation-20261010210316` 已编译真实 supervisor 并完成 69 项
+Linux `functions-foundation-20261010211021` 已编译真实 supervisor 并完成 71 项
 Go race/vet 和 9 项 Node HTTP/SSE 检查，0 fail / 0 skip。测试包含实际 TLS
 artifact HTTP peer、错误 CA/签名/重放/redirect/hash/overflow 拒绝、严格配置
-和并发日志上限。它没有执行 guest sysctl、netfilter、cgroup 或 Secret 卸载。
+和并发日志上限、固定 Writer selector。它没有执行 guest sysctl、netfilter、cgroup 或 Secret 卸载。
 实际 VM 验收须独立记录，镜像 build/CI 成功不能替代这些门槛。
 
 ## 2. 实例与引导合同
@@ -33,15 +33,18 @@ Secret CD-ROM 挂载 `/run/function-bootstrap`，唯一输入 `config.json`，�
 | `artifact_key` | 独立 base64 32 bytes | 不可等于 manager key，只用于本实例/版本的签名获取 |
 | `artifact_ca` | PEM ≤32 KiB | 不回退到系统 CA、不使用代理、不跟随 redirect |
 | `bundle_digest` | 小写 SHA256 hex | 绑定整个 ZIP 原始 bytes，≤8 MiB，获取后再次 ZIP/CRC 校验 |
-| `database_url` | PostgreSQL URL | 用户 `fn_<16hex>`，密码≥24 bytes，精确 Proxy hostname/port；只接受两个 SSL query 字段 |
+| `database_url` | PostgreSQL URL | 用户 `fn_<16hex>`，密码≥24 bytes，精确 Proxy hostname/port；只接受固定 SSL 字段及 Writer options |
+| `writer_endpoint_id` | `ep_<16hex>` | 固定 Writer，SQL options 必须精确等于 `endpoint=ep-<16hex>`；Driver 还须校验它属于本 branch |
 | `sql_ca` | PEM ≤32 KiB | 公共 SQL trust anchor 写入固定 `/etc/neon-function/sql-ca.crt` |
 | `proxy_ip` / `dns_ip` | 显式 IPv4 | Node UID-owner 网络白名单，不接受 loopback/unspecified |
 | `proxy_hostname` / `proxy_port` | lowercase DNS / uint16>0 | 固定 `/etc/hosts` 映射；SQL `verify-full` 身份与目标一致 |
 | `environment` | 受限 string map | 客户 env；禁止平台保留键，不含 manager/artifact key |
 | `allow_public_https` | boolean | 默认 false；启用时仍拒绝私网/metadata/保留地址 |
 
-SQL URL 仅接受 `sslmode=verify-full` 和
-`sslrootcert=/etc/neon-function/sql-ca.crt`。这里的 role 命名/URL 校验不能替代
+SQL URL 仅接受 `sslmode=verify-full`、
+`sslrootcert=/etc/neon-function/sql-ca.crt` 和一个精确绑定 Writer 的 `options`。
+当前 own-fork Proxy 使用该 startup option 路由，不能仅依据一个 TLS 主机名假定
+SQL 已绑定分支。这里的 role 命名/URL 校验不能替代
 SQL Driver 的实际 NOSUPERUSER/NOCREATEDB/NOCREATEROLE/NOBYPASSRLS/NOINHERIT/
 NOREPLICATION、表授权、连接数和超时验收；这些留在 F2/F3。
 

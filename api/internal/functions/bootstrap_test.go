@@ -50,6 +50,8 @@ func bootstrapFixture(t *testing.T) Bootstrap {
 	digest := strings.Repeat("a", 64)
 	scope := Scope{InstanceID: "fni_0000000000000001", DeploymentID: "fdp_0000000000000002", ProjectID: "prj_0000000000000003", BranchID: "br_0000000000000004", Slug: "hello", Generation: 1}
 	b := Bootstrap{Scope: scope, ManagerKey: base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{12}, 32)), ArtifactKey: base64.StdEncoding.EncodeToString(bytes.Repeat([]byte{13}, 32)), ManagerCA: anchor, SQLCA: anchor, ArtifactCA: anchor, ManagerCertificate: string(pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})), ManagerPrivateKey: string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE" + " KEY", Bytes: private})), BundleDigest: digest, ProxyIP: "192.0.2.2", ProxyHostname: "sql.example.test", ProxyPort: 5432, DNSIP: "192.0.2.53", DatabaseURL: "postgresql://fn_0000000000000005:012345678901234567890123456789@sql.example.test:5432/neondb?sslmode=verify-full&sslrootcert=%2Fetc%2Fneon-function%2Fsql-ca.crt", Environment: map[string]string{}}
+	b.WriterEndpointID = "ep_0000000000000006"
+	b.DatabaseURL += "&options=endpoint%3Dep-0000000000000006"
 	b.ArtifactURL = "https://artifact.example.test" + b.artifactPath()
 	return b
 }
@@ -67,6 +69,8 @@ func TestBootstrapRejectsCredentialScopeAndTrustChanges(t *testing.T) {
 			v.DatabaseURL = strings.Replace(v.DatabaseURL, "fn_0000000000000005", "cloud_admin", 1)
 		},
 		"sql-no-verify":        func(v *Bootstrap) { v.DatabaseURL = strings.Replace(v.DatabaseURL, "verify-full", "require", 1) },
+		"sql-other-writer":     func(v *Bootstrap) { v.WriterEndpointID = "ep_0000000000000008" },
+		"sql-missing-writer":   func(v *Bootstrap) { v.WriterEndpointID = "" },
 		"sql-other-target":     func(v *Bootstrap) { v.ProxyHostname = "another.example.test" },
 		"sql-host-injection":   func(v *Bootstrap) { v.ProxyHostname = "sql.example.test\n127.0.0.1 injected" },
 		"sql-host-empty-label": func(v *Bootstrap) { v.ProxyHostname = "sql..example.test" },

@@ -22,6 +22,7 @@ const MaxBootstrapBytes = 128 << 10
 
 var digestPattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
 var sqlRolePattern = regexp.MustCompile(`^fn_[a-f0-9]{16}$`)
+var writerEndpointPattern = regexp.MustCompile(`^ep_[a-f0-9]{16}$`)
 
 func validDNSHostname(value string) bool {
 	if len(value) > 253 || strings.ToLower(value) != value {
@@ -55,6 +56,7 @@ type Bootstrap struct {
 	ArtifactCA         string            `json:"artifact_ca"`
 	BundleDigest       string            `json:"bundle_digest"`
 	DatabaseURL        string            `json:"database_url"`
+	WriterEndpointID   string            `json:"writer_endpoint_id"`
 	SQLCA              string            `json:"sql_ca"`
 	ProxyIP            string            `json:"proxy_ip"`
 	ProxyHostname      string            `json:"proxy_hostname"`
@@ -131,8 +133,9 @@ func (b Bootstrap) Validate() error {
 	}
 	password, exists := u.User.Password()
 	query, queryErr := url.ParseQuery(u.RawQuery)
-	if queryErr != nil || !exists || len(password) < 24 || len(query) != 2 || query.Get("sslmode") != "verify-full" || query.Get("sslrootcert") != "/etc/neon-function/sql-ca.crt" || len(query["sslmode"]) != 1 || len(query["sslrootcert"]) != 1 {
-		return errors.New("restricted SQL requires password and fixed verify-full CA")
+	selector := strings.Replace(b.WriterEndpointID, "ep_", "ep-", 1)
+	if queryErr != nil || !exists || len(password) < 24 || !writerEndpointPattern.MatchString(b.WriterEndpointID) || len(query) != 3 || query.Get("sslmode") != "verify-full" || query.Get("sslrootcert") != "/etc/neon-function/sql-ca.crt" || query.Get("options") != "endpoint="+selector || len(query["sslmode"]) != 1 || len(query["sslrootcert"]) != 1 || len(query["options"]) != 1 {
+		return errors.New("restricted SQL requires fixed Writer selector and verify-full CA")
 	}
 	_, err = b.ManagerTLS(time.Now())
 	return err
