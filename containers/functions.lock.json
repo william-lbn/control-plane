@@ -1,0 +1,12 @@
+{
+  "architecture": "linux/amd64",
+  "node_version": "24.19.0-bookworm-slim",
+  "node_image": "docker.io/library/node@sha256:a9f5f7c91a432850b2a8a7797adf5eadb6c733ceed61167806cee7ea7fbc29df",
+  "debian_snapshot": "20261009T000000Z",
+  "autoscaling_commit": "c0052f5f2d38fce6c70e448f3f1ee2ee239a0a93",
+  "vm_builder": "docker.io/williamluckyli/vm-builder@sha256:6d88835873fc6b33d2b68b80d06913fa150ddd8a6a9e2eb4f3256b3b0e93684c",
+  "vm_daemon": "docker.io/williamluckyli/neonvm-daemon@sha256:59528d915c134dd84db9208a1a412dfecc21eb81c4f329bb8cb3796c69eefc10",
+  "vm_kernel": "docker.io/williamluckyli/vm-kernel@sha256:abd0ff565418b46000010120c4b7b173b1b5b3d1de997e4e0a99a25d32eb60fc",
+  "root_disk_size": "2G",
+  "contract": "isolated-neonvm-functions-v1"
+}

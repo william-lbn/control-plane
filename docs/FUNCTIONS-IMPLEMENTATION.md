@@ -11,7 +11,8 @@ overview 更新 2026-10-02，limits 更新 2026-09-16，deploy 更新 2026-10-09
 本地历史快照日期与这些在线版本分开记录。
 
 **本增量是有可运行代码和 Linux 测试的基础层，Functions 产品能力仍禁用。**
-尚未提供可部署的完整 guest supervisor/镜像、metadata/分支 Driver、Console
+Go guest supervisor 和专用镜像构建源码已补齐，详见 [guest 合同和构建](FUNCTIONS-GUEST.md)。
+镜像发布/真实 VM 验收、metadata/分支 Driver、Console
 部署/调用、真实 microVM 隔离和缩零验收。没有 Functions API/Worker 集成就不能
 把下面内部协议宣称为已可用的公网服务，当前 OpenAPI 仍为 0.10.1 / 87 操作。
 
@@ -21,7 +22,12 @@ overview 更新 2026-10-02，limits 更新 2026-09-16，deploy 更新 2026-10-09
 payload 的确定性 CRC 损坏负例。新增 path `..`、保留键、代次/重放/redirect/
 关闭失败重试等检查。这些结果只对基础层有效，不放行真实 VM 或 Functions UI。
 
-已实现源代码：`api/internal/functions`、`services/functions/runtime` 和各自测试。
+Foundation 提交 `5bb6c5c` 的公开 Linux CI `38084887655` 全部 13 作业成功，
+完整 Go/PostgreSQL 432 pass / 0 fail / 0 skip。后续 supervisor Linux Job
+`functions-foundation-20261010210316` 为 69 Go / 9 Node pass，阶段区分见 guest 文档。
+
+已实现源代码：`api/internal/functions`、`api/cmd/function-supervisor`、
+`services/functions/runtime`、`services/functions/guest` 和各自测试/构建输入。
 Go 提供 bundle 校验/安装、严格实例模型、管理签名/重放拒绝、固定 loopback 调用、
 流式转发、关闭重试及 guest 边界 primitives。Node 提供 Fetch/HTTP/SSE/
 waitUntil 执行；其宿主是独立 guest，不能放进共享 API/Worker 进程执行客户代码。
@@ -46,8 +52,8 @@ flowchart TB
   Proxy --> Branch[(原生分支 / 受限 SQL 身份)]
 ```
 
-目前 Go 包可独立调用，Node runtime 可在 Linux 启动并接收真实 HTTP；图中的
-“未来”框和 guest 引导尚须实现。测试 peer 验证管理协议，不代表微虚机、租户
+目前 Go 包可独立调用，Node runtime 可在 Linux 启动并接收真实 HTTP，guest
+引导源码已实现；图中的“未来”框和真实镜像/实例验收仍待完成。测试 peer 验证管理协议，不代表微虚机、租户
 逃逸、网络负例或生产外部栅栏已验收。
 
 ### 2.1 代码包与环境
@@ -140,7 +146,7 @@ HTTP body bounded、16 并发、SSE 实际逐块送达。独立 self-hosted wait
 
 | 顺序 | 实现内容 | 必须留下的真实证据 |
 | --- | --- | --- |
-| F1 | 完整 guest supervisor、签名 artifact 获取、受信 manager TLS、固定 VM 镜像/own vm-builder | 实际隔离 VM、Node fetch/SQL、Secret/raw-device/UID/cgroup/egress 负例、终止树 |
+| F1 | supervisor、签名 artifact、受信 TLS、镜像构建源码已实现；真实 build/VM 待验收 | 实际隔离 VM、Node fetch/SQL、Secret/raw-device/UID/cgroup/egress 负例、终止树 |
 | F2 | immutable bundle/Secret/deployment intent、leased Driver、quota、严格 OpenAPI、React 编辑/部署/调用/日志 | UI lost-202 幂等、失败保留旧版本、版本回滚、实际 Response/SSE、正常 VM 回收 |
 | F3 | 受限 SQL login、branch SQL manifest、克隆/历史点继承、zero/wake、Writer 删除依赖 | 新 branch URL/role/key；父子 SQL/代码/Secret 隔离；首次请求冷醒 Function 和 Compute |
 | F4 | WS、独立预算、cron/对象 outbox、dedup/retry、完整生命周期和监控 | 真实 WS、event delivery 语义、分支旧事件隔离、触发失败恢复、持久日志/指标 |

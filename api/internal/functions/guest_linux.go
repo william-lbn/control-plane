@@ -15,6 +15,59 @@ import (
 	"syscall"
 )
 
+// HardenGuestCgroups overrides the cooperative (world-writable root procs)
+// defaults in the own-fork NeonVM init. Untrusted Node must never migrate itself
+// out of its resource group. Run only after the guest marker/root check.
+func HardenGuestCgroups() error {
+	if os.Geteuid() != 0 {
+		return errors.New("privileged guest cgroup hardening required")
+	}
+	marker, err := os.ReadFile("/etc/neon-function-guest")
+	if err != nil || string(marker) != "isolated-neonvm-functions-v1\n" {
+		return errors.New("function guest marker required")
+	}
+	for _, path := range []string{"/sys/fs/cgroup", "/sys/fs/cgroup/cgroup.procs", "/sys/fs/cgroup/cgroup.threads"} {
+		mode := os.FileMode(0600)
+		if path == "/sys/fs/cgroup" {
+			mode = 0755
+		}
+		if err := os.Chmod(path, mode); err != nil {
+			return errors.New("guest cgroup migration boundary unavailable")
+		}
+	}
+	if err := os.WriteFile("/sys/fs/cgroup/cgroup.subtree_control", []byte("+memory +pids"), 0600); err != nil {
+		return errors.New("guest resource controllers unavailable")
+	}
+	return nil
+}
+
+// HideGuestBlockDevices denies raw reads of the detached Secret CD-ROM as well
+// as runtime/root disks. The Functions rootfs also installs a root-only udev
+// block rule; hotplug is unsupported for this fixed-resource instance contract.
+func HideGuestBlockDevices() error {
+	if os.Geteuid() != 0 {
+		return errors.New("privileged block device hardening required")
+	}
+	return filepath.WalkDir("/dev", func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return errors.New("guest device enumeration failed")
+		}
+		if entry.IsDir() || entry.Type()&os.ModeSymlink != 0 {
+			return nil
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return errors.New("guest device inspection failed")
+		}
+		if info.Mode()&os.ModeDevice != 0 && info.Mode()&os.ModeCharDevice == 0 {
+			if os.Chown(path, 0, 0) != nil || os.Chmod(path, 0600) != nil {
+				return errors.New("raw guest device boundary unavailable")
+			}
+		}
+		return nil
+	})
+}
+
 // GuestBoundary applies inside one dedicated NeonVM. It must never run on a
 // Kubernetes host: paths and network policy belong to the guest namespace.
 // The exact own-fork kernel has IPv4 owner matching but no IPv6 filter table;
@@ -127,7 +180,7 @@ func (g *ChildGroup) Command(ctx context.Context, entry string, environment map[
 		return nil, errors.New("fixed runtime entry and branch SQL credential required")
 	}
 	command := exec.CommandContext(ctx, "/usr/bin/setpriv", "--reuid=65532", "--regid=65532", "--clear-groups", "--no-new-privs", "--bounding-set=-all", "--inh-caps=-all", "--ambient-caps=-all", "/usr/local/bin/node", "--max-old-space-size=1024", entry)
-	command.SysProcAttr = &syscall.SysProcAttr{UseCgroupFD: true, CgroupFD: int(g.file.Fd()), Setpgid: true}
+	command.SysProcAttr = &syscall.SysProcAttr{UseCgroupFD: true, CgroupFD: int(g.file.Fd()), Setpgid: true, Pdeathsig: syscall.SIGKILL}
 	command.Dir = "/srv/function"
 	command.Env = []string{"PATH=/usr/local/bin:/usr/bin:/bin", "HOME=/srv/function", "TMPDIR=/tmp/function", "NODE_ENV=production", "DATABASE_URL=" + databaseURL}
 	for name, value := range environment {

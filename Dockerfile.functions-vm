@@ -1,0 +1,9 @@
+ARG NODE_BUILDER_IMAGE
+FROM ${NODE_BUILDER_IMAGE}
+# Only the qcow2 carrier runs in the image-loader init container. Guest execution
+# uses its own rootfs, root supervisor and dropped-privilege Node child.
+COPY artifacts/functions-vm/disk.qcow2 /disk.qcow2
+COPY artifacts/functions-vm/guest-packages.txt /guest-packages.txt
+COPY containers/functions.lock.json /functions-build-inputs.json
+ENTRYPOINT []
+CMD ["/bin/true"]

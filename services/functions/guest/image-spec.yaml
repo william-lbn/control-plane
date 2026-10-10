@@ -1,0 +1,7 @@
+# Busybox init runs this hook before its general SIGTERM/one-second shutdown.
+# The root supervisor supplies the documented SIGINT/five-second child phase
+# and kills/reaps the whole cgroup before its workload lock is released.
+shutdownHook: |
+  if [ -f /run/neon-function/supervisor.pid ]; then
+    kill -INT "$(cat /run/neon-function/supervisor.pid)" 2>/dev/null || true
+  fi
