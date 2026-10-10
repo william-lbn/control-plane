@@ -63,7 +63,7 @@ docker build --platform linux/amd64 -f Dockerfile.functions-vm \
   --build-arg "NODE_BUILDER_IMAGE=$task_node" \
   --build-arg "DEBIAN_SNAPSHOT=${task_inputs[4]}" -t "$task_carrier" "$task_output/carrier"
 docker run --rm --privileged --network none --entrypoint /bin/sh "$task_carrier" -ec \
-  'mkdir -p /vm/images; mv /disk.qcow2 /vm/images/rootdisk.qcow2 && chown 36:34 /vm/images/rootdisk.qcow2 && sysctl -w net.ipv4.ip_forward=1; test -s /vm/images/rootdisk.qcow2; test "$(stat -c %u:%g /vm/images/rootdisk.qcow2)" = 36:34' \
+  'mkdir -p /vm/images; mv /disk.qcow2 /vm/images/rootdisk.qcow2 && chown 36:34 /vm/images/rootdisk.qcow2 && sysctl -w net.ipv4.ip_forward=1; test -s /vm/images/rootdisk.qcow2; stat -c %u:%g /vm/images/rootdisk.qcow2 | grep -qx 36:34' \
   > "$task_output/carrier-contract.log"
 docker run --rm --entrypoint /bin/cat "$task_carrier" /carrier-packages.txt > "$task_output/carrier-packages.txt"
 # Large intermediate files are CI-local and are deliberately not published.

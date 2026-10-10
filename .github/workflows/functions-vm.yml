@@ -47,14 +47,16 @@ jobs:
             task_tags="$task_tags"$'\n'"docker.io/$DOCKERHUB_USERNAME/control-functions-vm:$task_tag"
           fi
           { echo 'tags<<TAGS'; printf '%s\n' "$task_tags"; echo TAGS; } >> "$GITHUB_OUTPUT"
-          node tools/build-args.mjs >> "$GITHUB_OUTPUT"
-          node --input-type=module - <<'NODE' >> "$GITHUB_OUTPUT"
+          {
+          node tools/build-args.mjs
+          node --input-type=module - <<'NODE'
           import fs from 'node:fs';
           const l = JSON.parse(fs.readFileSync('containers/functions.lock.json'));
           if (!/^[a-z0-9./-]+@sha256:[a-f0-9]{64}$/.test(l.node_image) || !/^\d{8}T\d{6}Z$/.test(l.debian_snapshot)) throw Error('Unpinned carrier input');
           console.log(`FUNCTIONS_NODE_BUILDER_IMAGE=${l.node_image}`);
           console.log(`DEBIAN_SNAPSHOT=${l.debian_snapshot}`);
           NODE
+          } >> "$GITHUB_OUTPUT"
       - uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772
         with: {registry: ghcr.io, username: '${{ github.actor }}', password: '${{ secrets.GITHUB_TOKEN }}'}
       - uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772
