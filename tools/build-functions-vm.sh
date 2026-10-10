@@ -5,6 +5,8 @@ cd "$(dirname "$0")/.."
 : "${FUNCTIONS_SOURCE_COMMIT:?Exact reviewed source required}"
 [[ "$FUNCTIONS_SOURCE_COMMIT" =~ ^[a-f0-9]{40}$ ]] || exit 1
 [[ "$(git rev-parse HEAD)" == "$FUNCTIONS_SOURCE_COMMIT" ]] || { echo 'Source commit mismatch'; exit 1; }
+git diff --quiet && git diff --cached --quiet || { echo 'Commit all reviewed source changes before building'; exit 1; }
+[[ -z "$(git ls-files --others --exclude-standard)" ]] || { echo 'Untracked source cannot enter a revision-labeled guest'; exit 1; }
 task_output="$PWD/artifacts/functions-vm"
 mkdir -p "$task_output"
 [[ ! -e "$task_output/disk.qcow2" ]] || { echo 'Retain existing build evidence'; exit 1; }
