@@ -112,12 +112,14 @@ func stringsContainLine(text, line string) bool {
 	return false
 }
 
-// ServeGuest performs fail-closed privileged boot and then serves one immutable
-// instance. It is not a Kubernetes-host helper or a shared Node execution pool.
+// GuestBootError exposes only a fixed boot stage; bootstrap/private errors stay
+// out of the platform journal.
 type GuestBootError struct{ Stage string }
 
 func (e *GuestBootError) Error() string { return "function guest stage failed: " + e.Stage }
 
+// ServeGuest performs fail-closed privileged boot and then serves one immutable
+// instance. It is not a Kubernetes-host helper or a shared Node execution pool.
 func ServeGuest(ctx context.Context) (result error) {
 	stage := "bootstrap"
 	defer func() {

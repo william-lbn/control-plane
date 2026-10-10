@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"path"
 	"regexp"
 	"strings"
 	"sync"
@@ -201,6 +202,13 @@ func (m *Manager) validInvocation(v Invocation) bool {
 	u, err := url.Parse(v.URL)
 	prefix := "/functions/v1/" + m.scope.BranchID + "/" + m.scope.Slug
 	if err != nil || !(u.Scheme == "https" || u.Scheme == "http") || u.Host == "" || u.User != nil || u.Fragment != "" || !(u.Path == prefix || strings.HasPrefix(u.Path, prefix+"/")) {
+		return false
+	}
+	// WHATWG URL in Node normalizes dot segments and HTTP backslashes. Verify
+	// the decoded Go path before forwarding, so canonicalization cannot move
+	// an invocation outside its immutable branch/function URL namespace.
+	cleanable := strings.TrimSuffix(u.Path, "/")
+	if strings.ContainsRune(u.Path, '\\') || path.Clean(cleanable) != cleanable {
 		return false
 	}
 	total := 0

@@ -52,4 +52,7 @@ qemu-img convert -f raw -O qcow2 -o cluster_size=2M,lazy_refcounts=on "$task_out
 qemu-img info --output=json "$task_output/disk.qcow2" > "$task_output/disk-info.json"
 sha256sum "$task_output/disk.qcow2" "$task_output/guest-packages.txt" "$task_output/inittab.actual" > "$task_output/SHA256SUMS"
 printf '%s\n' "$FUNCTIONS_SOURCE_COMMIT" > "$task_output/source-commit.txt"
+mkdir "$task_output/carrier"
+cp "$task_output/disk.qcow2" "$task_output/guest-packages.txt" "$task_output/carrier/"
+cp containers/functions.lock.json "$task_output/carrier/functions-build-inputs.json"
 # Large intermediate files are CI-local and are deliberately not published.

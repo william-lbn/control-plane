@@ -7,10 +7,11 @@
 `capabilities.functions` 仍为 false；metadata/leased Driver、UI 和真实 VM
 验收未完成前，不允许将这个镜像作为生产 Functions 服务发布。
 
-Linux `functions-foundation-20261010211021` 已编译真实 supervisor 并完成 71 项
+Linux `functions-foundation-20261010212911` 已编译真实 supervisor 并完成 74 项
 Go race/vet 和 9 项 Node HTTP/SSE 检查，0 fail / 0 skip。测试包含实际 TLS
 artifact HTTP peer、错误 CA/签名/重放/redirect/hash/overflow 拒绝、严格配置
-和并发日志上限、固定 Writer selector。它没有执行 guest sysctl、netfilter、cgroup 或 Secret 卸载。
+和并发日志上限、固定 Writer selector、明文/编码 dot segments 和 HTTP backslash
+归一化拒绝。它没有执行 guest sysctl、netfilter、cgroup 或 Secret 卸载。
 实际 VM 验收须独立记录，镜像 build/CI 成功不能替代这些门槛。
 
 ## 2. 实例与引导合同
@@ -111,6 +112,13 @@ Node base 已通过匿名 registry manifest SHA256 验证。构建只能在 Linu
 4. 使用 qemu-img/debugfs 在 CI 离线替换 `/etc/inittab`；逐字比较写入结果并
    执行 e2fsck，拒绝只依据 debugfs 的 exit code 宣称成功。
 5. 生成 qcow2 SHA256、guest package/inittab/source receipt，再发布 carrier image。
+
+公开源 `2cd2f804` 的质量 CI `38086954494` 全部通过（454 Go/PostgreSQL，0 fail /
+0 skip）。首次 VM pipeline `38087496936` 完成 rootfs、qcow2、inittab compare/
+e2fsck，发布 carrier 的 COPY 被默认 artifact 排除规则阻止；失败原日志保留。
+已改为显式 `artifacts/functions-vm/carrier` 独立构建上下文，只复制已封存的
+disk、公共 package 清单和锁文件，不放宽仓库的 private/artifact 排除规则。
+它不是成功发布或真实运行验收。
 
 vm-builder 本身包含自己的 base image/tool 输入；其 digest 与来源锁已保留。
 其已有 Vector 下载没有新 checksum gate，最终 Function init 不启动 Vector。

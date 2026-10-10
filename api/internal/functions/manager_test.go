@@ -113,7 +113,7 @@ func TestManagerInvokePreservesRequestAndStreamsResponse(t *testing.T) {
 func TestManagerRejectsCrossBranchAndOldBootInvocation(t *testing.T) {
 	var calls atomic.Int32
 	m, server, key := managerFixture(t, func(w http.ResponseWriter, r *http.Request) { calls.Add(1) }, nil)
-	for _, kind := range []string{"branch", "slug", "generation", "boot", "method", "header", "body"} {
+	for _, kind := range []string{"branch", "slug", "generation", "boot", "method", "header", "body", "traversal", "encoded-dot", "backslash"} {
 		t.Run(kind, func(t *testing.T) {
 			v := invocationFor(m)
 			switch kind {
@@ -131,6 +131,12 @@ func TestManagerRejectsCrossBranchAndOldBootInvocation(t *testing.T) {
 				v.Headers["X-Test"] = []string{"bad\r\nInjected: header"}
 			case "body":
 				v.Body = bytes.Repeat([]byte{1}, MaxInvokeBytes+1)
+			case "traversal":
+				v.URL += "/../../other"
+			case "encoded-dot":
+				v.URL += "/%2e%2e/%2e%2e/other"
+			case "backslash":
+				v.URL += `/..\..\other`
 			}
 			response := managerCall(t, server.URL, "/internal/v1/invoke", key, encode(t, v))
 			if response.StatusCode != 422 {
