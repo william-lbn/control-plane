@@ -346,7 +346,11 @@ test('Managed Auth: UI identity, native branch isolation, Data API RLS and cold 
           exact: true,
         })
         .click();
-      await expect(page.getByRole('dialog', { name: '操作详情' })).toContainText('succeeded');
+      const dialog = page.getByRole('dialog', { name: '操作详情' });
+      await expect(dialog).toContainText(recovery.branch_operation_id);
+      await expect(dialog.locator('.detail-row').filter({ hasText: '状态' })).toContainText(
+        '已完成',
+      );
       await record(
         'ui_reopened_original_completed_branch_operation_without_recreating_project_or_branch',
       );
