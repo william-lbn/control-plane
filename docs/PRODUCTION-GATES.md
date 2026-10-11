@@ -1,6 +1,6 @@
 # 生产门槛与官网对齐
 
-状态截至 2026-10-11；当前版本现场结果见 [Compute 生命周期交付](DELIVERY-2026-10-10-COMPUTE-LIFECYCLE.md)。未通过项不能被 Ready Pod 或 CI build 替代。
+状态截至 2026-10-11；最新增量及运行版本通过/失败见 [Functions 存储与缩零恢复](DELIVERY-2026-10-11-FUNCTIONS-BACKING.md)，先前 [Compute 生命周期交付](DELIVERY-2026-10-10-COMPUTE-LIFECYCLE.md)保留历史版本结果。未通过项不能被 Ready Pod 或 CI build 替代。
 
 ## 1. 已实现路径
 
@@ -34,8 +34,9 @@
 ## 3. 官网 Backend 服务
 
 Functions 已开始实际 Go/Node 基础层实现，合同和内部接口见
-[FUNCTIONS-IMPLEMENTATION](FUNCTIONS-IMPLEMENTATION.md)。完整 guest 引导、镜像、
-Driver、UI、分支与零/唤醒仍须交付；基础检查不放行 Functions 产品能力。
+[FUNCTIONS-IMPLEMENTATION](FUNCTIONS-IMPLEMENTATION.md)。默认 guest 已有独立真实 VM
+验收；代码包/环境存储和持久身份回执见 [FUNCTIONS-BACKING](FUNCTIONS-BACKING.md)。
+完整 Driver、UI 执行、分支与零/唤醒仍须交付；基础检查不放行 Functions 产品能力。
 
 Managed Auth 已有 Go Driver、Better Auth 1.7.7 运行时、React UI、注册/会话/JWT/分支隔离与 PostgreSQL CI，详细见 [Auth 合同](MANAGED-AUTH.md)。真实 Neon UI 结果按版本交付报告记录；SMTP/OAuth/MFA、完整恢复/删除一致性、生产隔离与 HA 仍须独立实现/验收。
 

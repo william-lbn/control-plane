@@ -4,6 +4,7 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 许可证：Apache-2.0。项目由自托管维护者开发，与 Neon 托管服务独立。
 
 **发行状态：预览版本。已经验证的实验环境功能不等于生产认证，也不等于 Neon 官网全部 Backend 服务。**
+[Functions 存储与缩零恢复增量](docs/DELIVERY-2026-10-11-FUNCTIONS-BACKING.md)区分新增 540 项 Go/PG 验证、实际 MinIO/Kubernetes 检查与运行版本 UI 的通过/失败；Functions 执行能力仍未启用。
 [当前 Compute 生命周期交付](docs/DELIVERY-2026-10-10-COMPUTE-LIFECYCLE.md)记录七镜像、统一 Helm 0.1.7、九套真实 Linux UI 共 146 项与 23 项原失败恢复检查；[先前 Object Storage](docs/DELIVERY-2026-10-09-OBJECT-STORAGE.md)、[Managed Auth](docs/DELIVERY-2026-10-08-MANAGED-AUTH.md)及历史报告保留各版本证据。
 Chart 0.8.2 提供独立 API、Worker、Web 进程及可选 Data API、应用凭据、Console 邀请注册、历史分支恢复、保留删除与独立 Compute 退休；新增 Functions 只读元数据/历史页面，执行 Driver 尚未启用。Worker 使用 PostgreSQL 领导租约和只读 Runner observer。
 当前只允许一个 API 和一个 Worker，跨实例外部 fencing 与 HA 仍须独立验收。
@@ -71,6 +72,7 @@ docs/                 架构、对象模型、部署、测试、来源及生产�
 - [Functions 不可变数据模型、并发准入和删除依赖](docs/FUNCTIONS-MODEL.md)
 - [Functions SQL 最小权限、owner 准入与真实 PostgreSQL 验证](docs/FUNCTIONS-SQL.md)
 - [Functions 候选实例、租约和 Worker 重启恢复](docs/FUNCTIONS-DRIVER.md)
+- [Functions 不可变代码包、环境 Secret 与丢失回复恢复](docs/FUNCTIONS-BACKING.md)
 - [AI Gateway 官网核验、平台配置与动态模型设计](docs/AI-GATEWAY-PLATFORM-DESIGN.md)
 - [原生 Data API 驱动与部署](docs/DATA-API-NATIVE-DRIVER.md)
 - [分支应用凭据：模型、API、部署、UI 和验收](docs/BACKEND-CREDENTIALS.md)
@@ -128,4 +130,4 @@ Postgres 下包含一个 Writer、多个 Readers、数据库、角色和 Data AP
 
 ## 2026-10-09 Object Storage increment
 
-[Branch Object Storage REST v1](docs/OBJECT-STORAGE.md) adds Go manifest/immutable-blob access, React bucket/file management, migration 017 and OpenAPI 0.10.0. It preserves native timeline inheritance and branch isolation. The matching seven-image deployment and 19 real Linux UI checks passed; exact versions, regressions and retained failures are recorded in the [current delivery](docs/DELIVERY-2026-10-09-OBJECT-STORAGE.md). Public S3 compatibility, multipart and physical GC are not implemented yet. Functions and inference remain unimplemented; HA/DR, external cross-instance fencing and whole-chain TLS remain unqualified. Previous delivery reports are historical evidence, not the current image source lock.
+[Branch Object Storage REST v1](docs/OBJECT-STORAGE.md) adds Go manifest/immutable-blob access and React bucket/file management while preserving native timeline inheritance and branch isolation. The 2026-10-09 seven-image deployment and 19 real Linux UI checks are recorded in its [versioned delivery](docs/DELIVERY-2026-10-09-OBJECT-STORAGE.md). Public S3 compatibility, multipart and physical GC remain future work. The Functions metadata/guest/backing increment is described above; its product deployment/invocation Driver and AI inference remain incomplete. HA/DR, external cross-instance fencing and whole-chain TLS remain unqualified. Versioned delivery reports are historical evidence; use the explicit deployment image lock for the active runtime.

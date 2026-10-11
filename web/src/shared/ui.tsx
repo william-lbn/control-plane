@@ -21,8 +21,8 @@ export const stateLabel = (value: string) =>
       recovering: '恢复中',
     }) as Record<string, string>
   )[value] || value;
-export const status = (value: string) => (
-  <span className={`status status-${value}`}>● {stateLabel(value)}</span>
+export const status = (value: string, label?: string) => (
+  <span className={`status status-${value}`}>● {label ?? stateLabel(value)}</span>
 );
 
 export function PageHeading({

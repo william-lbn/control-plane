@@ -339,3 +339,36 @@ npm --prefix web run test:e2e -- restore.spec.ts
 
 测试显式延迟角色成功后的只读目录刷新，确认用户同时填入的数据库名称仍保留。
 该测试暴露的实际 UI 缺陷修复只清理已提交表单，不清理其他表单或较新的编辑。
+
+### 恢复 Object Storage 冷醒/子分支创建阶段的原测试
+
+`object-storage.spec.ts` 支持 `NEON_E2E_STORAGE_RESUME_FIXTURE`。先归档原失败，
+确认原 Job/Pod 已停止；不能在它仍写入时另启 suite。该模式只复用下列阶段的明确
+身份：原私有 bucket/file 已成功验证，原 Writer suspend 为 failed/retryable；可选
+带上已经受理后失败的唯一子分支创建。它不重新创建项目或覆盖父文件。
+
+受保护 JSON 输入包含：project_id、branch_id、writer_id、project_name、
+original_failure_job、failed_suspend_operation_id 和 database_password_file。
+project_name 必须精确等于 `ci-{original_failure_job}-storage`；密码只能从原私有文件
+读取。若已有 child，必须同时提供 child_id、child_writer_id、child_name 和
+failed_branch_operation_id。子分支原 parent/name/Writer 和 Operation action/resource
+在任何重试前核验；不能省略这些字段来创建第二个 child。已经成功的操作不再次重试。
+
+该路径从 Console 登录开始，在 Operation UI 重试相同 ID，保留新 attempts。
+若先前失败清理已禁用 Storage，则从 UI 重新启用，验证原对象仍存在，再缩零/冷醒。
+子分支失败沿用原 create_branch Operation；继续验证父子原字节、条件写入、下载
+token 隔离、禁用/重启、独立删除和保留项目退休。失败立即保留终态/原身份；受理的
+Operation 在等待弹窗前写入结果。清理请求的 500/502/503/504 或超时属于结果未知，
+不能标记为“未受理”，必须用记录的幂等键/Operation 只读查证。
+
+```bash
+export NEON_E2E_STORAGE_RESUME_FIXTURE=/secure/e2e/original-storage-fixture.json
+export NEON_E2E_PRIVATE_DIR=/secure/e2e/storage-resume-unique
+export NEON_E2E_ARTIFACTS=/var/lib/neon-evidence/storage-resume-unique
+npm --prefix web run test:e2e -- object-storage.spec.ts
+```
+
+如运营方临时暂停了该失败 fixture 的 Proxy 入口，必须先按保存的 Secret UID 和
+resourceVersion 恢复**此 selector 的准确原 entry**并保留其他 routes；不要整体回滚
+一份旧 Secret 覆盖其他客户的新配置。原 entry 可能没有 `state` 字段，不能把“恢复”
+理解为强制写 active。恢复后的新测试也有独立结果；历史失败不改成通过。

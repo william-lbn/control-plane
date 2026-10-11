@@ -32,6 +32,22 @@ type Deployment = {
   finished_at: string | null;
 };
 
+// Definition intent is metadata; an active definition is not an observed Node.
+const definitionLabel: Record<string, string> = {
+  provisioning: '定义创建中',
+  active: '定义已激活',
+  suspended: '定义已休眠',
+  degraded: '定义需恢复',
+  deleting: '定义删除中',
+  deleted: '定义已删除',
+};
+const deploymentLabel: Record<string, string> = {
+  pending: '部署待处理',
+  building: '部署构建中',
+  completed: '部署已完成',
+  failed: '部署失败',
+};
+
 // Read-only branch metadata is useful independently of execution admission.
 // Never manufacture an invocation URL, infer Node health or show env values.
 // Customer response/code execution does not belong to the Console origin.
@@ -206,7 +222,7 @@ export function Functions({ projectId, branches }: { projectId: string; branches
                         {item.database_name} / {item.sql_schema}
                       </small>
                     </span>
-                    {status(item.state)}
+                    {status(item.state, definitionLabel[item.state] || '未知定义状态')}
                   </button>
                 ))}
               </div>
@@ -215,7 +231,7 @@ export function Functions({ projectId, branches }: { projectId: string; branches
               <section className="panel" data-testid="function-detail">
                 <div className="function-detail-heading">
                   <h2>{current.slug}</h2>
-                  {status(current.state)}
+                  {status(current.state, definitionLabel[current.state] || '未知定义状态')}
                 </div>
                 <dl className="function-facts">
                   <div>
@@ -245,7 +261,7 @@ export function Functions({ projectId, branches }: { projectId: string; branches
                     <article key={d.id} data-testid="function-deployment">
                       <div>
                         <code>{d.id}</code>
-                        {status(d.state)}
+                        {status(d.state, deploymentLabel[d.state] || '未知部署状态')}
                       </div>
                       <p>
                         {d.runtime} · {(d.bundle_bytes / 1024).toFixed(1)} KiB ·{' '}

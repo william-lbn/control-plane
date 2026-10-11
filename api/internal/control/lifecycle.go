@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -104,6 +105,14 @@ func (s *server) suspendCompute(ctx context.Context, p suspendPayload) error {
 	vmPath := s.kube.path("vm", name)
 	vm, err := s.kube.request(ctx, http.MethodGet, vmPath, nil)
 	if err != nil {
+		var ke kubeError
+		if errors.As(err, &ke) && ke.Status == http.StatusNotFound {
+			// The original deletion may have committed before its reply or the
+			// Worker acknowledgement was lost. Do not cold-wake a VM just to run
+			// the idle probe. Observe normal Runner retirement, then recheck VM
+			// absence; any successor is preserved and makes this path fail.
+			return s.kube.observeSuspendedComputeAbsence(ctx, p, 120*time.Second, 2*time.Second)
+		}
 		return err
 	}
 	if !owned(vm, p.ProjectID, p.EndpointID) || nested(vm, "status", "phase") != "Running" {
@@ -146,6 +155,48 @@ func (s *server) suspendCompute(ctx context.Context, p suspendPayload) error {
 		return err
 	}
 	return s.kube.waitVMGenerationDeletion(ctx, p, uid, 120*time.Second, 2*time.Second)
+}
+
+// This is bounded idempotent absence recovery, not distributed admission
+// fencing. A late wake after the final observation still requires the separate
+// Proxy/Worker epoch gate. No VM/Pod mutation is performed by this observer.
+func (k *kubeClient) observeSuspendedComputeAbsence(ctx context.Context, p suspendPayload, window, interval time.Duration) error {
+	ctx, cancel := context.WithTimeout(ctx, window)
+	defer cancel()
+	path := k.path("pod", "") + "?labelSelector=" + url.QueryEscape("vm.neon.tech/name="+p.WorkloadName)
+	for {
+		list, err := k.request(ctx, http.MethodGet, path, nil)
+		if err != nil {
+			return err
+		}
+		items, ok := list["items"].([]any)
+		if !ok {
+			return errors.New("suspend runner observation invalid")
+		}
+		for _, item := range items {
+			pod, ok := item.(map[string]any)
+			if !ok || !owned(pod, p.ProjectID, p.EndpointID) || nested(pod, "metadata", "labels", "vm.neon.tech/name") != p.WorkloadName {
+				return errors.New("suspend runner ownership mismatch")
+			}
+		}
+		_, err = k.request(ctx, http.MethodGet, k.path("vm", p.WorkloadName), nil)
+		var ke kubeError
+		if !errors.As(err, &ke) || ke.Status != http.StatusNotFound {
+			if err != nil {
+				return err
+			}
+			return errors.New("suspend absence recovery observed a successor; it was preserved")
+		}
+		if len(items) == 0 {
+			return nil
+		}
+		// Even Succeeded/Failed or Terminating Runner Pods must disappear.
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(interval):
+		}
+	}
 }
 
 // A Proxy cold wake can replace the named VM between observations. Seeing an

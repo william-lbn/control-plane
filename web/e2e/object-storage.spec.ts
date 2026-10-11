@@ -15,18 +15,62 @@ test('Object Storage: UI files, native timeline clone, isolated changes and cold
   const privateDir = process.env.NEON_E2E_PRIVATE_DIR;
   if (!baseURL || !adminFile || !privateDir) throw new Error('Protected Linux E2E inputs required');
   const attempt = `${process.env.NEON_E2E_ATTEMPT || Date.now()}-storage`;
-  const password = randomBytes(30).toString('base64url');
+  const recoveryFile = process.env.NEON_E2E_STORAGE_RESUME_FIXTURE;
+  const recovery = recoveryFile
+    ? (JSON.parse(await readFile(recoveryFile, 'utf8')) as {
+        project_id: string;
+        branch_id: string;
+        writer_id: string;
+        project_name: string;
+        original_failure_job: string;
+        failed_suspend_operation_id: string;
+        database_password_file: string;
+        child_id?: string;
+        child_writer_id?: string;
+        child_name?: string;
+        failed_branch_operation_id?: string;
+      })
+    : null;
+  if (
+    recovery &&
+    (!/^prj_[a-f0-9]{16}$/.test(recovery.project_id) ||
+      !/^br_[a-f0-9]{16}$/.test(recovery.branch_id) ||
+      !/^ep_[a-f0-9]{16}$/.test(recovery.writer_id) ||
+      !/^op_[a-f0-9]{24}$/.test(recovery.failed_suspend_operation_id) ||
+      !/^publication-ui-[0-9]{14}$/.test(recovery.original_failure_job) ||
+      recovery.project_name !== `ci-${recovery.original_failure_job}-storage`)
+  )
+    throw new Error('Explicit original cold-wake fixture required');
+  if (
+    recovery &&
+    [
+      recovery.child_id,
+      recovery.child_writer_id,
+      recovery.child_name,
+      recovery.failed_branch_operation_id,
+    ].some(Boolean) &&
+    (!/^br_[a-f0-9]{16}$/.test(recovery.child_id || '') ||
+      !/^ep_[a-f0-9]{16}$/.test(recovery.child_writer_id || '') ||
+      !/^op_[a-f0-9]{24}$/.test(recovery.failed_branch_operation_id || '') ||
+      !recovery.child_name?.startsWith('child-publication-ui-'))
+  )
+    throw new Error('Existing child recovery requires its complete original identity');
+  const password = recovery
+    ? (await readFile(recovery.database_password_file, 'utf8')).trim()
+    : randomBytes(30).toString('base64url');
   const original = Buffer.from('Immutable parent content · 初始文件\n');
   const updated = Buffer.from('Independent child content · 子分支文件\n');
   const key = 'documents/report.txt';
   const digest = (data: Buffer) => createHash('sha256').update(data).digest('hex');
   const checks: { name: string; [key: string]: unknown }[] = [];
+  const acceptedOperations: { id: string; action: string; resource_id: string }[] = [];
   const endpoints = new Set<string>();
   const cleanup: {
     resource: string;
     action: string;
     status?: number;
     operation_id?: string;
+    idempotency_key?: string;
     state?: string;
   }[] = [];
   let project = '';
@@ -34,6 +78,7 @@ test('Object Storage: UI files, native timeline clone, isolated changes and cold
   let child = '';
   let writer = '';
   let childWriter = '';
+  let signed = '';
   let result = 'running';
   await mkdir(privateDir, { recursive: true, mode: 0o700 });
   await writeFile(path.join(privateDir, attempt + '-database-password'), password, {
@@ -49,11 +94,14 @@ test('Object Storage: UI files, native timeline clone, isolated changes and cold
           result,
           linux_only: process.platform === 'linux',
           project_id: project,
+          original_failure_job: recovery?.original_failure_job,
+          creates_new_project: !recovery,
           branch_id: root,
           child_id: child,
           writer_id: writer,
           endpoints: [...endpoints],
           checks,
+          operations: acceptedOperations,
           failure_cleanup: cleanup,
           data_retained: true,
           s3_compatible: false,
@@ -78,6 +126,38 @@ test('Object Storage: UI files, native timeline clone, isolated changes and cold
   async function record(name: string, fields: Record<string, unknown> = {}) {
     checks.push({ name, ...fields });
     await save();
+  }
+  async function retryOriginalOperation(id: string, action: string, resource: string) {
+    const opPath = `/api/v1/projects/${project}/operations/${id}`;
+    const failed = await context.request.get(opPath);
+    expect(failed.status()).toBe(200);
+    const op = await failed.json();
+    expect(op.action).toBe(action);
+    expect(op.resource_id).toBe(resource);
+    expect(op.state).toBe('failed');
+    expect(op.retryable).toBe(true);
+    acceptedOperations.push({ id, action, resource_id: resource });
+    await save();
+    await page.goto(`/#/projects/${project}/operations`);
+    await page.getByRole('button', { name: `查看操作 ${id} 的步骤`, exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: '操作详情' });
+    const pending = page.waitForResponse(
+      (r) => r.url().endsWith(`${opPath}/retry`) && r.request().method() === 'POST',
+    );
+    await dialog.getByRole('button', { name: '重试原操作', exact: true }).click();
+    expect((await pending).status()).toBe(202);
+    await expect
+      .poll(
+        async () => {
+          const r = await context.request.get(opPath);
+          return r.ok() && ['succeeded', 'failed', 'cancelled'].includes((await r.json()).state);
+        },
+        { timeout: 490000, intervals: [2000] },
+      )
+      .toBe(true);
+    const completed = await context.request.get(opPath);
+    expect(completed.status()).toBe(200);
+    expect((await completed.json()).state).toBe('succeeded');
   }
   const branchPath = (branch: string) => `/api/v1/projects/${project}/branches/${branch}/storage`;
   const objectPath = (branch: string, bucket = 'uploads') =>
@@ -107,6 +187,12 @@ test('Object Storage: UI files, native timeline clone, isolated changes and cold
     const response = await pending;
     expect(response.status()).toBe(202);
     const op = (await response.json()).operation;
+    acceptedOperations.push({
+      id: op.id,
+      action: disable ? 'disable_object_storage' : 'enable_object_storage',
+      resource_id: branch,
+    });
+    await save();
     await expect(page.getByTestId('storage-operation')).toContainText(op.id);
     await expect(page.getByTestId('storage-operation')).toContainText(
       /succeeded|failed|cancelled/,
@@ -194,6 +280,7 @@ test('Object Storage: UI files, native timeline clone, isolated changes and cold
       const entry: (typeof cleanup)[number] = {
         resource,
         action: method === 'DELETE' ? 'disable_storage' : 'suspend_compute',
+        idempotency_key: randomUUID(),
       };
       cleanup.push(entry);
       await save();
@@ -202,7 +289,7 @@ test('Object Storage: UI files, native timeline clone, isolated changes and cold
           method,
           headers: {
             ...h,
-            'Idempotency-Key': randomUUID(),
+            'Idempotency-Key': entry.idempotency_key!,
             ...(generation === undefined ? {} : { 'If-Match': `"${generation}"` }),
           },
           ...(method === 'POST' ? { data: {} } : {}),
@@ -210,7 +297,9 @@ test('Object Storage: UI files, native timeline clone, isolated changes and cold
         });
         entry.status = r.status();
         if (r.status() !== 202) {
-          entry.state = 'not_accepted';
+          entry.state = [500, 502, 503, 504].includes(r.status())
+            ? 'uncertain_retain_original_operation'
+            : 'not_accepted';
           return;
         }
         entry.operation_id = (await r.json()).operation.id;
@@ -246,110 +335,156 @@ test('Object Storage: UI files, native timeline clone, isolated changes and cold
     await page.getByLabel('用户名').fill('admin');
     await page.getByLabel('密码', { exact: true }).fill((await readFile(adminFile, 'utf8')).trim());
     await page.getByRole('button', { name: '登录控制台 →', exact: true }).click();
-    await page.getByRole('button', { name: '＋ 创建项目', exact: true }).click();
-    await page.getByLabel('项目名称').fill('ci-' + attempt);
-    await page.locator('.create-modal input[type="password"]').fill(password);
-    await page.getByLabel('最大 CPU', { exact: true }).selectOption('1000');
-    await page.getByLabel('最大内存', { exact: true }).selectOption('1024');
-    const creating = page.waitForResponse(
-      (r) => r.url().endsWith('/organizations/local/projects') && r.request().method() === 'POST',
-    );
-    await page.getByRole('button', { name: '创建并验证', exact: true }).click();
-    const created = await creating;
-    expect(created.status()).toBe(202);
-    project = (await created.json()).resource.id;
-    await expect(page.locator('.create-modal')).toHaveCount(0, { timeout: 490000 });
-    const e = (await (await context.request.get(`/api/v1/projects/${project}/endpoints`)).json())
-      .items[0];
-    root = e.branch_id;
-    writer = e.id;
-    endpoints.add(writer);
-    await record('ui_created_bounded_neon_project');
-    await page.goto(`/#/projects/${project}/query`);
-    await page.getByLabel('SQL 查询').fill('GRANT CREATE ON DATABASE postgres TO control_probe');
-    await page.locator('input[type="password"]').fill(password);
-    const grant = page.waitForResponse(
-      (r) => r.url().endsWith(`/endpoints/${writer}/query`) && r.request().method() === 'POST',
-    );
-    await page.getByRole('button', { name: '▶ 执行 SQL', exact: true }).click();
-    expect((await grant).status()).toBe(200);
-    await page.goto(`/#/projects/${project}/storage`);
-    const enabled = await mutate(root, false);
-    const replay = await context.request.post(branchPath(root), {
-      headers: {
-        ...(await headers()),
-        'Idempotency-Key': enabled.response.request().headers()['idempotency-key'],
-        'If-Match': '"0"',
-      },
-      data: { database: 'postgres' },
-    });
-    expect(replay.status()).toBe(202);
-    expect((await replay.json()).operation.id).toBe(enabled.op.id);
-    await record('ui_enabled_storage_and_exact_operation_idempotency_replayed', {
-      operation_id: enabled.op.id,
-    });
-    await page.getByLabel('存储桶名称').fill('uploads');
-    await page.getByRole('button', { name: '创建存储桶', exact: true }).click();
-    await expect(page.getByTestId('storage-notice')).toContainText('存储桶已创建', {
-      timeout: 190000,
-    });
-    await upload(original);
-    await record('ui_private_bucket_upload_published_real_immutable_blob');
-    const row = page
-      .getByRole('row')
-      .filter({ has: page.getByRole('cell', { name: key, exact: true }) });
-    const downloading = page.waitForEvent('download');
-    await row.getByRole('button', { name: '下载', exact: true }).click();
-    const download = await downloading;
-    const stream = await download.createReadStream();
-    const chunks: Buffer[] = [];
-    for await (const chunk of stream) chunks.push(Buffer.from(chunk));
-    expect(digest(Buffer.concat(chunks))).toBe(digest(original));
-    await record('ui_downloaded_bytes_and_sha256_match');
-    const anonymous = await context.request.get(
-      `/storage/v1/${root}/uploads?${new URLSearchParams({ key })}`,
-    );
-    expect(anonymous.status()).toBe(404);
-    const signed = await presign(root);
-    const range = await context.request.get(signed, { headers: { Range: 'bytes=0-8' } });
-    expect(range.status()).toBe(206);
-    expect(await range.body()).toEqual(original.subarray(0, 9));
-    expect((await context.request.head(signed)).status()).toBe(200);
-    expect(
-      (
-        await context.request.get(signed, { headers: { 'If-None-Match': `"${digest(original)}"` } })
-      ).status(),
-    ).toBe(304);
-    expect((await context.request.get(signed + 'tampered')).status()).toBe(404);
-    await record('private_acl_range_head_conditional_get_and_signature_tampering_checked');
+    await expect(page.getByRole('button', { name: '＋ 创建项目', exact: true })).toBeVisible();
     const h = await headers();
-    expect(
-      (
-        await context.request.put(objectPath(root), {
-          headers: { ...h, 'Content-Type': 'text/plain', 'If-None-Match': '*' },
-          data: updated,
-        })
-      ).status(),
-    ).toBe(412);
-    expect(
-      (
-        await context.request.put(objectPath(root), {
-          headers: { ...h, 'Content-Type': 'text/plain', 'If-Match': '"stale"' },
-          data: updated,
-        })
-      ).status(),
-    ).toBe(412);
-    expect(
-      (
-        await context.request.put(objectPath(root), {
-          headers: { ...h, 'Content-Type': 'text/plain' },
-          data: updated,
-        })
-      ).status(),
-    ).toBe(428);
-    await record('write_preconditions_prevent_unconditional_or_stale_overwrites');
-    await suspend(writer);
-    await record('ui_storage_writer_suspended_to_zero');
+    if (recovery) {
+      project = recovery.project_id;
+      root = recovery.branch_id;
+      writer = recovery.writer_id;
+      endpoints.add(writer);
+      const info = await context.request.get(`/api/v1/projects/${project}`);
+      expect(info.status()).toBe(200);
+      const existing = await info.json();
+      expect(existing.name).toBe(recovery.project_name);
+      expect(existing.source).toBe('managed');
+      const observed = await context.request.get(`/api/v1/projects/${project}/endpoints/${writer}`);
+      expect(observed.status()).toBe(200);
+      expect((await observed.json()).branch_id).toBe(root);
+      await retryOriginalOperation(
+        recovery.failed_suspend_operation_id,
+        'suspend_endpoint',
+        writer,
+      );
+      await record('ui_original_failed_suspend_retried_same_identity_without_new_project', {
+        operation_id: recovery.failed_suspend_operation_id,
+        original_failure_job: recovery.original_failure_job,
+      });
+      const storage = await context.request.get(branchPath(root));
+      expect(storage.status()).toBe(200);
+      const storageState = (await storage.json()).state;
+      expect(['active', 'disabled']).toContain(storageState);
+      await page.goto(`/#/projects/${project}/storage`);
+      if (storageState === 'disabled') {
+        await mutate(root, false);
+        await record('ui_original_storage_reenabled_without_replacing_retained_objects');
+        await suspend(writer);
+        await page.goto(`/#/projects/${project}/storage`);
+      }
+      await expect(page.getByRole('button', { name: '禁用对象存储', exact: true })).toBeEnabled();
+    } else {
+      await page.getByRole('button', { name: '＋ 创建项目', exact: true }).click();
+      await page.getByLabel('项目名称').fill('ci-' + attempt);
+      await page.locator('.create-modal input[type="password"]').fill(password);
+      await page.getByLabel('最大 CPU', { exact: true }).selectOption('1000');
+      await page.getByLabel('最大内存', { exact: true }).selectOption('1024');
+      const creating = page.waitForResponse(
+        (r) => r.url().endsWith('/organizations/local/projects') && r.request().method() === 'POST',
+      );
+      await page.getByRole('button', { name: '创建并验证', exact: true }).click();
+      const created = await creating;
+      expect(created.status()).toBe(202);
+      const acceptedProject = await created.json();
+      project = acceptedProject.resource.id;
+      acceptedOperations.push({
+        id: acceptedProject.operation.id,
+        action: 'create_project',
+        resource_id: project,
+      });
+      await save();
+      await expect(page.locator('.create-modal')).toHaveCount(0, { timeout: 490000 });
+      const e = (await (await context.request.get(`/api/v1/projects/${project}/endpoints`)).json())
+        .items[0];
+      root = e.branch_id;
+      writer = e.id;
+      endpoints.add(writer);
+      await record('ui_created_bounded_neon_project');
+      await page.goto(`/#/projects/${project}/query`);
+      await page.getByLabel('SQL 查询').fill('GRANT CREATE ON DATABASE postgres TO control_probe');
+      await page.locator('input[type="password"]').fill(password);
+      const grant = page.waitForResponse(
+        (r) => r.url().endsWith(`/endpoints/${writer}/query`) && r.request().method() === 'POST',
+      );
+      await page.getByRole('button', { name: '▶ 执行 SQL', exact: true }).click();
+      expect((await grant).status()).toBe(200);
+      await page.goto(`/#/projects/${project}/storage`);
+      const enabled = await mutate(root, false);
+      const replay = await context.request.post(branchPath(root), {
+        headers: {
+          ...(await headers()),
+          'Idempotency-Key': enabled.response.request().headers()['idempotency-key'],
+          'If-Match': '"0"',
+        },
+        data: { database: 'postgres' },
+      });
+      expect(replay.status()).toBe(202);
+      expect((await replay.json()).operation.id).toBe(enabled.op.id);
+      await record('ui_enabled_storage_and_exact_operation_idempotency_replayed', {
+        operation_id: enabled.op.id,
+      });
+      await page.getByLabel('存储桶名称').fill('uploads');
+      await page.getByRole('button', { name: '创建存储桶', exact: true }).click();
+      await expect(page.getByTestId('storage-notice')).toContainText('存储桶已创建', {
+        timeout: 190000,
+      });
+      await upload(original);
+      await record('ui_private_bucket_upload_published_real_immutable_blob');
+      const row = page
+        .getByRole('row')
+        .filter({ has: page.getByRole('cell', { name: key, exact: true }) });
+      const downloading = page.waitForEvent('download');
+      await row.getByRole('button', { name: '下载', exact: true }).click();
+      const download = await downloading;
+      const stream = await download.createReadStream();
+      const chunks: Buffer[] = [];
+      for await (const chunk of stream) chunks.push(Buffer.from(chunk));
+      expect(digest(Buffer.concat(chunks))).toBe(digest(original));
+      await record('ui_downloaded_bytes_and_sha256_match');
+      const anonymous = await context.request.get(
+        `/storage/v1/${root}/uploads?${new URLSearchParams({ key })}`,
+      );
+      expect(anonymous.status()).toBe(404);
+      signed = await presign(root);
+      const range = await context.request.get(signed, { headers: { Range: 'bytes=0-8' } });
+      expect(range.status()).toBe(206);
+      expect(await range.body()).toEqual(original.subarray(0, 9));
+      expect((await context.request.head(signed)).status()).toBe(200);
+      expect(
+        (
+          await context.request.get(signed, {
+            headers: { 'If-None-Match': `"${digest(original)}"` },
+          })
+        ).status(),
+      ).toBe(304);
+      expect((await context.request.get(signed + 'tampered')).status()).toBe(404);
+      await record('private_acl_range_head_conditional_get_and_signature_tampering_checked');
+      expect(
+        (
+          await context.request.put(objectPath(root), {
+            headers: { ...h, 'Content-Type': 'text/plain', 'If-None-Match': '*' },
+            data: updated,
+          })
+        ).status(),
+      ).toBe(412);
+      expect(
+        (
+          await context.request.put(objectPath(root), {
+            headers: { ...h, 'Content-Type': 'text/plain', 'If-Match': '"stale"' },
+            data: updated,
+          })
+        ).status(),
+      ).toBe(412);
+      expect(
+        (
+          await context.request.put(objectPath(root), {
+            headers: { ...h, 'Content-Type': 'text/plain' },
+            data: updated,
+          })
+        ).status(),
+      ).toBe(428);
+      await record('write_preconditions_prevent_unconditional_or_stale_overwrites');
+      await suspend(writer);
+      await record('ui_storage_writer_suspended_to_zero');
+    }
     await page.goto(`/#/projects/${project}/storage`);
     expect(
       (await (await context.request.get(`/api/v1/projects/${project}/endpoints/${writer}`)).json())
@@ -360,26 +495,62 @@ test('Object Storage: UI files, native timeline clone, isolated changes and cold
       timeout: 190000,
     });
     await record('metadata_page_preserved_zero_and_ui_directory_read_cold_woke_writer');
-    await page.goto(`/#/projects/${project}/branches`);
-    await page.getByRole('button', { name: '＋ 创建分支', exact: true }).click();
-    await page.getByLabel('分支名称').fill('child-' + attempt);
-    await page.getByLabel('父分支').selectOption(root);
-    await page.getByLabel('数据库角色密码').fill(password);
-    await page.getByLabel('最大 CPU', { exact: true }).selectOption('1000');
-    await page.getByLabel('最大内存', { exact: true }).selectOption('1024');
-    const cloning = page.waitForResponse(
-      (r) => r.url().endsWith(`/projects/${project}/branches`) && r.request().method() === 'POST',
-    );
-    await page.getByRole('button', { name: '创建并验证', exact: true }).click();
-    const cloned = await cloning;
-    expect(cloned.status()).toBe(202);
-    child = (await cloned.json()).resource.id;
-    await expect(page.locator('.create-modal')).toHaveCount(0, { timeout: 490000 });
-    const ce = (
-      await (await context.request.get(`/api/v1/projects/${project}/endpoints`)).json()
-    ).items.find((v: { branch_id: string }) => v.branch_id === child);
-    childWriter = ce.id;
-    endpoints.add(childWriter);
+    if (recovery) {
+      expect(await (await context.request.get(objectPath(root))).body()).toEqual(original);
+      signed = await presign(root);
+      await record('original_parent_file_bytes_verified_before_cloning');
+    }
+    if (recovery?.child_id) {
+      child = recovery.child_id;
+      childWriter = recovery.child_writer_id!;
+      endpoints.add(childWriter);
+      await save();
+      const observedChild = await context.request.get(
+        `/api/v1/projects/${project}/branches/${child}`,
+      );
+      expect(observedChild.status()).toBe(200);
+      const existingChild = await observedChild.json();
+      expect(existingChild.parent_branch_id).toBe(root);
+      expect(existingChild.name).toBe(recovery.child_name);
+      const observedWriter = await context.request.get(
+        `/api/v1/projects/${project}/endpoints/${childWriter}`,
+      );
+      expect(observedWriter.status()).toBe(200);
+      expect((await observedWriter.json()).branch_id).toBe(child);
+      await retryOriginalOperation(recovery.failed_branch_operation_id!, 'create_branch', child);
+      await record('ui_original_failed_child_retried_same_identity_without_new_branch', {
+        operation_id: recovery.failed_branch_operation_id,
+        child_id: child,
+      });
+    } else {
+      await page.goto(`/#/projects/${project}/branches`);
+      await page.getByRole('button', { name: '＋ 创建分支', exact: true }).click();
+      await page.getByLabel('分支名称').fill('child-' + attempt);
+      await page.getByLabel('父分支').selectOption(root);
+      await page.getByLabel('数据库角色密码').fill(password);
+      await page.getByLabel('最大 CPU', { exact: true }).selectOption('1000');
+      await page.getByLabel('最大内存', { exact: true }).selectOption('1024');
+      const cloning = page.waitForResponse(
+        (r) => r.url().endsWith(`/projects/${project}/branches`) && r.request().method() === 'POST',
+      );
+      await page.getByRole('button', { name: '创建并验证', exact: true }).click();
+      const cloned = await cloning;
+      expect(cloned.status()).toBe(202);
+      const acceptedClone = await cloned.json();
+      child = acceptedClone.resource.id;
+      acceptedOperations.push({
+        id: acceptedClone.operation.id,
+        action: 'create_branch',
+        resource_id: child,
+      });
+      await save();
+      await expect(page.locator('.create-modal')).toHaveCount(0, { timeout: 490000 });
+      const ce = (
+        await (await context.request.get(`/api/v1/projects/${project}/endpoints`)).json()
+      ).items.find((v: { branch_id: string }) => v.branch_id === child);
+      childWriter = ce.id;
+      endpoints.add(childWriter);
+    }
     await load(child);
     await expect(page.getByRole('cell', { name: key, exact: true })).toBeVisible({
       timeout: 190000,
@@ -478,7 +649,8 @@ test('Object Storage: UI files, native timeline clone, isolated changes and cold
     await record('ui_disabled_services_and_released_all_owned_compute_preserving_data');
     await page.goto(`/#/projects/${project}/lifecycle`);
     await expect(page.getByTestId('project-lifecycle')).toBeVisible();
-    await lifecycleAction('解除项目保护', 'ci-' + attempt);
+    const retainedProjectName = recovery?.project_name || 'ci-' + attempt;
+    await lifecycleAction('解除项目保护', retainedProjectName);
     for (const [id, name] of [
       [root, 'main'],
       [child, 'child-' + attempt],
@@ -488,10 +660,10 @@ test('Object Storage: UI files, native timeline clone, isolated changes and cold
         .getByRole('button', { name: '解除分支保护', exact: true });
       if (await button.count()) await lifecycleAction('解除分支保护', name, id);
     }
-    await lifecycleAction('删除项目', 'ci-' + attempt);
+    await lifecycleAction('删除项目', retainedProjectName);
     expect((await context.request.get(objectPath(root))).status()).toBe(404);
     await record('ui_retained_project_deletion_closed_object_admission');
-    await lifecycleAction('恢复项目', 'ci-' + attempt);
+    await lifecycleAction('恢复项目', retainedProjectName);
     expect((await (await context.request.get(branchPath(root))).json()).state).toBe('disabled');
     await page.goto(`/#/projects/${project}/storage`);
     await mutate(root, false);
@@ -501,7 +673,7 @@ test('Object Storage: UI files, native timeline clone, isolated changes and cold
     await suspend(writer);
     await page.goto(`/#/projects/${project}/lifecycle`);
     await expect(page.getByTestId('project-lifecycle')).toBeVisible();
-    await lifecycleAction('删除项目', 'ci-' + attempt);
+    await lifecycleAction('删除项目', retainedProjectName);
     const receipt = await (
       await context.request.get(`/api/v1/projects/${project}/lifecycle`)
     ).json();
