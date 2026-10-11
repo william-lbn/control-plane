@@ -4,8 +4,8 @@
 
 `api/internal/control/functions_instances.go` 已实现候选实例的 PostgreSQL 仓库。
 它是后续 Functions Driver 的实际内部代码，尚未注册为公共部署接口，也尚未被
-Worker action 调用。当前部署源码 `fbff1b09` / 统一 Helm 0.1.9 已包含候选仓库和
-Migration 020 存储回执；Migration 021 引导身份为下一增量。对应运行能力仍以
+Worker action 调用。当前部署源码 `dda5d34` / 统一 Helm 0.1.10 已包含候选仓库、
+Migration 020 存储回执和 Migration 021 引导身份。对应运行能力仍以
 镜像锁和具体验收记录为准。`capabilities.functions.enabled` 保持 false。
 
 本阶段解决：lost reply / Worker 重启沿用同一个候选身份、当前 Operation lease

@@ -14,16 +14,50 @@ test('UI lifecycle: protections, dependency graph, retained delete and seven-day
   const privateDir = process.env.NEON_E2E_PRIVATE_DIR;
   if (!adminFile || !privateDir || !baseURL) throw new Error('Explicit live test inputs required');
   const privateRoot = privateDir;
+  const resumeFile =
+    process.env.NEON_E2E_LIFECYCLE_RESUME_FIXTURE || process.env.NEON_E2E_RECOVERY_FIXTURE;
+  const resume = resumeFile
+    ? (JSON.parse(await readFile(resumeFile, 'utf8')) as {
+        project_id: string;
+        project_name: string;
+        branch_id: string;
+        writer_id: string;
+        reader_ids: string[];
+        deleted_branch_ids: string[];
+        original_failure_job: string;
+        database_password_file: string;
+      })
+    : null;
+  if (
+    resume &&
+    (!/^prj_[a-f0-9]{16}$/.test(resume.project_id) ||
+      !/^br_[a-f0-9]{16}$/.test(resume.branch_id) ||
+      !/^ep_[a-f0-9]{16}$/.test(resume.writer_id) ||
+      !/^publication-ui-\d+$/.test(resume.original_failure_job) ||
+      resume.project_name !== 'ci-lifecycle-' + resume.original_failure_job ||
+      !Array.isArray(resume.reader_ids) ||
+      resume.reader_ids.length !== 2 ||
+      !resume.reader_ids.every((id) => /^ep_[a-f0-9]{16}$/.test(id)) ||
+      new Set([resume.writer_id, ...resume.reader_ids]).size !== 3 ||
+      !Array.isArray(resume.deleted_branch_ids) ||
+      resume.deleted_branch_ids.length !== 2 ||
+      !resume.deleted_branch_ids.every((id) => /^br_[a-f0-9]{16}$/.test(id)) ||
+      new Set([resume.branch_id, ...resume.deleted_branch_ids]).size !== 3)
+  )
+    throw new Error('Invalid original lifecycle fixture');
   const attempt = process.env.NEON_E2E_ATTEMPT || new Date().toISOString().replace(/[^0-9]/g, '');
   if (!/^[a-z0-9_-]+$/.test(attempt)) throw new Error('Invalid attempt');
   await mkdir(privateDir, { recursive: true, mode: 0o700 });
-  const password = randomBytes(30).toString('base64url');
+  const password = resume
+    ? (await readFile(resume.database_password_file, 'utf8')).trim()
+    : randomBytes(30).toString('base64url');
   await writeFile(path.join(privateDir, attempt + '-database-password'), password, {
     mode: 0o600,
     flag: 'wx',
   });
   let project = '';
   let result = 'running';
+  const projectName = resume?.project_name || 'ci-lifecycle-' + attempt;
   const endpoints = new Set<string>();
   const checks: { name: string; [key: string]: unknown }[] = [];
   const operations: { id: string; action: string }[] = [];
@@ -32,7 +66,16 @@ test('UI lifecycle: protections, dependency graph, retained delete and seven-day
     await writeFile(
       testInfo.outputPath('result.json'),
       JSON.stringify(
-        { result, project_id: project, checks, operations, credentials_in_report: false },
+        {
+          result,
+          project_id: project,
+          checks,
+          operations,
+          ...(resume
+            ? { original_failure_job: resume.original_failure_job, creates_new_project: false }
+            : {}),
+          credentials_in_report: false,
+        },
         null,
         2,
       ) + '\n',
@@ -179,136 +222,194 @@ test('UI lifecycle: protections, dependency graph, retained delete and seven-day
     await page.getByLabel('用户名').fill('admin');
     await page.getByLabel('密码', { exact: true }).fill((await readFile(adminFile, 'utf8')).trim());
     await page.getByRole('button', { name: '登录控制台 →', exact: true }).click();
-    await page.getByRole('button', { name: '＋ 创建项目', exact: true }).click();
-    const projectName = 'ci-lifecycle-' + attempt;
-    await page.getByLabel('项目名称').fill(projectName);
-    await page.locator('.create-modal input[type="password"]').fill(password);
-    await page.getByLabel('最大 CPU', { exact: true }).selectOption('1000');
-    await page.getByLabel('最大内存', { exact: true }).selectOption('1024');
-    project = await created('/api/v1/organizations/local/projects');
-    const initial = await data('/api/v1/projects/' + project + '/endpoints');
-    const writer = initial.items[0].id as string;
-    const root = initial.items[0].branch_id as string;
-    endpoints.add(writer);
-    await record('ui_creates_owned_isolated_project', { writer, root });
-    await sql(
-      writer,
-      'CREATE TABLE public.lifecycle_probe(id integer PRIMARY KEY, marker text NOT NULL)',
-    );
-    await sql(writer, "INSERT INTO public.lifecycle_probe VALUES(1,'retained-parent')");
-    await suspend(writer);
-    let parent = '';
-    let leaf = '';
-    for (const branchName of ['parent', 'leaf']) {
-      await page.goto('/#/projects/' + project + '/branches');
-      await page.getByRole('button', { name: '＋ 创建分支', exact: true }).click();
-      await page.getByLabel('分支名称').fill(branchName);
-      await page.getByLabel('父分支').selectOption(parent || root);
-      await page.getByLabel('同时创建读写 Compute Endpoint').uncheck();
-      const id = await created('/api/v1/projects/' + project + '/branches');
-      if (parent) leaf = id;
-      else parent = id;
-    }
-    await lifecycle();
-    await expect(
-      page.getByTestId('lifecycle-' + root).getByRole('button', { name: '删除分支', exact: true }),
-    ).toBeDisabled();
-    await expect(
-      page
-        .getByTestId('lifecycle-' + parent)
-        .getByRole('button', { name: '删除分支', exact: true }),
-    ).toBeDisabled();
-    await expect(
-      page.getByTestId('project-lifecycle').getByRole('button', { name: '删除项目', exact: true }),
-    ).toBeDisabled();
-    await record('ui_root_child_dependencies_and_protection_block_delete');
-    await action('保护分支', 'leaf', leaf);
-    await expect(
-      page.getByTestId('lifecycle-' + leaf).getByRole('button', { name: '删除分支', exact: true }),
-    ).toBeDisabled();
-    await action('解除分支保护', 'leaf', leaf);
-    await record('ui_admin_explicit_branch_protection');
-    await page.goto('/#/projects/' + project + '/branches/' + leaf);
-    await page.getByRole('button', { name: '＋ 创建 Endpoint', exact: true }).click();
-    await page.locator('.create-modal input[type="password"]').fill(password);
-    await page.getByLabel('最大 CPU', { exact: true }).selectOption('1000');
-    await page.getByLabel('最大内存', { exact: true }).selectOption('1024');
-    const leafWriter = await created('/api/v1/projects/' + project + '/endpoints');
-    endpoints.add(leafWriter);
-    expect((await sql(leafWriter, 'SELECT marker FROM public.lifecycle_probe')).rows).toEqual([
-      ['retained-parent'],
-    ]);
-    await record('ui_leaf_compute_inherits_native_data', { leafWriter });
-    await lifecycle();
-    const deleted = await action('删除分支', 'leaf', leaf);
-    const accepted = await deleted.json();
-    const cookies = await context.cookies();
-    const csrf = cookies.find((c) => c.name === 'neon_v2_csrf')!.value;
-    const original = deleted.request();
-    const replay = await context.request.delete(original.url(), {
-      headers: {
-        'X-CSRF-Token': csrf,
-        'If-Match': original.headers()['if-match'],
-        'Idempotency-Key': original.headers()['idempotency-key'],
-      },
-      data: original.postData()!,
-    });
-    expect(replay.status()).toBe(202);
-    expect((await replay.json()).operation.id).toBe(accepted.operation.id);
-    await expect(page.getByTestId('lifecycle-' + leaf)).toContainText('已删除');
-    expect(
-      (
-        await context.request.get(baseURL + '/api/v1/projects/' + project + '/branches/' + leaf)
-      ).status(),
-    ).toBe(404);
-    expect(
-      (
-        await context.request.get(
-          baseURL + '/api/v1/projects/' + project + '/endpoints/' + leafWriter,
-        )
-      ).status(),
-    ).toBe(404);
-    await record('ui_active_leaf_delete_retirement_tombstone_and_same_operation_replay', {
-      operation_id: accepted.operation.id,
-    });
-    await action('删除分支', 'parent', parent);
-    await record('ui_parent_delete_after_child');
-    await action('解除项目保护', projectName);
-    await action('解除分支保护', 'main', root);
-    // Each reader has its own selector and VM, with the writer's database roles.
-    // Run them serially on the resource-constrained cluster and retain all IDs.
+    await expect(page.getByRole('button', { name: '＋ 创建项目', exact: true })).toBeVisible();
+    let writer: string;
+    let root: string;
     const readers: string[] = [];
-    for (let n = 0; n < 2; n++) {
-      await page.goto('/#/projects/' + project + '/branches/' + root);
-      await page.getByRole('button', { name: '＋ 添加 Compute', exact: true }).click();
-      await page.getByLabel('Compute 类型').selectOption('read_only');
-      await expect(page.locator('.create-modal input[type="password"]')).toHaveCount(0);
+    if (!resume) {
+      await page.getByRole('button', { name: '＋ 创建项目', exact: true }).click();
+      await page.getByLabel('项目名称').fill(projectName);
+      await page.locator('.create-modal input[type="password"]').fill(password);
       await page.getByLabel('最大 CPU', { exact: true }).selectOption('1000');
       await page.getByLabel('最大内存', { exact: true }).selectOption('1024');
-      const reader = await created('/api/v1/projects/' + project + '/endpoints');
-      readers.push(reader);
-      endpoints.add(reader);
-      const replica = await sql(
-        reader,
-        "SELECT pg_is_in_recovery(),current_setting('transaction_read_only')",
+      project = await created('/api/v1/organizations/local/projects');
+      const initial = await data('/api/v1/projects/' + project + '/endpoints');
+      writer = initial.items[0].id as string;
+      root = initial.items[0].branch_id as string;
+      endpoints.add(writer);
+      await record('ui_creates_owned_isolated_project', { writer, root });
+      await sql(
+        writer,
+        'CREATE TABLE public.lifecycle_probe(id integer PRIMARY KEY, marker text NOT NULL)',
       );
-      expect(replica.rows).toEqual([[true, 'on']]);
-      const rejected = await sql(
-        reader,
-        `INSERT INTO public.lifecycle_probe VALUES(${10 + n},'must-not-write')`,
-        422,
-      );
-      expect(rejected.code).toBe('sql_failed');
-      expect(rejected.message).toMatch(/read.only/i);
-      await record('ui_reader_is_real_replica_and_rejects_writes', { reader, ordinal: n });
-      await suspend(reader);
-      const state = await data('/api/v1/projects/' + project + '/endpoints');
-      expect(state.items.find((e: { id: string }) => e.id === reader).observed_state).toBe(
-        'suspended',
-      );
-      await record('ui_reader_independent_one_to_zero', { reader });
+      await sql(writer, "INSERT INTO public.lifecycle_probe VALUES(1,'retained-parent')");
+      await suspend(writer);
+      let parent = '';
+      let leaf = '';
+      for (const branchName of ['parent', 'leaf']) {
+        await page.goto('/#/projects/' + project + '/branches');
+        await page.getByRole('button', { name: '＋ 创建分支', exact: true }).click();
+        await page.getByLabel('分支名称').fill(branchName);
+        await page.getByLabel('父分支').selectOption(parent || root);
+        await page.getByLabel('同时创建读写 Compute Endpoint').uncheck();
+        const id = await created('/api/v1/projects/' + project + '/branches');
+        if (parent) leaf = id;
+        else parent = id;
+      }
+      await lifecycle();
+      await expect(
+        page
+          .getByTestId('lifecycle-' + root)
+          .getByRole('button', { name: '删除分支', exact: true }),
+      ).toBeDisabled();
+      await expect(
+        page
+          .getByTestId('lifecycle-' + parent)
+          .getByRole('button', { name: '删除分支', exact: true }),
+      ).toBeDisabled();
+      await expect(
+        page
+          .getByTestId('project-lifecycle')
+          .getByRole('button', { name: '删除项目', exact: true }),
+      ).toBeDisabled();
+      await record('ui_root_child_dependencies_and_protection_block_delete');
+      await action('保护分支', 'leaf', leaf);
+      await expect(
+        page
+          .getByTestId('lifecycle-' + leaf)
+          .getByRole('button', { name: '删除分支', exact: true }),
+      ).toBeDisabled();
+      await action('解除分支保护', 'leaf', leaf);
+      await record('ui_admin_explicit_branch_protection');
+      await page.goto('/#/projects/' + project + '/branches/' + leaf);
+      await page.getByRole('button', { name: '＋ 创建 Endpoint', exact: true }).click();
+      await page.locator('.create-modal input[type="password"]').fill(password);
+      await page.getByLabel('最大 CPU', { exact: true }).selectOption('1000');
+      await page.getByLabel('最大内存', { exact: true }).selectOption('1024');
+      const leafWriter = await created('/api/v1/projects/' + project + '/endpoints');
+      endpoints.add(leafWriter);
+      expect((await sql(leafWriter, 'SELECT marker FROM public.lifecycle_probe')).rows).toEqual([
+        ['retained-parent'],
+      ]);
+      await record('ui_leaf_compute_inherits_native_data', { leafWriter });
+      await lifecycle();
+      const deleted = await action('删除分支', 'leaf', leaf);
+      const accepted = await deleted.json();
+      const cookies = await context.cookies();
+      const csrf = cookies.find((c) => c.name === 'neon_v2_csrf')!.value;
+      const original = deleted.request();
+      const replay = await context.request.delete(original.url(), {
+        headers: {
+          'X-CSRF-Token': csrf,
+          'If-Match': original.headers()['if-match'],
+          'Idempotency-Key': original.headers()['idempotency-key'],
+        },
+        data: original.postData()!,
+      });
+      expect(replay.status()).toBe(202);
+      expect((await replay.json()).operation.id).toBe(accepted.operation.id);
+      await expect(page.getByTestId('lifecycle-' + leaf)).toContainText('已删除');
+      expect(
+        (
+          await context.request.get(baseURL + '/api/v1/projects/' + project + '/branches/' + leaf)
+        ).status(),
+      ).toBe(404);
+      expect(
+        (
+          await context.request.get(
+            baseURL + '/api/v1/projects/' + project + '/endpoints/' + leafWriter,
+          )
+        ).status(),
+      ).toBe(404);
+      await record('ui_active_leaf_delete_retirement_tombstone_and_same_operation_replay', {
+        operation_id: accepted.operation.id,
+      });
+      await action('删除分支', 'parent', parent);
+      await record('ui_parent_delete_after_child');
+      await action('解除项目保护', projectName);
+      await action('解除分支保护', 'main', root);
+      // Each reader has its own selector and VM, with the writer's database roles.
+      // Run them serially on the resource-constrained cluster and retain all IDs.
+      for (let n = 0; n < 2; n++) {
+        await page.goto('/#/projects/' + project + '/branches/' + root);
+        await page.getByRole('button', { name: '＋ 添加 Compute', exact: true }).click();
+        await page.getByLabel('Compute 类型').selectOption('read_only');
+        await expect(page.locator('.create-modal input[type="password"]')).toHaveCount(0);
+        await page.getByLabel('最大 CPU', { exact: true }).selectOption('1000');
+        await page.getByLabel('最大内存', { exact: true }).selectOption('1024');
+        const reader = await created('/api/v1/projects/' + project + '/endpoints');
+        readers.push(reader);
+        endpoints.add(reader);
+        const replica = await sql(
+          reader,
+          "SELECT pg_is_in_recovery(),current_setting('transaction_read_only')",
+        );
+        expect(replica.rows).toEqual([[true, 'on']]);
+        const rejected = await sql(
+          reader,
+          `INSERT INTO public.lifecycle_probe VALUES(${10 + n},'must-not-write')`,
+          422,
+        );
+        expect(rejected.code).toBe('sql_failed');
+        expect(rejected.message).toMatch(/read.only/i);
+        await record('ui_reader_is_real_replica_and_rejects_writes', { reader, ordinal: n });
+        await suspend(reader);
+        const state = await data('/api/v1/projects/' + project + '/endpoints');
+        expect(state.items.find((e: { id: string }) => e.id === reader).observed_state).toBe(
+          'suspended',
+        );
+        await record('ui_reader_independent_one_to_zero', { reader });
+      }
+    } else {
+      project = resume.project_id;
+      root = resume.branch_id;
+      writer = resume.writer_id;
+      readers.push(...resume.reader_ids);
+      for (const id of [writer, ...readers]) endpoints.add(id);
+      const retained = await data('/api/v1/projects/' + project);
+      expect(retained.name).toBe(projectName);
+      expect(retained.source).toBe('managed');
+      expect(retained.state).toBe('ready');
+      expect(retained.protected).toBe(false);
+      const graph = await data('/api/v1/projects/' + project + '/lifecycle');
+      expect(
+        graph.branches
+          .filter((b: { deleted_at: string | null }) => !b.deleted_at)
+          .map((b: { id: string }) => b.id),
+      ).toEqual([root]);
+      for (const id of resume.deleted_branch_ids)
+        expect(
+          graph.tombstones.some(
+            (t: { resource_type: string; resource_id: string; physical_gc_state: string }) =>
+              t.resource_type === 'branch' &&
+              t.resource_id === id &&
+              t.physical_gc_state === 'held',
+          ),
+        ).toBe(true);
+      const current = (await data('/api/v1/projects/' + project + '/endpoints')).items;
+      expect(current.map((e: { id: string }) => e.id).sort()).toEqual([writer, ...readers].sort());
+      for (const id of readers) {
+        const endpoint = current.find((e: { id: string }) => e.id === id);
+        expect(endpoint.branch_id).toBe(root);
+        expect(endpoint.endpoint_type).toBe('read_only');
+        expect(endpoint.observed_state).toBe('suspended');
+      }
+      await record('original_lifecycle_dependencies_readers_and_held_branch_deletions_confirmed');
     }
-    await sql(writer, "INSERT INTO public.lifecycle_probe VALUES(2,'before-delete')");
+    // The original failing request may have executed its INSERT before the
+    // reply was lost. Resolve the exact rows first; never blindly repeat DML.
+    const existing = (await sql(writer, 'SELECT id,marker FROM public.lifecycle_probe ORDER BY id'))
+      .rows;
+    if (existing.length === 1) {
+      expect(existing).toEqual([[1, 'retained-parent']]);
+      await sql(writer, "INSERT INTO public.lifecycle_probe VALUES(2,'before-delete')");
+    } else {
+      expect(existing).toEqual([
+        [1, 'retained-parent'],
+        [2, 'before-delete'],
+      ]);
+    }
+    if (resume) await record('original_unknown_insert_resolved_by_exact_rows_without_blind_replay');
     for (const reader of readers) {
       await expect
         .poll(

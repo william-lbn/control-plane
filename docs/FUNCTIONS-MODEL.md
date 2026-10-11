@@ -167,8 +167,11 @@ multipart foundation 为 87 Go / 9 Node pass。后续
 `functions-boot-metadata-full-linux-quality-attempt2` 为 474 Go pass / 0 fail /
 0 skip，追加了 default-route 等待与已授权 Writer/branch/project 删除拒绝检查。
 
-下一阶段必须实现并验收：immutable artifact/Secret 写入结果恢复、SQL login/schema
-权限、leased Driver、真实函数部署/失败保持旧版本/回滚/缩零冷醒、严格 OpenAPI 和 React
+immutable artifact/environment/bootstrap 与候选回执的写入结果恢复已实现；当前运行
+`dda5d34` 为 21/21 migrations。[资源恢复/原子发布](FUNCTIONS-PUBLICATION.md)新增
+真实 Service恢复/CRD dry-run及私有 PG发布事务，尚未接公共执行 Driver。
+下一阶段必须实现并验收：持久 SQL login/branch manifest、leased Driver、真实函数
+部署/失败保持旧版本/回滚/缩零冷醒、严格 OpenAPI 和 React
 部署调用/日志页面；随后验证 SQL manifest 的 branch/PITR 继承。未完成项不是“只差测试”。
 
 所有证据保留源 commit、artifact digest、Job/VM/Pod UID、Scope、boot、真实正负检查及

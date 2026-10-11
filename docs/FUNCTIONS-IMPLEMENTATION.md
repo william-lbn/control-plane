@@ -149,7 +149,7 @@ HTTP body bounded、16 并发、SSE 实际逐块送达。独立 self-hosted wait
 | 顺序 | 实现内容 | 必须留下的真实证据 |
 | --- | --- | --- |
 | F1 | supervisor、签名 artifact、受信 TLS、自有 build/VM 默认 entry 32 项通过；真实分支 SQL 待验收 | 实际隔离 VM、Node fetch/SQL、Secret/raw-device/UID/cgroup/egress 负例、终止树 |
-| F2 | metadata/read API/UI 已接通；持久候选租约仓库已实现；immutable backing、执行 Driver 和编辑/部署/调用/日志仍待集成 | UI lost-202 幂等、失败保留旧版本、版本回滚、实际 Response/SSE、正常 VM 回收 |
+| F2 | metadata/read API/UI、持久候选、immutable artifact/environment/bootstrap 回执已实现；Service/VM 恢复及原子发布内部代码已增加，执行 Driver 和编辑/部署/调用/日志仍待集成 | UI lost-202 幂等、失败保留旧版本、版本回滚、实际 Response/SSE、正常 VM 回收 |
 | F3 | 受限 SQL login、branch SQL manifest、克隆/历史点继承、zero/wake、Writer 删除依赖 | 新 branch URL/role/key；父子 SQL/代码/Secret 隔离；首次请求冷醒 Function 和 Compute |
 | F4 | WS、独立预算、cron/对象 outbox、dedup/retry、完整生命周期和监控 | 真实 WS、event delivery 语义、分支旧事件隔离、触发失败恢复、持久日志/指标 |
 

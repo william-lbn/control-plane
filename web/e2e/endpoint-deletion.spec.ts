@@ -14,8 +14,42 @@ test('UI independent Compute deletion, lost reply, replica continuity and retain
   const privateDir = process.env.NEON_E2E_PRIVATE_DIR;
   if (!adminFile || !privateDir || !baseURL || process.platform !== 'linux')
     throw new Error('Protected Linux live UI inputs required');
+  const resumeFile =
+    process.env.NEON_E2E_ENDPOINT_RESUME_FIXTURE || process.env.NEON_E2E_RECOVERY_FIXTURE;
+  const resume = resumeFile
+    ? (JSON.parse(await readFile(resumeFile, 'utf8')) as {
+        project_id: string;
+        project_name: string;
+        branch_id: string;
+        writer_id: string;
+        deleted_reader_id: string;
+        surviving_reader_id: string;
+        delete_operation_id: string;
+        original_failure_job: string;
+        cleanup_operation_ids: string[];
+        database_password_file: string;
+      })
+    : null;
+  if (
+    resume &&
+    (!/^prj_[a-f0-9]{16}$/.test(resume.project_id) ||
+      !/^br_[a-f0-9]{16}$/.test(resume.branch_id) ||
+      ![resume.writer_id, resume.deleted_reader_id, resume.surviving_reader_id].every((id) =>
+        /^ep_[a-f0-9]{16}$/.test(id),
+      ) ||
+      new Set([resume.writer_id, resume.deleted_reader_id, resume.surviving_reader_id]).size !==
+        3 ||
+      !/^op_[a-f0-9]+$/.test(resume.delete_operation_id) ||
+      !/^publication-ui-\d+$/.test(resume.original_failure_job) ||
+      resume.project_name !== 'ci-' + resume.original_failure_job + '-epdelete' ||
+      !Array.isArray(resume.cleanup_operation_ids) ||
+      !resume.cleanup_operation_ids.every((id) => /^op_[a-f0-9]+$/.test(id)))
+  )
+    throw new Error('Invalid original Endpoint deletion fixture');
   const attempt = `${process.env.NEON_E2E_ATTEMPT || Date.now()}-epdelete`;
-  const password = randomBytes(30).toString('base64url');
+  const password = resume
+    ? (await readFile(resume.database_password_file, 'utf8')).trim()
+    : randomBytes(30).toString('base64url');
   await mkdir(privateDir, { recursive: true, mode: 0o700 });
   await writeFile(path.join(privateDir, attempt + '-database-password'), password, {
     mode: 0o600,
@@ -28,7 +62,7 @@ test('UI independent Compute deletion, lost reply, replica continuity and retain
   const checks: { name: string; [key: string]: unknown }[] = [];
   const operations: { id: string; action: string; resource_id: string }[] = [];
   const cleanup: { endpoint_id?: string; status: number; operation_id?: string }[] = [];
-  const projectName = 'ci-' + attempt;
+  const projectName = resume?.project_name || 'ci-' + attempt;
   const base = () => `/api/v1/projects/${project}`;
   const storagePath = () => `${base()}/branches/${branch}/storage`;
   async function save() {
@@ -40,6 +74,13 @@ test('UI independent Compute deletion, lost reply, replica continuity and retain
           result,
           project_id: project,
           branch_id: branch,
+          ...(resume
+            ? {
+                original_failure_job: resume.original_failure_job,
+                original_deleted_reader_operation_id: resume.delete_operation_id,
+                creates_new_project: false,
+              }
+            : {}),
           endpoints: [...endpoints],
           checks,
           operations,
@@ -171,89 +212,146 @@ test('UI independent Compute deletion, lost reply, replica continuity and retain
     await page.getByLabel('用户名').fill('admin');
     await page.getByLabel('密码', { exact: true }).fill((await readFile(adminFile, 'utf8')).trim());
     await page.getByRole('button', { name: '登录控制台 →', exact: true }).click();
-    await page.getByRole('button', { name: '＋ 创建项目', exact: true }).click();
-    await page.getByLabel('项目名称').fill(projectName);
-    await page.locator('.create-modal input[type="password"]').fill(password);
-    await page.getByLabel('最大 CPU', { exact: true }).selectOption('1000');
-    await page.getByLabel('最大内存', { exact: true }).selectOption('1024');
-    project = await created('/api/v1/organizations/local/projects');
-    const original = (await get(base() + '/endpoints')).items[0];
-    const writer = original.id as string;
-    branch = original.branch_id;
-    endpoints.add(writer);
-    // The SQL workbench uses a single prepared statement per request.
-    await sql(
-      writer,
-      'CREATE TABLE public.endpoint_retention_probe(id int PRIMARY KEY, value text)',
-    );
-    await sql(writer, "INSERT INTO public.endpoint_retention_probe VALUES(1,'retained')");
-    await sql(writer, 'GRANT CREATE ON DATABASE postgres TO control_probe');
-    await record('ui_created_native_project_and_persisted_branch_sql');
-    expect((await sql(writer, 'SELECT 1; SELECT 2', 422)).code).toBe('sql_failed');
-    await record('ui_rejected_multi_statement_query_clears_single_request_password');
-    const reader1 = await createEndpoint('read_only');
-    const reader2 = await createEndpoint('read_only');
-    expect(
-      (await sql(reader2, 'SELECT * FROM public.endpoint_retention_probe ORDER BY id')).rows,
-    ).toEqual([[1, 'retained']]);
-    await record('ui_two_independent_readers_observe_real_writer_wal');
+    await expect(page.getByRole('button', { name: '＋ 创建项目', exact: true })).toBeVisible();
+    let original: { id: string; branch_id: string; selector: string; endpoint_type: string };
+    let writer: string;
+    let reader2: string;
+    if (!resume) {
+      await page.getByRole('button', { name: '＋ 创建项目', exact: true }).click();
+      await page.getByLabel('项目名称').fill(projectName);
+      await page.locator('.create-modal input[type="password"]').fill(password);
+      await page.getByLabel('最大 CPU', { exact: true }).selectOption('1000');
+      await page.getByLabel('最大内存', { exact: true }).selectOption('1024');
+      project = await created('/api/v1/organizations/local/projects');
+      original = (await get(base() + '/endpoints')).items[0];
+      writer = original.id;
+      branch = original.branch_id;
+      endpoints.add(writer);
+      // The SQL workbench uses a single prepared statement per request.
+      await sql(
+        writer,
+        'CREATE TABLE public.endpoint_retention_probe(id int PRIMARY KEY, value text)',
+      );
+      await sql(writer, "INSERT INTO public.endpoint_retention_probe VALUES(1,'retained')");
+      await sql(writer, 'GRANT CREATE ON DATABASE postgres TO control_probe');
+      await record('ui_created_native_project_and_persisted_branch_sql');
+      expect((await sql(writer, 'SELECT 1; SELECT 2', 422)).code).toBe('sql_failed');
+      await record('ui_rejected_multi_statement_query_clears_single_request_password');
+      const reader1 = await createEndpoint('read_only');
+      reader2 = await createEndpoint('read_only');
+      expect(
+        (await sql(reader2, 'SELECT * FROM public.endpoint_retention_probe ORDER BY id')).rows,
+      ).toEqual([[1, 'retained']]);
+      await record('ui_two_independent_readers_observe_real_writer_wal');
 
-    const reviewed = await openDelete(reader1);
-    await page.getByLabel('Endpoint Selector 确认').fill('wrong-selector');
-    await expect(
-      page.getByRole('button', { name: '确认删除 Compute', exact: true }),
-    ).toBeDisabled();
-    await page.getByLabel('Endpoint Selector 确认').fill(reviewed.selector);
-    await record('ui_requires_exact_selector_confirmation_before_delete');
-    const captured: { key: string; version: string; operation_id: string }[] = [];
-    const deleteURL = `${base()}/endpoints/${reader1}`;
-    await page.route('**' + deleteURL, async (route) => {
-      if (route.request().method() !== 'DELETE') return route.continue();
-      const response = await route.fetch();
-      expect(response.status()).toBe(202);
-      const value = await response.json();
-      captured.push({
-        key: route.request().headers()['idempotency-key'],
-        version: route.request().headers()['if-match'],
-        operation_id: value.operation.id,
+      const reviewed = await openDelete(reader1);
+      await page.getByLabel('Endpoint Selector 确认').fill('wrong-selector');
+      await expect(
+        page.getByRole('button', { name: '确认删除 Compute', exact: true }),
+      ).toBeDisabled();
+      await page.getByLabel('Endpoint Selector 确认').fill(reviewed.selector);
+      await record('ui_requires_exact_selector_confirmation_before_delete');
+      const captured: { key: string; version: string; operation_id: string }[] = [];
+      const deleteURL = `${base()}/endpoints/${reader1}`;
+      await page.route('**' + deleteURL, async (route) => {
+        if (route.request().method() !== 'DELETE') return route.continue();
+        const response = await route.fetch();
+        expect(response.status()).toBe(202);
+        const value = await response.json();
+        captured.push({
+          key: route.request().headers()['idempotency-key'],
+          version: route.request().headers()['if-match'],
+          operation_id: value.operation.id,
+        });
+        if (captured.length === 1) return route.abort('failed'); // server accepted; browser lost the reply
+        await route.fulfill({ response });
       });
-      if (captured.length === 1) return route.abort('failed'); // server accepted; browser lost the reply
-      await route.fulfill({ response });
-    });
-    await page.getByRole('button', { name: '确认删除 Compute', exact: true }).click();
-    await expect(page.locator('.endpoint-delete-modal [role="alert"]')).toBeVisible();
-    await expect(page.getByRole('button', { name: '确认删除 Compute', exact: true })).toBeEnabled();
-    await page.getByRole('button', { name: '确认删除 Compute', exact: true }).click();
-    await expect(page.locator('.endpoint-delete-modal')).not.toBeVisible({ timeout: 480000 });
-    await page.unroute('**' + deleteURL);
-    expect(captured).toHaveLength(2);
-    expect(captured[1]).toEqual(captured[0]);
-    const oldDelete = await get(`${base()}/operations/${captured[0].operation_id}`);
-    expect(oldDelete.state).toBe('succeeded');
-    expect(oldDelete.steps).toHaveLength(4);
-    expect(oldDelete.steps.every((s: { state: string }) => s.state === 'succeeded')).toBe(true);
-    operations.push(oldDelete);
-    await record('ui_lost_accepted_reply_reuses_key_version_and_same_operation', {
-      operation_id: oldDelete.id,
-    });
-    const live = (await get(base() + '/endpoints')).items;
-    expect(live.map((e: { id: string }) => e.id).sort()).toEqual([writer, reader2].sort());
-    expect(
-      (await sql(reader2, 'SELECT * FROM public.endpoint_retention_probe ORDER BY id')).rows,
-    ).toEqual([[1, 'retained']]);
-    await record('ui_reader_delete_preserves_writer_other_reader_and_branch_data');
-    const replay = await context.request.delete(deleteURL, {
-      headers: {
-        ...(await headers()),
-        'Idempotency-Key': captured[0].key,
-        'If-Match': captured[0].version,
-      },
-      data: { confirm_selector: reviewed.selector },
-    });
-    expect(replay.status()).toBe(202);
-    expect((await replay.json()).operation.id).toBe(oldDelete.id);
-    expect((await context.request.get(deleteURL + '/connection-info')).status()).toBe(404);
-    await record('ui_deleted_selector_is_closed_and_completed_request_replay_is_stable');
+      await page.getByRole('button', { name: '确认删除 Compute', exact: true }).click();
+      await expect(page.locator('.endpoint-delete-modal [role="alert"]')).toBeVisible();
+      await expect(
+        page.getByRole('button', { name: '确认删除 Compute', exact: true }),
+      ).toBeEnabled();
+      await page.getByRole('button', { name: '确认删除 Compute', exact: true }).click();
+      await expect(page.locator('.endpoint-delete-modal')).not.toBeVisible({ timeout: 480000 });
+      await page.unroute('**' + deleteURL);
+      expect(captured).toHaveLength(2);
+      expect(captured[1]).toEqual(captured[0]);
+      const oldDelete = await get(`${base()}/operations/${captured[0].operation_id}`);
+      expect(oldDelete.state).toBe('succeeded');
+      expect(oldDelete.steps).toHaveLength(4);
+      expect(oldDelete.steps.every((s: { state: string }) => s.state === 'succeeded')).toBe(true);
+      operations.push(oldDelete);
+      await record('ui_lost_accepted_reply_reuses_key_version_and_same_operation', {
+        operation_id: oldDelete.id,
+      });
+      const live = (await get(base() + '/endpoints')).items;
+      expect(live.map((e: { id: string }) => e.id).sort()).toEqual([writer, reader2].sort());
+      expect(
+        (await sql(reader2, 'SELECT * FROM public.endpoint_retention_probe ORDER BY id')).rows,
+      ).toEqual([[1, 'retained']]);
+      await record('ui_reader_delete_preserves_writer_other_reader_and_branch_data');
+      const replay = await context.request.delete(deleteURL, {
+        headers: {
+          ...(await headers()),
+          'Idempotency-Key': captured[0].key,
+          'If-Match': captured[0].version,
+        },
+        data: { confirm_selector: reviewed.selector },
+      });
+      expect(replay.status()).toBe(202);
+      expect((await replay.json()).operation.id).toBe(oldDelete.id);
+      expect((await context.request.get(deleteURL + '/connection-info')).status()).toBe(404);
+      await record('ui_deleted_selector_is_closed_and_completed_request_replay_is_stable');
+    } else {
+      project = resume.project_id;
+      branch = resume.branch_id;
+      writer = resume.writer_id;
+      reader2 = resume.surviving_reader_id;
+      const retained = await get(base());
+      expect(retained.name).toBe(projectName);
+      expect(retained.source).toBe('managed');
+      expect(retained.state).toBe('ready');
+      // Inspect the original cleanup Operations before another SQL wake-up.
+      // A submitted 202 is never counted as completed retirement.
+      for (const id of resume.cleanup_operation_ids) {
+        await expect
+          .poll(async () => (await get(`${base()}/operations/${id}`)).state, {
+            timeout: 120000,
+          })
+          .toBe('succeeded');
+      }
+      expect((await get(storagePath())).state).toBe('disabled');
+      const live = (await get(base() + '/endpoints')).items;
+      expect(live.map((e: { id: string }) => e.id).sort()).toEqual([writer, reader2].sort());
+      original = await get(`${base()}/endpoints/${writer}`);
+      expect(original.branch_id).toBe(branch);
+      expect(original.endpoint_type).toBe('read_write');
+      expect((await get(`${base()}/endpoints/${reader2}`)).endpoint_type).toBe('read_only');
+      expect(
+        (await context.request.get(`${base()}/endpoints/${resume.deleted_reader_id}`)).status(),
+      ).toBe(404);
+      const oldDelete = await get(`${base()}/operations/${resume.delete_operation_id}`);
+      expect(oldDelete.action).toBe('delete_endpoint');
+      expect(oldDelete.resource_id).toBe(resume.deleted_reader_id);
+      expect(oldDelete.state).toBe('succeeded');
+      expect(oldDelete.steps).toHaveLength(4);
+      expect(oldDelete.steps.every((s: { state: string }) => s.state === 'succeeded')).toBe(true);
+      const receipt = await get(base() + '/lifecycle');
+      expect(
+        receipt.tombstones.some(
+          (t: { resource_id: string; physical_gc_state: string }) =>
+            t.resource_id === resume.deleted_reader_id && t.physical_gc_state === 'held',
+        ),
+      ).toBe(true);
+      for (const id of [writer, resume.deleted_reader_id, reader2]) endpoints.add(id);
+      operations.push(oldDelete);
+      await record('original_reader_delete_and_cleanup_operations_confirmed_without_new_project');
+      for (const id of [writer, reader2])
+        expect(
+          (await sql(id, 'SELECT * FROM public.endpoint_retention_probe ORDER BY id')).rows,
+        ).toEqual([[1, 'retained']]);
+      await record('original_writer_and_surviving_reader_reopen_exact_retained_rows');
+    }
 
     await storage(false);
     await openDelete(writer);
@@ -265,9 +363,11 @@ test('UI independent Compute deletion, lost reply, replica continuity and retain
     await page.getByRole('button', { name: '确认删除 Compute', exact: true }).click();
     const denied = await blocked;
     expect(denied.status()).toBe(409);
-    expect((await denied.json()).code).toBe('endpoint_has_services');
+    const dependency = await denied.json();
+    expect(dependency.code).toBe('endpoint_has_services');
+    expect(typeof dependency.message).toBe('string');
     await expect(page.locator('.endpoint-delete-modal [role="alert"]')).toContainText(
-      'Disable dependent',
+      dependency.message,
     );
     await page.getByRole('button', { name: '取消', exact: true }).click();
     await record('ui_active_object_storage_blocks_writer_deletion_without_side_effects');

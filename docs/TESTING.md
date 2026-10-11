@@ -398,3 +398,88 @@ npm --prefix web run test:e2e -- object-storage.spec.ts
 resourceVersion 恢复**此 selector 的准确原 entry**并保留其他 routes；不要整体回滚
 一份旧 Secret 覆盖其他客户的新配置。原 entry 可能没有 `state` 字段，不能把“恢复”
 理解为强制写 active。恢复后的新测试也有独立结果；历史失败不改成通过。
+
+### 已受理并恢复成功的 timestamp 分支继续验收
+
+`restore-resume.spec.ts` 仅接受 `NEON_E2E_RESTORE_RESUME_FIXTURE` 指向的原受保护
+fixture。原失败 Job 已终止，原 timestamp Operation 已通过 UI 重试至 succeeded，
+原 VM 正常恢复后才能使用。该模式保留原 project/timestamp branch/Operation 与历史点，
+验证原真实数据及目录隔离，再串行验证写入隔离、原恢复 Writer 1→0→1、UI 创建新的
+LSN 分支、其真实历史数据及冷醒、原 LSN 请求的幂等重放、窗口外拒绝、历史页与监控。
+它不重复创建 timestamp 分支，不声称原失败变为首次成功；不是原地 PITR。
+
+JSON 字段：project_id、project_name、operation_id、writer_id、child_branch_id、
+child_endpoint_id、original_failure_job、names（receipt/laterTable/laterRole/laterDatabase）、
+sourcePoint（timestamp/lsn）、resolved_parent_lsn、database_password_file。项目名须为
+`restore-{original_failure_job}`；resolved_parent_lsn 是原 timestamp admission 固定的
+精确 LSN，可能与 sourcePoint.lsn 不同。不要重新计算或猜测这些字段。
+
+fixture 密码来自原 Linux 私有文件；JSON 不存密码值。已有 receipt 中原 child 的 id=1
+为 before、source id=1 为 after，且 child 尚未插入 id=2。其他失败阶段不能套用。
+每次新 attempt 单独保存受保护的 accepted LSN 原请求/幂等键，在等待创建窗口关闭前
+保存 branch/endpoint/Operation 身份；不会把包含密码的请求体上传为公开 evidence。
+
+```bash
+export NEON_E2E_RESTORE_RESUME_FIXTURE=/secure/e2e/original-restored-fixture.json
+export NEON_E2E_PRIVATE_DIR=/secure/e2e/restore-resume-unique
+export NEON_E2E_ARTIFACTS=/var/lib/neon-evidence/restore-resume-unique
+export NEON_E2E_ATTEMPT=publication-ui-20261011000000 # 替换为本次唯一身份
+npm --prefix web run test:e2e -- restore-resume.spec.ts
+```
+
+每阶段先正常缩零上一 Writer，再进行下一项，不并行启动三个恢复 Compute。结束还需
+实际 Kubernetes 确认原 VM/Runner 全部消失，才可正常保留删除该测试项目释放配额。
+原失败、恢复与续测分别出具回执；只统计实际通过的检查，不合并不同版本的数字。
+
+### 原 Reader 删除成功后的 Compute 生命周期续测
+
+`endpoint-deletion.spec.ts` 支持受保护的 `NEON_E2E_ENDPOINT_RESUME_FIXTURE`。
+仅适用于第一 Reader 已经正常删除、原 Writer 与第二 Reader 仍保留，原 SQL 表
+`public.endpoint_retention_probe` 只有 `(1,'retained')` 的阶段。原 Job 必须已终止。
+后续阶段失败不能重新使用此前 fixture，也不能创建替代项目冒充原失败恢复。
+
+JSON 字段：project_id、project_name、branch_id、writer_id、deleted_reader_id、
+surviving_reader_id、delete_operation_id、original_failure_job、cleanup_operation_ids、
+database_password_file。名字必须为 `ci-{original_failure_job}-epdelete`；三个 Endpoint
+身份必须不同。密码从原私有文件读取。先确认原清理 Operation 全部 succeeded、
+Storage disabled、删除 Reader 的四个步骤 succeeded/404/held tombstone，以及
+原 Writer/保留 Reader 的精确数据，再继续实际 UI 服务依赖保护和删除流程。
+
+续测涵盖 Writer 正常退休、原密码重建新 selector、Reader 跟随新 WAL、Storage 绑定
+替换 Writer、独立 Reader 退休、无 Compute 界面、重新创建后的数据、项目恢复排除
+独立删除的 Endpoint，最后正常保留删除并核对四份 held Endpoint tombstone。
+依赖错误校验实际 409/code 和 UI 呈现的服务端 message，不把旧英语提示当作 API 合同。
+
+```bash
+export NEON_E2E_ENDPOINT_RESUME_FIXTURE=/secure/e2e/original-endpoint-fixture.json
+export NEON_E2E_PRIVATE_DIR=/secure/e2e/endpoint-resume-unique
+export NEON_E2E_ARTIFACTS=/var/lib/neon-evidence/endpoint-resume-unique
+npm --prefix web run test:e2e -- endpoint-deletion.spec.ts
+```
+
+这是原 fixture 的续测范围，原首次失败保持失败。通过回执必须额外核对实际 VM 和
+运行 Runner 为零；受理清理的 202 不构成已经缩零或已经释放资源的证据。
+
+### 原生命周期测试在 Writer SQL 回复未知后继续
+
+`lifecycle.spec.ts` 的 `NEON_E2E_LIFECYCLE_RESUME_FIXTURE` 只适用于已删除 parent/leaf、
+解除项目/main 保护、创建两个真实 Reader 并分别缩零后，Writer 插入 id=2 的回复失败
+阶段。JSON 字段：project_id、project_name、branch_id、writer_id、reader_ids（恰好两个）、
+deleted_branch_ids（恰好两个）、original_failure_job、database_password_file。名字必须
+为 `ci-lifecycle-{original_failure_job}`。只能使用已停止的原 Job 和保留的原密码。
+
+续测先确认原项目 ready、唯一 live root、两份 held branch tombstone，以及原 Writer
+和两个原 Reader 的类型/归属/休眠状态。随后 UI SELECT 原表：只有 id=1 时执行一次
+插入；已含准确 id=1/id=2 则继续，不重放 INSERT。其他行/值直接失败，不清表或覆盖。
+继续两个 Reader 冷醒/WAL、项目删除/恢复/原身份数据、Data API 真实 RLS、服务关闭、
+撤销凭据不复活和显式重新启用。该模式不重新执行先前十项新建/保护检查。
+
+```bash
+export NEON_E2E_LIFECYCLE_RESUME_FIXTURE=/secure/e2e/original-lifecycle-fixture.json
+export NEON_E2E_PRIVATE_DIR=/secure/e2e/lifecycle-resume-unique
+export NEON_E2E_ARTIFACTS=/var/lib/neon-evidence/lifecycle-resume-unique
+npm --prefix web run test:e2e -- lifecycle.spec.ts
+```
+
+新回执单独记录恢复范围与原 Job，不将原 503 改成通过。所有服务停用、VM/Runner
+实际归零后，才可按原项目名称、实际版本和通过证据进行正常保留删除释放测试配额。

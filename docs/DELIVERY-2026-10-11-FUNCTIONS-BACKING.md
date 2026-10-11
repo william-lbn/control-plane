@@ -89,7 +89,7 @@ Compute VM/运行 Pod 为 0，逻辑删除释放测试配额，数据、对象�
 该串行批次在 Auth 失败处停止；本版本后续 Data API/PITR/Endpoint/生命周期/凭据/邀请
 尚未完成该批次验证。8 个已完成 Auth 检查不是一次通过的完整 Auth 验收。
 
-### 3.2 下一代码增量
+### 3.2 后续已发布的引导身份与 UI 响应修复
 
 Migration 021 与 [不可变引导合同](FUNCTIONS-BOOTSTRAP.md) 已实现并在 Linux 通过
 553 Go/PG/race/vet/构建检查、3 个实际 MinIO/Kubernetes 检查。Linux Web Job
@@ -98,10 +98,65 @@ RBAC 测试）。畸形成功响应的恢复测试只重读原 accepted Operatio
 这些结果使用独立 fixture，仍未接通产品部署/调用 Driver。UI 响应修复和原 Auth 恢复
 suite 的运行验收单独记录，未用前端测试冒充真实浏览器恢复。
 
+### 3.3 当前运行发行与逐套回归
+
+当前运行源码 **`dda5d34dc9bed7117950f31de0bc438b47dc2c02`**，公开 Linux CI
+**`38126879254`** 的 13 个作业全部成功。七镜像逐一匿名核验，三节点共 21 次
+CRI 固定 digest 拉取通过。统一 Helm **0.1.10** 提交
+`be44ca850cdd12b7207b9e78c93b7b02a98ae818`；分支 CI `38131636400`、标签 CI
+`38131682981` 成功。10 Chart 的匿名消费者 index、包 SHA 和下载验证通过。
+八阶段更新已有 releases，metadata 为 **21/21 migrations**。没有修改 data plane fork。
+
+实际串行 Linux UI 回归如下。运行均为上述源码；恢复续测的 TypeScript 增量采用
+明确记录 SHA-256 的 override，之后提交公开源代码。所有原失败、密码和数据保留。
+
+| 场景 | 实际通过检查 | 验证范围 |
+| --- | --- | --- |
+| Functions metadata | 8 | 真实只读 UI/API/PG、执行禁用；没有函数执行 |
+| Native | 13 | UI 项目/分支/Writer/Proxy SQL/缩零冷醒；四次 GET 观察故障、一次 project POST |
+| Managed Auth | 23 | 本版新建项目/注册/JWT/RLS、父子隔离、零/冷醒、禁用 |
+| Data API | 20 | 本版新建项目、真实分支 RLS、零/冷醒、禁用；没有 Worker 故障注入 |
+| Object Storage | 19 | 本版正常完整 suite：分支文件、隔离、条件写入、冷醒及保留生命周期 |
+| 历史恢复续测 | 10 | 原 timestamp Operation/固定点恢复后继续；写入隔离、UI 新 LSN fork、冷醒/重放/监控 |
+| Endpoint 删除续测 | 14 | 原 Reader 删除已成功；依赖保护、替换 Writer/原密码数据、保留 Reader WAL、独立退休和项目恢复 |
+| 生命周期续测 | 14 | 原依赖/两 Reader 状态；SQL 未知结果核验、项目恢复、真实 Data API、撤销凭据不复活 |
+| 应用凭据 | 8 | 精确自有既有项目、data-only 分支、祖先/兄弟/模型范围、一次性重放、轮换/撤销 |
+| Console 邀请 | 6 | 原 Job 实际注册、已有账号、隔离/撤销；只读补采，没有重新注册 |
+
+合计 **135 个实际通过检查**：七套正常场景 **97** 个，三个明确恢复续测场景 **38** 个。
+这不是“十套全新首次通过”，也没有把旧失败中的部分成功累计进去。各场景终态
+实际 managed Compute VM/运行 Pod 为零。已通过的本版新建测试项目正常保留删除
+释放逻辑配额；恢复项目也按原名称和通过证据保留删除。物理 GC 保持 false。
+
+原 Auth 项目 `prj_ae29a8fffebad70e` 的独立恢复 **19 项**使用已提交的测试修复
+`af063ac`，其与运行源码间只包含 Auth 测试与 TESTING 文档；没有运行代码差异。
+`68e4327`/`af063ac` 的公开 CI `38132297918`/`38132506964` 均成功。
+该 19 项单独保留，不加入上述 135 项。
+
+本轮原失败与纠正：
+
+- timestamp 创建原 Operation `op_b3a4a83e428170d24cabb00e` 在 wait_neonvm_running
+  重试性失败，根因未证明。实际原 VM 随后 Running；UI 重试相同 Operation 并固定
+  原 LSN，通过独立 5 项恢复，再用原项目完成 10 项续测。原 3 项后失败仍保留。
+- Endpoint 原 Job `publication-ui-20261011115104` 在 7 项后失败。409 依赖保护正确，
+  测试仍匹配旧英语提示；改为机器 code + 实际 UI message。原项目续测，首个续测
+  的 endpoint_type 字段读取错误也保留；纠正后 14 项通过，未替换原项目。
+- 生命周期原 Job `publication-ui-20261011121353` 在 10 项后 INSERT 返回 503。
+  不假定未执行，不盲目重放 DML。原项目 UI SELECT 核验精确行后继续，14 项通过；
+  不将 503 归因硬件或抹去。硬件影响与软件缺陷分别记录。
+- 凭据首个尝试误选普通项目；`ci-` 自有 fixture 前置保护拒绝，未创建分支/凭据。
+  改用有 23 项历史通过证据、当前 ready 的 `prj_3a5251a12cefad42`，正常 suite 8 项通过。
+- 邀请原 Job `publication-ui-20261011124004` 已成功完成 6 项；Windows 采证路径
+  过长导致复制失败。按原 Job/Pod UID 只读补采并查证零 Compute，原采证失败不覆盖。
+
+135 项串行总回执为维护者私有 `functions-bootstrap-final-serial-matrix-202610111315`。
+原测试密码、Token/SQL 请求、Kubernetes Secrets 和私密截图不进入公开仓库。
+新的资源恢复/原子发布代码、质量检查及未接通范围见 [下一实现](FUNCTIONS-PUBLICATION.md)。
+
 ## 4. 下一阶段与独立门槛
 
-1. UI 响应恢复与 bootstrap 增量的公开 Linux CI、七个自有镜像、固定摘要、统一 Helm
-   版本锁；原 Auth 项目 UI 恢复及剩余套件逐项回归。
+1. 将资源恢复/原子发布内部增量经过实际 CRD 与 PG 质量检查后，提交公开源代码，
+   校验 Linux CI、七个自有镜像与下一统一 Helm 固定版本锁。当前已发布运行版见 3.3。
 2. Functions API/Worker 与本阶段存储/持久引用接通；真实 scope/UID、私有 CA/bootstrap、
    受限 SQL、guest health、排空、正常退休、版本发布、UI 上传/调用/回滚和零/冷醒。
 3. 同一新镜像逐套完成存储、历史恢复、目录/凭据、成员邀请及生命周期回归；每套结束
