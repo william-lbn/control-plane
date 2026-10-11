@@ -75,6 +75,32 @@ npm run test:e2e -- native-product.spec.ts
 
 完成 [Managed Auth 部署](MANAGED-AUTH.md) 和公开 CA/证书名称设置后，使用相同受保护输入执行 `npm run test:e2e -- managed-auth.spec.ts`。`NEON_E2E_BASE_URL` 必须为部署 `managedAuth.publicOrigin`，不能改为另一个未声明的 Service Origin。该测试从 React 创建项目和 Auth，验证真实 Neon 中的注册、会话撤销、JWT/JWKS、用户继承、子分支隔离、Data API RLS、手动/自动缩零和 Auth 冷唤醒，再停用自己创建的服务和 Compute。重测必须使用新 attempt，失败资源可按保存的 ID/Operation 观察和正常停用；不清除账户或数据。
 
+若原 Auth 测试在子分支创建后观察失败，但原 Operation 已实际 succeeded，可以恢复原
+fixture。先用只读 API 核对原项目名称/managed source、根/子分支、Writer 归属及原
+Operation，不重新创建项目或子分支。将以下完整身份写到 mode-0600 私密 JSON：
+`project_id`、`project_name`、`branch_id`、`writer_id`、`child_id`、`child_writer_id`、
+`child_name`、`branch_operation_id`、`original_failure_job`、`database_password_file`、
+`application_password_file`。最后两个字段指向原测试保存的 mode-0600 密码文件，不能
+把密码值写到文档、日志或 JSON 回执。原 job 必须为 `publication-ui-{14位数字}`，
+项目名 `ci-{原job}-auth`、子分支名 `child-{原job}-auth`；不要手工改变名称掩盖归属。
+
+在 Linux 使用新的私密目录、证据目录和 attempt，保留原失败，然后执行：
+
+```bash
+export NEON_E2E_AUTH_RESUME_FIXTURE=/secure/e2e/original-auth-fixture.json
+export NEON_E2E_PRIVATE_DIR=/secure/e2e/auth-recovery-001
+export NEON_E2E_ARTIFACTS=/var/lib/neon-evidence/auth-recovery-001
+export NEON_E2E_ATTEMPT=auth_recovery_001
+npm --prefix web run test:e2e -- managed-auth.spec.ts
+```
+
+该路径从 React 操作详情重新观察原已成功 Operation，再在 UI 按实际 disabled 状态
+重新启用原分支 Auth、登录原账号并查询原 RLS 行；随后验证子分支账号隔离、JWT 边界、
+手动零/冷醒/自动零、禁用/重新启用和原账号保留。恢复结果明确
+`creates_new_project=false`；不能当作本版本新注册/新分支创建验收。原失败回执始终为 fail。
+新建路径会在等待创建窗口关闭之前保存 child Writer 身份，异常退出也能正常缩零该
+精确自有 Endpoint。逻辑退休仅在完整通过且实际 VM/Runner 为 0 后执行，数据继续保留。
+
 ### 2.0 保护、删除与恢复
 
 项目/分支保护与保留删除：相同 Linux 参数下运行

@@ -301,6 +301,9 @@ test('Managed Auth: UI identity, native branch isolation, Data API RLS and cold 
     await page.getByLabel('用户名').fill('admin');
     await page.getByLabel('密码', { exact: true }).fill((await readFile(adminFile, 'utf8')).trim());
     await page.getByRole('button', { name: '登录控制台 →', exact: true }).click();
+    // The native path waits on this button before its first mutation. Recovery
+    // starts with API reads, so explicitly await the same authenticated UI state.
+    await expect(page.getByRole('button', { name: '＋ 创建项目', exact: true })).toBeVisible();
     if (recovery) {
       project = recovery.project_id;
       root = recovery.branch_id;
