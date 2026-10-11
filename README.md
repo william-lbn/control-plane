@@ -28,7 +28,7 @@ Chart 0.8.1 提供独立 API、Worker、Web 进程及可选 Data API、应用凭
 | 项目/分支保留删除与独立 Compute 删除 | 保护/依赖图、关闭 Proxy 和服务、正常 Runner 回收、held tombstone、项目恢复、原密码重建与 React UI | 物理 GC、TTL、失败创建回收与跨实例栅栏未开放；详见 [删除手册](docs/RETAINED-DELETION.md)和本版交付 |
 | HA / DR | 部分租约与恢复工具 | 未通过独立故障域 HA/DR；历史新分支恢复不等于完整 DR |
 | 产品 Object Storage | Go REST Driver、独立受限 bucket、随分支目录、上传下载 UI、条件写入、预签名与保留恢复 | REST v1 真实 UI 19 项及原失败项目恢复 4 项通过；完整 S3/multipart/GC/HA/TLS 仍未完成 |
-| Functions、AI Gateway 推理 | Functions Go/Node guest、自有镜像、不可变模型与 multipart 已实现；带延迟 entry 的真实 VM 隔离 32 项通过，产品仍 disabled | 默认启动新镜像、SQL/Driver/UI/分支零与唤醒仍须完成；推理需真实上游 |
+| Functions、AI Gateway 推理 | Functions Go/Node guest、自有镜像、不可变模型与 multipart 已实现；默认 entry 的真实 VM 隔离 32 项通过，产品仍 disabled | SQL/Driver/UI/分支零与唤醒仍须完成；推理需真实上游；见 [guest 验收](docs/ACCEPTANCE-2026-10-11-FUNCTIONS-GUEST.md) |
 | Data API | 原生 Go Driver、持久 Operation、React UI、分支 JWT Gateway 和固定 PostgREST 镜像 | 默认禁用；须显式 labHTTP，真实 Neon UI 验收独立于 PG CI；RPC/views 等不在首版范围 |
 | 分支应用凭据 | 一次性 Token、范围/到期、轮换/撤销、哈希存储、当前权限检查和 UI | 当前仅 ai_gateway:invoke；凭据不等于 AI 推理服务可用 |
 

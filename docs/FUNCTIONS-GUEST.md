@@ -176,7 +176,11 @@ bash tools/build-functions-vm.sh
 固定 commit；没有在 Windows 或实验室 host 上构建 qcow2。发布 receipt 明确
 `microvm_acceptance:false`，真实 VM 测试通过后另出 runtime acceptance lock。
 
-## 5. F1 实际 VM 验收清单（尚未通过）
+## 5. 实际 VM 验收清单和边界
+
+默认 entry 隔离 32 项已经通过：[2026-10-11 回执与说明](ACCEPTANCE-2026-10-11-FUNCTIONS-GUEST.md)。
+下面第 4 项真实 SQL、第 6 项完整资源超限/崩溃恢复，以及产品 Driver/UI 仍有门槛；
+不能把全部清单标记通过。前面失败诊断属于历史记录。
 
 必须按以下顺序串行执行并保留 Job/VM/Pod UID、精确 image digest、source/boot /
 scope、正负检查和正常回收回执：

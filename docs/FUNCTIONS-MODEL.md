@@ -141,6 +141,22 @@ env values、project、branch、slug、If-Match。JSON serializer 故意隐藏�
 Operation；invoke 执行结果未知时不得自动重放。ingress 要另外实现并发/epoch admission，
 这些表本身不能保证整条网络链路只有一次执行。
 
+### 4.1 必须分离浏览器 origin 与平台凭据
+
+公网 Functions 返回客户 HTML/JavaScript，必须与 Console 的可信 origin 分离。
+单纯使用同一 IP 的不同端口不能分离 Cookie 的 host 范围；不能直接把 untrusted
+Function HTML 挂到 Console 的 `/functions` 路径来声称产品可用。独立 functions
+hostname、明确 Host/TLS、Cookie boundary 和 exact-origin CORS 是启用前的门槛。
+平台 session/CSRF/management headers 不进入 Function，客户 Set-Cookie 不得覆盖
+Console 凭据。无域名实验环境可以先提供授权的 JSON/text 调试调用，React 以文本
+渲染结果；不能使用 iframe srcdoc/innerHTML 执行客户响应，也不能虚标公开 URL。
+
+`GuestIssuer` 是新增 Worker 前置库：读取单一 valid root CA 与匹配强 PKCS8 key，
+为精确 instance SAN 签发每次独立 P-256 leaf / serial，期限 30 分钟至 4 小时、
+不得越过 root 期限。`GuestIdentity` JSON 不含 leaf private key。API 只能挂载
+artifact listener 自己的 leaf，不应得到 Worker CA signing key。此库不创建平台
+Secret，也不证明平台已启用 at-rest encryption/PKI rotation 或全链路可信 TLS。
+
 ## 5. 验收与下一阶段
 
 Linux 全量 `functions-metadata-full-linux-quality-attempt1` 为 471 Go pass / 0 fail /
