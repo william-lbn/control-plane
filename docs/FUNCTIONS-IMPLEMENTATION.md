@@ -37,8 +37,8 @@ waitUntil 执行；其宿主是独立 guest，不能放进共享 API/Worker 进�
 
 ```mermaid
 flowchart TB
-  UI[未来 React Functions 页面] --> CP[未来 Go API / 授权 / 幂等]
-  CP --> Meta[(未来 metadata intent / immutable deployment)]
+  UI[React Functions 只读页面 / 执行 UI 待接通] --> CP[Go 只读 API / 部署授权幂等待接通]
+  CP --> Meta[(019 metadata / 执行 intent 待集成)]
   Meta --> Worker[未来 leased Functions Driver]
   Worker --> VM[独立 NeonVM / 2048 MiB nominal]
   subgraph Guest[单个 Function isolate]
@@ -54,8 +54,8 @@ flowchart TB
 ```
 
 目前 Go 包可独立调用，Node runtime 可在 Linux 启动并接收真实 HTTP，guest
-引导源码已实现；图中的“未来”框和真实镜像/实例验收仍待完成。测试 peer 验证管理协议，不代表微虚机、租户
-逃逸、网络负例或生产外部栅栏已验收。
+默认 entry 已在自有镜像的真实 VM 通过 32 项边界检查。图中的执行 intent / Driver /
+真实分支 SQL / 公网调用尚未接通；该基础验收不证明多租户逃逸审计或生产外部栅栏。
 
 ### 2.1 代码包与环境
 
@@ -82,7 +82,8 @@ IPv4 UID-owner 默认拒绝，精确允许 loopback、指定 Proxy IP/端口、�
 每个 packet 验证，不能用 DNS 初次解析替代网络边界。当前 own-fork kernel 有
 IPv4 owner matcher，无 IPv6 filter；因此 guest 必须先禁 IPv6。
 
-**这些是代码边界，仍须在真实镜像/guest 验证。** CNI NetworkPolicy 对 NeonVM
+这些边界已在记录的自有镜像默认 entry 中验证，仍须对后续镜像和产品 Driver 回归。
+CNI NetworkPolicy 对 NeonVM
 extra VXLAN 网络不足以单独证明隔离。Bootstrap Secret CD-ROM 必须加载后卸载，
 核对 raw device 权限，manager/CA 私钥不进入 Node env/文件可读范围。guest marker
 只用于拒绝错误启动位置，不是可信启动/远程证明。全链路 TLS 仍是独立门槛。
@@ -127,7 +128,7 @@ sequenceDiagram
   Note over M,N: waitUntil remains pending in Node; not a trusted external ledger
   D->>M: signed shutdown for this boot/generation
   M->>M: mark draining; reject new invokes
-  M->>N: actual graceful stop callback (future supervisor)
+  M->>N: actual graceful stop callback / whole cgroup stop
   M-->>D: success only after callback, or explicit retryable failure
 ```
 
@@ -147,8 +148,8 @@ HTTP body bounded、16 并发、SSE 实际逐块送达。独立 self-hosted wait
 
 | 顺序 | 实现内容 | 必须留下的真实证据 |
 | --- | --- | --- |
-| F1 | supervisor、签名 artifact、受信 TLS、镜像构建源码已实现；真实 build/VM 待验收 | 实际隔离 VM、Node fetch/SQL、Secret/raw-device/UID/cgroup/egress 负例、终止树 |
-| F2 | immutable bundle/Secret/deployment intent、leased Driver、quota、严格 OpenAPI、React 编辑/部署/调用/日志 | UI lost-202 幂等、失败保留旧版本、版本回滚、实际 Response/SSE、正常 VM 回收 |
+| F1 | supervisor、签名 artifact、受信 TLS、自有 build/VM 默认 entry 32 项通过；真实分支 SQL 待验收 | 实际隔离 VM、Node fetch/SQL、Secret/raw-device/UID/cgroup/egress 负例、终止树 |
+| F2 | metadata/read API/UI 已接通；持久候选租约仓库已实现；immutable backing、执行 Driver 和编辑/部署/调用/日志仍待集成 | UI lost-202 幂等、失败保留旧版本、版本回滚、实际 Response/SSE、正常 VM 回收 |
 | F3 | 受限 SQL login、branch SQL manifest、克隆/历史点继承、zero/wake、Writer 删除依赖 | 新 branch URL/role/key；父子 SQL/代码/Secret 隔离；首次请求冷醒 Function 和 Compute |
 | F4 | WS、独立预算、cron/对象 outbox、dedup/retry、完整生命周期和监控 | 真实 WS、event delivery 语义、分支旧事件隔离、触发失败恢复、持久日志/指标 |
 
@@ -185,3 +186,7 @@ Linux 全量 `functions-boot-metadata-full-linux-quality-attempt2` 为 474 Go pa
 每阶段提交实际实现、Linux CI、own digest 镜像、Helm/schema/版本锁与真实 UI。
 未通过 F1–F3 前 capabilities.functions 保持 false；基础层检查不计入 146 项
 已部署产品回归，也不替代 23 项原失败恢复。外部模型凭据不阻止这些本地步骤。
+
+F2 候选仓库的锁顺序、wall-clock lease、重启/部分 UID 恢复和实际 PG 验证见
+[Functions Driver](FUNCTIONS-DRIVER.md)。此代码尚未接 Worker action，不使执行能力
+自动变为可用；正在运行的版本与下一阶段源代码须按具体 commit 分开记录。

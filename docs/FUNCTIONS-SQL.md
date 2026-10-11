@@ -39,6 +39,12 @@ statement_timeout=30s、指定 search_path。RLS 保持有效。
 视图/外部表或 SECURITY DEFINER 执行。不会代表所有客户 owners 安装 default privileges；
 新表需要 owner 显式授权并重新调谐。
 
+这里核验的是**当前连接 database 内**的权限。PostgreSQL role 在整个实例内存在，
+其它 database 的 PUBLIC CONNECT 和对象权限不能从当前连接自动证明安全。未来
+Driver 必须另实现精确 database 路由授权，或由分支 owner 明确建立并验证整个实例
+的 CONNECT/PUBLIC 策略，再做实际跨 database 负例。当前库不能据此宣称客户代码
+被隔离到唯一 database；这个门槛不能通过静默撤销其它用户 database 权限来绕过。
+
 ### 3.1 数据库 owner 的必要检查
 
 PostgreSQL 默认把 TEMP 授予 PUBLIC。预览权限边界会拒绝这样的 database；由 database

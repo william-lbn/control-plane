@@ -70,6 +70,7 @@ docs/                 架构、对象模型、部署、测试、来源及生产�
 - [Functions 执行基础层、内部协议和下一步验收](docs/FUNCTIONS-IMPLEMENTATION.md)
 - [Functions 不可变数据模型、并发准入和删除依赖](docs/FUNCTIONS-MODEL.md)
 - [Functions SQL 最小权限、owner 准入与真实 PostgreSQL 验证](docs/FUNCTIONS-SQL.md)
+- [Functions 候选实例、租约和 Worker 重启恢复](docs/FUNCTIONS-DRIVER.md)
 - [AI Gateway 官网核验、平台配置与动态模型设计](docs/AI-GATEWAY-PLATFORM-DESIGN.md)
 - [原生 Data API 驱动与部署](docs/DATA-API-NATIVE-DRIVER.md)
 - [分支应用凭据：模型、API、部署、UI 和验收](docs/BACKEND-CREDENTIALS.md)
