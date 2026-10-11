@@ -12,8 +12,8 @@ overview 更新 2026-10-02，limits 更新 2026-09-16，deploy 更新 2026-10-09
 
 **本增量是有可运行代码和 Linux 测试的基础层，Functions 产品能力仍禁用。**
 Go guest supervisor 和专用镜像构建源码已补齐，详见 [guest 合同和构建](FUNCTIONS-GUEST.md)。
-镜像发布/真实 VM 验收、metadata/分支 Driver、Console
-部署/调用、真实 microVM 隔离和缩零验收。没有 Functions API/Worker 集成就不能
+已有镜像发布与带延迟 entry 的真实 VM 隔离检查；默认 entry 网络等待修复、
+metadata/分支 Driver、Console 部署/调用、SQL 和缩零仍有独立门槛。没有 Functions API/Worker 集成就不能
 把下面内部协议宣称为已可用的公网服务，当前 OpenAPI 仍为 0.10.1 / 87 操作。
 
 本次精确源码的 Linux foundation Job 为 `functions-foundation-20261010203931`：
@@ -175,6 +175,11 @@ deployment 引用 content hash 与独立 env Secret version；instance 引用 de
 generation/VM UID/boot；invocation ledger 与 admission/epoch 同步。分支内 SQL
 manifest 是历史/克隆解析来源，不能用父分支当前 metadata 覆盖历史快照。对象
 trigger 应使用与分支目录写入一致的 SQL outbox，不声称跨库 exactly-once。
+
+F2 metadata / multipart foundation 见 [数据模型与准入](FUNCTIONS-MODEL.md)：
+019 forward migration 定义真实表/外键/不可变与预算 guard，尚未接公共 API/Worker。
+Linux 全量 `functions-boot-metadata-full-linux-quality-attempt2` 为 474 Go pass /
+0 fail / 0 skip，包含 default-route readiness 与父资源删除保护。
 
 每阶段提交实际实现、Linux CI、own digest 镜像、Helm/schema/版本锁与真实 UI。
 未通过 F1–F3 前 capabilities.functions 保持 false；基础层检查不计入 146 项

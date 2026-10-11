@@ -281,6 +281,22 @@ func (s *server) admitDeletion(w http.ResponseWriter, r *http.Request, recoverin
 		return
 	}
 	if !recovering {
+		// Functions do not yet have the verified parent-retirement Driver.
+		// Never close a writer/branch under a retained executing guest. The
+		// future Driver must drain and prove Runner absence before this gate
+		// becomes an integrated lifecycle step.
+		var functionsHeld bool
+		err = tx.QueryRow(r.Context(), `SELECT
+		 EXISTS(SELECT 1 FROM function_definitions WHERE project_id=$1 AND branch_id=ANY($2::text[]) AND state<>'deleted') OR
+		 EXISTS(SELECT 1 FROM function_instances WHERE project_id=$1 AND branch_id=ANY($2::text[]) AND state<>'retired')`, project, p.BranchIDs).Scan(&functionsHeld)
+		if err != nil {
+			fail(w, r, 503, "metadata_unavailable", "Could not read Functions lifecycle dependencies")
+			return
+		}
+		if functionsHeld {
+			fail(w, r, 409, "functions_retirement_required", "Retire dependent Functions and their owned instances before changing parent lifecycle")
+			return
+		}
 		var unsupported bool
 		err = tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM branch_service_instances WHERE branch_id=ANY($1::text[]) AND service_kind NOT IN ('postgres','data_api','auth','object_storage') AND desired_state<>'disabled')`, p.BranchIDs).Scan(&unsupported)
 		if err != nil || unsupported {

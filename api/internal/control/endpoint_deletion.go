@@ -96,13 +96,16 @@ func (s *server) deleteEndpoint(w http.ResponseWriter, r *http.Request) {
 	err = tx.QueryRow(r.Context(), `SELECT
 	 EXISTS(SELECT 1 FROM data_api_instances WHERE endpoint_id=$1 AND state<>'disabled') OR
 	 EXISTS(SELECT 1 FROM managed_auth_instances WHERE endpoint_id=$1 AND state<>'disabled') OR
-	 EXISTS(SELECT 1 FROM object_storage_instances WHERE endpoint_id=$1 AND state<>'disabled')`, p.EndpointID).Scan(&dependency)
+	 EXISTS(SELECT 1 FROM object_storage_instances WHERE endpoint_id=$1 AND state<>'disabled') OR
+	 EXISTS(SELECT 1 FROM function_definitions WHERE endpoint_id=$1 AND state<>'deleted') OR
+	 EXISTS(SELECT 1 FROM function_instances i JOIN function_definitions f ON f.id=i.function_id
+	  WHERE f.endpoint_id=$1 AND i.state<>'retired')`, p.EndpointID).Scan(&dependency)
 	if err != nil {
 		fail(w, r, 503, "metadata_unavailable", "Could not read endpoint dependencies")
 		return
 	}
 	if dependency {
-		fail(w, r, 409, "endpoint_has_services", "Disable dependent Data API, Auth and Object Storage services before deleting their endpoint")
+		fail(w, r, 409, "endpoint_has_services", "Retire dependent Data API, Auth, Object Storage and Functions before deleting their endpoint")
 		return
 	}
 	op := newID("op_")

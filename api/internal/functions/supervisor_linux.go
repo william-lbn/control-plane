@@ -177,6 +177,10 @@ func ServeGuest(ctx context.Context) (result error) {
 	if err != nil {
 		return errors.New("guest supervisor state persistence failed")
 	}
+	stage = "bootstrap-network"
+	if err = AwaitGuestNetwork(ctx); err != nil {
+		return err
+	}
 	stage = "artifact"
 	archive, err := b.FetchBundle(ctx)
 	if err != nil {
