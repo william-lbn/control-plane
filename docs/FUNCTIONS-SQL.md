@@ -117,6 +117,40 @@ SCRAM verifier 只发布到该 branch 的 Proxy registry，并在冷启动时保
 删除/轮换须先排空原 Function VM、停止 route admission，再按原 scope 禁用 login；
 不得删除用户表或把密码轮换等同于 compute 创建。
 
+### 3.3 独立的可信运行连接
+
+`functionsql.ConnectRuntime(ctx, ConnectionPolicy, password)` 的代码已加入下一阶段。
+发行、Linux 结果和部署状态单独记录；它不是现有 Console SQL helper 的别名，
+也没有启用 Functions。Policy 只由 trusted Driver 构造，完整包含已持久 Scope、
+原 Writer ID、精确私有 IPv4/端口、TLS hostname、显式 CA 和最多 120 秒预算。
+不接受用户 DSN、URL、系统 CA、HTTP proxy、DNS 重定向或 plaintext fallback。
+
+Caller 先核验原 credential UID/MAC、当前 Operation/父 intent 和原 Writer route
+所有权；本方法再以 Fn role 建立实际连接、检查 authenticated session 和 catalog。
+方法本身不查询 metadata/K8s，不把 role comment 当作物理租户/分支证明，不实现
+跨 database 或多 Worker 外部栅栏。返回连接由 caller 有界使用并关闭，不入池、
+不自动重连，也不重放结果未知的 SQL。
+
+TLS 采用显式 trust roots、hostname 验证、最低 TLS 1.3。固定地址和逻辑 hostname
+分开，保留 SNI/证书名称核验；`PGHOST`、`PGOPTIONS`、ambient 证书/密钥路径不能
+改写目标或连接 GUC。所有相关 pgx Host/Port/TLS/Fallback 字段同时设置，fallback
+为空；使用从不拨号的 Unix socket 解析模板，避免 pgx 在配置 TLS 前读取 ambient
+证书路径。`statement_timeout=30s` / `idle_session_timeout=5s` 保持 role 默认值，
+不会用 Console helper 覆盖为 120 秒。Policy JSON 序列化为 `{}`，错误固定且不
+含 DSN、密码、verifier、远端 SQL 错误或内部地址。
+
+固定版本 [pgx 5.9.2](https://github.com/jackc/pgx/blob/v5.9.2/pgconn/config.go)
+没有 `require_auth` 开关。本包只在交给 pgx 之前核验有界的 startup authentication
+帧：要求 SASL/continue/final 后才能接受 AuthenticationOk，拒绝 trust、明文、MD5、
+错误顺序和超大帧。SCRAM 机制和 server proof 仍完全由 pgx 实现；没有自己实现
+SCRAM 或把密码/SASL 帧写进 trace/log。保留真实 tls.Conn，使 pgx 能协商 SCRAM-PLUS。
+
+专用 Linux CI PostgreSQL 必须使用 `POSTGRES_INITDB_ARGS=--auth-host=scram-sha-256`。
+新增测试明确验证错误密码拒绝，不再把默认回环 trust 登录当作 SCRAM 认证证明。
+TLS/真实 PostgreSQL 测试采用专用 TLS routing fixture，只在该 fixture 移除 Neon
+endpoint startup 参数；真正的 PG16 执行认证、权限、默认 GUC 和 DML。这个 fixture
+不是 Neon Proxy，实际 Neon/guest/跨 database/冷醒仍需另验。
+
 ## 4. 实际测试与复测
 
 测试必须在 Linux、专用 `control_ci` PostgreSQL 中运行；测试创建自己的 database/role，

@@ -93,6 +93,25 @@ Pod UID `8817cee7-f426-4d97-86e2-b1d76bfb6675`。实际 immutable SQL Secret
 不同密码拒绝。原 Secret 保留。Service 实际创建并核验，VM 仅 admission dry-run，
 没有持久 VM，不计入函数执行或 UI 部署验收。
 
+SQL Secret/委托代码已以 DCO commit `77e12ef82e57c22b588310f62be9bf52e40683c4`
+提交，[公开 CI 38162444768](https://github.com/william-lbn/control-plane/actions/runs/38162444768)
+十三个作业成功。统一 Helm 的验收文档已提交 `ee61106`，对应
+[文档 CI 38162137975](https://github.com/william-lbn/neon-helm/actions/runs/38162137975) 成功；
+不可变 v0.1.12 标签未覆盖。新源码镜像的现场部署与 UI 结果不能沿用运行版 f0b63f5。
+
+随后完成 `ConnectRuntime` 的可信 SQL 连接与认证 downgrade 拒绝合同。最终专用 Linux
+Job `dataapi-quality-20261011182049` 为 **704 pass / 0 fail / 0 skip**，Pod UID
+`cb35b57c-5e67-46dd-a92b-1ade2c0b93df`，源码归档
+`fa32a6073c32d755c51dbeda70376a255176e79afd1ca04d920d79c726b7066a`。
+真实 PG16 的正确 SCRAM/TLS 登录、普通表/sequence DML、默认 30s/5s GUC、错误
+密码/CA/hostname/branch/cancellation 都通过；认证降级和环境输入负例独立运行。
+
+首次 TLS 测试失败 `dataapi-quality-20261011181349` 保留：专用 PG 的回环默认 trust
+使错误密码未被验证，pgx 在 TLS mode 分支之前会读取 ambient 证书路径。修复的是
+专用 CI 的 SCRAM initdb 参数和连接配置/认证检查，未修改业务 HBA 或放宽断言。
+此前仅以回环登录声称实际 SCRAM 的证明不足；704 项补上正确/错误密码及强制 SASL
+握手的独立证据。TLS routing fixture 仍不是 Neon Proxy/guest 产品验收。
+
 AI Gateway 真实供应商凭据仍未配置。跨实例栅栏、HA/DR、全链路可信 TLS、完整
 内存缩回、小数 CPU、完整物理删除/GC 等仍需独立开发/验收；硬件影响记录与业务
 能力分开。完整状态见 [PRODUCTION-GATES](PRODUCTION-GATES.md)。
