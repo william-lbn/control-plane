@@ -9,9 +9,10 @@ URL、SQL role 和管理密钥。官网最新 [deploy](https://neon.com/docs/com
 
 当前已实现：`migrations/019_functions.sql`、真实 PostgreSQL 隔离/并发测试；
 `DeploymentSnapshot`、`RequestFingerprint`、`InstanceClient` 和内存内 multipart 校验。
-**公共 Functions API、Worker Driver、UI 和 SQL manifest 尚未接通。**
+公共 Functions 只读 API/React 定义与历史页面已接入；SQL 权限库见 [SQL 合同](FUNCTIONS-SQL.md)。
+**部署/调用 API、Worker Driver、SQL manifest 与 UI 函数执行尚未接通。**
 此模型是下一阶段可执行的数据库基础，不使 capabilities.functions 变为 true；
-未接通的接口不能写进当前 OpenAPI 或当成已部署功能。
+当前 OpenAPI 0.11.0 / 90 操作只增加三项实际只读接口；未接通的执行接口不能写进合同。
 
 本次迁移是 forward-only。上线前备份 metadata；不删除历史 migration、原 Python
 归档、业务 branch、Secret、ZIP、WAL 或 PVC。新建数据表不自行创建 VM。

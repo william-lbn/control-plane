@@ -5,14 +5,14 @@ on:
       suite:
         description: Real Linux UI acceptance slice
         type: choice
-        options: [native-product.spec.ts, restore.spec.ts, lifecycle.spec.ts, endpoint-deletion.spec.ts, data-api.spec.ts, backend-credentials.spec.ts, console-invitations.spec.ts, managed-auth.spec.ts, object-storage.spec.ts]
+        options: [native-product.spec.ts, restore.spec.ts, lifecycle.spec.ts, endpoint-deletion.spec.ts, data-api.spec.ts, backend-credentials.spec.ts, console-invitations.spec.ts, managed-auth.spec.ts, object-storage.spec.ts, functions-metadata.spec.ts]
         default: native-product.spec.ts
       poll_fault:
         description: Inject transient read failures for native/Data API observation recovery
         type: boolean
         default: true
       credential_project:
-        description: Retained authorized test project for Backend credential UI suite
+        description: Retained authorized test project for credentials or Functions metadata UI
         type: string
         required: false
 permissions: {contents: read}
@@ -50,7 +50,7 @@ jobs:
           test -n "$ADMIN_PASSWORD"
           case "$NEON_E2E_SUITE" in
             native-product.spec.ts|restore.spec.ts|lifecycle.spec.ts|endpoint-deletion.spec.ts|data-api.spec.ts|console-invitations.spec.ts|managed-auth.spec.ts|object-storage.spec.ts) ;;
-            backend-credentials.spec.ts) [[ "$NEON_E2E_CREDENTIAL_PROJECT" =~ ^prj_[a-f0-9]{16}$ ]] ;;
+            backend-credentials.spec.ts|functions-metadata.spec.ts) [[ "$NEON_E2E_CREDENTIAL_PROJECT" =~ ^prj_[a-f0-9]{16}$ ]] ;;
             *) exit 1 ;;
           esac
           install -d -m 0700 "$NEON_E2E_PRIVATE_DIR"

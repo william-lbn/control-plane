@@ -215,6 +215,12 @@ function App() {
                 <span>◈</span>Auth
               </a>
               <a
+                className={page === 'functions' ? 'active' : ''}
+                href={route(projectId, 'functions')}
+              >
+                <span>ƒ</span>Functions
+              </a>
+              <a
                 className={page === 'permissions' ? 'active' : ''}
                 href={route(projectId, 'permissions')}
               >

@@ -1,4 +1,5 @@
 import { ObjectStorage } from '../storage/ObjectStorage';
+import { Functions } from '../functions/Functions';
 import { useEffect, useState } from 'react';
 import { api, route, projectPath } from '../../api';
 import type {
@@ -177,6 +178,7 @@ export function ProjectWorkspace({
   const canEdit =
     project.effective_permission === 'admin' || project.effective_permission === 'editor';
   const canAdmin = project.effective_permission === 'admin';
+  if (page === 'functions') return <Functions projectId={projectId} branches={branches} />;
   if (page === 'storage')
     return (
       <ObjectStorage

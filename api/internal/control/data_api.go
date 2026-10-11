@@ -103,7 +103,7 @@ func (s *server) dataAPIRead(w http.ResponseWriter, r *http.Request) {
 	if item["state"] == "active" {
 		item["runtime"] = s.kube.runtime(r.Context(), "deployment", dataAPIName(stringVal(branch["id"])))
 	}
-	w.Header().Set("ETag", fmt.Sprintf(`"%d"`, int64(number(item["generation"]))))
+	w.Header().Set("ETag", fmt.Sprintf(`"%d"`, item["generation"].(int64)))
 	jsonResponse(w, 200, item)
 }
 func (s *server) acceptDataAPI(w http.ResponseWriter, r *http.Request, id string) {

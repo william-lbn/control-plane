@@ -59,7 +59,7 @@ func (s *server) objectStorageRead(w http.ResponseWriter, r *http.Request) {
 	item["protocol"] = "neon-object-rest-v1"
 	item["s3_compatible"] = false
 	item["limits"] = record{"object_bytes": storageObjectLimit, "branch_bytes": storageBranchLimit, "buckets": 32, "objects": 1000}
-	w.Header().Set("ETag", fmt.Sprintf(`"%d"`, int64(number(item["generation"]))))
+	w.Header().Set("ETag", fmt.Sprintf(`"%d"`, item["generation"].(int64)))
 	jsonResponse(w, 200, item)
 }
 func (s *server) acceptObjectStorage(w http.ResponseWriter, r *http.Request, id string) {

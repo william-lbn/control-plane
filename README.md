@@ -5,12 +5,12 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 
 **发行状态：预览版本。已经验证的实验环境功能不等于生产认证，也不等于 Neon 官网全部 Backend 服务。**
 [当前 Compute 生命周期交付](docs/DELIVERY-2026-10-10-COMPUTE-LIFECYCLE.md)记录七镜像、统一 Helm 0.1.7、九套真实 Linux UI 共 146 项与 23 项原失败恢复检查；[先前 Object Storage](docs/DELIVERY-2026-10-09-OBJECT-STORAGE.md)、[Managed Auth](docs/DELIVERY-2026-10-08-MANAGED-AUTH.md)及历史报告保留各版本证据。
-Chart 0.8.1 提供独立 API、Worker、Web 进程及可选 Data API、应用凭据、Console 邀请注册、历史分支恢复、保留删除与独立 Compute 退休；Worker 使用 PostgreSQL 领导租约和只读 Runner observer。
+Chart 0.8.2 提供独立 API、Worker、Web 进程及可选 Data API、应用凭据、Console 邀请注册、历史分支恢复、保留删除与独立 Compute 退休；新增 Functions 只读元数据/历史页面，执行 Driver 尚未启用。Worker 使用 PostgreSQL 领导租约和只读 Runner observer。
 当前只允许一个 API 和一个 Worker，跨实例外部 fencing 与 HA 仍须独立验收。
 旧合并版本升级前必须执行 [停止/排空流程](docs/WORKER-SPLIT.md)。
 运行代码与实际合同见 [OpenAPI](contracts/openapi-v1.json)；本项目使用 `/api/v1`，未声称兼容托管 Neon `/api/v2`。
 
-[Object Storage REST v1](docs/OBJECT-STORAGE.md) 已增加真实分支文件服务；当前完整合同为 OpenAPI 0.10.1。现场验收按版本记录，仍未开放外部 S3 协议兼容。
+[Object Storage REST v1](docs/OBJECT-STORAGE.md) 已增加真实分支文件服务；当前完整合同为 OpenAPI 0.11.0。现场验收按版本记录，仍未开放外部 S3 协议兼容。
 
 ## 1. 功能范围
 
@@ -54,7 +54,7 @@ docs/                 架构、对象模型、部署、测试、来源及生产�
 
 - [独立 Compute 删除、重建与保留数据](docs/ENDPOINT-DELETION.md)
 - [架构与模型](docs/ARCHITECTURE.md)
-- [87 个实际 API 操作](docs/API.md)
+- [90 个实际 API 操作](docs/API.md)
 - [原 Operation 恢复与未知 DDL 的受控修复](docs/OPERATION-RECOVERY.md)
 - [Linux 部署与回滚](docs/DEPLOYMENT.md)
 - [测试与交付标准](docs/TESTING.md)
@@ -69,6 +69,7 @@ docs/                 架构、对象模型、部署、测试、来源及生产�
 - [完整 Backend 产品实施合同](docs/FULL-PRODUCT-IMPLEMENTATION.md)
 - [Functions 执行基础层、内部协议和下一步验收](docs/FUNCTIONS-IMPLEMENTATION.md)
 - [Functions 不可变数据模型、并发准入和删除依赖](docs/FUNCTIONS-MODEL.md)
+- [Functions SQL 最小权限、owner 准入与真实 PostgreSQL 验证](docs/FUNCTIONS-SQL.md)
 - [AI Gateway 官网核验、平台配置与动态模型设计](docs/AI-GATEWAY-PLATFORM-DESIGN.md)
 - [原生 Data API 驱动与部署](docs/DATA-API-NATIVE-DRIVER.md)
 - [分支应用凭据：模型、API、部署、UI 和验收](docs/BACKEND-CREDENTIALS.md)

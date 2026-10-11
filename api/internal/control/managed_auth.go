@@ -93,7 +93,7 @@ func (s *server) managedAuthRead(w http.ResponseWriter, r *http.Request) {
 	if item["state"] == "active" {
 		item["runtime"] = s.kube.runtime(r.Context(), "deployment", managedAuthName(stringVal(branch["id"])))
 	}
-	w.Header().Set("ETag", fmt.Sprintf(`"%d"`, int64(number(item["generation"]))))
+	w.Header().Set("ETag", fmt.Sprintf(`"%d"`, item["generation"].(int64)))
 	jsonResponse(w, 200, item)
 }
 func (s *server) acceptManagedAuth(w http.ResponseWriter, r *http.Request, id string) {

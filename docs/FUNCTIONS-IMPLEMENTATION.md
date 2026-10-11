@@ -13,8 +13,9 @@ overview 更新 2026-10-02，limits 更新 2026-09-16，deploy 更新 2026-10-09
 **本增量是有可运行代码和 Linux 测试的基础层，Functions 产品能力仍禁用。**
 Go guest supervisor 和专用镜像构建源码已补齐，详见 [guest 合同和构建](FUNCTIONS-GUEST.md)。
 自有镜像默认 entry 的真实 VM 隔离 32 项已通过，见 [guest 验收](ACCEPTANCE-2026-10-11-FUNCTIONS-GUEST.md)；
-metadata/分支 Driver、Console 部署/调用、SQL 和缩零仍有独立门槛。没有 Functions API/Worker 集成就不能
-把下面内部协议宣称为已可用的公网服务，当前 OpenAPI 仍为 0.10.1 / 87 操作。
+只读定义/历史 API 和 React 页面已接入，SQL 权限库通过专用 PG 验证；
+分支 Driver、Console 部署/调用、真实函数 SQL 和缩零仍有独立门槛。执行 API/Worker
+尚未集成，不能把下面内部协议宣称为已可用的公网服务。当前 OpenAPI 为 0.11.0 / 90 操作。
 
 本次精确源码的 Linux foundation Job 为 `functions-foundation-20261010203931`：
 49 项 Go（race/vet，0 fail / 0 skip）和 9 项真实 Node HTTP/SSE 检查通过。原 ZIP

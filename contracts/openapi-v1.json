@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.10.1",
+    "version": "0.11.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -31,6 +31,9 @@
     },
     {
       "name": "Data API"
+    },
+    {
+      "name": "Functions"
     }
   ],
   "components": {
@@ -2535,6 +2538,241 @@
             "minLength": 1,
             "maxLength": 128,
             "description": "Exact current Endpoint Selector, not the branch name"
+          }
+        }
+      },
+      "FunctionDefinition": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "project_id",
+          "branch_id",
+          "slug",
+          "database_name",
+          "sql_schema",
+          "version",
+          "generation",
+          "state",
+          "active_deployment_id",
+          "target_deployment_id",
+          "idle_timeout_seconds",
+          "created_at",
+          "updated_at",
+          "invocation_url",
+          "runtime_observed",
+          "driver_enabled"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^fnc_[a-f0-9]{16}$"
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "branch_id": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string",
+            "pattern": "^[a-z0-9]{1,20}$"
+          },
+          "database_name": {
+            "type": "string"
+          },
+          "sql_schema": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "generation": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "provisioning",
+              "active",
+              "suspended",
+              "degraded",
+              "deleting"
+            ]
+          },
+          "active_deployment_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "target_deployment_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "idle_timeout_seconds": {
+            "type": "integer",
+            "minimum": 30,
+            "maximum": 3600
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "invocation_url": {
+            "type": "null",
+            "description": "No public Functions origin admitted in this release."
+          },
+          "runtime_observed": {
+            "const": false
+          },
+          "driver_enabled": {
+            "const": false
+          }
+        }
+      },
+      "FunctionDeployment": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "function_id",
+          "project_id",
+          "branch_id",
+          "runtime",
+          "bundle_digest",
+          "bundle_bytes",
+          "entry",
+          "environment_names",
+          "state",
+          "operation_id",
+          "failure_code",
+          "created_at",
+          "finished_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^fdp_[a-f0-9]{16}$"
+          },
+          "function_id": {
+            "type": "string"
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "branch_id": {
+            "type": "string"
+          },
+          "runtime": {
+            "const": "nodejs24"
+          },
+          "bundle_digest": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "bundle_bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8388608
+          },
+          "entry": {
+            "type": "string",
+            "enum": [
+              "index.mjs",
+              "index.js"
+            ]
+          },
+          "environment_names": {
+            "type": "array",
+            "maxItems": 32,
+            "items": {
+              "type": "string"
+            },
+            "description": "Names only. No values or Secret refs."
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "building",
+              "completed",
+              "failed"
+            ]
+          },
+          "operation_id": {
+            "type": "string"
+          },
+          "failure_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "FunctionPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor",
+          "driver_enabled"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FunctionDefinition"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "driver_enabled": {
+            "const": false
+          }
+        }
+      },
+      "FunctionDeploymentPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FunctionDeployment"
+            }
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       }
@@ -10743,6 +10981,360 @@
           },
           "503": {
             "description": "Authorization, lifecycle, quota, version or storage error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/functions": {
+      "get": {
+        "operationId": "listFunctions",
+        "summary": "List branch Functions metadata",
+        "description": "Read-only Functions foundation. Deployment/invocation Driver remains disabled; a retained completed deployment is not current VM readiness.",
+        "tags": [
+          "Functions"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Last returned slug or deployment ID, exclusive stable cursor."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized durable metadata. No SQL/guest probing or runtime availability claim.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FunctionPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient project permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project, branch or Function not accessible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid bounded pagination",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Metadata unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/functions/{slug}": {
+      "get": {
+        "operationId": "getFunction",
+        "summary": "Read a Function definition",
+        "description": "Read-only Functions foundation. Deployment/invocation Driver remains disabled; a retained completed deployment is not current VM readiness.",
+        "tags": [
+          "Functions"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized durable metadata. No SQL/guest probing or runtime availability claim.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FunctionDefinition"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "description": "Quoted numeric definition version.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient project permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project, branch or Function not accessible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid bounded pagination",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Metadata unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/functions/{slug}/deployments": {
+      "get": {
+        "operationId": "listFunctionDeployments",
+        "summary": "Read immutable deployment history",
+        "description": "Read-only Functions foundation. Deployment/invocation Driver remains disabled; a retained completed deployment is not current VM readiness.",
+        "tags": [
+          "Functions"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Last returned slug or deployment ID, exclusive stable cursor."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Authorized durable metadata. No SQL/guest probing or runtime availability claim.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FunctionDeploymentPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient project permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project, branch or Function not accessible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid bounded pagination",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Metadata unavailable",
             "content": {
               "application/json": {
                 "schema": {

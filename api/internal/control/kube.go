@@ -187,6 +187,14 @@ func number(value any) float64 {
 		return v
 	case int:
 		return float64(v)
+	case int64:
+		return float64(v)
+	case int32:
+		return float64(v)
+	case int16:
+		return float64(v)
+	case int8:
+		return float64(v)
 	case string:
 		n, _ := strconv.ParseFloat(v, 64)
 		return n
