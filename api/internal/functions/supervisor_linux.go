@@ -122,8 +122,15 @@ func (e *GuestBootError) Error() string { return "function guest stage failed: "
 // instance. It is not a Kubernetes-host helper or a shared Node execution pool.
 func ServeGuest(ctx context.Context) (result error) {
 	stage := "bootstrap"
+	guestVerified := false
 	defer func() {
 		if result != nil {
+			// Retrying inside a partially initialized guest cannot establish a
+			// fresh Secret/cgroup/boot identity. Suppress vmstart's local respawn;
+			// an owned replacement must be created by the control Driver.
+			if guestVerified {
+				_ = os.Remove("/neonvm/vmstart.allowed")
+			}
 			result = &GuestBootError{Stage: stage}
 		}
 	}()
@@ -134,6 +141,8 @@ func ServeGuest(ctx context.Context) (result error) {
 	if err != nil || string(marker) != "isolated-neonvm-functions-v1\n" {
 		return errors.New("function guest marker required")
 	}
+	guestVerified = true
+	stage = "bootstrap-secret"
 	file, err := os.Open("/run/function-bootstrap/config.json")
 	if err != nil {
 		return errors.New("function bootstrap unavailable")
@@ -143,16 +152,19 @@ func ServeGuest(ctx context.Context) (result error) {
 	if readErr != nil {
 		return errors.New("function bootstrap could not be read")
 	}
+	stage = "bootstrap-contract"
 	b, err := DecodeBootstrap(content)
 	if err != nil {
 		return err
 	}
+	stage = "bootstrap-tls"
 	identity, err := b.ManagerTLS(time.Now())
 	if err != nil {
 		return err
 	}
 	// An irreversible instance lifecycle cannot be restarted in the same guest
 	// after customer execution. Worker creates a fresh VM generation instead.
+	stage = "bootstrap-state"
 	if err = os.MkdirAll("/run/neon-function", 0700); err != nil {
 		return errors.New("guest supervisor state unavailable")
 	}
@@ -194,20 +206,24 @@ func ServeGuest(ctx context.Context) (result error) {
 	if err = os.WriteFile("/etc/hosts", []byte("127.0.0.1 localhost\n"+b.ProxyIP+" "+b.ProxyHostname+"\n"), 0644); err != nil {
 		return errors.New("guest SQL hostname mapping failed")
 	}
-	stage = "boundary"
+	stage = "boundary-detach"
 	if err = DetachBootstrap("/run/function-bootstrap"); err != nil {
 		return err
 	}
+	stage = "boundary-block-devices"
 	if err = HideGuestBlockDevices(); err != nil {
 		return err
 	}
+	stage = "boundary-cgroups"
 	if err = HardenGuestCgroups(); err != nil {
 		return err
 	}
+	stage = "boundary-network"
 	boundary := GuestBoundary{ProxyIP: netip.MustParseAddr(b.ProxyIP), DNSIP: netip.MustParseAddr(b.DNSIP), ProxyPort: b.ProxyPort, AllowPublicHTTPS: b.AllowPublicHTTPS}
 	if err = boundary.Prepare(ctx); err != nil {
 		return err
 	}
+	stage = "boundary-resource-group"
 	group, err := NewChildGroup()
 	if err != nil {
 		return err

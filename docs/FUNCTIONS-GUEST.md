@@ -133,6 +133,18 @@ digest 已核验。首次真实 VM UID `05cc4ec4-c07b-4661-9060-537c6c4bfa74`
 resourceVersion 前置条件正常回收，bootstrap Secret/Service/全部文件保留。
 这次失败不算 manager、客户 Node、SQL 或 UI 验收。
 
+修复源 `01bc0fca` 的质量 CI `38089380577` 和镜像 pipeline `38089669332`
+成功（含实际 loader 合同）。三节点拉取时的原 EOF 回执保留：node1 RKE2 因
+`leaderelection lost for rke2` 自动退出/重启，未观察到 OOM；重试后三节点
+实际 CRI 摘要一致。第二次 VM UID `188e5419-fe9d-4224-8565-8a011e789ee7`
+进入 guest、校验 TLS/读取 bundle 后，停在 boundary 初始化，未执行客户代码。
+单独 root-only 诊断 VM（没有客户 Node）核验卸载、block devices、cgroup、IPv6 /
+owner matcher 成功，实际 `iptables ... REJECT` 返回缺少 target；固定 kernel
+配置 `CONFIG_IP_NF_TARGET_REJECT` 未启用。Functions 改用 built-in `DROP`，保持
+每包默认禁止及 private-range 先于 public allow 的边界，不改 upstream kernel。
+新 supervisor 细分无密钥的 boot stage，失败后抑制同 guest respawn，待新镜像
+真实负例复测。原失败/诊断 VM 均按 UID/resourceVersion 普通回收，证据保留。
+
 vm-builder 本身包含自己的 base image/tool 输入；其 digest 与来源锁已保留。
 其已有 Vector 下载没有新 checksum gate，最终 Function init 不启动 Vector。
 qcow2 内的依赖清单和镜像 SBOM/provenance须共同审阅；carrier SBOM 不能单独

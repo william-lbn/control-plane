@@ -87,7 +87,7 @@ func (b GuestBoundary) Validate() error {
 }
 
 // guestRules are argument arrays, never interpolated shell text. The terminal
-// owner rule rejects every unapproved destination, including metadata IPs and
+// owner rule drops every unapproved destination, including metadata IPs and
 // Kubernetes control/management APIs even when a VXLAN path bypasses CNI policy.
 func (b GuestBoundary) guestRules() [][]string {
 	rules := [][]string{
@@ -102,11 +102,14 @@ func (b GuestBoundary) guestRules() [][]string {
 		// resolving to private, link-local, multicast or reserved destinations
 		// remain rejected on every packet, not just initial DNS resolution.
 		for _, cidr := range []string{"0.0.0.0/8", "10.0.0.0/8", "100.64.0.0/10", "127.0.0.0/8", "169.254.0.0/16", "172.16.0.0/12", "192.0.0.0/24", "192.0.2.0/24", "192.168.0.0/16", "198.18.0.0/15", "198.51.100.0/24", "203.0.113.0/24", "224.0.0.0/4", "240.0.0.0/4"} {
-			rules = append(rules, []string{"-A", "NEON_FUNCTION", "-d", cidr, "-j", "REJECT"})
+			rules = append(rules, []string{"-A", "NEON_FUNCTION", "-d", cidr, "-j", "DROP"})
 		}
 		rules = append(rules, []string{"-A", "NEON_FUNCTION", "-p", "tcp", "--dport", "443", "-j", "ACCEPT"})
 	}
-	rules = append(rules, []string{"-A", "NEON_FUNCTION", "-j", "REJECT"}, []string{"-I", "OUTPUT", "1", "-m", "owner", "--uid-owner", "65532", "-j", "NEON_FUNCTION"})
+	// DROP is a built-in verdict in the pinned own-fork kernel. REJECT needs
+	// CONFIG_IP_NF_TARGET_REJECT, which this kernel deliberately does not enable;
+	// using it made the observed guest fail before customer code could start.
+	rules = append(rules, []string{"-A", "NEON_FUNCTION", "-j", "DROP"}, []string{"-I", "OUTPUT", "1", "-m", "owner", "--uid-owner", "65532", "-j", "NEON_FUNCTION"})
 	return rules
 }
 

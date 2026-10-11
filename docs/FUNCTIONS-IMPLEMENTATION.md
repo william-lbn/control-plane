@@ -151,6 +151,25 @@ HTTP body bounded、16 并发、SSE 实际逐块送达。独立 self-hosted wait
 | F3 | 受限 SQL login、branch SQL manifest、克隆/历史点继承、zero/wake、Writer 删除依赖 | 新 branch URL/role/key；父子 SQL/代码/Secret 隔离；首次请求冷醒 Function 和 Compute |
 | F4 | WS、独立预算、cron/对象 outbox、dedup/retry、完整生命周期和监控 | 真实 WS、event delivery 语义、分支旧事件隔离、触发失败恢复、持久日志/指标 |
 
+F2 的前置实现新增 `InstanceClient` 和 `DeploymentSnapshot`。前者固定 private
+Service IP / port 9090，显式 CA / instance SAN / TLS 1.3，校验完整 Scope/boot /
+root status，不跟随 redirect、不自动重试 POST；流 body 生命周期由 ingress
+调用者负责。Linux真实 TLS/manager/stream/cancel 检查通过。后者支持首次 ZIP /
+config-only 复用代码、env merge/delete 和重启后 ownership-verified Secret
+hydration；JSON 只包含代码摘要/大小及 env key，私有 byte/value 不进入 Operation。
+这些是 Driver/API 的前置层，还未接入公共部署 API 或 UI。
+
+2026-10-11 Linux `functions-deployment-boundary-quality-attempt3`：84 项 Go
+检查和 9 项 Node 检查通过，包含实际 TLS、流式响应与取消；ZIP/config-only/
+env merge/delete、不可变快照和重启恢复；密钥值、代码、branch、slug、If-Match
+均绑定到域分离 HMAC 请求指纹，避免只哈希公开 JSON 而忽略密钥轮换。
+该结果是基础层验证，真实 microVM/SQL/UI/租户配额仍有独立门槛。
+
+官网允许用户覆盖部分自动注入服务变量；本版本为分支绑定和进程边界保留
+DATABASE_URL、NEON_*/NODE*/PG*/PATH 等名称，**当前兼容差异**明确保留。
+正式产品扩展须区分可覆盖的应用服务配置与不可覆盖的 supervisor/OS 凭据，
+并对用户自定连接重做授权/egress 评审，不能把保留键校验直接删除。
+
 metadata 目标：Function definition 唯一 `(project_id,branch_id,slug)`；immutable
 deployment 引用 content hash 与独立 env Secret version；instance 引用 deployment/
 generation/VM UID/boot；invocation ledger 与 admission/epoch 同步。分支内 SQL

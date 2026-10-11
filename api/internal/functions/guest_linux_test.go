@@ -20,7 +20,7 @@ func TestGuestEgressIsUIDScopedAndDefaultDeny(t *testing.T) {
 	if !reflect.DeepEqual(rules[len(rules)-1], []string{"-I", "OUTPUT", "1", "-m", "owner", "--uid-owner", "65532", "-j", "NEON_FUNCTION"}) {
 		t.Fatal("untrusted child is not isolated by UID")
 	}
-	if !reflect.DeepEqual(rules[len(rules)-2], []string{"-A", "NEON_FUNCTION", "-j", "REJECT"}) {
+	if !reflect.DeepEqual(rules[len(rules)-2], []string{"-A", "NEON_FUNCTION", "-j", "DROP"}) {
 		t.Fatal("egress does not fail closed")
 	}
 	for _, rule := range rules {
