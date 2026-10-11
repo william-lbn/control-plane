@@ -1,6 +1,6 @@
 # 生产门槛与官网对齐
 
-状态截至 2026-10-11；运行版 `932f5ad` / 统一 Helm 0.1.11 的独立验收、原失败与续测范围见 [当前回归](DELIVERY-2026-10-11-FUNCTIONS-PUBLICATION.md)。[资源恢复与原子发布](FUNCTIONS-PUBLICATION.md)已有内部代码；后续 SQL/Worker 增量仍须单独记录源码、部署和验收。[0.1.10 基线](DELIVERY-2026-10-11-FUNCTIONS-BACKING.md)与 [Compute 生命周期交付](DELIVERY-2026-10-10-COMPUTE-LIFECYCLE.md)保留历史版本结果。未通过项不能被 Ready Pod 或 CI build 替代。
+状态截至 2026-10-12；运行版 `f0b63f5` / 统一 Helm 0.1.12 的独立验收、原失败与续测范围见 [当前回归](DELIVERY-2026-10-12-SQL-IDENTITY.md)。[资源恢复与原子发布](FUNCTIONS-PUBLICATION.md)已有内部代码；下一阶段 SQL Secret/委托/Migration 022 仍须单独记录源码、部署和验收。[0.1.11 基线](DELIVERY-2026-10-11-FUNCTIONS-PUBLICATION.md)与 [Compute 生命周期交付](DELIVERY-2026-10-10-COMPUTE-LIFECYCLE.md)保留历史版本结果。未通过项不能被 Ready Pod 或 CI build 替代。
 
 ## 1. 已实现路径
 
@@ -40,7 +40,7 @@ Functions 已开始实际 Go/Node 基础层实现，合同和内部接口见
 
 Managed Auth 已有 Go Driver、Better Auth 1.7.7 运行时、React UI、注册/会话/JWT/分支隔离与 PostgreSQL CI，详细见 [Auth 合同](MANAGED-AUTH.md)。真实 Neon UI 结果按版本交付报告记录；SMTP/OAuth/MFA、完整恢复/删除一致性、生产隔离与 HA 仍须独立实现/验收。
 
-产品 Object Storage 已实现分支目录、独立受限对象凭据、Go REST Driver、React UI、条件写入、签名下载和分支继承，详见 [Object Storage 合同](OBJECT-STORAGE.md)。当前是 `neon-object-rest-v1`；`7162449` Linux 现场 UI 19 项已通过，原失败项目另有 4 项恢复。实际版本与其余回归见 [当前交付](DELIVERY-2026-10-09-OBJECT-STORAGE.md)。外部 S3 协议兼容、多段上传、物理 GC、分布式网关隔离及 HA/DR 仍未完成。
+产品 Object Storage 已实现分支目录、独立受限对象凭据、Go REST Driver、React UI、条件写入、签名下载和分支继承，详见 [Object Storage 合同](OBJECT-STORAGE.md)。当前是 `neon-object-rest-v1`；f0b63f5 Linux 现场 UI 19 项已通过，实际版本与其余回归见 [当前交付](DELIVERY-2026-10-12-SQL-IDENTITY.md)。外部 S3 协议兼容、多段上传、物理 GC、分布式网关隔离及 HA/DR 仍未完成。
 
 Functions 已有 guest、只读模型/UI、不可变存储与持久候选/引导身份，但产品执行
 Driver/API/UI 尚未接通；AI Gateway 真实推理服务未验收。Data API 已有原生 Driver、

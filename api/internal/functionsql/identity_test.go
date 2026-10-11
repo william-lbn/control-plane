@@ -3,6 +3,7 @@ package functionsql
 import (
 	"context"
 	"crypto/rand"
+	"encoding/base64"
 	"encoding/hex"
 	"net/url"
 	"os"
@@ -13,11 +14,49 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+func TestBoundedPlatformSCRAMVerifier(t *testing.T) {
+	encode := func(size int) string { return base64.StdEncoding.EncodeToString(make([]byte, size)) }
+	valid := "SCRAM-SHA-256$4096:" + encode(16) + "$" + encode(32) + ":" + encode(32)
+	if !ValidVerifier(valid) {
+		t.Fatal("platform verifier rejected")
+	}
+	for name, value := range map[string]string{
+		"short_salt": "SCRAM-SHA-256$4096:" + encode(8) + "$" + encode(32) + ":" + encode(32),
+		"short_key":  "SCRAM-SHA-256$4096:" + encode(16) + "$" + encode(16) + ":" + encode(32),
+		"long_key":   "SCRAM-SHA-256$4096:" + encode(16) + "$" + encode(64) + ":" + encode(32),
+		"iterations": strings.Replace(valid, "4096", "1024", 1),
+		"base64":     strings.Replace(valid, encode(16), "!!!!", 1),
+		"oversized":  valid + strings.Repeat("A", 4096),
+		"trailing":   valid + "$extra",
+	} {
+		t.Run(name, func(t *testing.T) {
+			if ValidVerifier(value) {
+				t.Fatal("invalid verifier admitted")
+			}
+		})
+	}
+}
+
 func TestScopeValidation(t *testing.T) {
-	s := Scope{"fnc_0123456789abcdef", "prj_0123456789abcdef", "br_0123456789abcdef", "neondb", "app"}
+	s := Scope{FunctionID: "fnc_0123456789abcdef", ProjectID: "prj_0123456789abcdef", BranchID: "br_0123456789abcdef", Database: "neondb", Schema: "app"}
 	if s.Validate() != nil || s.Role() != "fn_0123456789abcdef" {
 		t.Fatal("valid immutable scope rejected")
 	}
+	t.Run("explicit_provisioning_principal_validation", func(t *testing.T) {
+		original := s.marker()
+		for _, principal := range []string{"a-b", "x; DROP ROLE y", s.Role(), strings.Repeat("x", 64)} {
+			candidate := s
+			candidate.ProvisioningRole = principal
+			if candidate.Validate() == nil {
+				t.Fatal("invalid provisioning principal admitted")
+			}
+		}
+		candidate := s
+		candidate.ProvisioningRole = "control_probe"
+		if candidate.Validate() != nil || candidate.marker() == original {
+			t.Fatal("explicit trusted principal not bound to immutable marker")
+		}
+	})
 	for _, name := range []string{"pg_catalog", "neon_auth", "control_manifest", "information_schema", "app; DROP ROLE x", "a-b", "", strings.Repeat("x", 64)} {
 		s.Schema = name
 		if s.Validate() == nil {
@@ -49,7 +88,7 @@ func TestRestrictedIdentityAuthenticationAndRollback(t *testing.T) {
 		t.Fatal(err)
 	}
 	suffix := hex.EncodeToString(random[:])
-	s := Scope{"fnc_" + suffix, "prj_" + suffix, "br_" + suffix, "fn_ci_" + suffix, "app"}
+	s := Scope{FunctionID: "fnc_" + suffix, ProjectID: "prj_" + suffix, BranchID: "br_" + suffix, Database: "fn_ci_" + suffix, Schema: "app"}
 	exec := func(c *pgx.Conn, q string, args ...any) {
 		t.Helper()
 		if _, err := c.Exec(ctx, q, args...); err != nil {

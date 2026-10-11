@@ -18,6 +18,7 @@ guest supervisor 包不依赖管理 SQL 客户端，客户 VM 不得到 provisio
 | ProjectID / BranchID | prj_/br_ + 16 hex，原生创建身份 |
 | Database | PostgreSQL identifier ≤63；必须精确等于 current_database() |
 | Schema | PostgreSQL identifier ≤63；拒绝 pg_/neon_/control_ 和 information_schema |
+| ProvisioningRole | 可选、显式持久化的可信控制角色；非客户输入；单函数权限标记同时绑定此身份 |
 | Verifier | 固定 SCRAM-SHA-256 / 4096 格式，来自独立 immutable SQL Secret |
 
 role 固定为 `fn_{FunctionID hex}`。数据库角色 comment 绑定 project、branch 和 function。
@@ -36,7 +37,7 @@ metadata version 和 Operation lease 建立连接。此库不接受 DSN，不自
 现存 sequence USAGE/SELECT。设置 connection limit=4、idle_session_timeout=5s、
 statement_timeout=30s、指定 search_path。RLS 保持有效。
 
-不授予 schema CREATE、TEMP、对象 ownership、角色 membership、管理权限、BYPASSRLS、
+不授予 schema CREATE、TEMP、对象 ownership、运行角色的角色 membership、管理权限、BYPASSRLS、
 视图/外部表或 SECURITY DEFINER 执行。不会代表所有客户 owners 安装 default privileges；
 新表需要 owner 显式授权并重新调谐。
 
@@ -94,10 +95,22 @@ current_user、原 scope comment、LOGIN/connection limit、角色权限、searc
 后续客户 SQL 都受强制时间栅栏保护。
 
 PostgreSQL 16 中非 superuser 的 CREATEROLE 创建者会得到新角色的管理 membership。
-当前保守合同拒绝与运行角色有关的所有 membership，因此专用 superuser 测试通过
-不能证明 Neon `control_probe` 的真实创建路径可用。后续 Driver 必须定义并核验
-专用 provisioning principal 的 ADMIN/INHERIT/SET 委托，不能仅放宽 membership
-查询或给客户函数 superuser 以绕过这项准入。
+已发布的 `f0b63f5` 保守合同拒绝与运行角色有关的所有 membership，因此其专用
+superuser 测试不能证明 Neon `control_probe` 的真实创建路径可用。
+
+下一阶段源代码增加可选 `Scope.ProvisioningRole`，空值保留旧的严格合同。非空值
+必须来自不可变、已授权的控制元数据；它写入 role marker，不能通过修改 caller
+输入收编旧身份。执行 provisioning 时 session_user/current_user 都必须等于该角色，
+该角色必须为非 superuser CREATEROLE，且 `createrole_self_grant` 必须为空；不会为
+通过检查自行 SET ROLE 或修改 GUC。运行角色不能是其它角色的 member。
+
+只允许一个精确的 creator 管理关系：grantee 是已记录的 provisioning role，
+grantor 是 PostgreSQL bootstrap superuser OID 10，ADMIN=true、INHERIT=false、
+SET=false。此关系必须存在；任意其它 grantee、grantor 或 SET/INHERIT 授权均拒绝。
+这不把 creator 的 ADMIN 权限授予运行函数，也不证明这个 catalogue 关系的历史
+创建来源；可信 database/role 管理者仍能修改它。对应真实 PG16 测试已在 Linux
+`dataapi-quality-20261011180043` 通过；全量 666 pass / 0 fail / 0 skip。Neon 实际 Writer/Proxy
+路径、权限委托和跨 database 负例仍需独立验证。
 
 SQL role 与密码不能成为 compute 普通高权限 role spec。未来 Driver 必须把服务
 SCRAM verifier 只发布到该 branch 的 Proxy registry，并在冷启动时保留已授权服务身份。
@@ -128,7 +141,82 @@ SECURITY DEFINER 负例、已升权角色拒绝以及失败事务无残留 login
 
 ## 5. 后续闭环
 
-必须继续完成 immutable SQL Secret、原结果未知恢复、Neon Proxy route、leased Worker、
+### 5.1 下一阶段 SQL 凭据与持久身份合同
+
+下一阶段新增 `functions_sql_secret.go` 和 Migration 022。真实专用 PostgreSQL
+的回执、租约、不可变 trigger、重启恢复与拒绝变更测试已通过，Linux 全量 666/0/0。
+真实 Kubernetes 验证和发行分别记录；当前运行的 `f0b63f5` 仍是 Migration 021，
+不含这些新代码，也未启用 Functions 执行。
+
+真实 Linux Job `functions-foundation-20261011180347` 4 pass / 0 fail / 0 skip，
+使用相同归档源码。SQL Secret 原 UID 为 `5c4b9b4e-e515-4966-8aec-b2b2cdd0efe6`，
+通过实际 immutable admission、已提交 POST 回复丢失、独立 client 重启恢复、
+原 UID 重读与替换 UID/跨分支/不同密码拒绝。原 Secret 保留；其它三项是实际
+MinIO artifact、env Secret 和 Service/VM admission dry-run，不是函数 VM 执行。
+
+复测须使用专用投射 ServiceAccount，Secret GET 仅放行预先分配的原测试名称，
+不授予 list/patch/delete；原函数/部署身份由 operator 明确传入，不能复用随机
+scope 覆盖既有 Secret。下例只验证 SQL backing，不启用 Functions 或操作业务数据库：
+
+```bash
+export NEON_FUNCTIONS_LIVE_SQL_SECRET_TEST=true
+export NEON_FUNCTIONS_LIVE_FUNCTION_ID=fnc_<预先分配的16位hex>
+export NEON_KUBE_NAMESPACE=<专用测试namespace>
+cd api
+go test -mod=readonly -count=1 -tags=live \
+  -run '^TestFunctionSQLSecretLiveKubernetes$' ./internal/control
+```
+
+凭据属于 Function definition，首版 generation 固定为 1；不同部署重用原身份，
+不通过滚动部署重设仍在运行的函数密码。轮换需要原 VM/连接排空和路由停用，
+尚无公共轮换 API。Secret 名称为 `fn-{function hex}-sql-1`，类型 Opaque、
+immutable=true，只有 `sql.json`，内含独立 Password/SCRAM Verifier。
+
+HMAC 绑定 namespace/name、Function/Project/Branch、database/schema、可信
+provisioning role、原 Writer、credential generation、MAC key version 和精确
+canonical 内容。验证真实 UID、全部作用域标签、annotation、不可删除状态、
+唯一数据键和 canonical JSON；错误只返回固定描述。私有 record/reference 默认
+JSON 序列化为 `{}`，不返回 API 或写入日志。
+
+创建前 GET；首次明确 404 后只发一次 POST；未知结果只 GET 核验原对象。
+同名不同内容拒绝，不 PATCH、替换或删除。原 proposal/回复丢失时，显式
+`findFunctionSQLSecret` 只读找回原可信 scope/key 对应的签名内容；随后必须持久化
+原 UID/MAC。已有持久回执必须使用 `readFunctionSQLSecret` 核验原 UID，不得退回
+“同名即收编”的恢复方法。
+
+`function_sql_credentials` 不含密码、verifier 或 DSN，只存作用域、原 Secret UID、
+内容 MAC、key version 和原创建 Operation。Function/Project/Branch/Writer 具备
+外键，数据库/Schema/role 与 definition 精确一致；真实数据库 trigger 拒绝改写。
+首版可信 provisioning role 固定为 `control_probe`。保留候选使用的同一 Operation
+租约和父 intent 行锁，提交前再次用 wall clock 核验；租约失效、旧 worker、父删除、
+不同 UID/MAC/key、数据库/Schema 不匹配时拒绝。事务不调用 K8s/guest/业务 SQL。
+
+Secret 回执、角色 provisioning、实际登录探针、Writer/Proxy/TLS 核验必须逐步接入
+同一 leased Driver。回执代码存在不能放行函数调用、跨 database 隔离、凭据轮换
+或跨实例 fencing。
+
+```mermaid
+sequenceDiagram
+  participant W as Leased Worker（待接通）
+  participant M as Metadata PostgreSQL
+  participant K as Kubernetes API
+  participant P as 原分支 Writer / Proxy
+  W->>M: 锁原 Operation / definition / 父 intent，读取已授权 scope
+  W->>K: GET 原 SQL Secret，核验签名；明确缺失时 POST 一次
+  Note over W,K: 结果未知只 GET 原对象；不轮换、替换或删除
+  W->>M: 同一租约记录真实 UID/MAC/key/Writer，wall clock 再核验
+  W->>K: 按持久原 UID/MAC 重读凭据
+  W->>P: trusted control_probe / 原 Writer，ProvisionTx
+  Note over W,P: 仅允许 bootstrap ADMIN、INHERIT=false、SET=false；不改变 PUBLIC 策略
+  W->>P: 独立 Fn role / CA / hostname / selector 登录探针（待接通）
+  W->>M: 再核验父 intent / 租约，再继续候选部署（待接通）
+```
+
+图中的外部调用不能组成跨系统原子事务。每步都必须恢复原结果、保留失败并继续
+检查 authoritative intent。Metadata 租约不是 SQL/Kubernetes 的外部 fencing；即使
+单 Worker 串行正反例通过，也不能放行多实例准入。
+
+必须继续接通 immutable SQL Secret、原结果未知恢复、Neon Proxy route、leased Worker、
 真正 Node/pg 读写、跨分支凭据拒绝、冷醒与正常退休、UI ZIP/config-only 部署和返回结果。
 本次 PostgreSQL 库测试不替代这些验收，也不放行 HA 或外部缩零 fencing。
 

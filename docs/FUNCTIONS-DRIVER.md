@@ -4,9 +4,14 @@
 
 `api/internal/control/functions_instances.go` 已实现候选实例的 PostgreSQL 仓库。
 它是后续 Functions Driver 的实际内部代码，尚未注册为公共部署接口，也尚未被
-Worker action 调用。当前部署源码 `932f5ad` / 统一 Helm 0.1.11 已包含候选仓库、
+Worker action 调用。当前部署源码 `f0b63f5` / 统一 Helm 0.1.12 已包含候选仓库、
 Migration 020 存储回执和 Migration 021 引导身份。对应运行能力仍以
 镜像锁和具体验收记录为准。`capabilities.functions.enabled` 保持 false。
+
+下一阶段新增 SQL Secret 与 Migration 022 的不可变 SQL UID/MAC 回执，合同和
+真实委托测试见 [FUNCTIONS-SQL](FUNCTIONS-SQL.md)。Linux 专用 PostgreSQL 全量测试
+666/0/0 已通过，真实 Kubernetes 验证和发行单独记录。它们不是这版已启用的部署/调用 Driver；不能把 Scope/UUID 的格式检查当作实际
+Kubernetes、Neon Writer 或数据库隔离证明。
 
 本阶段解决：lost reply / Worker 重启沿用同一个候选身份、当前 Operation lease
 及父资源准入、代次前进拒绝旧写入、部分资源 UID 的持久观察、失败 VM 保留配额。

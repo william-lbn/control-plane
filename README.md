@@ -4,7 +4,7 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 许可证：Apache-2.0。项目由自托管维护者开发，与 Neon 托管服务独立。
 
 **发行状态：预览版本。已经验证的实验环境功能不等于生产认证，也不等于 Neon 官网全部 Backend 服务。**
-[当前运行发行及回归](docs/DELIVERY-2026-10-11-FUNCTIONS-PUBLICATION.md)：控制面 `932f5ad`、统一 Helm 0.1.11、21/21 migrations；新镜像独立通过 Linux Go/PG、实际 Kubernetes foundation、公开 CI、七镜像和三节点拉取。UI 正常通过与原项目恢复分别记录，原失败保留。[历史 0.1.10](docs/DELIVERY-2026-10-11-FUNCTIONS-BACKING.md)保留其 135 项基线。[资源恢复与原子发布](docs/FUNCTIONS-PUBLICATION.md)已有内部实现；Functions 执行能力仍未启用。
+[当前运行发行及回归](docs/DELIVERY-2026-10-12-SQL-IDENTITY.md)：控制面 `f0b63f5`、统一 Helm 0.1.12、21/21 migrations；新镜像独立通过 Linux Go/PG 610 项、公开 CI、七镜像和三节点拉取。UI 正常通过与原项目恢复分别记录，原失败保留。[历史 0.1.11](docs/DELIVERY-2026-10-11-FUNCTIONS-PUBLICATION.md)保留其 129 项基线。[资源恢复与原子发布](docs/FUNCTIONS-PUBLICATION.md)已有内部实现；Functions 执行能力仍未启用。下一阶段 SQL Secret/明确 creator 委托/Migration 022 已通过独立 Linux Go/PG 666 项和真实 K8s/MinIO 4 项，发行状态单独记录；不能当成当前已部署的函数执行能力。
 [历史 Compute 生命周期交付](docs/DELIVERY-2026-10-10-COMPUTE-LIFECYCLE.md)记录先前七镜像、统一 Helm 0.1.7、九套真实 Linux UI 共 146 项与 23 项原失败恢复检查；[先前 Object Storage](docs/DELIVERY-2026-10-09-OBJECT-STORAGE.md)、[Managed Auth](docs/DELIVERY-2026-10-08-MANAGED-AUTH.md)及历史报告保留各版本证据。
 Chart 0.8.3 提供独立 API、Worker、Web 进程及可选 Data API、应用凭据、Console 邀请注册、历史分支恢复、保留删除与独立 Compute 退休；Functions 只读元数据/历史页面、不可变存储和持久身份回执已加入，执行 Driver 尚未启用。Worker 使用 PostgreSQL 领导租约和只读 Runner observer。
 当前只允许一个 API 和一个 Worker，跨实例外部 fencing 与 HA 仍须独立验收。
