@@ -118,7 +118,10 @@ artifact digest/branch 拒绝、直接 SQL 改写被数据库 trigger 拒绝、�
 
 ## 5. 下一步门槛
 
-仍需：持久回执与部署 API/Worker 的完整集成、私有 CA/bootstrap、实际 VM
+不可变 bootstrap 与 Migration 021 的内部实现及实际 Kubernetes 检查见
+[引导合同](FUNCTIONS-BOOTSTRAP.md)，仍未接通完整产品 Driver。
+
+仍需：持久回执与部署 API/Worker 的完整集成、私有 CA/引导策略、实际 VM
 所有权证明、分支受限 SQL、真实 guest health、排空/正常退休、原子发布、UI ZIP 上传、
 配置更新、调用、回滚、分支复制、自动零与冷醒。后续要补 Function Triggers（cron/对象
 事件）、日志、WebSocket 和独立域名。HA、外部栅栏和生产 TLS 都保持独立准入。

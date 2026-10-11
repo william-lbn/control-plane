@@ -57,16 +57,21 @@ test('native UI: project, timeline branch, writer, Proxy SQL and cold resume', a
         /^\/api\/v1\/projects\/[^/]+\/operations\/[^/]+$/.test(
           new URL(route.request().url()).pathname,
         ) &&
-        injectedReads < 2
+        injectedReads < 4
       ) {
         injectedReads++;
         await route.fulfill({
-          status: 503,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            code: 'metadata_unavailable',
-            message: 'Controlled observation outage',
-          }),
+          status: injectedReads <= 2 ? 503 : 200,
+          contentType: injectedReads === 4 ? 'text/html' : 'application/json',
+          body:
+            injectedReads === 3
+              ? '{"id":'
+              : injectedReads === 4
+                ? '<html>Controlled intermediary error</html>'
+                : JSON.stringify({
+                    code: 'metadata_unavailable',
+                    message: 'Controlled observation outage',
+                  }),
         });
       } else await route.continue();
     });
@@ -209,10 +214,12 @@ test('native UI: project, timeline branch, writer, Proxy SQL and cold resume', a
     endpoints.add(writer);
     await record('ui_native_project_ready', { writer, parent });
     if (pollFault) {
-      expect(injectedReads).toBe(2);
+      expect(injectedReads).toBe(4);
       expect(projectMutations).toBe(1);
       await record('ui_recovers_transient_operation_reads_without_repeating_project_creation', {
         injected_reads: injectedReads,
+        injected_503_reads: 2,
+        injected_malformed_success_reads: 2,
         project_mutations: projectMutations,
       });
     }

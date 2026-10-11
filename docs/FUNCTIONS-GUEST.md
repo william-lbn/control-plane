@@ -2,7 +2,13 @@
 
 ## 1. 交付范围和当前门槛
 
-2026-10-11 最新状态：修复源 `56357493` 的公开 CI `38099817861` 为
+2026-10-11 最新默认启动验收：源码 `86a9e07a` 的自有镜像
+`docker.io/williamluckyli/control-functions-vm@sha256:c4b5d20b248e0d3d0951f2c3ae04b917092b58c5ba2f146047e99a3828fbbc32`
+在实际 NeonVM 使用默认 entry 通过 32 项检查，没有 sleep/entry override。
+详见 [验收及独立门槛](ACCEPTANCE-2026-10-11-FUNCTIONS-GUEST.md)。SQL 登录、真实数据
+读写和 UI/租户 Driver 仍未验收；32 项结果不包含这些能力。
+
+此前修复源 `56357493` 的公开 CI `38099817861` 为
 467 Go pass / 0 fail / 0 skip；VM pipeline `38100159669` 成功，发布 own image
 `docker.io/williamluckyli/control-functions-vm@sha256:e84aab1254073d6947ad6ad5b089a40ed2025d592ce584278da5d71fbf21fc40`，
 三节点匿名/实际 CRI 拉取验证通过。默认 entry 首次在 DHCP route 准备前下载 artifact
@@ -10,10 +16,10 @@
 401 / signed 200、节点 NTP 与时间一致。同镜像延迟 entry 的真实 VM 通过 32 项隔离/
 HTTP/SSE/nonce/boot/generation/branch/整棵进程树关闭检查并普通回收。
 
-**该 32 项结果带 operator entry override，尚不等于默认镜像启动验收。**
+此前该 32 项结果带 operator entry override，与上面的默认启动结果分别记录。
 源码新增 `AwaitGuestNetwork`：15 秒内观察固定 eth0 的 IPv4、UP default gateway，
 就绪后立即继续；不改 TLS/签名 freshness，不重试客户 POST，不用固定 sleep。
-待该精确源新镜像的默认启动复测。SQL login 与 UI/租户 Driver 均未验收。
+后续精确源默认启动复测已完成；SQL login 与 UI/租户 Driver 均未验收。
 
 这是 Functions 专用 VM 的 Go supervisor、Node runtime 和 Linux 镜像构建实现。
 它是 [Functions 产品计划](FUNCTIONS-IMPLEMENTATION.md) 的 F1 增量。平台

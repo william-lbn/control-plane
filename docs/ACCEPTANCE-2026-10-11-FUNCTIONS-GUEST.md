@@ -9,7 +9,8 @@
 
 这完成了 guest 默认启动与执行隔离切片；**没有完成 Functions 控制面产品闭环或生产准入**。
 scope 为独立测试身份；SQL 项只是受允许端口的 TCP 连通，未验证数据库登录或数据读写。
-当前 deployed API/Worker/Web 仍是 `0ba1732`，没有自动部署本次新 migration 或启用服务。
+本次 guest 验收发生时 deployed API/Worker/Web 是 `0ba1732`；该回执没有部署新的
+控制面 migration 或启用服务。后续运行版本见 [当日交付](DELIVERY-2026-10-11-FUNCTIONS-BACKING.md)。
 
 ## 验证内容
 

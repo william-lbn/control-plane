@@ -4,8 +4,9 @@
 
 `api/internal/control/functions_instances.go` 已实现候选实例的 PostgreSQL 仓库。
 它是后续 Functions Driver 的实际内部代码，尚未注册为公共部署接口，也尚未被
-Worker action 调用。当前部署镜像 `f256408` 不含本阶段新增代码；对应运行能力
-仍以镜像锁和具体验收记录为准。`capabilities.functions.enabled` 保持 false。
+Worker action 调用。当前部署源码 `fbff1b09` / 统一 Helm 0.1.9 已包含候选仓库和
+Migration 020 存储回执；Migration 021 引导身份为下一增量。对应运行能力仍以
+镜像锁和具体验收记录为准。`capabilities.functions.enabled` 保持 false。
 
 本阶段解决：lost reply / Worker 重启沿用同一个候选身份、当前 Operation lease
 及父资源准入、代次前进拒绝旧写入、部分资源 UID 的持久观察、失败 VM 保留配额。
@@ -75,7 +76,10 @@ metadata，也没有把测试中的资源 UUID 当作集群证明。实际 Linux
 SHA-256 为 `9c267d18d6f395ee6818a769fc8061edcfad84a77f62b8bd68e86407d95ea299`。
 这不是 Functions 部署/调用或外部 fencing 的产品验收。
 
-下一步依次接通不可变 artifact/env/SQL Secret、Worker 私有 CA、实际 K8s 所有权
+不可变 artifact/env 及持久回执见 [存储合同](FUNCTIONS-BACKING.md)，不可变引导 Secret
+及 Migration 021 见 [引导合同](FUNCTIONS-BOOTSTRAP.md)。这些内部实现尚未组成完整 Driver。
+
+下一步依次接通 artifact TLS 服务/SQL Secret、Worker 私有 CA、实际 K8s 所有权
 查证与创建、真实 guest TLS/status/SQL、旧实例排空和正常 UID 退休、原子发布、
 UI ZIP/config-only/调用/回滚与冷醒。公共 OpenAPI 只有实际注册的接口，不能先发布
 一个没有执行 Driver 的部署 API。多 Worker / 多 ingress 的外部栅栏仍是独立门槛。

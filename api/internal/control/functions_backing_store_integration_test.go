@@ -112,6 +112,57 @@ func TestFunctionDeploymentBackingPersistenceAndLease(t *testing.T) {
 			t.Fatal("original receipt altered")
 		}
 	})
+	t.Run("bootstrap_durable_uid_and_private_recovery", func(t *testing.T) {
+		candidate, err := s.reserveFunctionInstance(ctx, op, worker, p)
+		if err != nil {
+			t.Fatal("candidate unavailable", err)
+		}
+		ref := functionBootstrapReference{Namespace: "neon-ci", Name: candidate.SecretName, UID: "22222222-3333-4444-5555-666666666666", MAC: strings.Repeat("e", 64), MACKeyVersion: "ci-bootstrap-v1", FunctionID: p.FunctionID, WriterID: endpoint, BundleDigest: backing.Artifact.Digest, Scope: candidate.Scope}
+		if _, err = s.loadFunctionBootstrap(ctx, op, worker, p, candidate.Scope.InstanceID); !errors.Is(err, errFunctionBootstrap) {
+			t.Fatal("missing bootstrap receipt fabricated")
+		}
+		original, err := s.recordFunctionBootstrap(ctx, op, worker, p, ref)
+		if err != nil || original != ref {
+			t.Fatal("bootstrap receipt not persisted", err)
+		}
+		restarted := &server{db: db}
+		again, err := restarted.recordFunctionBootstrap(ctx, op, worker, p, ref)
+		if err != nil || again != ref {
+			t.Fatal("lost reply recovery changed bootstrap receipt")
+		}
+		loaded, err := restarted.loadFunctionBootstrap(ctx, op, worker, p, candidate.Scope.InstanceID)
+		if err != nil || loaded != ref {
+			t.Fatal("restart lost original bootstrap UID", err)
+		}
+		if public, _ := json.Marshal(loaded); string(public) != "{}" {
+			t.Fatal("private bootstrap reference serialized")
+		}
+		for _, change := range []func(*functionBootstrapReference){
+			func(v *functionBootstrapReference) { v.UID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee" },
+			func(v *functionBootstrapReference) { v.MAC = strings.Repeat("f", 64) },
+			func(v *functionBootstrapReference) { v.MACKeyVersion = "ci-bootstrap-v2" },
+			func(v *functionBootstrapReference) { v.Namespace = "foreign" },
+			func(v *functionBootstrapReference) { v.WriterID = "ep_ffffffffffffffff" },
+			func(v *functionBootstrapReference) { v.BundleDigest = strings.Repeat("f", 64) },
+		} {
+			changed := ref
+			change(&changed)
+			if _, err := s.recordFunctionBootstrap(ctx, op, worker, p, changed); !errors.Is(err, errFunctionBootstrap) {
+				t.Fatal("changed bootstrap receipt adopted")
+			}
+		}
+		if _, err := db.Exec(ctx, `UPDATE function_instance_bootstraps SET content_mac=$2 WHERE instance_id=$1`, candidate.Scope.InstanceID, strings.Repeat("f", 64)); err == nil {
+			t.Fatal("direct bootstrap receipt mutation allowed")
+		}
+		if _, err := s.loadFunctionBootstrap(ctx, op, "old_worker", p, candidate.Scope.InstanceID); !errors.Is(err, errLeaseLost) {
+			t.Fatal("stale worker loaded private bootstrap")
+		}
+		wrong := p
+		wrong.Generation++
+		if _, err := s.loadFunctionBootstrap(ctx, op, worker, wrong, candidate.Scope.InstanceID); !errors.Is(err, errFunctionInstanceConflict) {
+			t.Fatal("stale generation loaded bootstrap")
+		}
+	})
 	t.Run("database_immutability_and_scope_guards", func(t *testing.T) {
 		if _, err := db.Exec(ctx, `UPDATE function_deployment_backings SET mac_key_version='other' WHERE deployment_id=$1`, p.DeploymentID); err == nil {
 			t.Fatal("direct receipt mutation allowed")

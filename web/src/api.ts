@@ -1,4 +1,5 @@
-import { retryAfterSeconds } from './shared/followOperation';
+import { decodeAPIResponse } from './shared/apiResponse';
+export { ApiError } from './shared/apiResponse';
 
 export type User = { id: string; username: string; role: string };
 export type Organization = { id: string; name: string; slug: string; role: string; state: string };
@@ -142,18 +143,6 @@ export type QueryResult = {
   truncated: boolean;
 };
 
-export class ApiError extends Error {
-  constructor(
-    public status: number,
-    public code: string,
-    message: string,
-    public requestId?: string,
-    public retryAfterSeconds?: number,
-  ) {
-    super(message);
-  }
-}
-
 function csrf(): string {
   const part = document.cookie.split('; ').find((value) => value.startsWith('neon_v2_csrf='));
   return part ? decodeURIComponent(part.split('=')[1]) : '';
@@ -165,16 +154,7 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   if (options.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   if (method !== 'GET' && method !== 'HEAD') headers.set('X-CSRF-Token', csrf());
   const response = await fetch(path, { ...options, headers, credentials: 'same-origin' });
-  const data = (await response.json().catch(() => ({}))) as Record<string, unknown>;
-  if (!response.ok)
-    throw new ApiError(
-      response.status,
-      String(data.code || 'request_failed'),
-      String(data.message || `HTTP ${response.status}`),
-      String(data.request_id || ''),
-      retryAfterSeconds(response.headers.get('Retry-After')),
-    );
-  return data as T;
+  return decodeAPIResponse<T>(response);
 }
 
 export const projectPath = (id: string) => `/api/v1/projects/${encodeURIComponent(id)}`;

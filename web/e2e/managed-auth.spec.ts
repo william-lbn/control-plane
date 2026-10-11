@@ -17,9 +17,40 @@ test('Managed Auth: UI identity, native branch isolation, Data API RLS and cold 
   if (!baseURL || !adminFile || !privateDir)
     throw new Error('Protected Linux E2E configuration required');
   const attempt = `${process.env.NEON_E2E_ATTEMPT || Date.now()}-auth`;
-  const password = randomBytes(30).toString('base64url');
-  const appPassword = randomBytes(30).toString('base64url');
-  const email = `synthetic-${attempt}@example.test`;
+  const recoveryFile = process.env.NEON_E2E_AUTH_RESUME_FIXTURE;
+  const recovery = recoveryFile
+    ? (JSON.parse(await readFile(recoveryFile, 'utf8')) as {
+        project_id: string;
+        project_name: string;
+        branch_id: string;
+        writer_id: string;
+        child_id: string;
+        child_writer_id: string;
+        child_name: string;
+        branch_operation_id: string;
+        original_failure_job: string;
+        database_password_file: string;
+        application_password_file: string;
+      })
+    : null;
+  if (
+    recovery &&
+    (!/^publication-ui-[0-9]{14}$/.test(recovery.original_failure_job) ||
+      recovery.project_name !== `ci-${recovery.original_failure_job}-auth` ||
+      !/^prj_[a-f0-9]{16}$/.test(recovery.project_id) ||
+      ![recovery.branch_id, recovery.child_id].every((id) => /^br_[a-f0-9]{16}$/.test(id)) ||
+      ![recovery.writer_id, recovery.child_writer_id].every((id) => /^ep_[a-f0-9]{16}$/.test(id)) ||
+      !/^op_[a-f0-9]{24}$/.test(recovery.branch_operation_id) ||
+      recovery.child_name !== `child-${recovery.original_failure_job}-auth`)
+  )
+    throw new Error('Complete original Auth recovery identity required');
+  const password = recovery
+    ? (await readFile(recovery.database_password_file, 'utf8')).trim()
+    : randomBytes(30).toString('base64url');
+  const appPassword = recovery
+    ? (await readFile(recovery.application_password_file, 'utf8')).trim()
+    : randomBytes(30).toString('base64url');
+  const email = `synthetic-${recovery ? recovery.original_failure_job + '-auth' : attempt}@example.test`;
   const checks: { name: string; [key: string]: unknown }[] = [];
   const endpoints = new Set<string>();
   const cleanup: {
@@ -34,6 +65,9 @@ test('Managed Auth: UI identity, native branch isolation, Data API RLS and cold 
   let root = '';
   let child = '';
   let writer = '';
+  let childWriter = '';
+  let user = '';
+  let rootJWT = '';
   let result = 'running';
   await mkdir(privateDir, { recursive: true, mode: 0o700 });
   await writeFile(path.join(privateDir, attempt + '-database-password'), password, {
@@ -55,6 +89,8 @@ test('Managed Auth: UI identity, native branch isolation, Data API RLS and cold 
           branch_id: root,
           child_id: child,
           writer_id: writer,
+          original_failure_job: recovery?.original_failure_job,
+          creates_new_project: !recovery,
           checks,
           failure_cleanup: cleanup,
           credentials_in_evidence: false,
@@ -265,125 +301,202 @@ test('Managed Auth: UI identity, native branch isolation, Data API RLS and cold 
     await page.getByLabel('用户名').fill('admin');
     await page.getByLabel('密码', { exact: true }).fill((await readFile(adminFile, 'utf8')).trim());
     await page.getByRole('button', { name: '登录控制台 →', exact: true }).click();
-    await page.getByRole('button', { name: '＋ 创建项目', exact: true }).click();
-    await page.getByLabel('项目名称').fill('ci-' + attempt);
-    await page.locator('.create-modal input[type="password"]').fill(password);
-    await page.getByLabel('最大 CPU', { exact: true }).selectOption('1000');
-    await page.getByLabel('最大内存', { exact: true }).selectOption('1024');
-    const pending = page.waitForResponse(
-      (r) => r.url().endsWith('/organizations/local/projects') && r.request().method() === 'POST',
-    );
-    await page.getByRole('button', { name: '创建并验证', exact: true }).click();
-    const response = await pending;
-    expect(response.status()).toBe(202);
-    project = (await response.json()).resource.id;
-    await expect(page.locator('.create-modal')).toHaveCount(0, { timeout: 490000 });
-    const listed = await context.request.get(`/api/v1/projects/${project}/endpoints`);
-    expect(listed.status()).toBe(200);
-    const endpoint = (await listed.json()).items[0];
-    writer = endpoint.id;
-    root = endpoint.branch_id;
-    endpoints.add(writer);
-    await record('ui_created_real_neon_project_with_bounded_compute');
-    await sql('GRANT CREATE, CONNECT ON DATABASE postgres TO control_probe WITH GRANT OPTION');
-    await authPage(root);
-    await page.getByLabel('Auth 可信来源').fill('https://app.example.test');
-    await mutateAuth(root, false);
-    const preflight = await context.request.fetch(`/auth/v1/${root}/sign-up/email`, {
-      method: 'OPTIONS',
-      headers: {
-        Origin: 'https://app.example.test',
-        'Access-Control-Request-Method': 'POST',
-        'Access-Control-Request-Headers': 'content-type',
-      },
-    });
-    expect(preflight.status()).toBe(204);
-    expect(preflight.headers()['access-control-allow-origin']).toBe('https://app.example.test');
-    const deniedOrigin = await context.request.get(`/auth/v1/${root}/get-session`, {
-      headers: { Origin: 'https://unrelated.example.test' },
-    });
-    expect(deniedOrigin.status()).toBe(403);
-    await record('real_auth_relay_allows_exact_cors_preflight_and_rejects_untrusted_origins');
-    await page.getByLabel('应用姓名').fill('Synthetic parent');
-    await page.getByLabel('应用邮箱', { exact: true }).fill(email);
-    await page.getByLabel('应用密码', { exact: true }).fill(appPassword);
-    await page.getByRole('button', { name: '注册应用用户', exact: true }).click();
-    await expect(page.getByTestId('auth-app-result')).toContainText('应用用户注册成功', {
-      timeout: 190000,
-    });
-    expect(
+    if (recovery) {
+      project = recovery.project_id;
+      root = recovery.branch_id;
+      writer = recovery.writer_id;
+      child = recovery.child_id;
+      childWriter = recovery.child_writer_id;
+      endpoints.add(writer);
+      endpoints.add(childWriter);
+      await save();
+      const p = await context.request.get(`/api/v1/projects/${project}`);
+      expect(p.status()).toBe(200);
+      const info = await p.json();
+      expect(info.name).toBe(recovery.project_name);
+      expect(info.source).toBe('managed');
+      const b = await context.request.get(`/api/v1/projects/${project}/branches/${child}`);
+      expect(b.status()).toBe(200);
+      const branch = await b.json();
+      expect(branch.name).toBe(recovery.child_name);
+      expect(branch.parent_branch_id).toBe(root);
+      for (const [endpoint, branch] of [
+        [writer, root],
+        [childWriter, child],
+      ]) {
+        const r = await context.request.get(`/api/v1/projects/${project}/endpoints/${endpoint}`);
+        expect(r.status()).toBe(200);
+        expect((await r.json()).branch_id).toBe(branch);
+      }
+      const op = await context.request.get(
+        `/api/v1/projects/${project}/operations/${recovery.branch_operation_id}`,
+      );
+      expect(op.status()).toBe(200);
+      const observed = await op.json();
+      expect(observed.action).toBe('create_branch');
+      expect(observed.resource_id).toBe(child);
+      expect(observed.state).toBe('succeeded');
+      await page.goto(`/#/projects/${project}/operations`);
       await page
-        .getByLabel('应用密码', { exact: true })
-        .evaluate((input) => (input as HTMLInputElement).value.length),
-    ).toBe(0);
-    await page.getByRole('button', { name: '检查应用会话', exact: true }).click();
-    await expect(page.getByTestId('auth-app-result')).toContainText('应用会话有效');
-    await page.getByRole('button', { name: '读取应用用户', exact: true }).click();
-    await expect(page.getByRole('cell', { name: 'Synthetic parent', exact: true })).toBeVisible();
-    await record('ui_registered_persisted_branch_user_and_session_without_console_identity');
-    const parentSession = await page.evaluate(
-      async (id) =>
-        (await fetch(`/auth/v1/${id}/get-session`, { credentials: 'same-origin' })).json(),
-      root,
-    );
-    const user = parentSession.user.id as string;
-    let rootJWT = await applicationToken(root);
-    const claims = JSON.parse(Buffer.from(rootJWT.split('.')[1], 'base64url').toString());
-    expect(claims.aud).toBe(root);
-    expect(claims.sub).toBe(user);
-    expect(claims.branch_id).toBe(root);
-    expect(claims.exp - claims.iat).toBeLessThanOrEqual(300);
-    expect(claims.email).toBeUndefined();
-    await record('actual_branch_scoped_jwt_has_bounded_expiry_and_public_jwks');
-    for (const statement of [
-      'CREATE SCHEMA app_auth',
-      'CREATE TABLE app_auth.notes(id text PRIMARY KEY, owner_id text NOT NULL, body text NOT NULL)',
-      'ALTER TABLE app_auth.notes ENABLE ROW LEVEL SECURITY',
-      'ALTER TABLE app_auth.notes FORCE ROW LEVEL SECURITY',
-      "CREATE POLICY own_rows ON app_auth.notes USING(owner_id=current_setting('request.jwt.claims',true)::jsonb->>'sub') WITH CHECK(owner_id=current_setting('request.jwt.claims',true)::jsonb->>'sub')",
-      `INSERT INTO app_auth.notes VALUES('owned','${user}','owned auth row'),('other','another-user','hidden auth row')`,
-      'GRANT USAGE ON SCHEMA app_auth TO control_probe WITH GRANT OPTION',
-      'GRANT SELECT,INSERT,UPDATE,DELETE ON app_auth.notes TO control_probe WITH GRANT OPTION',
-    ])
-      await sql(statement);
-    await configureData(root);
-    rootJWT = await applicationToken(root);
-    await requestData(rootJWT, 200, 'owned auth row');
-    await expect(page.getByTestId('data-api-response')).not.toContainText('hidden auth row');
-    await record('ui_auth_jwt_data_api_real_postgres_rls_read_isolation');
-    await authPage(root);
-    const dependency = page.waitForResponse(
-      (r) => r.url().endsWith(`/branches/${root}/auth`) && r.request().method() === 'DELETE',
-    );
-    await page.getByRole('button', { name: '禁用 Auth', exact: true }).click();
-    expect((await dependency).status()).toBe(409);
-    await record('ui_blocks_disabling_auth_while_its_data_api_dependency_is_active');
-    await page.getByRole('button', { name: '退出应用', exact: true }).click();
-    await expect(page.getByTestId('auth-app-result')).toContainText('应用会话已撤销');
-    await page.getByRole('button', { name: '检查应用会话', exact: true }).click();
-    await expect(page.getByTestId('auth-app-result')).toContainText('没有应用会话');
-    await loginApp(root);
-    await record('ui_logout_revokes_session_and_password_login_restores_access');
-    await page.goto(`/#/projects/${project}/branches`);
-    await page.getByRole('button', { name: '＋ 创建分支', exact: true }).click();
-    await page.getByLabel('分支名称').fill('child-' + attempt);
-    await page.getByLabel('父分支').selectOption(root);
-    await page.getByLabel('数据库角色密码').fill(password);
-    await page.getByLabel('最大 CPU', { exact: true }).selectOption('1000');
-    await page.getByLabel('最大内存', { exact: true }).selectOption('1024');
-    const clone = page.waitForResponse(
-      (r) => r.url().endsWith(`/projects/${project}/branches`) && r.request().method() === 'POST',
-    );
-    await page.getByRole('button', { name: '创建并验证', exact: true }).click();
-    const cloned = await clone;
-    expect(cloned.status()).toBe(202);
-    child = (await cloned.json()).resource.id;
-    await expect(page.locator('.create-modal')).toHaveCount(0, { timeout: 490000 });
-    const childEndpoints = await context.request.get(`/api/v1/projects/${project}/endpoints`);
-    const childWriter = (await childEndpoints.json()).items.find(
-      (v: { branch_id: string }) => v.branch_id === child,
-    ).id as string;
-    endpoints.add(childWriter);
+        .getByRole('button', {
+          name: `查看操作 ${recovery.branch_operation_id} 的步骤`,
+          exact: true,
+        })
+        .click();
+      await expect(page.getByRole('dialog', { name: '操作详情' })).toContainText('succeeded');
+      await record(
+        'ui_reopened_original_completed_branch_operation_without_recreating_project_or_branch',
+      );
+      for (const branch of [root, child]) {
+        const r = await context.request.get(`/api/v1/projects/${project}/branches/${branch}/auth`);
+        expect(r.status()).toBe(200);
+        const state = (await r.json()).state;
+        expect(['active', 'disabled']).toContain(state);
+        if (state === 'disabled') {
+          await authPage(branch);
+          await page.getByLabel('Auth 可信来源').fill('https://app.example.test');
+          await mutateAuth(branch, false);
+        }
+      }
+      await loginApp(root);
+      const session = await page.evaluate(
+        async (id) =>
+          (await fetch(`/auth/v1/${id}/get-session`, { credentials: 'same-origin' })).json(),
+        root,
+      );
+      user = session.user.id;
+      rootJWT = await applicationToken(root);
+      const data = await context.request.get(
+        `/api/v1/projects/${project}/branches/${root}/data-api`,
+      );
+      expect(data.status()).toBe(200);
+      if ((await data.json()).state !== 'active') await configureData(root);
+      else await dataPage(root);
+      await requestData(rootJWT, 200, 'owned auth row');
+      await record('ui_original_auth_accounts_and_sql_rls_rows_retained_after_failure_cleanup');
+    } else {
+      await page.getByRole('button', { name: '＋ 创建项目', exact: true }).click();
+      await page.getByLabel('项目名称').fill('ci-' + attempt);
+      await page.locator('.create-modal input[type="password"]').fill(password);
+      await page.getByLabel('最大 CPU', { exact: true }).selectOption('1000');
+      await page.getByLabel('最大内存', { exact: true }).selectOption('1024');
+      const pending = page.waitForResponse(
+        (r) => r.url().endsWith('/organizations/local/projects') && r.request().method() === 'POST',
+      );
+      await page.getByRole('button', { name: '创建并验证', exact: true }).click();
+      const response = await pending;
+      expect(response.status()).toBe(202);
+      project = (await response.json()).resource.id;
+      await expect(page.locator('.create-modal')).toHaveCount(0, { timeout: 490000 });
+      const listed = await context.request.get(`/api/v1/projects/${project}/endpoints`);
+      expect(listed.status()).toBe(200);
+      const endpoint = (await listed.json()).items[0];
+      writer = endpoint.id;
+      root = endpoint.branch_id;
+      endpoints.add(writer);
+      await record('ui_created_real_neon_project_with_bounded_compute');
+      await sql('GRANT CREATE, CONNECT ON DATABASE postgres TO control_probe WITH GRANT OPTION');
+      await authPage(root);
+      await page.getByLabel('Auth 可信来源').fill('https://app.example.test');
+      await mutateAuth(root, false);
+      const preflight = await context.request.fetch(`/auth/v1/${root}/sign-up/email`, {
+        method: 'OPTIONS',
+        headers: {
+          Origin: 'https://app.example.test',
+          'Access-Control-Request-Method': 'POST',
+          'Access-Control-Request-Headers': 'content-type',
+        },
+      });
+      expect(preflight.status()).toBe(204);
+      expect(preflight.headers()['access-control-allow-origin']).toBe('https://app.example.test');
+      const deniedOrigin = await context.request.get(`/auth/v1/${root}/get-session`, {
+        headers: { Origin: 'https://unrelated.example.test' },
+      });
+      expect(deniedOrigin.status()).toBe(403);
+      await record('real_auth_relay_allows_exact_cors_preflight_and_rejects_untrusted_origins');
+      await page.getByLabel('应用姓名').fill('Synthetic parent');
+      await page.getByLabel('应用邮箱', { exact: true }).fill(email);
+      await page.getByLabel('应用密码', { exact: true }).fill(appPassword);
+      await page.getByRole('button', { name: '注册应用用户', exact: true }).click();
+      await expect(page.getByTestId('auth-app-result')).toContainText('应用用户注册成功', {
+        timeout: 190000,
+      });
+      expect(
+        await page
+          .getByLabel('应用密码', { exact: true })
+          .evaluate((input) => (input as HTMLInputElement).value.length),
+      ).toBe(0);
+      await page.getByRole('button', { name: '检查应用会话', exact: true }).click();
+      await expect(page.getByTestId('auth-app-result')).toContainText('应用会话有效');
+      await page.getByRole('button', { name: '读取应用用户', exact: true }).click();
+      await expect(page.getByRole('cell', { name: 'Synthetic parent', exact: true })).toBeVisible();
+      await record('ui_registered_persisted_branch_user_and_session_without_console_identity');
+      const parentSession = await page.evaluate(
+        async (id) =>
+          (await fetch(`/auth/v1/${id}/get-session`, { credentials: 'same-origin' })).json(),
+        root,
+      );
+      user = parentSession.user.id as string;
+      rootJWT = await applicationToken(root);
+      const claims = JSON.parse(Buffer.from(rootJWT.split('.')[1], 'base64url').toString());
+      expect(claims.aud).toBe(root);
+      expect(claims.sub).toBe(user);
+      expect(claims.branch_id).toBe(root);
+      expect(claims.exp - claims.iat).toBeLessThanOrEqual(300);
+      expect(claims.email).toBeUndefined();
+      await record('actual_branch_scoped_jwt_has_bounded_expiry_and_public_jwks');
+      for (const statement of [
+        'CREATE SCHEMA app_auth',
+        'CREATE TABLE app_auth.notes(id text PRIMARY KEY, owner_id text NOT NULL, body text NOT NULL)',
+        'ALTER TABLE app_auth.notes ENABLE ROW LEVEL SECURITY',
+        'ALTER TABLE app_auth.notes FORCE ROW LEVEL SECURITY',
+        "CREATE POLICY own_rows ON app_auth.notes USING(owner_id=current_setting('request.jwt.claims',true)::jsonb->>'sub') WITH CHECK(owner_id=current_setting('request.jwt.claims',true)::jsonb->>'sub')",
+        `INSERT INTO app_auth.notes VALUES('owned','${user}','owned auth row'),('other','another-user','hidden auth row')`,
+        'GRANT USAGE ON SCHEMA app_auth TO control_probe WITH GRANT OPTION',
+        'GRANT SELECT,INSERT,UPDATE,DELETE ON app_auth.notes TO control_probe WITH GRANT OPTION',
+      ])
+        await sql(statement);
+      await configureData(root);
+      rootJWT = await applicationToken(root);
+      await requestData(rootJWT, 200, 'owned auth row');
+      await expect(page.getByTestId('data-api-response')).not.toContainText('hidden auth row');
+      await record('ui_auth_jwt_data_api_real_postgres_rls_read_isolation');
+      await authPage(root);
+      const dependency = page.waitForResponse(
+        (r) => r.url().endsWith(`/branches/${root}/auth`) && r.request().method() === 'DELETE',
+      );
+      await page.getByRole('button', { name: '禁用 Auth', exact: true }).click();
+      expect((await dependency).status()).toBe(409);
+      await record('ui_blocks_disabling_auth_while_its_data_api_dependency_is_active');
+      await page.getByRole('button', { name: '退出应用', exact: true }).click();
+      await expect(page.getByTestId('auth-app-result')).toContainText('应用会话已撤销');
+      await page.getByRole('button', { name: '检查应用会话', exact: true }).click();
+      await expect(page.getByTestId('auth-app-result')).toContainText('没有应用会话');
+      await loginApp(root);
+      await record('ui_logout_revokes_session_and_password_login_restores_access');
+      await page.goto(`/#/projects/${project}/branches`);
+      await page.getByRole('button', { name: '＋ 创建分支', exact: true }).click();
+      await page.getByLabel('分支名称').fill('child-' + attempt);
+      await page.getByLabel('父分支').selectOption(root);
+      await page.getByLabel('数据库角色密码').fill(password);
+      await page.getByLabel('最大 CPU', { exact: true }).selectOption('1000');
+      await page.getByLabel('最大内存', { exact: true }).selectOption('1024');
+      const clone = page.waitForResponse(
+        (r) => r.url().endsWith(`/projects/${project}/branches`) && r.request().method() === 'POST',
+      );
+      await page.getByRole('button', { name: '创建并验证', exact: true }).click();
+      const cloned = await clone;
+      expect(cloned.status()).toBe(202);
+      child = (await cloned.json()).resource.id;
+      const childEndpoints = await context.request.get(`/api/v1/projects/${project}/endpoints`);
+      expect(childEndpoints.status()).toBe(200);
+      childWriter = (await childEndpoints.json()).items.find(
+        (v: { branch_id: string }) => v.branch_id === child,
+      ).id as string;
+      endpoints.add(childWriter);
+      await save();
+      await expect(page.locator('.create-modal')).toHaveCount(0, { timeout: 490000 });
+    }
     await expect
       .poll(
         async () => {
