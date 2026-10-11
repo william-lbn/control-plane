@@ -117,6 +117,71 @@ func TestControllerLeadershipIntegration(t *testing.T) {
 			t.Fatalf("old close modified successor generation: %v", err)
 		}
 	})
+	third.close()
+
+	t.Run("independent_worker_waits_after_startup_acquisition_timeout", func(t *testing.T) {
+		// A real exhausted one-connection pool holds acquisition past its five
+		// second attempt deadline. A Worker must remain standby, then acquire
+		// only after the database becomes available, without a process restart.
+		waitingCfg := cfg.Copy()
+		waitingCfg.MaxConns = 1
+		waitingDB, err := pgxpool.NewWithConfig(ctx, waitingCfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer waitingDB.Close()
+		held, err := waitingDB.Acquire(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer held.Release()
+		waitCtx, stop := context.WithTimeout(ctx, 15*time.Second)
+		defer stop()
+		type result struct {
+			lease *controllerLease
+			err   error
+		}
+		done := make(chan result, 1)
+		consumed := false
+		defer func() {
+			stop()
+			if !consumed {
+				select {
+				case got := <-done:
+					if got.lease != nil {
+						got.lease.close()
+					}
+				case <-time.After(6 * time.Second):
+					t.Error("cancelled test acquisition did not finish")
+				}
+			}
+		}()
+		s := &server{db: waitingDB}
+		go func() { lease, err := s.awaitControllerLease(waitCtx, roleWorker); done <- result{lease, err} }()
+		select {
+		case got := <-done:
+			consumed = true
+			if got.lease != nil {
+				got.lease.close()
+			}
+			t.Fatalf("worker exited or became leader while acquisition was unavailable: %v", got.err)
+		case <-time.After(6 * time.Second):
+		}
+		held.Release()
+		select {
+		case got := <-done:
+			consumed = true
+			if got.err != nil || got.lease == nil {
+				t.Fatalf("worker did not recover its original acquisition: %v", got.err)
+			}
+			defer got.lease.close()
+			if err := got.lease.heartbeat(ctx); err != nil {
+				t.Fatal("recovered lease cannot heartbeat", err)
+			}
+		case <-waitCtx.Done():
+			t.Fatal("standby worker did not recover within the test deadline")
+		}
+	})
 }
 
 // pgx Close sends Terminate and closes the client socket; PostgreSQL releases

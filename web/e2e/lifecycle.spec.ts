@@ -26,6 +26,13 @@ test('UI lifecycle: protections, dependency graph, retained delete and seven-day
         deleted_branch_ids: string[];
         original_failure_job: string;
         database_password_file: string;
+        stage?: 'leaf_endpoint_accepted' | 'readers_in_progress';
+        parent_branch_id?: string;
+        leaf_branch_id?: string;
+        leaf_endpoint_id?: string;
+        operation_id?: string;
+        reader_operation_ids?: string[];
+        continuation_failure_job?: string;
       })
     : null;
   if (
@@ -36,13 +43,31 @@ test('UI lifecycle: protections, dependency graph, retained delete and seven-day
       !/^publication-ui-\d+$/.test(resume.original_failure_job) ||
       resume.project_name !== 'ci-lifecycle-' + resume.original_failure_job ||
       !Array.isArray(resume.reader_ids) ||
-      resume.reader_ids.length !== 2 ||
+      (resume.stage === 'readers_in_progress'
+        ? resume.reader_ids.length < 1 || resume.reader_ids.length > 2
+        : resume.reader_ids.length !== (resume.stage === 'leaf_endpoint_accepted' ? 0 : 2)) ||
       !resume.reader_ids.every((id) => /^ep_[a-f0-9]{16}$/.test(id)) ||
-      new Set([resume.writer_id, ...resume.reader_ids]).size !== 3 ||
+      new Set([resume.writer_id, ...resume.reader_ids]).size !== 1 + resume.reader_ids.length ||
       !Array.isArray(resume.deleted_branch_ids) ||
-      resume.deleted_branch_ids.length !== 2 ||
+      resume.deleted_branch_ids.length !== (resume.stage === 'leaf_endpoint_accepted' ? 0 : 2) ||
       !resume.deleted_branch_ids.every((id) => /^br_[a-f0-9]{16}$/.test(id)) ||
-      new Set([resume.branch_id, ...resume.deleted_branch_ids]).size !== 3)
+      new Set([resume.branch_id, ...resume.deleted_branch_ids]).size !==
+        1 + resume.deleted_branch_ids.length ||
+      (resume.stage !== undefined &&
+        !['leaf_endpoint_accepted', 'readers_in_progress'].includes(resume.stage)) ||
+      (resume.stage === 'readers_in_progress' &&
+        (!Array.isArray(resume.reader_operation_ids) ||
+          resume.reader_operation_ids.length !== resume.reader_ids.length ||
+          !resume.reader_operation_ids.every((id) => /^op_[a-f0-9]{24}$/.test(id)) ||
+          new Set(resume.reader_operation_ids).size !== resume.reader_operation_ids.length ||
+          !/^publication-ui-\d+$/.test(resume.continuation_failure_job || ''))) ||
+      (resume.stage === 'leaf_endpoint_accepted' &&
+        (!/^br_[a-f0-9]{16}$/.test(resume.parent_branch_id || '') ||
+          !/^br_[a-f0-9]{16}$/.test(resume.leaf_branch_id || '') ||
+          new Set([resume.branch_id, resume.parent_branch_id, resume.leaf_branch_id]).size !== 3 ||
+          !/^ep_[a-f0-9]{16}$/.test(resume.leaf_endpoint_id || '') ||
+          resume.leaf_endpoint_id === resume.writer_id ||
+          !/^op_[a-f0-9]{24}$/.test(resume.operation_id || ''))))
   )
     throw new Error('Invalid original lifecycle fixture');
   const attempt = process.env.NEON_E2E_ATTEMPT || new Date().toISOString().replace(/[^0-9]/g, '');
@@ -60,7 +85,7 @@ test('UI lifecycle: protections, dependency graph, retained delete and seven-day
   const projectName = resume?.project_name || 'ci-lifecycle-' + attempt;
   const endpoints = new Set<string>();
   const checks: { name: string; [key: string]: unknown }[] = [];
-  const operations: { id: string; action: string }[] = [];
+  const operations: { id: string; action: string; resource_id?: string }[] = [];
   let recoveryFault = process.env.NEON_E2E_LIFECYCLE_RECOVERY_FAULT === 'true';
   async function save() {
     await writeFile(
@@ -72,7 +97,13 @@ test('UI lifecycle: protections, dependency graph, retained delete and seven-day
           checks,
           operations,
           ...(resume
-            ? { original_failure_job: resume.original_failure_job, creates_new_project: false }
+            ? {
+                original_failure_job: resume.original_failure_job,
+                creates_new_project: false,
+                ...(resume.continuation_failure_job
+                  ? { continuation_failure_job: resume.continuation_failure_job }
+                  : {}),
+              }
             : {}),
           credentials_in_report: false,
         },
@@ -104,24 +135,53 @@ test('UI lifecycle: protections, dependency graph, retained delete and seven-day
     const response = await reply;
     expect(response.status()).toBe(202);
     const value = await response.json();
-    operations.push({ id: value.operation.id, action: value.operation.action });
+    operations.push({
+      id: value.operation.id,
+      action: value.operation.action,
+      resource_id: value.resource.id,
+    });
+    // Persist the accepted identity before waiting for the modal to finish.
+    // A process failure must not erase an unknown creation's recovery input.
+    await save();
     await expect(page.locator('.create-modal')).not.toBeVisible({ timeout: 480_000 });
     return value.resource.id as string;
   }
   async function sql(endpoint: string, statement: string, status = 200) {
-    await page.goto('/#/projects/' + project + '/query');
-    await page.locator('select').first().selectOption(endpoint);
-    await page.getByLabel('SQL 查询').fill(statement);
-    await page.locator('input[type="password"]').fill(password);
-    const reply = page.waitForResponse(
-      (r) =>
-        r.url().endsWith('/endpoints/' + endpoint + '/query') && r.request().method() === 'POST',
-      { timeout: 190_000 },
-    );
-    await page.getByRole('button', { name: '▶ 执行 SQL', exact: true }).click();
-    const response = await reply;
-    expect(response.status()).toBe(status);
-    return response.json();
+    // Recovery can repeat only these fixed read-only observations after a
+    // service timeout. Never retry arbitrary SELECT/functions or any DML whose
+    // result is unknown. Normal first-pass acceptance keeps one attempt.
+    const retryableRead =
+      resume &&
+      status === 200 &&
+      [
+        "SELECT pg_is_in_recovery(),current_setting('transaction_read_only')",
+        'SELECT id,marker FROM public.lifecycle_probe ORDER BY id',
+        'SELECT count(*) FROM public.lifecycle_probe',
+        'SELECT marker FROM public.lifecycle_probe',
+      ].includes(statement);
+    for (let attempt = 0; attempt < (retryableRead ? 2 : 1); attempt++) {
+      await page.goto('/#/projects/' + project + '/query');
+      await page.locator('select').first().selectOption(endpoint);
+      await page.getByLabel('SQL 查询').fill(statement);
+      await page.locator('input[type="password"]').fill(password);
+      const reply = page.waitForResponse(
+        (r) =>
+          r.url().endsWith('/endpoints/' + endpoint + '/query') && r.request().method() === 'POST',
+        { timeout: 190_000 },
+      );
+      await page.getByRole('button', { name: '▶ 执行 SQL', exact: true }).click();
+      const response = await reply;
+      if (retryableRead && attempt === 0 && [503, 504].includes(response.status())) {
+        await record('explicit_original_fixed_read_only_sql_retry_after_service_timeout', {
+          endpoint_id: endpoint,
+          status: response.status(),
+        });
+        continue;
+      }
+      expect(response.status()).toBe(status);
+      return response.json();
+    }
+    throw new Error('Fixed read-only recovery observation exhausted');
   }
   async function suspend(endpoint: string) {
     await page.goto('/#/projects/' + project + '/compute');
@@ -226,119 +286,279 @@ test('UI lifecycle: protections, dependency graph, retained delete and seven-day
     let writer: string;
     let root: string;
     const readers: string[] = [];
-    if (!resume) {
-      await page.getByRole('button', { name: '＋ 创建项目', exact: true }).click();
-      await page.getByLabel('项目名称').fill(projectName);
-      await page.locator('.create-modal input[type="password"]').fill(password);
-      await page.getByLabel('最大 CPU', { exact: true }).selectOption('1000');
-      await page.getByLabel('最大内存', { exact: true }).selectOption('1024');
-      project = await created('/api/v1/organizations/local/projects');
-      const initial = await data('/api/v1/projects/' + project + '/endpoints');
-      writer = initial.items[0].id as string;
-      root = initial.items[0].branch_id as string;
-      endpoints.add(writer);
-      await record('ui_creates_owned_isolated_project', { writer, root });
-      await sql(
-        writer,
-        'CREATE TABLE public.lifecycle_probe(id integer PRIMARY KEY, marker text NOT NULL)',
-      );
-      await sql(writer, "INSERT INTO public.lifecycle_probe VALUES(1,'retained-parent')");
-      await suspend(writer);
+    if (!resume || resume.stage) {
       let parent = '';
       let leaf = '';
-      for (const branchName of ['parent', 'leaf']) {
-        await page.goto('/#/projects/' + project + '/branches');
-        await page.getByRole('button', { name: '＋ 创建分支', exact: true }).click();
-        await page.getByLabel('分支名称').fill(branchName);
-        await page.getByLabel('父分支').selectOption(parent || root);
-        await page.getByLabel('同时创建读写 Compute Endpoint').uncheck();
-        const id = await created('/api/v1/projects/' + project + '/branches');
-        if (parent) leaf = id;
-        else parent = id;
+      if (!resume) {
+        await page.getByRole('button', { name: '＋ 创建项目', exact: true }).click();
+        await page.getByLabel('项目名称').fill(projectName);
+        await page.locator('.create-modal input[type="password"]').fill(password);
+        await page.getByLabel('最大 CPU', { exact: true }).selectOption('1000');
+        await page.getByLabel('最大内存', { exact: true }).selectOption('1024');
+        project = await created('/api/v1/organizations/local/projects');
+        const initial = await data('/api/v1/projects/' + project + '/endpoints');
+        writer = initial.items[0].id as string;
+        root = initial.items[0].branch_id as string;
+        endpoints.add(writer);
+        await record('ui_creates_owned_isolated_project', { writer, root });
+        await sql(
+          writer,
+          'CREATE TABLE public.lifecycle_probe(id integer PRIMARY KEY, marker text NOT NULL)',
+        );
+        await sql(writer, "INSERT INTO public.lifecycle_probe VALUES(1,'retained-parent')");
+        await suspend(writer);
+        for (const branchName of ['parent', 'leaf']) {
+          await page.goto('/#/projects/' + project + '/branches');
+          await page.getByRole('button', { name: '＋ 创建分支', exact: true }).click();
+          await page.getByLabel('分支名称').fill(branchName);
+          await page.getByLabel('父分支').selectOption(parent || root);
+          await page.getByLabel('同时创建读写 Compute Endpoint').uncheck();
+          const id = await created('/api/v1/projects/' + project + '/branches');
+          if (parent) leaf = id;
+          else parent = id;
+        }
+        await lifecycle();
+        await expect(
+          page
+            .getByTestId('lifecycle-' + root)
+            .getByRole('button', { name: '删除分支', exact: true }),
+        ).toBeDisabled();
+        await expect(
+          page
+            .getByTestId('lifecycle-' + parent)
+            .getByRole('button', { name: '删除分支', exact: true }),
+        ).toBeDisabled();
+        await expect(
+          page
+            .getByTestId('project-lifecycle')
+            .getByRole('button', { name: '删除项目', exact: true }),
+        ).toBeDisabled();
+        await record('ui_root_child_dependencies_and_protection_block_delete');
+        await action('保护分支', 'leaf', leaf);
+        await expect(
+          page
+            .getByTestId('lifecycle-' + leaf)
+            .getByRole('button', { name: '删除分支', exact: true }),
+        ).toBeDisabled();
+        await action('解除分支保护', 'leaf', leaf);
+        await record('ui_admin_explicit_branch_protection');
+      } else if (resume.stage === 'leaf_endpoint_accepted') {
+        // Recover the original accepted leaf creation after an API outage.
+        // Never create a replacement project, branch, Endpoint or SQL table.
+        project = resume.project_id;
+        root = resume.branch_id;
+        writer = resume.writer_id;
+        parent = resume.parent_branch_id!;
+        leaf = resume.leaf_branch_id!;
+        endpoints.add(writer);
+        endpoints.add(resume.leaf_endpoint_id!);
+        const original = await data('/api/v1/projects/' + project);
+        expect(original.name).toBe(projectName);
+        expect(original.source).toBe('managed');
+        expect(original.state).toBe('ready');
+        expect(original.protected).toBe(true);
+        const graph = await data('/api/v1/projects/' + project + '/lifecycle');
+        expect(
+          graph.branches
+            .filter((b: { deleted_at: string | null }) => !b.deleted_at)
+            .map((b: { id: string }) => b.id)
+            .sort(),
+        ).toEqual([root, parent, leaf].sort());
+        for (const [id, name, ancestor] of [
+          [root, 'main', null],
+          [parent, 'parent', root],
+          [leaf, 'leaf', parent],
+        ]) {
+          const b = graph.branches.find((b: { id: string }) => b.id === id);
+          expect(b.name).toBe(name);
+          expect(b.parent_branch_id).toBe(ancestor);
+          expect(b.state).toBe('ready');
+          expect(b.protected).toBe(id === root);
+        }
+        const opPath = '/api/v1/projects/' + project + '/operations/' + resume.operation_id;
+        const op = await data(opPath);
+        expect(op.project_id).toBe(project);
+        expect(op.resource_id).toBe(resume.leaf_endpoint_id);
+        expect(op.action).toBe('create_endpoint');
+        expect(['failed', 'queued', 'running', 'retry_wait', 'succeeded']).toContain(op.state);
+        if (op.state === 'failed') {
+          expect(op.retryable).toBe(true);
+          await page.goto('/#/projects/' + project + '/operations');
+          await page.getByRole('button', { name: `查看操作 ${op.id} 的步骤`, exact: true }).click();
+          const reply = page.waitForResponse(
+            (r) =>
+              new URL(r.url()).pathname === opPath + '/retry' && r.request().method() === 'POST',
+          );
+          await page.getByRole('button', { name: '重试原操作', exact: true }).click();
+          const retried = await reply;
+          expect(retried.status()).toBe(202);
+          expect((await retried.json()).id).toBe(op.id);
+        }
+        await expect
+          .poll(async () => (await data(opPath)).state, {
+            timeout: 480_000,
+            intervals: [1000, 2000, 5000],
+          })
+          .toBe('succeeded');
+        const current = (await data('/api/v1/projects/' + project + '/endpoints')).items;
+        expect(current.map((e: { id: string }) => e.id).sort()).toEqual(
+          [writer, resume.leaf_endpoint_id].sort(),
+        );
+        const child = current.find((e: { id: string }) => e.id === resume.leaf_endpoint_id);
+        expect(child.branch_id).toBe(leaf);
+        expect(child.endpoint_type).toBe('read_write');
+        expect(
+          (await sql(writer, 'SELECT id,marker FROM public.lifecycle_probe ORDER BY id')).rows,
+        ).toEqual([[1, 'retained-parent']]);
+        await suspend(writer);
+        await record(
+          'original_accepted_leaf_endpoint_recovered_without_recreating_resources_or_sql',
+          { operation_id: op.id, leafWriter: child.id },
+        );
+      } else {
+        project = resume.project_id;
+        root = resume.branch_id;
+        writer = resume.writer_id;
+        readers.push(...resume.reader_ids);
+        for (const id of [writer, ...readers]) endpoints.add(id);
+        const retained = await data('/api/v1/projects/' + project);
+        expect(retained.name).toBe(projectName);
+        expect(retained.source).toBe('managed');
+        expect(retained.state).toBe('ready');
+        expect(retained.protected).toBe(false);
+        const graph = await data('/api/v1/projects/' + project + '/lifecycle');
+        expect(
+          graph.branches
+            .filter((b: { deleted_at: string | null }) => !b.deleted_at)
+            .map((b: { id: string }) => b.id),
+        ).toEqual([root]);
+        for (const id of resume.deleted_branch_ids)
+          expect(
+            graph.tombstones.some(
+              (t: { resource_type: string; resource_id: string; physical_gc_state: string }) =>
+                t.resource_type === 'branch' &&
+                t.resource_id === id &&
+                t.physical_gc_state === 'held',
+            ),
+          ).toBe(true);
+        const current = (await data('/api/v1/projects/' + project + '/endpoints')).items;
+        expect(current.map((e: { id: string }) => e.id).sort()).toEqual(
+          [writer, ...readers].sort(),
+        );
+        for (const id of readers) {
+          const e = current.find((e: { id: string }) => e.id === id);
+          expect(e.branch_id).toBe(root);
+          expect(e.endpoint_type).toBe('read_only');
+        }
+        expect(
+          (await sql(writer, 'SELECT id,marker FROM public.lifecycle_probe ORDER BY id')).rows,
+        ).toEqual([[1, 'retained-parent']]);
+        await suspend(writer);
+        await record(
+          'original_partial_readers_and_held_branches_reused_without_recreating_project_or_sql',
+        );
       }
-      await lifecycle();
-      await expect(
-        page
-          .getByTestId('lifecycle-' + root)
-          .getByRole('button', { name: '删除分支', exact: true }),
-      ).toBeDisabled();
-      await expect(
-        page
-          .getByTestId('lifecycle-' + parent)
-          .getByRole('button', { name: '删除分支', exact: true }),
-      ).toBeDisabled();
-      await expect(
-        page
-          .getByTestId('project-lifecycle')
-          .getByRole('button', { name: '删除项目', exact: true }),
-      ).toBeDisabled();
-      await record('ui_root_child_dependencies_and_protection_block_delete');
-      await action('保护分支', 'leaf', leaf);
-      await expect(
-        page
-          .getByTestId('lifecycle-' + leaf)
-          .getByRole('button', { name: '删除分支', exact: true }),
-      ).toBeDisabled();
-      await action('解除分支保护', 'leaf', leaf);
-      await record('ui_admin_explicit_branch_protection');
-      await page.goto('/#/projects/' + project + '/branches/' + leaf);
-      await page.getByRole('button', { name: '＋ 创建 Endpoint', exact: true }).click();
-      await page.locator('.create-modal input[type="password"]').fill(password);
-      await page.getByLabel('最大 CPU', { exact: true }).selectOption('1000');
-      await page.getByLabel('最大内存', { exact: true }).selectOption('1024');
-      const leafWriter = await created('/api/v1/projects/' + project + '/endpoints');
-      endpoints.add(leafWriter);
-      expect((await sql(leafWriter, 'SELECT marker FROM public.lifecycle_probe')).rows).toEqual([
-        ['retained-parent'],
-      ]);
-      await record('ui_leaf_compute_inherits_native_data', { leafWriter });
-      await lifecycle();
-      const deleted = await action('删除分支', 'leaf', leaf);
-      const accepted = await deleted.json();
-      const cookies = await context.cookies();
-      const csrf = cookies.find((c) => c.name === 'neon_v2_csrf')!.value;
-      const original = deleted.request();
-      const replay = await context.request.delete(original.url(), {
-        headers: {
-          'X-CSRF-Token': csrf,
-          'If-Match': original.headers()['if-match'],
-          'Idempotency-Key': original.headers()['idempotency-key'],
-        },
-        data: original.postData()!,
-      });
-      expect(replay.status()).toBe(202);
-      expect((await replay.json()).operation.id).toBe(accepted.operation.id);
-      await expect(page.getByTestId('lifecycle-' + leaf)).toContainText('已删除');
-      expect(
-        (
-          await context.request.get(baseURL + '/api/v1/projects/' + project + '/branches/' + leaf)
-        ).status(),
-      ).toBe(404);
-      expect(
-        (
-          await context.request.get(
-            baseURL + '/api/v1/projects/' + project + '/endpoints/' + leafWriter,
-          )
-        ).status(),
-      ).toBe(404);
-      await record('ui_active_leaf_delete_retirement_tombstone_and_same_operation_replay', {
-        operation_id: accepted.operation.id,
-      });
-      await action('删除分支', 'parent', parent);
-      await record('ui_parent_delete_after_child');
-      await action('解除项目保护', projectName);
-      await action('解除分支保护', 'main', root);
+      if (resume?.stage !== 'readers_in_progress') {
+        let leafWriter: string;
+        if (!resume) {
+          await page.goto('/#/projects/' + project + '/branches/' + leaf);
+          await page.getByRole('button', { name: '＋ 创建 Endpoint', exact: true }).click();
+          await page.locator('.create-modal input[type="password"]').fill(password);
+          await page.getByLabel('最大 CPU', { exact: true }).selectOption('1000');
+          await page.getByLabel('最大内存', { exact: true }).selectOption('1024');
+          leafWriter = await created('/api/v1/projects/' + project + '/endpoints');
+        } else {
+          leafWriter = resume.leaf_endpoint_id!;
+        }
+        endpoints.add(leafWriter);
+        expect((await sql(leafWriter, 'SELECT marker FROM public.lifecycle_probe')).rows).toEqual([
+          ['retained-parent'],
+        ]);
+        await record('ui_leaf_compute_inherits_native_data', { leafWriter });
+        await lifecycle();
+        const deleted = await action('删除分支', 'leaf', leaf);
+        const accepted = await deleted.json();
+        const cookies = await context.cookies();
+        const csrf = cookies.find((c) => c.name === 'neon_v2_csrf')!.value;
+        const original = deleted.request();
+        const replay = await context.request.delete(original.url(), {
+          headers: {
+            'X-CSRF-Token': csrf,
+            'If-Match': original.headers()['if-match'],
+            'Idempotency-Key': original.headers()['idempotency-key'],
+          },
+          data: original.postData()!,
+        });
+        expect(replay.status()).toBe(202);
+        expect((await replay.json()).operation.id).toBe(accepted.operation.id);
+        await expect(page.getByTestId('lifecycle-' + leaf)).toContainText('已删除');
+        expect(
+          (
+            await context.request.get(baseURL + '/api/v1/projects/' + project + '/branches/' + leaf)
+          ).status(),
+        ).toBe(404);
+        expect(
+          (
+            await context.request.get(
+              baseURL + '/api/v1/projects/' + project + '/endpoints/' + leafWriter,
+            )
+          ).status(),
+        ).toBe(404);
+        await record('ui_active_leaf_delete_retirement_tombstone_and_same_operation_replay', {
+          operation_id: accepted.operation.id,
+        });
+        await action('删除分支', 'parent', parent);
+        await record('ui_parent_delete_after_child');
+        await action('解除项目保护', projectName);
+        await action('解除分支保护', 'main', root);
+      }
       // Each reader has its own selector and VM, with the writer's database roles.
       // Run them serially on the resource-constrained cluster and retain all IDs.
       for (let n = 0; n < 2; n++) {
-        await page.goto('/#/projects/' + project + '/branches/' + root);
-        await page.getByRole('button', { name: '＋ 添加 Compute', exact: true }).click();
-        await page.getByLabel('Compute 类型').selectOption('read_only');
-        await expect(page.locator('.create-modal input[type="password"]')).toHaveCount(0);
-        await page.getByLabel('最大 CPU', { exact: true }).selectOption('1000');
-        await page.getByLabel('最大内存', { exact: true }).selectOption('1024');
-        const reader = await created('/api/v1/projects/' + project + '/endpoints');
-        readers.push(reader);
+        let reader = readers[n];
+        if (reader) {
+          const opPath =
+            '/api/v1/projects/' + project + '/operations/' + resume!.reader_operation_ids![n];
+          const op = await data(opPath);
+          expect(op.project_id).toBe(project);
+          expect(op.resource_id).toBe(reader);
+          expect(op.action).toBe('create_endpoint');
+          expect(['failed', 'queued', 'running', 'retry_wait', 'succeeded']).toContain(op.state);
+          if (op.state === 'failed') {
+            expect(op.retryable).toBe(true);
+            await page.goto('/#/projects/' + project + '/operations');
+            await page
+              .getByRole('button', { name: `查看操作 ${op.id} 的步骤`, exact: true })
+              .click();
+            const reply = page.waitForResponse(
+              (r) =>
+                new URL(r.url()).pathname === opPath + '/retry' && r.request().method() === 'POST',
+            );
+            await page.getByRole('button', { name: '重试原操作', exact: true }).click();
+            const retried = await reply;
+            expect(retried.status()).toBe(202);
+            expect((await retried.json()).id).toBe(op.id);
+          }
+          await expect
+            .poll(async () => (await data(opPath)).state, {
+              timeout: 480_000,
+              intervals: [1000, 2000, 5000],
+            })
+            .toBe('succeeded');
+          await record(
+            'original_accepted_reader_operation_recovered_or_observed_without_replacement',
+            { operation_id: op.id, reader },
+          );
+        } else {
+          await page.goto('/#/projects/' + project + '/branches/' + root);
+          await page.getByRole('button', { name: '＋ 添加 Compute', exact: true }).click();
+          await page.getByLabel('Compute 类型').selectOption('read_only');
+          await expect(page.locator('.create-modal input[type="password"]')).toHaveCount(0);
+          await page.getByLabel('最大 CPU', { exact: true }).selectOption('1000');
+          await page.getByLabel('最大内存', { exact: true }).selectOption('1024');
+          reader = await created('/api/v1/projects/' + project + '/endpoints');
+          readers.push(reader);
+        }
         endpoints.add(reader);
         const replica = await sql(
           reader,
@@ -360,6 +580,8 @@ test('UI lifecycle: protections, dependency graph, retained delete and seven-day
         );
         await record('ui_reader_independent_one_to_zero', { reader });
       }
+      if (resume)
+        await record('original_lifecycle_dependencies_readers_and_held_branch_deletions_confirmed');
     } else {
       project = resume.project_id;
       root = resume.branch_id;

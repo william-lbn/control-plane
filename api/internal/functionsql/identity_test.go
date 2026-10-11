@@ -112,6 +112,39 @@ func TestRestrictedIdentityAuthenticationAndRollback(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer runtime.Close(context.Background())
+	t.Run("actual_runtime_identity_probe", func(t *testing.T) {
+		if err := VerifyRuntimeSession(ctx, runtime, s); err != nil || runtime.PgConn().TxStatus() != 'I' {
+			t.Fatal("restricted authenticated session rejected or transaction retained", err)
+		}
+		if VerifyRuntimeSession(ctx, owner, s) == nil {
+			t.Fatal("owner session accepted as restricted runtime")
+		}
+		other := s
+		other.BranchID = "br_ffffffffffffffff"
+		if VerifyRuntimeSession(ctx, runtime, other) == nil {
+			t.Fatal("foreign branch marker accepted")
+		}
+	})
+	t.Run("runtime_probe_preserves_callers_transaction", func(t *testing.T) {
+		tx, err := runtime.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer tx.Rollback(ctx)
+		if VerifyRuntimeSession(ctx, runtime, s) == nil || runtime.PgConn().TxStatus() != 'T' {
+			t.Fatal("active caller transaction changed or admitted")
+		}
+	})
+	t.Run("runtime_probe_rejects_session_policy_override", func(t *testing.T) {
+		exec(runtime, `SET statement_timeout='0'`)
+		if VerifyRuntimeSession(ctx, runtime, s) == nil {
+			t.Fatal("unbounded session accepted")
+		}
+		exec(runtime, `SET statement_timeout='30s'`)
+		if VerifyRuntimeSession(ctx, runtime, s) != nil {
+			t.Fatal("restored session rejected")
+		}
+	})
 	t.Run("actual_scram_and_dml", func(t *testing.T) {
 		exec(runtime, `INSERT INTO app.items(value) VALUES('first'); UPDATE app.items SET value='second'`, pgx.QueryExecModeSimpleProtocol)
 		var value string
@@ -119,6 +152,37 @@ func TestRestrictedIdentityAuthenticationAndRollback(t *testing.T) {
 			t.Fatal("runtime DML failed", err)
 		}
 		exec(runtime, `DELETE FROM app.items`)
+	})
+	t.Run("actual_row_level_security_is_not_bypassed", func(t *testing.T) {
+		exec(owner, `CREATE TABLE app.rls_rows(id integer PRIMARY KEY,visible boolean NOT NULL);
+ INSERT INTO app.rls_rows VALUES(1,true),(2,false);
+ ALTER TABLE app.rls_rows ENABLE ROW LEVEL SECURITY;
+ CREATE POLICY visible_rows ON app.rls_rows USING(visible) WITH CHECK(visible)`, pgx.QueryExecModeSimpleProtocol)
+		if err := apply(s); err != nil {
+			t.Fatal("explicit RLS table grant failed", err)
+		}
+		var count int
+		if err := runtime.QueryRow(ctx, `SELECT count(*) FROM app.rls_rows`).Scan(&count); err != nil || count != 1 {
+			t.Fatal("runtime read exposed an RLS-hidden row", err)
+		}
+		if _, err := runtime.Exec(ctx, `INSERT INTO app.rls_rows VALUES(3,false)`); err == nil {
+			t.Fatal("runtime insert bypassed RLS WITH CHECK")
+		}
+		if tag, err := runtime.Exec(ctx, `DELETE FROM app.rls_rows WHERE id=2`); err != nil || tag.RowsAffected() != 0 {
+			t.Fatal("runtime deleted an RLS-hidden row", err)
+		}
+		exec(runtime, `SET row_security=off`)
+		if _, err := runtime.Exec(ctx, `SELECT * FROM app.rls_rows`); err == nil {
+			t.Fatal("session setting bypassed row-level security")
+		}
+		exec(runtime, `SET row_security=on`)
+		exec(runtime, `INSERT INTO app.rls_rows VALUES(3,true)`)
+		if err := owner.QueryRow(ctx, `SELECT count(*) FROM app.rls_rows`).Scan(&count); err != nil || count != 3 {
+			t.Fatal("owner's hidden fixture or permitted write was lost", err)
+		}
+		if VerifyRuntimeSession(ctx, runtime, s) != nil {
+			t.Fatal("RLS policy or fixed runtime session boundary rejected")
+		}
 	})
 	// After a permission error the connection remains usable because each
 	// negative example is a separate statement, not an aborted transaction.
@@ -149,6 +213,90 @@ func TestRestrictedIdentityAuthenticationAndRollback(t *testing.T) {
 			t.Fatal("PUBLIC data access admitted")
 		}
 		exec(owner, `REVOKE SELECT ON private.secrets FROM PUBLIC`)
+	})
+	t.Run("outside_column_grant_rejected", func(t *testing.T) {
+		exec(owner, "GRANT USAGE ON SCHEMA private TO "+quote(s.Role()))
+		exec(owner, "GRANT SELECT(value) ON private.secrets TO "+quote(s.Role()))
+		var value string
+		if err := runtime.QueryRow(ctx, `SELECT value FROM private.secrets`).Scan(&value); err != nil || value != "must-not-read" {
+			t.Fatal("column grant permission fixture did not expose actual outside data", err)
+		}
+		if apply(s) == nil || VerifyRuntimeSession(ctx, runtime, s) == nil {
+			t.Fatal("outside column grant admitted")
+		}
+		exec(owner, "REVOKE SELECT(value) ON private.secrets FROM "+quote(s.Role()))
+		exec(owner, "REVOKE USAGE ON SCHEMA private FROM "+quote(s.Role()))
+	})
+	t.Run("literal_catalog_prefix_does_not_hide_customer_schema", func(t *testing.T) {
+		exec(owner, `CREATE SCHEMA pgx_private; CREATE TABLE pgx_private.secret(value text); INSERT INTO pgx_private.secret VALUES('literal-prefix-private')`, pgx.QueryExecModeSimpleProtocol)
+		exec(owner, "GRANT USAGE ON SCHEMA pgx_private TO "+quote(s.Role()))
+		exec(owner, "GRANT SELECT ON pgx_private.secret TO "+quote(s.Role()))
+		var value string
+		if err := runtime.QueryRow(ctx, `SELECT value FROM pgx_private.secret`).Scan(&value); err != nil || value != "literal-prefix-private" {
+			t.Fatal("ordinary pgx schema fixture did not expose its granted table", err)
+		}
+		if apply(s) == nil || VerifyRuntimeSession(ctx, runtime, s) == nil {
+			t.Fatal("LIKE wildcard hid an ordinary customer schema")
+		}
+		exec(owner, "REVOKE SELECT ON pgx_private.secret FROM "+quote(s.Role()))
+		exec(owner, "REVOKE USAGE ON SCHEMA pgx_private FROM "+quote(s.Role()))
+	})
+	for _, item := range []struct{ name, grant, revoke string }{
+		{"truncate_rejected", "GRANT TRUNCATE ON app.items TO ", "REVOKE TRUNCATE ON app.items FROM "},
+		{"trigger_privilege_rejected", "GRANT TRIGGER ON app.items TO ", "REVOKE TRIGGER ON app.items FROM "},
+		{"column_references_rejected", "GRANT REFERENCES(value) ON app.items TO ", "REVOKE REFERENCES(value) ON app.items FROM "},
+		{"table_grant_option_rejected", "GRANT SELECT ON app.items TO ", "REVOKE GRANT OPTION FOR SELECT ON app.items FROM "},
+		{"column_grant_option_rejected", "GRANT SELECT(value) ON app.items TO ", "REVOKE GRANT OPTION FOR SELECT(value) ON app.items FROM "},
+		{"sequence_update_rejected", "GRANT UPDATE ON app.items_id_seq TO ", "REVOKE UPDATE ON app.items_id_seq FROM "},
+		{"sequence_grant_option_rejected", "GRANT USAGE ON app.items_id_seq TO ", "REVOKE GRANT OPTION FOR USAGE ON app.items_id_seq FROM "},
+	} {
+		t.Run(item.name, func(t *testing.T) {
+			option := ""
+			if strings.Contains(item.name, "grant_option") {
+				option = " WITH GRANT OPTION"
+			}
+			exec(owner, item.grant+quote(s.Role())+option)
+			if apply(s) == nil || VerifyRuntimeSession(ctx, runtime, s) == nil {
+				t.Fatal("unexpected permission admitted")
+			}
+			exec(owner, item.revoke+quote(s.Role()))
+			if VerifyRuntimeSession(ctx, runtime, s) != nil {
+				t.Fatal("explicit owner repair did not restore boundary")
+			}
+		})
+	}
+	t.Run("same_schema_owner_view_rejected", func(t *testing.T) {
+		exec(owner, `CREATE VIEW app.leak AS SELECT value FROM private.secrets; GRANT SELECT ON app.leak TO PUBLIC`, pgx.QueryExecModeSimpleProtocol)
+		var value string
+		if err := runtime.QueryRow(ctx, `SELECT value FROM app.leak`).Scan(&value); err != nil || value != "must-not-read" {
+			t.Fatal("actual owner view did not expose fixture data", err)
+		}
+		if apply(s) == nil || VerifyRuntimeSession(ctx, runtime, s) == nil {
+			t.Fatal("owner view adopted by ordinary-table grant")
+		}
+		exec(owner, `DROP VIEW app.leak`)
+	})
+	t.Run("enabled_trigger_rejected_without_public_execute", func(t *testing.T) {
+		exec(owner, `CREATE FUNCTION app.trigger_leak() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER AS $$BEGIN NEW.value := (SELECT value FROM private.secrets LIMIT 1); RETURN NEW; END$$;
+ REVOKE EXECUTE ON FUNCTION app.trigger_leak() FROM PUBLIC;
+ CREATE TRIGGER leak BEFORE INSERT ON app.items FOR EACH ROW EXECUTE FUNCTION app.trigger_leak()`, pgx.QueryExecModeSimpleProtocol)
+		var value string
+		if err := runtime.QueryRow(ctx, `INSERT INTO app.items(value) VALUES('ordinary') RETURNING value`).Scan(&value); err != nil || value != "must-not-read" {
+			t.Fatal("actual trigger permission fixture did not exercise owner execution", err)
+		}
+		if apply(s) == nil || VerifyRuntimeSession(ctx, runtime, s) == nil {
+			t.Fatal("enabled executable trigger admitted")
+		}
+		exec(owner, `DROP TRIGGER leak ON app.items; DROP FUNCTION app.trigger_leak()`, pgx.QueryExecModeSimpleProtocol)
+	})
+	t.Run("new_table_requires_explicit_reconciliation", func(t *testing.T) {
+		exec(owner, `CREATE TABLE app.later(id bigint)`)
+		if VerifyRuntimeSession(ctx, runtime, s) == nil {
+			t.Fatal("new ungranted application table silently admitted")
+		}
+		if apply(s) != nil || VerifyRuntimeSession(ctx, runtime, s) != nil {
+			t.Fatal("owner-authorized reconciliation did not grant new table")
+		}
 	})
 	t.Run("security_definer_rejected", func(t *testing.T) {
 		exec(owner, `CREATE FUNCTION app.escape() RETURNS text LANGUAGE sql SECURITY DEFINER AS 'SELECT value FROM private.secrets LIMIT 1'`)

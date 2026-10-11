@@ -23,7 +23,7 @@ flowchart LR
 
 | 进程 | 角色 | HTTP | 数据库连接 |
 | --- | --- | --- | --- |
-| control-api | `NEON_CONTROL_PROCESS_ROLE=api` | 8788，57 个控制操作及独立数据入口 | 意图、授权、读取、SQL guard |
+| control-api | `NEON_CONTROL_PROCESS_ROLE=api` | 8788，版本化控制操作及独立数据入口；精确数量见 OpenAPI | 意图、授权、读取、SQL guard |
 | control-worker | worker，入口固定 | 8789，仅 healthz / readyz | 调谐与专属 leadership session |
 | 显式兼容 profile | all | 8788 | 原合并功能 + 新领导租约 |
 
@@ -42,6 +42,13 @@ API 角色禁止取得此锁。合并模式发现另一领导者则退出，避�
 连接丢失、续约超时或 owner/epoch 不匹配会立即取消控制器 context、撤销 readiness、
 最多等待 12 秒排空，然后退出。归还 pool 前关闭持锁物理 connection，
 不把带 advisory lock 的连接交给其他请求。关闭时只过期自己的 owner/epoch。
+
+启动恢复增量：独立 Worker 的 acquisition 每次最多 5 秒，失败后保持 standby，
+2 秒后继续尝试；数据库错误日志只输出固定脱敏信息，每 30 秒最多一次。取得
+实际锁及持久租约前不启动 Worker/Monitor/Idle/session cleanup，readyz 为 503。
+取消 process context 时退出等待；显式 all 模式仍按原合同在 acquisition 错误或
+已有领导者时失败。已取得领导权后的 heartbeat 丢失仍按上述排空/退出规则处理，
+不得用启动重试代替运行期 lease 保护。镜像是否包含此增量及现场验收见当前交付报告。
 
 ```mermaid
 sequenceDiagram
@@ -116,6 +123,9 @@ process_role、separated、controller_status、可选 epoch/last_heartbeat_at。
 监控页面每 15 秒更新；不会因读取 Worker 状态唤醒 Compute。
 
 Go 真实 PG 测试覆盖互斥、takeover、epoch、终止专用连接、旧代次续约/关闭拒绝。
+启动恢复测试使用真实专用 PG 的单连接 pool，使 acquisition 超过 5 秒 deadline；
+确认 Worker 不退出、不取得锁，释放占用后才获得原租约并续约。该测试不是 metadata
+故障域切换或现场 HA 证明。
 Helm 覆盖 split/combined 渲染、拒绝多个 API/Worker、固定 digest 与 CA。
 现场必须另外验证真实进程分离、故障期间的 UI/Operation、恢复与基础设施稳定性。
 测试数据库必须独立于运行 metadata DB；session lock 以 database 为边界。

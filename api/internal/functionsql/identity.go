@@ -134,11 +134,23 @@ func verifyRole(ctx context.Context, tx pgx.Tx, s Scope) error {
 	var safe bool
 	err := tx.QueryRow(ctx, `SELECT NOT rolsuper AND NOT rolbypassrls AND NOT rolcreatedb AND NOT rolcreaterole AND NOT rolreplication AND NOT rolinherit
  AND NOT EXISTS(SELECT 1 FROM pg_auth_members WHERE member=pg_roles.oid OR roleid=pg_roles.oid)
- AND NOT EXISTS(SELECT 1 FROM pg_namespace n WHERE n.nspname NOT LIKE 'pg_%' AND n.nspname<>'information_schema' AND has_schema_privilege(pg_roles.oid,n.oid,'CREATE'))
- AND NOT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname NOT LIKE 'pg_%' AND n.nspname<>'information_schema' AND p.prosecdef AND has_function_privilege(pg_roles.oid,p.oid,'EXECUTE'))
- AND NOT EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname NOT LIKE 'pg_%' AND n.nspname<>'information_schema' AND c.relkind IN ('r','p','v','m','f') AND
- (c.relowner=pg_roles.oid OR (n.nspname<>$2 AND (has_table_privilege(pg_roles.oid,c.oid,'SELECT') OR has_table_privilege(pg_roles.oid,c.oid,'INSERT') OR has_table_privilege(pg_roles.oid,c.oid,'UPDATE') OR has_table_privilege(pg_roles.oid,c.oid,'DELETE')))))
- AND NOT EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname NOT LIKE 'pg_%' AND n.nspname<>'information_schema' AND n.nspname<>$2 AND c.relkind='S' AND (has_sequence_privilege(pg_roles.oid,c.oid,'USAGE') OR has_sequence_privilege(pg_roles.oid,c.oid,'SELECT') OR has_sequence_privilege(pg_roles.oid,c.oid,'UPDATE')))
+ -- '_' is a LIKE wildcard. Match the reserved literal prefix so ordinary
+ -- customer schemas such as pgx_private cannot bypass permission inspection.
+ AND NOT EXISTS(SELECT 1 FROM pg_namespace n WHERE left(n.nspname,3)<>'pg_' AND n.nspname<>'information_schema' AND has_schema_privilege(pg_roles.oid,n.oid,'CREATE'))
+ AND NOT EXISTS(SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE left(n.nspname,3)<>'pg_' AND n.nspname<>'information_schema' AND p.prosecdef AND has_function_privilege(pg_roles.oid,p.oid,'EXECUTE'))
+ AND NOT EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE left(n.nspname,3)<>'pg_' AND n.nspname<>'information_schema' AND c.relkind IN ('r','p','v','m','f') AND
+ (c.relowner=pg_roles.oid
+ OR ((n.nspname<>$2 OR c.relkind<>'r') AND (has_table_privilege(pg_roles.oid,c.oid,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') OR has_any_column_privilege(pg_roles.oid,c.oid,'SELECT,INSERT,UPDATE,REFERENCES')))
+ OR has_table_privilege(pg_roles.oid,c.oid,'TRUNCATE,REFERENCES,TRIGGER,SELECT WITH GRANT OPTION,INSERT WITH GRANT OPTION,UPDATE WITH GRANT OPTION,DELETE WITH GRANT OPTION')
+ OR has_any_column_privilege(pg_roles.oid,c.oid,'REFERENCES,SELECT WITH GRANT OPTION,INSERT WITH GRANT OPTION,UPDATE WITH GRANT OPTION')))
+ AND NOT EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE left(n.nspname,3)<>'pg_' AND n.nspname<>'information_schema' AND c.relkind='S' AND
+ (c.relowner=pg_roles.oid OR (n.nspname<>$2 AND has_sequence_privilege(pg_roles.oid,c.oid,'USAGE,SELECT,UPDATE')) OR has_sequence_privilege(pg_roles.oid,c.oid,'UPDATE,USAGE WITH GRANT OPTION,SELECT WITH GRANT OPTION')))
+ -- Trigger execution has its own permission semantics. A grant on an ordinary
+ -- table must not implicitly admit customer-installed executable hooks. This
+ -- preview rejects all enabled non-internal triggers; disabled hooks require a
+ -- new owner-authorized reconciliation before they can be enabled.
+ AND NOT EXISTS(SELECT 1 FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace
+ WHERE n.nspname=$2 AND NOT t.tgisinternal AND t.tgenabled<>'D' AND has_table_privilege(pg_roles.oid,c.oid,'INSERT,UPDATE,DELETE'))
  AND NOT has_database_privilege(pg_roles.oid,current_database(),'CREATE') AND NOT has_database_privilege(pg_roles.oid,current_database(),'TEMP')
  FROM pg_roles WHERE rolname=$1`, s.Role(), s.Schema).Scan(&safe)
 	if err != nil {

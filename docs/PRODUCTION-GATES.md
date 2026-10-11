@@ -1,6 +1,6 @@
 # 生产门槛与官网对齐
 
-状态截至 2026-10-11；运行版 `dda5d34` / 统一 Helm 0.1.10 的 135 项实际通过检查及原失败/续测范围见 [当前回归](DELIVERY-2026-10-11-FUNCTIONS-BACKING.md#33-当前运行发行与逐套回归)，[资源恢复与原子发布](FUNCTIONS-PUBLICATION.md)说明下一代码增量的接口和集成门槛。先前 [Compute 生命周期交付](DELIVERY-2026-10-10-COMPUTE-LIFECYCLE.md)保留历史版本结果。未通过项不能被 Ready Pod 或 CI build 替代。
+状态截至 2026-10-11；运行版 `932f5ad` / 统一 Helm 0.1.11 的独立验收、原失败与续测范围见 [当前回归](DELIVERY-2026-10-11-FUNCTIONS-PUBLICATION.md)。[资源恢复与原子发布](FUNCTIONS-PUBLICATION.md)已有内部代码；后续 SQL/Worker 增量仍须单独记录源码、部署和验收。[0.1.10 基线](DELIVERY-2026-10-11-FUNCTIONS-BACKING.md)与 [Compute 生命周期交付](DELIVERY-2026-10-10-COMPUTE-LIFECYCLE.md)保留历史版本结果。未通过项不能被 Ready Pod 或 CI build 替代。
 
 ## 1. 已实现路径
 

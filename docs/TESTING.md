@@ -462,7 +462,7 @@ npm --prefix web run test:e2e -- endpoint-deletion.spec.ts
 
 ### 原生命周期测试在 Writer SQL 回复未知后继续
 
-`lifecycle.spec.ts` 的 `NEON_E2E_LIFECYCLE_RESUME_FIXTURE` 只适用于已删除 parent/leaf、
+`lifecycle.spec.ts` 的 `NEON_E2E_LIFECYCLE_RESUME_FIXTURE` 默认适用于已删除 parent/leaf、
 解除项目/main 保护、创建两个真实 Reader 并分别缩零后，Writer 插入 id=2 的回复失败
 阶段。JSON 字段：project_id、project_name、branch_id、writer_id、reader_ids（恰好两个）、
 deleted_branch_ids（恰好两个）、original_failure_job、database_password_file。名字必须
@@ -483,3 +483,39 @@ npm --prefix web run test:e2e -- lifecycle.spec.ts
 
 新回执单独记录恢复范围与原 Job，不将原 503 改成通过。所有服务停用、VM/Runner
 实际归零后，才可按原项目名称、实际版本和通过证据进行正常保留删除释放测试配额。
+
+### 原叶 Endpoint 创建已受理，但 UI 等待失败
+
+同一 lifecycle suite 支持显式 `stage=leaf_endpoint_accepted`。原 Job 必须停止，
+原项目/main 仍 protected，parent/leaf 仍 ready 且无保护；保留三个 branch 的
+精确 parent 关系。JSON 使用上述原项目字段，`reader_ids=[]`、
+`deleted_branch_ids=[]`，另加 parent_branch_id、leaf_branch_id、leaf_endpoint_id、
+operation_id。原密码文件只放在受保护目录，不上传公共 Git。
+
+先按原 project/name/branch/Endpoint/Operation 核验。原 create_endpoint 失败时
+仅从 UI 操作记录重试同一 retryable Operation；已经 succeeded 时仅观察。
+不重新创建 project/branch/Endpoint/table，不重放原 INSERT。核验原 Writer
+精确 `(1,'retained-parent')` 后继续叶数据继承、叶/父保留删除与幂等回放，再通过
+UI 串行创建两个 Reader 并验证只读、缩零、WAL 和后续完整生命周期。
+
+该阶段不可用于 parent/leaf 已删除、已有 Reader、原表已出现其它行或后续步骤
+未知的项目。每次使用新 evidence/private directory；失败继续保存原资源和
+Operation，不能复用此早期 fixture 跳过对新现场的检查。测试运行时为明确恢复范围，
+不等同于原正常 suite 首次通过或 API 故障期间的连续可用性。
+
+如果明确续测已完成叶/父保留删除，失败发生在 Reader 创建阶段，重新核验现场后
+使用 `stage=readers_in_progress`。项目和 main 必须已解除保护、唯一 live root，
+`deleted_branch_ids` 对应两份 held branch tombstone；`reader_ids` 为一或两个
+已经受理的原 Reader（不得遗漏），`reader_operation_ids` 按相同顺序记录精确
+create_endpoint Operation，另记 `continuation_failure_job`。项目名称仍绑定最初
+original_failure_job；保留整个失败链，不把后续 Job 改成原项目创建 Job。
+
+对已受理的 Reader，续测核验类型/branch/Operation，failed 时仅从 UI 重试原 ID，
+succeeded 时仅观察；只有经完整 Endpoint 目录证明不存在的第二个 Reader 才通过
+UI 新建。两个 Reader 串行验证只读 SQL、拒写和独立缩零，再继续完整生命周期。
+原 Writer 表在此阶段必须只有准确 id=1，禁止清表、重建或重复插入来满足检查。
+
+明确恢复模式可在 503/504 后，最多重做一次固定白名单的只读 UI SQL 观察，并记录
+Endpoint 和 HTTP 状态；正常首次验收仍只有一次。白名单只包括此测试的具体
+catalog/原表读取，不接受任意 SELECT、调用任意 function 或重放任何 DML。
+所有失败和恢复 Job 分别保留，该恢复结果不能证明超时窗口内业务连续可用。

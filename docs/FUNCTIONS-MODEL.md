@@ -168,7 +168,7 @@ multipart foundation 为 87 Go / 9 Node pass。后续
 0 skip，追加了 default-route 等待与已授权 Writer/branch/project 删除拒绝检查。
 
 immutable artifact/environment/bootstrap 与候选回执的写入结果恢复已实现；当前运行
-`dda5d34` 为 21/21 migrations。[资源恢复/原子发布](FUNCTIONS-PUBLICATION.md)新增
+`932f5ad` / Helm 0.1.11 为 21/21 migrations。[资源恢复/原子发布](FUNCTIONS-PUBLICATION.md)新增
 真实 Service恢复/CRD dry-run及私有 PG发布事务，尚未接公共执行 Driver。
 下一阶段必须实现并验收：持久 SQL login/branch manifest、leased Driver、真实函数
 部署/失败保持旧版本/回滚/缩零冷醒、严格 OpenAPI 和 React

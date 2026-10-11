@@ -103,30 +103,53 @@ func (lease *controllerLease) close() {
 	lease.connection = nil
 }
 
-func (s *server) runLeaderControllers(ctx context.Context, role processRole, state *controllerState) error {
+// Independent Workers stay unready and perform no reconciliation while the
+// metadata database is temporarily unavailable. Restarting after one bounded
+// startup query only adds Kubernetes backoff to a recoverable outage. Combined
+// mode retains its explicit fail-fast contract. This is acquisition recovery,
+// not permission to keep running after an established leadership lease is lost.
+func (s *server) awaitControllerLease(ctx context.Context, role processRole) (*controllerLease, error) {
 	var lease *controllerLease
+	var lastWarning time.Time
 	for lease == nil {
 		if ctx.Err() != nil {
-			return nil
+			return nil, nil
 		}
 		attemptCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		var err error
 		lease, err = acquireControllerLease(attemptCtx, s.db, role)
 		cancel()
 		if err != nil {
-			// Do not include DSNs, PostgreSQL secrets or query parameters in logs.
-			return errors.New("controller leadership acquisition unavailable")
+			if ctx.Err() != nil {
+				return nil, nil
+			}
+			if role != roleWorker {
+				return nil, errors.New("controller leadership acquisition unavailable")
+			}
+			// Never log the database error, DSN, SQL text or credentials.
+			if s.logger != nil && time.Since(lastWarning) >= 30*time.Second {
+				s.logger.Warn("controller leadership acquisition unavailable; worker remains standby")
+				lastWarning = time.Now()
+			}
 		}
 		if lease == nil {
 			if role == roleAll {
-				return errors.New("another controller is active; combined mode cannot overlap")
+				return nil, errors.New("another controller is active; combined mode cannot overlap")
 			}
 			select {
 			case <-ctx.Done():
-				return nil
+				return nil, nil
 			case <-time.After(2 * time.Second):
 			}
 		}
+	}
+	return lease, nil
+}
+
+func (s *server) runLeaderControllers(ctx context.Context, role processRole, state *controllerState) error {
+	lease, err := s.awaitControllerLease(ctx, role)
+	if err != nil || lease == nil {
+		return err
 	}
 	defer lease.close()
 	controllerCtx, cancelControllers := context.WithCancel(ctx)
