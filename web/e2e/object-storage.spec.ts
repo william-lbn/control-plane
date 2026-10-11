@@ -653,7 +653,7 @@ test('Object Storage: UI files, native timeline clone, isolated changes and cold
     await lifecycleAction('解除项目保护', retainedProjectName);
     for (const [id, name] of [
       [root, 'main'],
-      [child, 'child-' + attempt],
+      [child, recovery?.child_name || 'child-' + attempt],
     ]) {
       const button = page
         .getByTestId('lifecycle-' + id)
