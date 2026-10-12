@@ -23,6 +23,9 @@ test('Database owner transfer: actual SQL, replay, retained data and Reader cold
       password_new_file: string;
       operations: string[];
       original_failure_job: string;
+      stage?: 'retired';
+      reader_id?: string;
+      checks?: string[];
     };
   };
   const { project_id: project, branch_id: branch, writer_id: writer } = fixture;
@@ -55,7 +58,7 @@ test('Database owner transfer: actual SQL, replay, retained data and Reader cold
   }
   let result = 'running',
     reader = '';
-  const checks: string[] = [],
+  const checks: string[] = [...(fixture.resume?.checks ?? [])],
     operations: string[] = [...(fixture.resume?.operations ?? [])];
   async function save(name?: string) {
     if (name) checks.push(name);
@@ -141,6 +144,12 @@ test('Database owner transfer: actual SQL, replay, retained data and Reader cold
   async function zero(endpoint: string) {
     await page.goto(`/#/projects/${project}/compute`);
     await page.locator('select').first().selectOption(endpoint);
+    const observed = await context.request.get(`/api/v1/projects/${project}/endpoints/${endpoint}`);
+    expect(observed.status()).toBe(200);
+    if ((await observed.json()).observed_state === 'suspended') {
+      await expect(page.locator('.stats-grid .stat-card strong').first()).toHaveText('已休眠');
+      return;
+    }
     await wait(
       await mutate('现在缩到 0', `/api/v1/projects/${project}/endpoints/${endpoint}/suspend`),
     );
@@ -155,6 +164,29 @@ test('Database owner transfer: actual SQL, replay, retained data and Reader cold
     await page.getByLabel('密码', { exact: true }).fill((await readFile(admin, 'utf8')).trim());
     await page.getByRole('button', { name: '登录控制台 →', exact: true }).click();
     await expect(page.getByRole('button', { name: '＋ 创建项目', exact: true })).toBeVisible();
+    if (fixture.resume?.stage === 'retired') {
+      reader = fixture.resume.reader_id ?? '';
+      expect(reader).toMatch(/^ep_[a-f0-9]{16}$/);
+      expect(checks).toContain('reader_creation_and_cold_wake_keep_owner_data_and_password');
+      const originalDelete = await context.request.get(
+        `/api/v1/projects/${project}/operations/${operations.at(-1)}`,
+      );
+      expect(originalDelete.status()).toBe(200);
+      const deleted = await originalDelete.json();
+      expect(deleted.action).toBe('delete_endpoint');
+      expect(deleted.resource_id).toBe(reader);
+      expect(deleted.state).toBe('succeeded');
+      const absent = await context.request.get(`/api/v1/projects/${project}/endpoints/${reader}`);
+      expect(absent.status()).toBe(404);
+      await zero(writer);
+      await save('owned_reader_normally_retired_data_roles_retained_compute_zero');
+      await save(
+        'original_completed_owner_and_reader_checks_reused_without_replaying_sql_or_mutations',
+      );
+      result = 'pass';
+      await save();
+      return;
+    }
     await page.goto(`/#/projects/${project}/databases`);
     if (!fixture.resume) {
       for (const [role, password] of [
