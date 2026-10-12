@@ -17,11 +17,13 @@ test('Functions history restores actual original code and environment, preserves
     branch_id: string;
     writer_id: string;
     resume?: {
-      phase: 'original_unready_no_write';
+      phase: 'original_unready_no_write' | 'stopped_before_delete';
       function_id: string;
       first_deployment_id: string;
       operations: string[];
       original_failure_job: string;
+      second_deployment_id?: string;
+      checks?: string[];
     };
   };
   for (const [key, prefix] of [
@@ -108,6 +110,30 @@ test('Functions history restores actual original code and environment, preserves
     expect(data.node_ready).toBe(true);
     return data;
   }
+  async function retireDefinitionAndWriter() {
+    await wait(await action('删除函数', '', 'DELETE'));
+    await expect(page.getByRole('button', { name: '查看函数 roll', exact: true })).toHaveCount(0);
+    await page.goto(`/#/projects/${project}/compute`);
+    await page.locator('select').first().selectOption(writer);
+    const endpoint = await context.request.get(`/api/v1/projects/${project}/endpoints/${writer}`);
+    expect(endpoint.status()).toBe(200);
+    const current = await endpoint.json();
+    if (current.observed_state !== 'suspended') {
+      const pending = page.waitForResponse(
+        (r) =>
+          new URL(r.url()).pathname === `/api/v1/projects/${project}/endpoints/${writer}/suspend` &&
+          r.request().method() === 'POST',
+      );
+      await page.getByRole('button', { name: '现在缩到 0', exact: true }).click();
+      await wait(await pending);
+    }
+    await expect(page.locator('.stats-grid .stat-card strong').first()).toHaveText('已休眠', {
+      timeout: 150000,
+    });
+    await save(
+      'unknown_history_rejected_original_guests_retired_records_and_sql_preserved_compute_zero',
+    );
+  }
   try {
     await save();
     await page.goto('/#/projects');
@@ -117,6 +143,61 @@ test('Functions history restores actual original code and environment, preserves
     await expect(page.getByRole('button', { name: '＋ 创建项目', exact: true })).toBeVisible();
     page.on('dialog', (d) => void d.accept());
     await page.goto(`/#/projects/${project}/functions`);
+    if (fixture.resume?.phase === 'stopped_before_delete') {
+      const original = fixture.resume;
+      if (
+        !/^fnc_[a-f0-9]{16}$/.test(original.function_id) ||
+        !/^fdp_[a-f0-9]{16}$/.test(original.first_deployment_id) ||
+        !/^fdp_[a-f0-9]{16}$/.test(original.second_deployment_id || '') ||
+        original.operations.length !== 9 ||
+        original.checks?.length !== 7 ||
+        !original.checks.includes(
+          'original_rollback_operation_replay_source_conflict_route_conflict_and_stale_version',
+        ) ||
+        original.original_failure_job !== 'publication-ui-20261012224420'
+      )
+        throw new Error('Exact stopped-after-acceptance checkpoint required');
+      functionID = original.function_id;
+      firstID = original.first_deployment_id;
+      secondID = original.second_deployment_id!;
+      const definition = await context.request.get(path);
+      expect(definition.status()).toBe(200);
+      const value = await definition.json();
+      expect(value.id).toBe(functionID);
+      expect(value.state).toBe('suspended');
+      for (const [index, id] of original.operations.entries()) {
+        if (!/^op_[a-f0-9]{16,24}$/.test(id)) throw new Error('Original Operation ID required');
+        const response = await context.request.get(`/api/v1/projects/${project}/operations/${id}`);
+        expect(response.status()).toBe(200);
+        const op = await response.json();
+        expect(op.state).toBe('succeeded');
+        expect(op.resource_id).toBe(functionID);
+        expect(op.action).toBe(
+          index === 0
+            ? 'create_function'
+            : index % 2 === 0
+              ? 'suspend_function'
+              : 'deploy_function',
+        );
+      }
+      const history = await context.request.get(path + '/deployments');
+      expect(history.status()).toBe(200);
+      const items = (await history.json()).items;
+      const active = items.find((d: { id: string }) => d.id === value.active_deployment_id),
+        first = items.find((d: { id: string }) => d.id === firstID);
+      expect(active.source_deployment_id).toBe(firstID);
+      expect(active.bundle_digest).toBe(first.bundle_digest);
+      operations.push(...original.operations);
+      checks.push(...original.checks);
+      await page.getByRole('button', { name: '查看函数 roll', exact: true }).click();
+      await save(
+        'original_completed_restore_and_final_stop_verified_before_delete_no_write_replay',
+      );
+      await retireDefinitionAndWriter();
+      result = 'pass';
+      await save();
+      return;
+    }
     if (fixture.resume) {
       const original = fixture.resume;
       if (
@@ -293,25 +374,7 @@ test('Functions history restores actual original code and environment, preserves
         })
       ).status(),
     ).toBe(404);
-    await wait(await action('删除函数定义', '', 'DELETE'));
-    await expect(page.getByRole('button', { name: '查看函数 roll', exact: true })).toHaveCount(0);
-    await page.goto(`/#/projects/${project}/compute`);
-    await page.locator('select').first().selectOption(writer);
-    if (!(await page.getByRole('button', { name: '现在缩到 0', exact: true }).isDisabled())) {
-      const pending = page.waitForResponse(
-        (r) =>
-          new URL(r.url()).pathname === `/api/v1/projects/${project}/endpoints/${writer}/suspend` &&
-          r.request().method() === 'POST',
-      );
-      await page.getByRole('button', { name: '现在缩到 0', exact: true }).click();
-      await wait(await pending);
-    }
-    await expect(page.locator('.stats-grid .stat-card strong').first()).toHaveText('已休眠', {
-      timeout: 150000,
-    });
-    await save(
-      'unknown_history_rejected_original_guests_retired_records_and_sql_preserved_compute_zero',
-    );
+    await retireDefinitionAndWriter();
     result = 'pass';
     await save();
   } catch (e) {
