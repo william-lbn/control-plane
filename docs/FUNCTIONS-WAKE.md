@@ -90,7 +90,12 @@ Use the trusted Linux workflow's `functions-wake.spec.ts` choice. Set the privat
 observation slice and the protected Console password. The workflow packages the
 sample outside Git. No Python runtime is part of the product.
 
-**New wake live acceptance is pending until an exact Linux receipt is published.**
+**New wake live acceptance passed at exact runtime/test source `0198f7c` / Helm
+0.1.21.** Linux Job `publication-ui-20261012113626` completed at 2026-10-12 19:38
+Asia/Shanghai, with the new boot, retained source/env/SQL identity, replay/conflict/
+stale-version checks and normal retirement/Compute zero. Public Linux CI
+`38223473074` passed all 13 jobs and 723 Go/PostgreSQL checks, zero failures/skips.
+See the [full immutable acceptance receipt](https://github.com/william-lbn/neon-helm/blob/v0.1.21/docs/ACCEPTANCE-2026-10-12-FUNCTIONS-WAKE.md).
 Monitoring acceptance at runtime `be557e0` / Helm 0.1.20 passed by original stopped
 checkpoint continuation; that result does not cover this new wake endpoint.
 

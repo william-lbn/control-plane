@@ -6,14 +6,14 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 **发行状态：预览版本。已经验证的实验环境功能不等于生产认证，也不等于 Neon 官网全部 Backend 服务。**
 [当前实际验收基线](https://github.com/william-lbn/neon-helm/blob/v0.1.19/docs/ACCEPTANCE-2026-10-12-FUNCTIONS.md)：`bf0dd9e` / 统一 Helm 0.1.19 的原生 Functions 已通过真实 Linux UI→microVM→Proxy→Neon SQL、停止/重部署和 NOLOGIN/保留数据验收；公开 Linux CI 722 项 Go/PostgreSQL、七镜像匿名核验和三节点串行部署通过。原失败与续测均独立保留。旧 UI 回执和当前这一切片不能冒充全部官网功能回归。
 
-[Functions 原生执行](docs/FUNCTIONS-NATIVE-PREVIEW.md)默认禁用，实验部署由不可变 operator 配置明确启用；其实际验收范围见上述报告。[运行监控](docs/FUNCTIONS-RUNTIME-OBSERVATION.md)已在 `be557e0` / Helm 0.1.20 通过真实 Linux UI，含原停止检查点续测、管理读取不算调用活动、不唤醒 SQL 和最终 Compute 零；[验收报告](https://github.com/william-lbn/neon-helm/blob/v0.1.20/docs/ACCEPTANCE-2026-10-12-FUNCTIONS-MONITORING.md)。[显式唤醒保留版本](docs/FUNCTIONS-WAKE.md)和 OpenAPI 0.14 是下一项独立验收，不能沿用监控的现场通过结果。
+[Functions 原生执行](docs/FUNCTIONS-NATIVE-PREVIEW.md)默认禁用，实验部署由不可变 operator 配置明确启用；其实际验收范围见上述报告。[运行监控](docs/FUNCTIONS-RUNTIME-OBSERVATION.md)已在 `be557e0` / Helm 0.1.20 通过真实 Linux UI，含原停止检查点续测、管理读取不算调用活动、不唤醒 SQL 和最终 Compute 零；[验收报告](https://github.com/william-lbn/neon-helm/blob/v0.1.20/docs/ACCEPTANCE-2026-10-12-FUNCTIONS-MONITORING.md)。[显式唤醒保留版本](docs/FUNCTIONS-WAKE.md)已在 `0198f7c` / Helm 0.1.21 通过实际 UI、保留代码/环境/SQL 身份、幂等重放与正常回收；[精确报告](https://github.com/william-lbn/neon-helm/blob/v0.1.21/docs/ACCEPTANCE-2026-10-12-FUNCTIONS-WAKE.md)。新增 [数据库 Owner 变更](docs/DATABASE-OWNER.md)为下一独立验收；不能沿用先前通过结果。
 [历史 Compute 生命周期交付](docs/DELIVERY-2026-10-10-COMPUTE-LIFECYCLE.md)记录先前七镜像、统一 Helm 0.1.7、九套真实 Linux UI 共 146 项与 23 项原失败恢复检查；[先前 Object Storage](docs/DELIVERY-2026-10-09-OBJECT-STORAGE.md)、[Managed Auth](docs/DELIVERY-2026-10-08-MANAGED-AUTH.md)及历史报告保留各版本证据。
 独立 Chart 提供 API、Worker、Web 进程及可选 Data API、应用凭据、Console 邀请注册、历史分支恢复、保留删除与独立 Compute 退休；Functions 包括元数据/历史、不可变存储、原生执行 Driver 和条件式 Worker Service 回收权限。Worker 使用 PostgreSQL 领导租约和只读 Runner observer。
 当前只允许一个 API 和一个 Worker，跨实例外部 fencing 与 HA 仍须独立验收。
 旧合并版本升级前必须执行 [停止/排空流程](docs/WORKER-SPLIT.md)。
 运行代码与实际合同见 [OpenAPI](contracts/openapi-v1.json)；本项目使用 `/api/v1`，未声称兼容托管 Neon `/api/v2`。
 
-[Object Storage REST v1](docs/OBJECT-STORAGE.md) 已增加真实分支文件服务；当前合同为 OpenAPI 0.14。现场验收按版本记录，仍未开放完整外部 S3 协议兼容。
+[Object Storage REST v1](docs/OBJECT-STORAGE.md) 已增加真实分支文件服务；当前合同为 OpenAPI 0.15。现场验收按版本记录，仍未开放完整外部 S3 协议兼容。
 
 ## 1. 功能范围
 
@@ -23,7 +23,7 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 | Console 邀请与受邀注册 | 账号绑定、一次性凭据、幂等/过期/撤销、事务审计、Go/React/PG 测试 | 手动安全交付邀请；邮件验证/OIDC/MFA 未完成，独立于 Managed Auth |
 | 项目、当前时间点分支、Writer、多个 Reader | 已实现，异步 Operation + SQL 就绪探针 | 单集群、单 Region、PG16；不支持所有项目/分支删除与恢复动作 |
 | PostgreSQL 连接与 SQL 工作台 | 通过独立 Neon Proxy 和 Endpoint selector | 应用不能直接连接控制 API；生产入口必须配置可信 TLS |
-| 数据库、角色与密码轮换 | 分支目录、Compute 原生配置、Proxy spec 调谐 | rename、owner 变更、未知外部 DDL 恢复未完成 |
+| 数据库、角色与密码轮换 | 分支目录、Compute 原生配置、Proxy spec 调谐；新增原 OID/版本保护的自定义库 Owner 变更 | 新 Owner 路径待实际 UI；默认/系统 Owner 变更、rename、未知外部 DDL 恢复未完成 |
 | CPU / 内存边界、自动休眠、连接唤醒 | 已实现实验环境控制路径 | 整数 CPU 1→2→1 已验证；小数 CPU、完整内存缩回、跨实例栅栏未验收 |
 | 监控、Operation 步骤、错误与重试 | 已实现 | 长期指标持久化、SLO 告警、完整审计导出未完成 |
 | 分支 Managed Auth | Go/TS/React、真实 PG 与 Neon UI 注册/会话/JWT/克隆隔离/RLS/自动缩零通过 | 邮件/OAuth/MFA、完整身份管理、密钥轮换、全链路 TLS/HA 未完成；见本版交付 |
@@ -31,7 +31,7 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 | 项目/分支保留删除与独立 Compute 删除 | 保护/依赖图、关闭 Proxy 和服务、正常 Runner 回收、held tombstone、项目恢复、原密码重建与 React UI | 物理 GC、TTL、失败创建回收与跨实例栅栏未开放；详见 [删除手册](docs/RETAINED-DELETION.md)和本版交付 |
 | HA / DR | 部分租约与恢复工具 | 未通过独立故障域 HA/DR；历史新分支恢复不等于完整 DR |
 | 产品 Object Storage | Go REST Driver、独立受限 bucket、随分支目录、上传下载 UI、条件写入、预签名与保留恢复 | REST v1 真实 UI 19 项及原失败项目恢复 4 项通过；完整 S3/multipart/GC/HA/TLS 仍未完成 |
-| Functions | Go Driver、隔离 Node guest、ZIP/环境、真实 SQL、停止/重部署/删除与监控已通过实际 UI；默认关闭 | 显式保留版本唤醒待本版验收；公开流式入口、自动休眠/唤醒、触发器与 Backend 分支复制仍缺 |
+| Functions | Go Driver、隔离 Node guest、ZIP/环境、真实 SQL、停止/重部署/删除、监控与显式保留版本唤醒已通过实际 UI；默认关闭 | 公开流式入口、自动休眠/唤醒、触发器与 Backend 分支复制仍缺 |
 | AI Gateway 推理 | 模型/分支应用凭据合同已有代码 | 真实 Gateway/供应商调用仍需实现与凭据；不能用聊天会话替代 API 凭据 |
 | Data API | 原生 Go Driver、持久 Operation、React UI、分支 JWT Gateway 和固定 PostgREST 镜像 | 默认禁用；须显式 labHTTP，真实 Neon UI 验收独立于 PG CI；RPC/views 等不在首版范围 |
 | 分支应用凭据 | 一次性 Token、范围/到期、轮换/撤销、哈希存储、当前权限检查和 UI | 当前仅 ai_gateway:invoke；凭据不等于 AI 推理服务可用 |

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { api, projectPath } from '../../api';
 import type { Branch, Operation, Page } from '../../api';
@@ -13,6 +13,7 @@ type CatalogItem = {
   protected: boolean;
   state: string;
   superuser?: boolean;
+  version_token?: string;
 };
 
 export function Catalog({
@@ -37,20 +38,26 @@ export function Catalog({
   const [owner, setOwner] = useState('');
   const [rotateName, setRotateName] = useState('');
   const [rotatePassword, setRotatePassword] = useState('');
+  const [transferDatabase, setTransferDatabase] = useState('');
+  const [transferOwner, setTransferOwner] = useState('');
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [operation, setOperation] = useState<Operation | null>(null);
+  const scopeEpoch = useRef(0);
   const path = `${projectPath(projectId)}/branches/${encodeURIComponent(branch)}`;
-  async function load() {
+  async function load(epoch = scopeEpoch.current) {
     const [r, d] = await Promise.all([
       api<Page<CatalogItem>>(path + '/roles'),
       api<Page<CatalogItem>>(path + '/databases'),
     ]);
+    if (epoch !== scopeEpoch.current) return;
     setRoles(r.items);
     setDatabases(d.items);
     setLoading(false);
   }
   useEffect(() => {
+    scopeEpoch.current++;
+    setBusy(false);
     let cancelled = false;
     setLoading(true);
     setRoles([]);
@@ -60,6 +67,8 @@ export function Catalog({
     setRotatePassword('');
     setOwner('');
     setRotateName('');
+    setTransferDatabase('');
+    setTransferOwner('');
     if (canEdit && branch)
       Promise.all([
         api<Page<CatalogItem>>(path + '/roles'),
@@ -80,17 +89,25 @@ export function Catalog({
         });
     return () => {
       cancelled = true;
+      scopeEpoch.current++;
     };
   }, [projectId, branch, canEdit]);
-  async function mutate(kind: string, method: string, body?: Record<string, string>) {
+  async function mutate(
+    kind: string,
+    method: string,
+    body?: Record<string, string>,
+    headers: Record<string, string> = {},
+  ) {
+    const epoch = scopeEpoch.current;
     setBusy(true);
     setOperation(null);
     try {
       const result = await api<{ operation: Operation }>(path + '/' + kind, {
         method,
         body: body ? JSON.stringify(body) : undefined,
-        headers: { 'Idempotency-Key': newRequestKey() },
+        headers: { 'Idempotency-Key': newRequestKey(), ...headers },
       });
+      if (epoch !== scopeEpoch.current) return;
       if (kind === 'roles' && method === 'POST')
         setPassword((value) => (value === body?.password ? '' : value));
       if (kind.startsWith('roles/') && method === 'PATCH')
@@ -102,11 +119,15 @@ export function Catalog({
         if (Date.now() > deadline) throw new Error('操作仍在执行，请在操作记录中查看结果。');
         await new Promise((resolve) => setTimeout(resolve, 2000));
         current = await api<Operation>(projectPath(projectId) + '/operations/' + current.id);
+        if (epoch !== scopeEpoch.current) return;
         setOperation(current);
       }
       if (current.state === 'failed')
         throw new Error(`${current.error_message || '调谐失败'} · ${current.id}`);
-      await load();
+      await load(epoch);
+      if (epoch !== scopeEpoch.current) return;
+      if (kind.startsWith('databases/') && method === 'PATCH')
+        setTransferOwner((value) => (value === body?.owner ? '' : value));
       // A completed role refresh must not erase a database form entered while
       // load() is pending. Clear only the submitted form, retaining newer edits.
       if (kind === 'roles' && method === 'POST')
@@ -114,9 +135,9 @@ export function Catalog({
       if (kind === 'databases' && method === 'POST')
         setDatabaseName((value) => (value === body?.name ? '' : value));
     } catch (e) {
-      showError(e);
+      if (epoch === scopeEpoch.current) showError(e);
     } finally {
-      setBusy(false);
+      if (epoch === scopeEpoch.current) setBusy(false);
     }
   }
   if (!canEdit)
@@ -177,6 +198,92 @@ export function Catalog({
         </div>
       )}
       <div className="identity-grid">
+        <form
+          className="panel"
+          onSubmit={(e: FormEvent) => {
+            e.preventDefault();
+            const selected = databases.find((d) => d.name === transferDatabase);
+            if (selected?.version_token)
+              void mutate(
+                'databases/' + encodeURIComponent(transferDatabase),
+                'PATCH',
+                { owner: transferOwner },
+                { 'If-Match': `"${selected.version_token}"` },
+              );
+          }}
+        >
+          <div className="panel-heading">
+            <h2>变更数据库 Owner</h2>
+            <span>原数据库 · 保留数据</span>
+          </div>
+          <p className="subtle-note">
+            仅支持 API 管理的非系统数据库及角色。同步所有 Compute 冷启动配置；数据库内表和 Schema 的
+            Owner、ACL 保持 PostgreSQL 原有语义。
+          </p>
+          <label>
+            变更 Owner 的数据库
+            <select
+              aria-label="变更 Owner 的数据库"
+              value={transferDatabase}
+              disabled={busy || loading || !canEdit}
+              onChange={(e) => {
+                setTransferDatabase(e.target.value);
+                setTransferOwner('');
+              }}
+            >
+              <option value="">选择数据库</option>
+              {databases
+                .filter(
+                  (d) =>
+                    d.managed &&
+                    !d.protected &&
+                    d.state === 'ready' &&
+                    roles.some((r) => r.name === d.owner && r.managed && !r.protected),
+                )
+                .map((d) => (
+                  <option key={d.name} value={d.name}>
+                    {d.name} · {d.owner}
+                  </option>
+                ))}
+            </select>
+          </label>
+          <label>
+            新的数据库 Owner
+            <select
+              aria-label="新的数据库 Owner"
+              value={transferOwner}
+              disabled={busy || loading || !canEdit}
+              onChange={(e) => setTransferOwner(e.target.value)}
+            >
+              <option value="">选择 Owner</option>
+              {roles
+                .filter(
+                  (r) =>
+                    r.managed &&
+                    !r.protected &&
+                    r.state === 'ready' &&
+                    r.name !== databases.find((d) => d.name === transferDatabase)?.owner,
+                )
+                .map((r) => (
+                  <option key={r.name} value={r.name}>
+                    {r.name}
+                  </option>
+                ))}
+            </select>
+          </label>
+          <button
+            className="button primary"
+            disabled={
+              busy ||
+              loading ||
+              !canEdit ||
+              !transferOwner ||
+              !databases.find((d) => d.name === transferDatabase)?.version_token
+            }
+          >
+            保存数据库 Owner
+          </button>
+        </form>
         <form
           className="panel"
           onSubmit={(e: FormEvent) => {

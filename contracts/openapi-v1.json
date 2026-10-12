@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.14.0",
+    "version": "0.15.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -6966,7 +6966,8 @@
           "503": {
             "description": "Dependency unavailable"
           }
-        }
+        },
+        "description": " Managed entries include decimal-string version_token for If-Match; state updating is a pending owner transition."
       },
       "post": {
         "operationId": "PostBranchDatabases",
@@ -7123,6 +7124,107 @@
           }
         },
         "description": "Ready managed non-system object required. PostgreSQL dependencies and active database connections are preserved as rejection conditions. Operation ID and all attempts are retained. PATCH updates all Writer/Reader cold specs and Proxy verifiers. Cookie writes require CSRF."
+      },
+      "patch": {
+        "operationId": "updateDatabaseOwner",
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "Transfer an original managed database to another managed role",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          },
+          {
+            "$ref": "#/components/parameters/database"
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Quoted decimal version_token from the managed catalog listing; string preserves bigint precision."
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Durable accepted Operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "operation": {
+                      "$ref": "#/components/schemas/Operation"
+                    },
+                    "branch_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Editor or Admin required"
+          },
+          "404": {
+            "description": "Branch or ready writer not available"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "description": "Invalid/protected name, owner or password"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "description": "Editor/Admin and CSRF; Idempotency-Key plus numeric If-Match catalog version_token. Only ready API-owned non-system databases with non-system managed owners on the same branch are eligible. Original PostgreSQL OID, branch ownership marker and old owner are captured before admission and checked by the Worker. Atomic branch/parent/role/version checks queue the existing catalog pipeline; real ALTER DATABASE OWNER, all Compute configuration Secrets, route verification and final metadata CAS are required. No data/table/schema ownership/ACL is rewritten, no connection is terminated and no privilege grants or superuser bypass are introduced. Same-key replay returns the original Operation after completion; unknown outcomes are observed by original OID/marker/old-or-final owner, never adopted by name alone. Default/system-owned databases, rename, arbitrary external DDL and distributed fencing remain separate gates.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "owner"
+                ],
+                "properties": {
+                  "owner": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 63
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/v1/projects/{project}/branches/{branch}/data-api": {

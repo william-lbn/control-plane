@@ -157,11 +157,11 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 			if stepErr == nil {
 				stepErr = s.reconcileManagedAuth(runCtx, id, workerID, action, p)
 			}
-		case "create_role", "rotate_role_password", "delete_role", "create_database", "delete_database":
+		case "create_role", "rotate_role_password", "delete_role", "create_database", "delete_database", "update_database_owner":
 			var p catalogPayload
 			if err := json.Unmarshal(payload, &p); err != nil {
 				stepErr = err
-			} else if p.ProjectID != projectID {
+			} else if p.ProjectID != projectID || (action == "update_database_owner" && (p.BranchID != resourceID || p.ExpectedVersion < 1 || p.DatabaseOID == 0)) {
 				stepErr = errors.New("catalog operation project identity mismatch")
 			} else {
 				stepErr = s.reconcileCatalog(runCtx, id, workerID, action, p)

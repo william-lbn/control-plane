@@ -103,6 +103,17 @@ func TestFunctionsNativeAdmissionReplayAuthorizationAndManualLifecycle(t *testin
 	request("owner", "POST", base+"/hello/resume", "native-resume", "1", `{"environment":{}}`, 422)
 	request("owner", "POST", base+"/hello/resume", "native-resume", "1", `null`, 422)
 	request("owner", "POST", base+"/hello/resume", "native-resume", "1", `{}`, 409)
+	// New catalog authorization/stale checks must finish before external SQL.
+	ownerPath := "/api/v1/projects/" + project + "/branches/" + branch + "/databases/owned"
+	exec(`INSERT INTO branch_databases(branch_id,name,owner_name,state) VALUES($1,'owned','app_old','ready')`, branch)
+	request("", "PATCH", ownerPath, "owner-change", "1", `{"owner":"app_new"}`, 401)
+	request("viewer", "PATCH", ownerPath, "owner-change", "1", `{"owner":"app_new"}`, 403)
+	request("stranger", "PATCH", ownerPath, "owner-change", "1", `{"owner":"app_new"}`, 404)
+	request("owner", "PATCH", ownerPath, "owner-change", "", `{"owner":"app_new"}`, 428)
+	request("owner", "PATCH", ownerPath, "owner-change", "9", `{"owner":"app_new"}`, 412)
+	request("owner", "PATCH", ownerPath, "owner-change", "1", `{"owner":"app_old"}`, 422)
+	request("owner", "PATCH", ownerPath, "owner-change", "1", `{"owner":"app_new"}`, 409)
+	request("owner", "PATCH", ownerPath, "owner-change", "1", `{"owner":"control_probe"}`, 422)
 	request("", "GET", base+"/hello/runtime", "", "", "", 401)
 	request("stranger", "GET", base+"/hello/runtime", "", "", "", 404)
 	for _, actor := range []string{"owner", "viewer"} {

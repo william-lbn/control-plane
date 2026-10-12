@@ -1,6 +1,6 @@
 # 生产门槛与官网对齐
 
-状态截至 2026-10-12；实际运行基线 `bf0dd9e` / 统一 Helm 0.1.19。原生 Functions 已通过真实 Linux UI、guest、Proxy SQL 读写、权限、安全响应、停止/重部署及 NOLOGIN/保留数据验收，准确范围及原失败续测见 [交付报告](https://github.com/william-lbn/neon-helm/blob/v0.1.19/docs/ACCEPTANCE-2026-10-12-FUNCTIONS.md)。执行仍默认禁用，实验部署使用明确的不可变 operator 配置启用。[运行监控](FUNCTIONS-RUNTIME-OBSERVATION.md)为下一项独立验收；公开 HTTP/SSE/WS、自动 Functions 休眠/唤醒、服务一致性分支复制等未由本次验收覆盖。历史版本和失败文件保留，未通过项不能被 Ready Pod 或 CI build 替代。
+状态截至 2026-10-12；实际运行基线 `0198f7c` / 统一 Helm 0.1.21。原生 Functions 的实际 SQL/生命周期见 [0.1.19](https://github.com/william-lbn/neon-helm/blob/v0.1.19/docs/ACCEPTANCE-2026-10-12-FUNCTIONS.md)；[运行监控](FUNCTIONS-RUNTIME-OBSERVATION.md)在 0.1.20 通过；[显式保留版本唤醒](FUNCTIONS-WAKE.md)在 0.1.21 通过实际 UI、新 boot、保留代码/环境/SQL 身份与幂等检查。执行仍默认禁用，实验部署由不可变 operator 配置明确启用。新增 [数据库 Owner 变更](DATABASE-OWNER.md)待本版独立现场验收；公开 HTTP/SSE/WS、自动 Functions 休眠/冷醒、Backend 分支复制等仍未放行。历史版本和失败文件保留，Ready Pod 或 CI build 不能替代未完成的验收。
 
 ## 1. 已实现路径
 

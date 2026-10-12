@@ -142,6 +142,7 @@ func (s *server) routes() *http.ServeMux {
 	mux.Handle("DELETE /api/v1/projects/{project}/branches/{branch}/roles/{role}", s.auth(http.HandlerFunc(s.catalogMutation), true))
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/databases", s.auth(http.HandlerFunc(s.catalogList), false))
 	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/databases", s.auth(http.HandlerFunc(s.catalogMutation), true))
+	mux.Handle("PATCH /api/v1/projects/{project}/branches/{branch}/databases/{database}", s.auth(http.HandlerFunc(s.databaseOwnerMutation), true))
 	mux.Handle("DELETE /api/v1/projects/{project}/branches/{branch}/databases/{database}", s.auth(http.HandlerFunc(s.catalogMutation), true))
 	mux.Handle("GET /api/v1/projects/{project}/endpoints", s.auth(http.HandlerFunc(s.endpoints), false))
 	mux.Handle("POST /api/v1/projects/{project}/endpoints", s.auth(http.HandlerFunc(s.createEndpoint), true))

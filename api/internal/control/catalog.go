@@ -18,12 +18,15 @@ import (
 // Catalog payloads contain references, never passwords or verifiers. The
 // credential Secret is immutable per Operation and safe to replay after crash.
 type catalogPayload struct {
-	ProjectID     string `json:"project_id"`
-	BranchID      string `json:"branch_id"`
-	EndpointID    string `json:"endpoint_id"`
-	Name          string `json:"name"`
-	Owner         string `json:"owner,omitempty"`
-	CredentialRef string `json:"credential_ref,omitempty"`
+	ProjectID       string `json:"project_id"`
+	BranchID        string `json:"branch_id"`
+	EndpointID      string `json:"endpoint_id"`
+	Name            string `json:"name"`
+	Owner           string `json:"owner,omitempty"`
+	CredentialRef   string `json:"credential_ref,omitempty"`
+	PreviousOwner   string `json:"previous_owner,omitempty"`
+	DatabaseOID     uint32 `json:"database_oid,omitempty"`
+	ExpectedVersion int64  `json:"expected_version,omitempty"`
 }
 
 func validPGIdentifier(name string) bool {
@@ -123,6 +126,7 @@ func (s *server) catalogList(w http.ResponseWriter, r *http.Request) {
 		if intent := byName[n]; intent != nil {
 			v["state"] = intent["state"]
 			v["version"] = intent["version"]
+			v["version_token"] = fmt.Sprint(intent["version"])
 			delete(byName, n)
 		}
 		if isRole {
@@ -132,6 +136,7 @@ func (s *server) catalogList(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	for _, v := range byName {
+		v["version_token"] = fmt.Sprint(v["version"])
 		v["managed"] = true
 		v["protected"] = false
 		items = append(items, v)
@@ -449,6 +454,8 @@ func (s *server) applyCatalogSQLOnce(ctx context.Context, p catalogPayload, acti
 	marker := "neon-control/branch/" + p.BranchID
 	quotedMarker := "'" + strings.ReplaceAll(marker, "'", "''") + "'"
 	switch action {
+	case "update_database_owner":
+		return applyDatabaseOwnerSQL(ctx, conn, p)
 	case "create_role", "rotate_role_password":
 		// pgx identifier quoting and pgconn literal quoting prevent injection.
 		// The literal is an immutable SCRAM verifier, never the user's password.
@@ -743,7 +750,11 @@ func (s *server) reconcileCatalog(ctx context.Context, operation, worker, action
 			if strings.Contains(action, "role") {
 				_, err = tx.Exec(ctx, `UPDATE branch_roles SET state=$3,credential_ref=NULLIF($4,''),version=version+1,updated_at=now() WHERE branch_id=$1 AND name=$2`, p.BranchID, p.Name, state, p.CredentialRef)
 			} else {
-				_, err = tx.Exec(ctx, `UPDATE branch_databases SET state=$3,version=version+1,updated_at=now() WHERE branch_id=$1 AND name=$2`, p.BranchID, p.Name, state)
+				if action == "update_database_owner" {
+					err = commitDatabaseOwnerTx(ctx, tx, p)
+				} else {
+					_, err = tx.Exec(ctx, `UPDATE branch_databases SET state=$3,version=version+1,updated_at=now() WHERE branch_id=$1 AND name=$2`, p.BranchID, p.Name, state)
+				}
 			}
 			if err != nil {
 				return err
