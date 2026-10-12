@@ -163,6 +163,7 @@ test('Functions native: UI ZIP deployment, SQL, safe invocation, stop, redeploy 
     await page.getByLabel('用户名').fill('admin');
     await page.getByLabel('密码', { exact: true }).fill((await readFile(adminFile, 'utf8')).trim());
     await page.getByRole('button', { name: '登录控制台 →', exact: true }).click();
+    await expect(page.getByRole('button', { name: '＋ 创建项目', exact: true })).toBeVisible();
     if (!resume) {
       await page.getByRole('button', { name: '＋ 创建项目', exact: true }).click();
       await page.getByLabel('项目名称').fill('ci-functions-' + attempt);
@@ -181,9 +182,9 @@ test('Functions native: UI ZIP deployment, SQL, safe invocation, stop, redeploy 
       project = (await response.json()).resource.id;
       await wait(response);
       await expect(page.locator('.create-modal')).toBeHidden({ timeout: 490000 });
-      const endpoints = (
-        await (await context.request.get(`/api/v1/projects/${project}/endpoints`)).json()
-      ).items;
+      const endpointResponse = await context.request.get(`/api/v1/projects/${project}/endpoints`);
+      expect(endpointResponse.status()).toBe(200);
+      const endpoints = (await endpointResponse.json()).items;
       expect(endpoints).toHaveLength(1);
       writer = endpoints[0].id;
       branch = endpoints[0].branch_id;
