@@ -106,4 +106,48 @@ func TestFunctionRetainedFailedSourceRequiresCompletedStop(t *testing.T) {
 	exec(`UPDATE function_deployments SET state='completed',finished_at=now() WHERE id=$1`, deployment)
 	exec(`UPDATE function_definitions SET state='active',active_deployment_id=$2 WHERE id=$1`, function, deployment)
 	check("completed_active_source_remains_reusable", 1)
+	t.Run("selected_history_retains_full_environment_and_owned_scope", func(t *testing.T) {
+		summary, ref, key, err := (&server{db: db}).loadRetainedFunctionSource(ctx, function, deployment)
+		if err != nil || ref.DeploymentID != deployment || ref.ProjectID != project || ref.BranchID != branch || key != "ci-key-v1" {
+			t.Fatal("historical source identity lost", err)
+		}
+		if _, err := functions.RestoreDeploymentSnapshot(summary, map[string]string{"APP_MESSAGE": "original-version"}); err != nil {
+			t.Fatal(err)
+		}
+	})
+	t.Run("selected_history_rejects_foreign_function_and_unknown_deployment", func(t *testing.T) {
+		for _, target := range [][2]string{{function, "fdp_ffffffffffffffff"}, {"fnc_ffffffffffffffff", deployment}} {
+			_, _, _, err := (&server{db: db}).loadRetainedFunctionSource(ctx, target[0], target[1])
+			if !isNoRows(err) {
+				t.Fatalf("foreign selected source accepted: %v", err)
+			}
+		}
+	})
+	const next = "fdp_abcdef0123456789"
+	exec(`INSERT INTO operations(id,project_id,resource_type,resource_id,action,state,actor_id,request_id,payload) VALUES('rollback',$1,'function',$2,'deploy_function','queued','actor','rollback','{}')`, project, function)
+	exec(`INSERT INTO function_deployments(id,function_id,project_id,branch_id,runtime,bundle_digest,bundle_bytes,entry,artifact_key,environment_secret_ref,environment_names,actor_id,operation_id,source_deployment_id)
+ SELECT $2,function_id,project_id,branch_id,runtime,bundle_digest,bundle_bytes,entry,artifact_key,'fdp-abcdef0123456789-environment',environment_names,actor_id,'rollback',id FROM function_deployments WHERE id=$1`, deployment, next)
+	t.Run("new_deployment_persists_owned_completed_lineage", func(t *testing.T) {
+		var source string
+		if err := db.QueryRow(ctx, `SELECT source_deployment_id FROM function_deployments WHERE id=$1`, next).Scan(&source); err != nil || source != deployment {
+			t.Fatal("lineage not retained", err)
+		}
+	})
+	t.Run("pending_source_not_selected_or_used_as_lineage", func(t *testing.T) {
+		_, _, _, err := (&server{db: db}).loadRetainedFunctionSource(ctx, function, next)
+		if !isNoRows(err) {
+			t.Fatal("pending source accepted", err)
+		}
+		_, err = db.Exec(ctx, `INSERT INTO function_deployments(id,function_id,project_id,branch_id,runtime,bundle_digest,bundle_bytes,entry,artifact_key,environment_secret_ref,environment_names,actor_id,operation_id,source_deployment_id)
+ SELECT 'fdp_fedcba9876543210',function_id,project_id,branch_id,runtime,bundle_digest,bundle_bytes,entry,artifact_key,'fdp-fedcba9876543210-environment',environment_names,actor_id,'missing-operation',id FROM function_deployments WHERE id=$1`, next)
+		if err == nil || !strings.Contains(err.Error(), "owned completed deployment") {
+			t.Fatal("uncompleted lineage not rejected by metadata guard", err)
+		}
+	})
+	t.Run("pending_deployment_lineage_is_immutable", func(t *testing.T) {
+		_, err := db.Exec(ctx, `UPDATE function_deployments SET source_deployment_id=NULL WHERE id=$1`, next)
+		if err == nil || !strings.Contains(err.Error(), "lineage is immutable") {
+			t.Fatal("lineage changed", err)
+		}
+	})
 }

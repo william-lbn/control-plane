@@ -15,7 +15,7 @@ import (
 const functionColumns = `id,project_id,branch_id,slug,database_name,sql_schema,version,generation,state,
  active_deployment_id,target_deployment_id,idle_timeout_seconds,created_at,updated_at`
 const deploymentColumns = `id,function_id,project_id,branch_id,runtime,bundle_digest,bundle_bytes,entry,
- environment_names,state,operation_id,failure_code,created_at,finished_at`
+ environment_names,state,operation_id,failure_code,created_at,finished_at,source_deployment_id`
 
 var functionDeploymentID = regexp.MustCompile(`^fdp_[a-f0-9]{16}$`)
 

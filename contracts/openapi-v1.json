@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.16.0",
+    "version": "0.17.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -2732,6 +2732,14 @@
               "null"
             ],
             "format": "date-time"
+          },
+          "source_deployment_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^fdp_[a-f0-9]{16}$",
+            "description": "Immutable completed original deployment in the exact same Function/project/branch; null for ordinary deploy/resume."
           }
         }
       },
@@ -12662,6 +12670,115 @@
         },
         "description": "Authorized Editor/Admin with public role/password, same Proxy selector and TLS policy as single SQL. PostgreSQL simple protocol parses the complete supplied script, including semicolons in comments/quoted strings/dollar bodies. No client-side splitting, injected BEGIN/COMMIT or automatic replay. Maximum input 32000 bytes; retain 16 result sets, 64 columns/set, 200 total rows and 1 MiB encoded cell JSON; still drain subsequent commands without dropping execution intent. Eight MiB wire message body cap; submitted transport/decode failure returns 503 sql_script_outcome_unknown with retryable=false. SQL statement errors return HTTP 200 outcome=failed with sanitized SQLSTATE and bounded preceding results. Earlier explicit COMMITs may be durable; never claim the whole script rolled back. Unclosed transactions are marked and rolled back on connection close. int8 values outside JavaScript safe integer range and non-finite floats are strings. Audit contains actor/endpoint/outcome only, no script/password.",
         "operationId": "executeSQLScript"
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/functions/{slug}/rollback": {
+      "post": {
+        "operationId": "rollbackFunction",
+        "tags": [
+          "Functions"
+        ],
+        "summary": "Restore an owned completed Function deployment",
+        "description": "Explicit asynchronous new deployment/generation/boot from selected completed source belonging to the exact Function/project/branch. Requires fully retired suspended original Function, Editor/Admin, CSRF, Idempotency-Key and numeric If-Match. Rejects code/environment overrides. Verifies retained environment UID/MAC/key version and blob digest before admission and rechecks locked parents/version/retirement/pending Operations/source in one transaction. Persists immutable source_deployment_id; audit action rollback_function; existing deploy_function Worker pipeline. Same key/body/version returns original Operation after completion. Cross-route/source key conflicts reject. Does not restore database data, replay customer invocation or resurrect process RAM. Current form contents are ignored.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          },
+          {
+            "$ref": "#/components/parameters/resourceVersion"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "deployment_id"
+                ],
+                "properties": {
+                  "deployment_id": {
+                    "type": "string",
+                    "pattern": "^fdp_[a-f0-9]{16}$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Queued; follow Location header until succeeded",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
       }
     }
   }

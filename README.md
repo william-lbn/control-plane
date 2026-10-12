@@ -13,7 +13,7 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 旧合并版本升级前必须执行 [停止/排空流程](docs/WORKER-SPLIT.md)。
 运行代码与实际合同见 [OpenAPI](contracts/openapi-v1.json)；本项目使用 `/api/v1`，未声称兼容托管 Neon `/api/v2`。
 
-[Object Storage REST v1](docs/OBJECT-STORAGE.md) 已增加真实分支文件服务；当前合同为 OpenAPI 0.16。现场验收按版本记录，仍未开放完整外部 S3 协议兼容。[SQL 脚本](docs/SQL-SCRIPTS.md)新增原生解析、逐条结果、事务结果和输出预算，已在 0.1.23 通过首次实际 UI 六组检查；原单条请求保持兼容。新增 [Explain/Analyze 与 CSV/JSON 导出](docs/SQL-TOOLS.md)待独立现场验收。需人工提供的外部依赖统一见 [人工输入清单](docs/OPERATOR-INPUTS.md)，其余工程任务继续推进。
+[Object Storage REST v1](docs/OBJECT-STORAGE.md) 已增加真实分支文件服务；源码合同为 OpenAPI 0.17。现场验收按版本记录，仍未开放完整外部 S3 协议兼容。[SQL 脚本](docs/SQL-SCRIPTS.md)新增原生解析、逐条结果、事务结果和输出预算，已在 0.1.23 通过首次实际 UI 六组检查；原单条请求保持兼容。[Explain/Analyze 与 CSV/JSON 导出](docs/SQL-TOOLS.md)已在 0.1.24 通过首次实际 UI 五组检查；新增 [Functions 历史部署恢复](docs/FUNCTIONS-ROLLBACK.md)待独立现场验收。需人工提供的外部依赖统一见 [人工输入清单](docs/OPERATOR-INPUTS.md)，其余工程任务继续推进。
 
 ## 1. 功能范围
 

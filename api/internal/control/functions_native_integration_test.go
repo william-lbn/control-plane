@@ -103,6 +103,16 @@ func TestFunctionsNativeAdmissionReplayAuthorizationAndManualLifecycle(t *testin
 	request("owner", "POST", base+"/hello/resume", "native-resume", "1", `{"environment":{}}`, 422)
 	request("owner", "POST", base+"/hello/resume", "native-resume", "1", `null`, 422)
 	request("owner", "POST", base+"/hello/resume", "native-resume", "1", `{}`, 409)
+	rollbackBody := `{"deployment_id":"fdp_0123456789abcdef"}`
+	request("", "POST", base+"/hello/rollback", "native-rollback", "1", rollbackBody, 401)
+	request("viewer", "POST", base+"/hello/rollback", "native-rollback", "1", rollbackBody, 403)
+	request("stranger", "POST", base+"/hello/rollback", "native-rollback", "1", rollbackBody, 404)
+	request("owner", "POST", base+"/hello/rollback", "native-rollback", "", rollbackBody, 428)
+	request("owner", "POST", base+"/hello/rollback", "native-rollback", "9", rollbackBody, 412)
+	for _, body := range []string{`{}`, `null`, `{"deployment_id":"foreign"}`, `{"deployment_id":"fdp_0123456789abcdef","environment":{}}`} {
+		request("owner", "POST", base+"/hello/rollback", "native-rollback", "1", body, 422)
+	}
+	request("owner", "POST", base+"/hello/rollback", "native-rollback", "1", rollbackBody, 409)
 	// New catalog authorization/stale checks must finish before external SQL.
 	ownerPath := "/api/v1/projects/" + project + "/branches/" + branch + "/databases/owned"
 	exec(`INSERT INTO branch_databases(branch_id,name,owner_name,state) VALUES($1,'owned','app_old','ready')`, branch)

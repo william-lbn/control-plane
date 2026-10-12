@@ -33,10 +33,28 @@ const functionPreviousSourceQuery = `SELECT d.runtime,d.bundle_digest,d.bundle_b
 // inventory. Restoration compares this inventory against the MAC-verified
 // Secret; silently omitting it must never weaken that integrity check.
 func (s *server) loadPreviousFunctionSource(ctx context.Context, functionID string) (functions.DeploymentSummary, functionEnvironmentReference, string, error) {
+	return s.loadRetainedFunctionSource(ctx, functionID, "")
+}
+
+// An explicit historical source must belong to the exact definition and be
+// completed. Secret UID/MAC and artifact bytes are verified by admission.
+const functionSelectedSourceQuery = `SELECT d.runtime,d.bundle_digest,d.bundle_bytes,d.entry,d.environment_names,
+ b.environment_namespace,b.environment_secret_ref,b.environment_secret_uid,b.environment_mac,b.mac_key_version,d.id,f.project_id,f.branch_id
+ FROM function_definitions f JOIN function_deployments d ON d.function_id=f.id
+ AND d.project_id=f.project_id AND d.branch_id=f.branch_id
+ JOIN function_deployment_backings b ON b.deployment_id=d.id AND b.function_id=f.id
+ AND b.project_id=f.project_id AND b.branch_id=f.branch_id
+ WHERE f.id=$1 AND d.id=$2 AND d.state='completed' AND f.state<>'deleted'`
+
+func (s *server) loadRetainedFunctionSource(ctx context.Context, functionID, source string) (functions.DeploymentSummary, functionEnvironmentReference, string, error) {
 	var summary functions.DeploymentSummary
 	var reference functionEnvironmentReference
 	var keyVersion string
-	err := s.db.QueryRow(ctx, functionPreviousSourceQuery, functionID).Scan(
+	query, args := functionPreviousSourceQuery, []any{functionID}
+	if source != "" {
+		query, args = functionSelectedSourceQuery, []any{functionID, source}
+	}
+	err := s.db.QueryRow(ctx, query, args...).Scan(
 		&summary.Runtime, &summary.BundleDigest, &summary.BundleBytes, &summary.Entry, &summary.EnvironmentNames,
 		&reference.Namespace, &reference.Name, &reference.UID, &reference.MAC, &keyVersion, &reference.DeploymentID,
 		&reference.ProjectID, &reference.BranchID)

@@ -34,6 +34,7 @@ type Deployment = {
   failure_code: string | null;
   created_at: string;
   finished_at: string | null;
+  source_deployment_id: string | null;
 };
 
 // Definition intent is metadata; an active definition is not an observed Node.
@@ -259,6 +260,16 @@ export function Functions({
           'If-Match': `"${current.version_token}"`,
         },
         body: '{}',
+      }),
+    );
+  }
+  async function rollback(deployment: Deployment) {
+    if (!current || current.state !== 'suspended' || deployment.state !== 'completed') return;
+    await mutate(() =>
+      api(`${path}/${current.slug}/rollback`, {
+        method: 'POST',
+        headers: { 'Idempotency-Key': newRequestKey(), 'If-Match': `"${current.version_token}"` },
+        body: JSON.stringify({ deployment_id: deployment.id }),
       }),
     );
   }
@@ -581,6 +592,7 @@ export function Functions({
                 <h3>部署历史</h3>
                 <p className="muted">
                   密钥只显示变量名称。历史按稳定部署 ID 分页；创建时间单独列出。
+                  恢复历史版本须先停止原实例；新实例使用所选版本的代码和环境配置，不回滚数据库数据。
                 </p>
                 {historyError && <p role="alert">{historyError}</p>}
                 <div className="function-deployments">
@@ -604,6 +616,21 @@ export function Functions({
                         <a href={route(projectId, 'operations')}>查看 Operation {d.operation_id}</a>
                       </p>
                       {d.failure_code && <p role="alert">错误码：{d.failure_code}</p>}
+                      {d.source_deployment_id && (
+                        <p>
+                          恢复来源：<code>{d.source_deployment_id}</code>
+                        </p>
+                      )}
+                      {driver && canEdit && d.state === 'completed' && (
+                        <button
+                          className="button"
+                          disabled={busy || current.state !== 'suspended'}
+                          aria-label={`恢复部署 ${d.id}`}
+                          onClick={() => void rollback(d)}
+                        >
+                          恢复此版本
+                        </button>
+                      )}
                     </article>
                   ))}
                 </div>

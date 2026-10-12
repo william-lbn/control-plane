@@ -39,5 +39,8 @@ Explain INSERT 后新连接确认没有写入；显式 Analyze INSERT 后确认�
 Chromium 下载并校验真实 CSV/JSON 文件；脚本截断下载保持 200 行和标记；最后正常缩零。
 保留写入和证据。失败后先核验原始 checkpoint，不能盲目重放 Analyze 写入。
 
-本版实际现场 UI 验收待精确版本回执。独立全链路 TLS、分布式准入、HA/DR、
+`7c0ac72` / Helm 0.1.24 已在首次真实 Linux UI 通过五组检查，实际 INSERT 计划/Analyze
+写入、Chromium 文件下载、截断和最终 Compute 零均有记录；见
+[精确版本回执](https://github.com/william-lbn/neon-helm/blob/v0.1.24/docs/ACCEPTANCE-2026-10-13-SQL-TOOLS.md)。
+独立全链路 TLS、分布式准入、HA/DR、
 原始全量导出、CSV 客户端的所有解释差异和官网全部 SQL Editor 功能未由此放行。

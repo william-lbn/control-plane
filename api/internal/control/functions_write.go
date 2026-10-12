@@ -152,17 +152,31 @@ func (s *server) functionCreate(w http.ResponseWriter, r *http.Request) {
 // exact actual env UID/MAC in the same commit as its queued Operation. Failed
 // admission retains orphan backing for reviewed GC; no request retries DELETE.
 func (s *server) functionDeploy(w http.ResponseWriter, r *http.Request) {
-	s.admitFunctionDeployment(w, r, false)
+	s.admitFunctionDeployment(w, r, functionDeployIntent)
 }
 
 // Explicit wake creates a new boot from the last successfully published source;
 // it never changes code/environment, resumes a customer POST, or replaces an
 // unretired guest. The existing deployment Worker owns all reconciliation.
 func (s *server) functionResume(w http.ResponseWriter, r *http.Request) {
-	s.admitFunctionDeployment(w, r, true)
+	s.admitFunctionDeployment(w, r, functionResumeIntent)
 }
 
-func (s *server) admitFunctionDeployment(w http.ResponseWriter, r *http.Request, resume bool) {
+func (s *server) functionRollback(w http.ResponseWriter, r *http.Request) {
+	s.admitFunctionDeployment(w, r, functionRollbackIntent)
+}
+
+type functionDeploymentIntent string
+
+const (
+	functionDeployIntent   functionDeploymentIntent = "deploy"
+	functionResumeIntent   functionDeploymentIntent = "resume"
+	functionRollbackIntent functionDeploymentIntent = "rollback"
+)
+
+func (s *server) admitFunctionDeployment(w http.ResponseWriter, r *http.Request, intent functionDeploymentIntent) {
+	resume, rollback := intent == functionResumeIntent, intent == functionRollbackIntent
+	retained := resume || rollback
 	if !s.functionsConfigured(w, r) {
 		return
 	}
@@ -176,7 +190,17 @@ func (s *server) admitFunctionDeployment(w http.ResponseWriter, r *http.Request,
 		return
 	}
 	var input functions.DeploymentInput
-	if resume {
+	var source string
+	if rollback {
+		var body struct {
+			DeploymentID string `json:"deployment_id"`
+		}
+		if readJSON(r, &body) != nil || !functionDeploymentID.MatchString(body.DeploymentID) {
+			fail(w, r, 422, "invalid_rollback", "An owned completed deployment_id is required; code and environment cannot be overridden")
+			return
+		}
+		source = body.DeploymentID
+	} else if resume {
 		var body map[string]json.RawMessage
 		if readJSON(r, &body) != nil || body == nil || len(body) != 0 {
 			fail(w, r, 422, "invalid_resume", "Empty JSON object required; wake preserves code and environment")
@@ -198,6 +222,9 @@ func (s *server) admitFunctionDeployment(w http.ResponseWriter, r *http.Request,
 	if resume {
 		// A wake key cannot replay or alias an unrelated deployment request.
 		fingerprint = "resume:" + fingerprint
+	}
+	if rollback {
+		fingerprint = "rollback:" + source + ":" + fingerprint
 	}
 	if s.replayFunctionOperation(w, r, key, fingerprint) {
 		return
@@ -225,8 +252,8 @@ func (s *server) admitFunctionDeployment(w http.ResponseWriter, r *http.Request,
 		fail(w, r, 409, "stop_before_redeploy", "Explicitly stop the original Function before replacing code or environment")
 		return
 	}
-	if resume && (state != "suspended" || !publishedBefore) {
-		fail(w, r, 409, "function_resume_unavailable", "Wake requires a fully retired suspended Function with a successful retained deployment")
+	if retained && (state != "suspended" || !publishedBefore) {
+		fail(w, r, 409, "function_"+string(intent)+"_unavailable", "A fully retired suspended Function with a successful retained deployment is required")
 		return
 	}
 	// Hydrate previous immutable source/env for config-only deployments. No
@@ -235,7 +262,7 @@ func (s *server) admitFunctionDeployment(w http.ResponseWriter, r *http.Request,
 	var summary functions.DeploymentSummary
 	var envRef functionEnvironmentReference
 	var priorKeyVersion string
-	summary, envRef, priorKeyVersion, err = s.loadPreviousFunctionSource(r.Context(), functionID)
+	summary, envRef, priorKeyVersion, err = s.loadRetainedFunctionSource(r.Context(), functionID, source)
 	if err == nil {
 		if envRef.ProjectID != r.PathValue("project") || envRef.BranchID != r.PathValue("branch") {
 			fail(w, r, 409, "function_scope_changed", "Original deployment scope rejected")
@@ -256,6 +283,9 @@ func (s *server) admitFunctionDeployment(w http.ResponseWriter, r *http.Request,
 			return
 		}
 		previous = &snapshot
+	} else if rollback && isNoRows(err) {
+		fail(w, r, 404, "function_source_not_found", "Owned completed deployment backing not found")
+		return
 	} else if !isNoRows(err) {
 		fail(w, r, 503, "metadata_unavailable", "Could not load deployment history")
 		return
@@ -296,11 +326,12 @@ func (s *server) admitFunctionDeployment(w http.ResponseWriter, r *http.Request,
 	err = tx.QueryRow(r.Context(), `SELECT f.version=$4 AND f.state NOT IN ('active','deleting','deleted') AND p.state='ready' AND p.source='managed'
 	AND NOT EXISTS(SELECT 1 FROM function_instances i WHERE i.function_id=f.id AND i.state<>'retired')
  AND (NOT $5 OR (f.state='suspended' AND EXISTS(SELECT 1 FROM function_deployments d WHERE d.id=f.active_deployment_id AND d.function_id=f.id AND d.project_id=f.project_id AND d.branch_id=f.branch_id AND d.state='completed')))
+ AND ($6='' OR EXISTS(SELECT 1 FROM function_deployments d WHERE d.id=$6 AND d.function_id=f.id AND d.project_id=f.project_id AND d.branch_id=f.branch_id AND d.state='completed'))
  AND p.deleted_at IS NULL AND b.state='ready' AND b.deleted_at IS NULL AND o.state='active'
  AND e.endpoint_type='read_write' AND e.state IN ('active','suspended') AND e.deleted_at IS NULL,f.generation
  FROM function_definitions f JOIN projects p ON p.id=f.project_id JOIN branches b ON b.id=f.branch_id
  JOIN organizations o ON o.id=f.org_id JOIN endpoints e ON e.id=f.endpoint_id
- WHERE f.id=$1 AND f.project_id=$2 AND f.branch_id=$3 FOR UPDATE OF p,b,e,f`, functionID, r.PathValue("project"), r.PathValue("branch"), version, resume).Scan(&eligible, &generation)
+ WHERE f.id=$1 AND f.project_id=$2 AND f.branch_id=$3 FOR UPDATE OF p,b,e,f`, functionID, r.PathValue("project"), r.PathValue("branch"), version, retained, source).Scan(&eligible, &generation)
 	if err != nil || !eligible {
 		fail(w, r, 412, "function_intent_changed", "Function or parents changed before admission")
 		return
@@ -317,8 +348,8 @@ func (s *server) admitFunctionDeployment(w http.ResponseWriter, r *http.Request,
 	_, err = tx.Exec(r.Context(), `INSERT INTO operations(id,project_id,resource_type,resource_id,action,state,actor_id,request_id,payload)
  VALUES($1,$2,'function',$3,'deploy_function','queued',$4,$5,$6)`, op, p.ProjectID, p.FunctionID, userFrom(r).ID, requestID(r), payload)
 	if err == nil {
-		_, err = tx.Exec(r.Context(), `INSERT INTO function_deployments(id,function_id,project_id,branch_id,runtime,bundle_digest,bundle_bytes,entry,artifact_key,environment_secret_ref,environment_names,actor_id,operation_id)
- VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`, deployment, functionID, p.ProjectID, p.BranchID, summary.Runtime, summary.BundleDigest, summary.BundleBytes, summary.Entry, artifact.Key, environment.Name, summary.EnvironmentNames, userFrom(r).ID, op)
+		_, err = tx.Exec(r.Context(), `INSERT INTO function_deployments(id,function_id,project_id,branch_id,runtime,bundle_digest,bundle_bytes,entry,artifact_key,environment_secret_ref,environment_names,actor_id,operation_id,source_deployment_id)
+ VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,NULLIF($14,''))`, deployment, functionID, p.ProjectID, p.BranchID, summary.Runtime, summary.BundleDigest, summary.BundleBytes, summary.Entry, artifact.Key, environment.Name, summary.EnvironmentNames, userFrom(r).ID, op, source)
 	}
 	if err == nil {
 		_, err = tx.Exec(r.Context(), `INSERT INTO function_deployment_backings(deployment_id,function_id,project_id,branch_id,environment_namespace,environment_secret_ref,environment_secret_uid,environment_mac,mac_key_version)
@@ -339,6 +370,9 @@ func (s *server) admitFunctionDeployment(w http.ResponseWriter, r *http.Request,
 		action := "deploy_function"
 		if resume {
 			action = "resume_function"
+		}
+		if rollback {
+			action = "rollback_function"
 		}
 		_, err = tx.Exec(r.Context(), `INSERT INTO audit_events(actor_id,action,resource_type,resource_id,request_id,outcome) VALUES($1,$2,'function',$3,$4,'accepted')`, userFrom(r).ID, action, functionID, requestID(r))
 	}
