@@ -17,7 +17,7 @@ test('Functions history restores actual original code and environment, preserves
     branch_id: string;
     writer_id: string;
     resume?: {
-      phase: 'original_active_no_write';
+      phase: 'original_unready_no_write';
       function_id: string;
       first_deployment_id: string;
       operations: string[];
@@ -120,7 +120,7 @@ test('Functions history restores actual original code and environment, preserves
     if (fixture.resume) {
       const original = fixture.resume;
       if (
-        original.phase !== 'original_active_no_write' ||
+        original.phase !== 'original_unready_no_write' ||
         !/^fnc_[a-f0-9]{16}$/.test(original.function_id) ||
         !/^fdp_[a-f0-9]{16}$/.test(original.first_deployment_id) ||
         original.operations.length !== 2 ||
@@ -146,6 +146,16 @@ test('Functions history restores actual original code and environment, preserves
       operations.push(...original.operations);
       await page.getByRole('button', { name: '查看函数 roll', exact: true }).click();
       await save('original_completed_definition_and_deployment_verified_before_continuation');
+      // Original pg idle-session error was classified from the retained guest
+      // log before this continuation. Retire that exact guest normally; update
+      // only the example bundle, preserving the definition, SQL identity/data.
+      await wait(await action('停止函数实例', '/suspend'));
+      await page.getByLabel('函数 ZIP', { exact: true }).setInputFiles(zip);
+      await page
+        .getByLabel('环境变量 JSON', { exact: true })
+        .fill('{"APP_MESSAGE":"rollback-original","APP_IDLE_SESSION_PROBE":"1s"}');
+      await wait(await action('部署函数版本', '/deployments'));
+      await save('original_unready_guest_normally_retired_and_corrected_sdk_deployed');
     } else {
       await page.getByLabel('函数名称', { exact: true }).fill('roll');
       await page.getByLabel('函数数据库', { exact: true }).fill('fn_native');
@@ -159,13 +169,13 @@ test('Functions history restores actual original code and environment, preserves
       await page.getByLabel('函数 ZIP', { exact: true }).setInputFiles(zip);
       await page
         .getByLabel('环境变量 JSON', { exact: true })
-        .fill('{"APP_MESSAGE":"rollback-original"}');
+        .fill('{"APP_MESSAGE":"rollback-original","APP_IDLE_SESSION_PROBE":"1s"}');
       await wait(await action('部署函数版本', '/deployments'));
     }
     await expect(page.getByRole('button', { name: '调用函数', exact: true })).toBeEnabled();
     const firstBoot = await observe();
     firstID = firstBoot.deployment_id;
-    if (fixture.resume) expect(firstID).toBe(fixture.resume.first_deployment_id);
+    if (fixture.resume) expect(firstID).not.toBe(fixture.resume.first_deployment_id);
     const before = await invoke();
     expect(before.message).toBe('rollback-original');
     expect(before.rows).toBe(1);
@@ -173,6 +183,15 @@ test('Functions history restores actual original code and environment, preserves
     expect(written.rows).toBe(2);
     expect(written.role).toBe(before.role);
     await save('original_ui_version_real_sql_write_and_authenticated_boot');
+    await page.waitForTimeout(15_000);
+    const afterIdle = await invoke();
+    expect(afterIdle.rows).toBe(2);
+    expect(afterIdle.role).toBe(before.role);
+    expect(afterIdle.idle_client_disconnects).toBeGreaterThan(0);
+    await observe();
+    await save(
+      'actual_idle_session_disconnect_survives_and_explicit_next_read_reconnects_without_write_replay',
+    );
     await wait(await action('停止函数实例', '/suspend'));
     await page.getByLabel('函数 ZIP', { exact: true }).setInputFiles(replacement);
     await page

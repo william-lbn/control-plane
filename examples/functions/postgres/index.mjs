@@ -7,9 +7,22 @@ const url = new URL(process.env.DATABASE_URL);
 const caFile = url.searchParams.get('sslrootcert');
 if (!caFile || url.searchParams.get('sslmode') !== 'verify-full') throw new Error('Verified SQL trust required');
 url.searchParams.delete('sslmode'); url.searchParams.delete('sslrootcert');
+// Optional live acceptance probe for this application session only. Never
+// change server/Endpoint timeouts or enable it in ordinary deployments.
+if (process.env.APP_IDLE_SESSION_PROBE === '1s') {
+  url.searchParams.set('options', `${url.searchParams.get('options') || ''} -c idle_session_timeout=1s`.trim());
+}
 const pool = new pg.Pool({ connectionString: url.toString(), max: 1,
   connectionTimeoutMillis: 20000, idleTimeoutMillis: 10000,
   ssl: { ca: readFileSync(caFile, 'utf8'), servername: url.hostname, rejectUnauthorized: true, minVersion: 'TLSv1.3' } });
+
+// PostgreSQL/Proxy can retire an idle session. pg-pool removes that client
+// before emitting error; handling it keeps the Function process alive and lets
+// a later explicit invocation open a new connection. Never log the error/client
+// object (it can contain credentials), retry SQL or suppress query failures.
+// A diagnostic count is not a trusted platform idle/billing measurement.
+let idleDisconnects = 0;
+pool.on('error', () => { idleDisconnects = Math.min(idleDisconnects + 1, 65535); });
 
 export default { async fetch(request) {
   const path = new URL(request.url).pathname;
@@ -25,5 +38,5 @@ export default { async fetch(request) {
     await pool.query('INSERT INTO app.function_probe(marker) VALUES($1)',[input.marker]);
   }
   const result=await pool.query('SELECT current_user AS role, current_database() AS database, count(*)::integer AS rows FROM app.function_probe');
-  return Response.json({...result.rows[0],message:process.env.APP_MESSAGE||'hello'});
+  return Response.json({...result.rows[0],message:process.env.APP_MESSAGE||'hello',idle_client_disconnects:idleDisconnects});
 }};
