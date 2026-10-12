@@ -152,6 +152,17 @@ func (s *server) functionCreate(w http.ResponseWriter, r *http.Request) {
 // exact actual env UID/MAC in the same commit as its queued Operation. Failed
 // admission retains orphan backing for reviewed GC; no request retries DELETE.
 func (s *server) functionDeploy(w http.ResponseWriter, r *http.Request) {
+	s.admitFunctionDeployment(w, r, false)
+}
+
+// Explicit wake creates a new boot from the last successfully published source;
+// it never changes code/environment, resumes a customer POST, or replaces an
+// unretired guest. The existing deployment Worker owns all reconciliation.
+func (s *server) functionResume(w http.ResponseWriter, r *http.Request) {
+	s.admitFunctionDeployment(w, r, true)
+}
+
+func (s *server) admitFunctionDeployment(w http.ResponseWriter, r *http.Request, resume bool) {
 	if !s.functionsConfigured(w, r) {
 		return
 	}
@@ -164,10 +175,19 @@ func (s *server) functionDeploy(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 428, "version_required", "Function numeric If-Match version required")
 		return
 	}
-	input, err := functions.ParseDeploymentRequest(r)
-	if err != nil {
-		fail(w, r, 422, "invalid_deployment", err.Error())
-		return
+	var input functions.DeploymentInput
+	if resume {
+		var body map[string]json.RawMessage
+		if readJSON(r, &body) != nil || body == nil || len(body) != 0 {
+			fail(w, r, 422, "invalid_resume", "Empty JSON object required; wake preserves code and environment")
+			return
+		}
+	} else {
+		input, err = functions.ParseDeploymentRequest(r)
+		if err != nil {
+			fail(w, r, 422, "invalid_deployment", err.Error())
+			return
+		}
 	}
 	fingerprint, err := input.RequestFingerprint(s.functions.key, functions.DeploymentRequestScope{ProjectID: r.PathValue("project"), BranchID: r.PathValue("branch"), Slug: r.PathValue("slug"), ExpectedVersion: version})
 	if err != nil {
@@ -175,15 +195,20 @@ func (s *server) functionDeploy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	fingerprint = "fn1:" + fingerprint
+	if resume {
+		// A wake key cannot replay or alias an unrelated deployment request.
+		fingerprint = "resume:" + fingerprint
+	}
 	if s.replayFunctionOperation(w, r, key, fingerprint) {
 		return
 	}
 	var functionID, state string
-	var unretired bool
+	var unretired, publishedBefore bool
 	var actualVersion, generation int64
 	err = s.db.QueryRow(r.Context(), `SELECT id,state,version,generation,
- EXISTS(SELECT 1 FROM function_instances i WHERE i.function_id=f.id AND i.state<>'retired')
- FROM function_definitions f WHERE project_id=$1 AND branch_id=$2 AND slug=$3 AND state<>'deleted'`, r.PathValue("project"), r.PathValue("branch"), r.PathValue("slug")).Scan(&functionID, &state, &actualVersion, &generation, &unretired)
+ EXISTS(SELECT 1 FROM function_instances i WHERE i.function_id=f.id AND i.state<>'retired'),
+ EXISTS(SELECT 1 FROM function_deployments d WHERE d.id=f.active_deployment_id AND d.function_id=f.id AND d.project_id=f.project_id AND d.branch_id=f.branch_id AND d.state='completed')
+ FROM function_definitions f WHERE project_id=$1 AND branch_id=$2 AND slug=$3 AND state<>'deleted'`, r.PathValue("project"), r.PathValue("branch"), r.PathValue("slug")).Scan(&functionID, &state, &actualVersion, &generation, &unretired, &publishedBefore)
 	if err != nil {
 		fail(w, r, 404, "not_found", "Function not found")
 		return
@@ -198,6 +223,10 @@ func (s *server) functionDeploy(w http.ResponseWriter, r *http.Request) {
 	}
 	if state == "active" || unretired {
 		fail(w, r, 409, "stop_before_redeploy", "Explicitly stop the original Function before replacing code or environment")
+		return
+	}
+	if resume && (state != "suspended" || !publishedBefore) {
+		fail(w, r, 409, "function_resume_unavailable", "Wake requires a fully retired suspended Function with a successful retained deployment")
 		return
 	}
 	// Hydrate previous immutable source/env for config-only deployments. No
@@ -266,11 +295,12 @@ func (s *server) functionDeploy(w http.ResponseWriter, r *http.Request) {
 	var eligible bool
 	err = tx.QueryRow(r.Context(), `SELECT f.version=$4 AND f.state NOT IN ('active','deleting','deleted') AND p.state='ready' AND p.source='managed'
 	AND NOT EXISTS(SELECT 1 FROM function_instances i WHERE i.function_id=f.id AND i.state<>'retired')
+ AND (NOT $5 OR (f.state='suspended' AND EXISTS(SELECT 1 FROM function_deployments d WHERE d.id=f.active_deployment_id AND d.function_id=f.id AND d.project_id=f.project_id AND d.branch_id=f.branch_id AND d.state='completed')))
  AND p.deleted_at IS NULL AND b.state='ready' AND b.deleted_at IS NULL AND o.state='active'
  AND e.endpoint_type='read_write' AND e.state IN ('active','suspended') AND e.deleted_at IS NULL,f.generation
  FROM function_definitions f JOIN projects p ON p.id=f.project_id JOIN branches b ON b.id=f.branch_id
  JOIN organizations o ON o.id=f.org_id JOIN endpoints e ON e.id=f.endpoint_id
- WHERE f.id=$1 AND f.project_id=$2 AND f.branch_id=$3 FOR UPDATE OF p,b,e,f`, functionID, r.PathValue("project"), r.PathValue("branch"), version).Scan(&eligible, &generation)
+ WHERE f.id=$1 AND f.project_id=$2 AND f.branch_id=$3 FOR UPDATE OF p,b,e,f`, functionID, r.PathValue("project"), r.PathValue("branch"), version, resume).Scan(&eligible, &generation)
 	if err != nil || !eligible {
 		fail(w, r, 412, "function_intent_changed", "Function or parents changed before admission")
 		return
@@ -306,7 +336,11 @@ func (s *server) functionDeploy(w http.ResponseWriter, r *http.Request) {
 		_, err = tx.Exec(r.Context(), `INSERT INTO idempotency_keys(actor_id,key_hash,request_hash,operation_id) VALUES($1,$2,$3,$4)`, userFrom(r).ID, keyHash(key), fingerprint, op)
 	}
 	if err == nil {
-		_, err = tx.Exec(r.Context(), `INSERT INTO audit_events(actor_id,action,resource_type,resource_id,request_id,outcome) VALUES($1,'deploy_function','function',$2,$3,'accepted')`, userFrom(r).ID, functionID, requestID(r))
+		action := "deploy_function"
+		if resume {
+			action = "resume_function"
+		}
+		_, err = tx.Exec(r.Context(), `INSERT INTO audit_events(actor_id,action,resource_type,resource_id,request_id,outcome) VALUES($1,$2,'function',$3,$4,'accepted')`, userFrom(r).ID, action, functionID, requestID(r))
 	}
 	if err == nil {
 		err = tx.Commit(r.Context())

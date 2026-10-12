@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.13.0",
+    "version": "0.14.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -12189,6 +12189,108 @@
             "$ref": "#/components/responses/Error"
           },
           "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/functions/{slug}/resume": {
+      "post": {
+        "operationId": "resumeFunction",
+        "tags": [
+          "Functions"
+        ],
+        "summary": "Wake a retained suspended Function",
+        "description": "Explicit asynchronous new boot from the last successfully published immutable source and environment. Requires Editor/Admin, CSRF, Idempotency-Key and numeric If-Match. Only a suspended definition with all original instances retired and a completed retained deployment is eligible. Verifies original env UID/MAC and bundle digest before committing a new deployment/generation, then rechecks parents, version, instance retirement and branch pending Operations in one metadata transaction. Uses the existing deploy_function Worker Operation; audit action is resume_function. Replaying the same key/body/version returns the original Operation even after completion; deployment requests have a separate fingerprint domain. Does not invoke or replay customer code, restore process RAM, change code/environment or perform automatic idle/wake. Secrets never appear in response or Operation payload.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          },
+          {
+            "$ref": "#/components/parameters/resourceVersion"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "maxProperties": 0,
+                "description": "Exactly an empty JSON object. Null, code, environment and other fields are rejected."
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Queued; follow Location header until succeeded",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
             "$ref": "#/components/responses/Error"
           }
         }

@@ -36,7 +36,7 @@
 Functions 已开始实际 Go/Node 基础层实现，合同和内部接口见
 [FUNCTIONS-IMPLEMENTATION](FUNCTIONS-IMPLEMENTATION.md)。默认 guest 已有独立真实 VM
 验收；代码包/环境存储和持久身份回执见 [FUNCTIONS-BACKING](FUNCTIONS-BACKING.md)。
-新增原生 Driver/UI 已接入，实际执行验收、分支与零/唤醒仍须独立交付；基础检查不放行 Functions 产品能力。
+原生 Driver/UI 已在 `bf0dd9e` / Helm 0.1.19 通过实际 Linux UI→microVM→Proxy→SQL 与手动停止/重部署/删除，运行监控在 `be557e0` / Helm 0.1.20 通过独立实际 UI；它们不放行分支复制、自动零/唤醒和全部 Functions 产品能力。新增显式唤醒合同见 [FUNCTIONS-WAKE](FUNCTIONS-WAKE.md)，须取得自己的现场回执。
 
 Managed Auth 已有 Go Driver、Better Auth 1.7.7 运行时、React UI、注册/会话/JWT/分支隔离与 PostgreSQL CI，详细见 [Auth 合同](MANAGED-AUTH.md)。真实 Neon UI 结果按版本交付报告记录；SMTP/OAuth/MFA、完整恢复/删除一致性、生产隔离与 HA 仍须独立实现/验收。
 

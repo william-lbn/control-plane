@@ -83,3 +83,15 @@ the protected runner's `NEON_E2E_FUNCTIONS_MONITOR_FIXTURE` variable as a Linux
 file path; never put its password in a workflow input or public Git. The example
 is packaged outside the checkout with pinned dependencies and npm scripts
 disabled. Private Windows SSH transport is not part of the product repository.
+
+## 4. Actual receipt
+
+Runtime `be557e0742ca8d2fb9030aa5f17a6f9936811acb` / unified Helm 0.1.20 passed
+the focused Linux UI slice. The first Job `publication-ui-20261012075619` reached
+the stopped checkpoint; its endpoint assertion mistook desired `state` for
+`observed_state`. Original suspend Operations had succeeded and no VM remained.
+Test-only descendant `488a477654021fc6e4da35bed522c12a5b8ade86` corrected that
+assertion and added explicit checkpoint continuation. Job
+`publication-ui-20261012080929` then completed the remaining UI checks with the
+same stopped Function, without replaying its invocation, grants or write.
+See the [immutable full acceptance and limits](https://github.com/william-lbn/neon-helm/blob/v0.1.20/docs/ACCEPTANCE-2026-10-12-FUNCTIONS-MONITORING.md).

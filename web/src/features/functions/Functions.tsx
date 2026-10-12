@@ -249,6 +249,19 @@ export function Functions({
       }),
     );
   }
+  async function resume() {
+    if (!current || current.state !== 'suspended') return;
+    await mutate(() =>
+      api(`${path}/${current.slug}/resume`, {
+        method: 'POST',
+        headers: {
+          'Idempotency-Key': newRequestKey(),
+          'If-Match': `"${current.version_token}"`,
+        },
+        body: '{}',
+      }),
+    );
+  }
   async function invoke() {
     if (!current) return;
     const epoch = actionEpoch.current;
@@ -444,8 +457,8 @@ export function Functions({
                     <dd>{current.generation}</dd>
                   </div>
                   <div>
-                    <dt>运行状态</dt>
-                    <dd>{current.runtime_observed ? '已有观测' : '尚未观测'}</dd>
+                    <dt>运行监控</dt>
+                    <dd>见下方原实例观测</dd>
                   </div>
                   <div>
                     <dt>公开地址</dt>
@@ -465,7 +478,8 @@ export function Functions({
                       ZIP 须包含 index.mjs 或 index.js。停止原实例后可更新部署；不选 ZIP
                       时复用已完成版本；首次部署失败须先停止并回收原实例，再复用保留代码恢复。
                       环境变量留空或 {} 保留上次版本；将某个变量设为 ""
-                      可删除该变量。已保存密钥不回显。
+                      可删除该变量。已保存密钥不回显。 唤醒保留版本会启动新的实例，保留代码、环境和
+                      SQL 身份；不会恢复原进程的内存或重放调用。
                     </p>
                     <label>
                       函数 ZIP
@@ -486,6 +500,15 @@ export function Functions({
                       />
                     </label>
                     <div className="function-actions">
+                      <button
+                        className="button primary"
+                        disabled={
+                          busy || current.state !== 'suspended' || !current.active_deployment_id
+                        }
+                        onClick={() => void resume()}
+                      >
+                        唤醒保留版本
+                      </button>
                       <button
                         className="button primary"
                         disabled={
