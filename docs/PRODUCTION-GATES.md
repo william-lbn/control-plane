@@ -1,6 +1,6 @@
 # 生产门槛与官网对齐
 
-状态截至 2026-10-12；实际运行基线 `0198f7c` / 统一 Helm 0.1.21。原生 Functions 的实际 SQL/生命周期见 [0.1.19](https://github.com/william-lbn/neon-helm/blob/v0.1.19/docs/ACCEPTANCE-2026-10-12-FUNCTIONS.md)；[运行监控](FUNCTIONS-RUNTIME-OBSERVATION.md)在 0.1.20 通过；[显式保留版本唤醒](FUNCTIONS-WAKE.md)在 0.1.21 通过实际 UI、新 boot、保留代码/环境/SQL 身份与幂等检查。执行仍默认禁用，实验部署由不可变 operator 配置明确启用。新增 [数据库 Owner 变更](DATABASE-OWNER.md)待本版独立现场验收；公开 HTTP/SSE/WS、自动 Functions 休眠/冷醒、Backend 分支复制等仍未放行。历史版本和失败文件保留，Ready Pod 或 CI build 不能替代未完成的验收。
+状态截至 2026-10-13；实际运行基线 `3b0eb7c` / 统一 Helm 0.1.23，新增 SQL 脚本已通过首次实际 UI 六组检查。原生 Functions 的实际 SQL/生命周期见 [0.1.19](https://github.com/william-lbn/neon-helm/blob/v0.1.19/docs/ACCEPTANCE-2026-10-12-FUNCTIONS.md)；[运行监控](FUNCTIONS-RUNTIME-OBSERVATION.md)在 0.1.20 通过；[显式保留版本唤醒](FUNCTIONS-WAKE.md)在 0.1.21 通过实际 UI、新 boot、保留代码/环境/SQL 身份与幂等检查。执行仍默认禁用，实验部署由不可变 operator 配置明确启用。[数据库 Owner 变更](DATABASE-OWNER.md)在 0.1.22 通过原 fixture 的 UI/SQL、Writer/Reader 冷醒、幂等和正常回收验收；公开 HTTP/SSE/WS、自动 Functions 休眠/冷醒、Backend 分支复制等仍未放行。历史版本和失败文件保留，Ready Pod 或 CI build 不能替代未完成的验收。需人工提供的输入统一见 [OPERATOR-INPUTS.md](OPERATOR-INPUTS.md)，不阻止其他工程任务。
 
 ## 1. 已实现路径
 
@@ -36,7 +36,7 @@
 Functions 已开始实际 Go/Node 基础层实现，合同和内部接口见
 [FUNCTIONS-IMPLEMENTATION](FUNCTIONS-IMPLEMENTATION.md)。默认 guest 已有独立真实 VM
 验收；代码包/环境存储和持久身份回执见 [FUNCTIONS-BACKING](FUNCTIONS-BACKING.md)。
-原生 Driver/UI 已在 `bf0dd9e` / Helm 0.1.19 通过实际 Linux UI→microVM→Proxy→SQL 与手动停止/重部署/删除，运行监控在 `be557e0` / Helm 0.1.20 通过独立实际 UI；它们不放行分支复制、自动零/唤醒和全部 Functions 产品能力。新增显式唤醒合同见 [FUNCTIONS-WAKE](FUNCTIONS-WAKE.md)，须取得自己的现场回执。
+原生 Driver/UI 已在 `bf0dd9e` / Helm 0.1.19 通过实际 Linux UI→microVM→Proxy→SQL 与手动停止/重部署/删除，运行监控在 `be557e0` / Helm 0.1.20 通过独立实际 UI；显式保留版本唤醒在 `0198f7c` / Helm 0.1.21 通过自己的现场回执，合同见 [FUNCTIONS-WAKE](FUNCTIONS-WAKE.md)。这些切片不放行分支复制、自动零/唤醒和全部 Functions 产品能力。
 
 Managed Auth 已有 Go Driver、Better Auth 1.7.7 运行时、React UI、注册/会话/JWT/分支隔离与 PostgreSQL CI，详细见 [Auth 合同](MANAGED-AUTH.md)。真实 Neon UI 结果按版本交付报告记录；SMTP/OAuth/MFA、完整恢复/删除一致性、生产隔离与 HA 仍须独立实现/验收。
 

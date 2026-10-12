@@ -303,8 +303,9 @@ identity verification and a leased metadata commit. It uses normal UID/RV deleti
 then verifies original VM and Runner absence before releasing capacity. No force
 deletion or backing/data GC is performed. Repeated failed proof remains failed.
 
-Next ordered slices: isolated public Functions ingress and SDK; guarded explicit
-wake and idle semantics; function/log/invocation metrics; immutable deployment
+Explicit retained wake has its own accepted 0.1.21 contract in
+[FUNCTIONS-WAKE.md](FUNCTIONS-WAKE.md). Next ordered slices: isolated public
+Functions ingress and SDK; automatic wake and idle semantics; function/log/invocation metrics; immutable deployment
 clone/PITR coordination; triggers; provider-backed AI integration after credentials;
 external fencing and HA/DR; issuer rotation and fully trusted end-to-end transport.
 Each needs independent implementation and focused actual acceptance before its

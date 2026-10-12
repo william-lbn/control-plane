@@ -4,6 +4,7 @@ import type { Endpoint, QueryResult } from '../../api';
 import { PageHeading } from '../../shared/ui';
 import { useEndpointSelection } from '../../shared/useEndpointSelection';
 import { ScriptResults, type ScriptResult } from './ScriptResults';
+import { ResultExports } from './ResultExports';
 
 export function Workbench({
   projectId,
@@ -24,6 +25,7 @@ export function Workbench({
   const [result, setResult] = useState<QueryResult | null>(null);
   const [scriptResult, setScriptResult] = useState<ScriptResult | null>(null);
   const [mode, setMode] = useState<'single' | 'script'>('single');
+  const [queryAction, setQueryAction] = useState<'query' | 'explain' | 'analyze'>('query');
   const scopeEpoch = useRef(0);
   const [busy, setBusy] = useState(false);
   const endpoint = endpoints.find((e) => e.id === selected) || endpoints[0];
@@ -32,6 +34,7 @@ export function Workbench({
     setResult(null);
     setScriptResult(null);
     setPassword('');
+    setQueryAction('query');
     setRole(endpoint?.role_name || '');
     setDatabase(endpoint?.database_name || '');
     setBusy(false);
@@ -51,7 +54,15 @@ export function Workbench({
         endpointPath(projectId, endpoint.id) + (mode === 'script' ? '/query-script' : '/query'),
         {
           method: 'POST',
-          body: JSON.stringify({ password, sql, role, database }),
+          body: JSON.stringify({
+            password,
+            sql:
+              mode === 'single' && queryAction !== 'query'
+                ? `EXPLAIN (${queryAction === 'analyze' ? 'ANALYZE, BUFFERS, ' : ''}FORMAT JSON) ${sql}`
+                : sql,
+            role,
+            database,
+          }),
         },
       );
       if (epoch !== scopeEpoch.current) return;
@@ -131,6 +142,7 @@ export function Workbench({
             disabled={busy}
             onChange={(e) => {
               setMode(e.target.value as 'single' | 'script');
+              setQueryAction('query');
               setResult(null);
               setScriptResult(null);
             }}
@@ -139,6 +151,29 @@ export function Workbench({
             <option value="script">SQL 脚本 · 逐条结果</option>
           </select>
         </label>
+        {mode === 'single' && (
+          <label>
+            查询操作
+            <select
+              aria-label="查询操作"
+              value={queryAction}
+              disabled={busy}
+              onChange={(e) => {
+                setQueryAction(e.target.value as 'query' | 'explain' | 'analyze');
+                setResult(null);
+              }}
+            >
+              <option value="query">执行 SQL</option>
+              <option value="explain">Explain · 估算计划</option>
+              <option value="analyze">Analyze · 实际执行并分析</option>
+            </select>
+          </label>
+        )}
+        {mode === 'single' && queryAction === 'analyze' && (
+          <p role="alert">
+            Analyze 会实际执行当前语句，包括 INSERT / UPDATE / DELETE 的写入。提交后不会自动重试。
+          </p>
+        )}
         <div className="query-toolbar">
           <span>SQL QUERY</span>
           <span>最多返回 200 行</span>
@@ -165,7 +200,15 @@ export function Workbench({
             disabled={busy || !password || !sql.trim()}
             onClick={execute}
           >
-            {busy ? '执行中…' : mode === 'script' ? '▶ 执行脚本' : '▶ 执行 SQL'}
+            {busy
+              ? '执行中…'
+              : mode === 'script'
+                ? '▶ 执行脚本'
+                : queryAction === 'explain'
+                  ? '▶ Explain'
+                  : queryAction === 'analyze'
+                    ? '▶ Analyze'
+                    : '▶ 执行 SQL'}
           </button>
         </div>
       </div>
@@ -190,13 +233,22 @@ export function Workbench({
                 {result.rows.map((row, index) => (
                   <tr key={index}>
                     {row.map((value, col) => (
-                      <td key={col}>{value === null ? <em>NULL</em> : String(value)}</td>
+                      <td key={col}>
+                        {value === null ? (
+                          <em>NULL</em>
+                        ) : typeof value === 'object' ? (
+                          <pre>{JSON.stringify(value, null, 2)}</pre>
+                        ) : (
+                          String(value)
+                        )}
+                      </td>
                     ))}
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+          <ResultExports result={result} />
         </div>
       )}
       {scriptResult && <ScriptResults result={scriptResult} />}

@@ -10,6 +10,10 @@
 实施合同由 FULL-PRODUCT-IMPLEMENTATION.md 和实际 OpenAPI 共同约束。
 下面是顺序及退出条件，不代表所有项目已经实现。
 
+2026-10-13 执行补充：优先现有环境可以完成的新功能闭环，不反复全量验证历史套件。
+确需运营方输入的依赖统一见 [OPERATOR-INPUTS.md](OPERATOR-INPUTS.md)，后续集中处理，
+不要求逐项选择，不阻塞不依赖这些输入的实现/部署/验收。
+
 历史 0.1.4 基线的运行语言收敛与保留生命周期已完成其版本闭环：原生 Go Proxy/Storage adapter、统一 Helm 0.1.4
 已部署，327 Go 测试和六套真实 Linux UI（83 检查）通过；现场没有运行中的 Python
 Pod。私有 Python 测试工具不是产品后端。源码/镜像锁和失败修复记录见

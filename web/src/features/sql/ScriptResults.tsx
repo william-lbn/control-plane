@@ -1,4 +1,5 @@
 import type { QueryResult } from '../../api';
+import { ResultExports } from './ResultExports';
 
 export type ScriptResult = {
   outcome: 'completed' | 'failed';
@@ -65,6 +66,7 @@ export function ScriptResults({ result }: { result: ScriptResult }) {
               </tbody>
             </table>
           </div>
+          <ResultExports result={statement} />
         </div>
       ))}
     </section>

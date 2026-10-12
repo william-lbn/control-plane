@@ -6,14 +6,14 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 **发行状态：预览版本。已经验证的实验环境功能不等于生产认证，也不等于 Neon 官网全部 Backend 服务。**
 [当前实际验收基线](https://github.com/william-lbn/neon-helm/blob/v0.1.19/docs/ACCEPTANCE-2026-10-12-FUNCTIONS.md)：`bf0dd9e` / 统一 Helm 0.1.19 的原生 Functions 已通过真实 Linux UI→microVM→Proxy→Neon SQL、停止/重部署和 NOLOGIN/保留数据验收；公开 Linux CI 722 项 Go/PostgreSQL、七镜像匿名核验和三节点串行部署通过。原失败与续测均独立保留。旧 UI 回执和当前这一切片不能冒充全部官网功能回归。
 
-[Functions 原生执行](docs/FUNCTIONS-NATIVE-PREVIEW.md)默认禁用，实验部署由不可变 operator 配置明确启用；其实际验收范围见上述报告。[运行监控](docs/FUNCTIONS-RUNTIME-OBSERVATION.md)已在 `be557e0` / Helm 0.1.20 通过真实 Linux UI，含原停止检查点续测、管理读取不算调用活动、不唤醒 SQL 和最终 Compute 零；[验收报告](https://github.com/william-lbn/neon-helm/blob/v0.1.20/docs/ACCEPTANCE-2026-10-12-FUNCTIONS-MONITORING.md)。[显式唤醒保留版本](docs/FUNCTIONS-WAKE.md)已在 `0198f7c` / Helm 0.1.21 通过实际 UI、保留代码/环境/SQL 身份、幂等重放与正常回收；[精确报告](https://github.com/william-lbn/neon-helm/blob/v0.1.21/docs/ACCEPTANCE-2026-10-12-FUNCTIONS-WAKE.md)。新增 [数据库 Owner 变更](docs/DATABASE-OWNER.md)为下一独立验收；不能沿用先前通过结果。
+[Functions 原生执行](docs/FUNCTIONS-NATIVE-PREVIEW.md)默认禁用，实验部署由不可变 operator 配置明确启用；其实际验收范围见上述报告。[运行监控](docs/FUNCTIONS-RUNTIME-OBSERVATION.md)已在 `be557e0` / Helm 0.1.20 通过真实 Linux UI；[精确报告](https://github.com/william-lbn/neon-helm/blob/v0.1.20/docs/ACCEPTANCE-2026-10-12-FUNCTIONS-MONITORING.md)。[显式唤醒保留版本](docs/FUNCTIONS-WAKE.md)已在 `0198f7c` / Helm 0.1.21 通过实际 UI、保留身份、幂等与正常回收；[精确报告](https://github.com/william-lbn/neon-helm/blob/v0.1.21/docs/ACCEPTANCE-2026-10-12-FUNCTIONS-WAKE.md)。[数据库 Owner 变更](docs/DATABASE-OWNER.md)已在 `e2dc587` / Helm 0.1.22 通过原 fixture 的实际 UI/SQL、Writer/Reader 冷醒和正常回收；[精确报告](https://github.com/william-lbn/neon-helm/blob/v0.1.22/docs/ACCEPTANCE-2026-10-12-DATABASE-OWNER.md)。后续版本不能沿用旧版本通过结果。
 [历史 Compute 生命周期交付](docs/DELIVERY-2026-10-10-COMPUTE-LIFECYCLE.md)记录先前七镜像、统一 Helm 0.1.7、九套真实 Linux UI 共 146 项与 23 项原失败恢复检查；[先前 Object Storage](docs/DELIVERY-2026-10-09-OBJECT-STORAGE.md)、[Managed Auth](docs/DELIVERY-2026-10-08-MANAGED-AUTH.md)及历史报告保留各版本证据。
 独立 Chart 提供 API、Worker、Web 进程及可选 Data API、应用凭据、Console 邀请注册、历史分支恢复、保留删除与独立 Compute 退休；Functions 包括元数据/历史、不可变存储、原生执行 Driver 和条件式 Worker Service 回收权限。Worker 使用 PostgreSQL 领导租约和只读 Runner observer。
 当前只允许一个 API 和一个 Worker，跨实例外部 fencing 与 HA 仍须独立验收。
 旧合并版本升级前必须执行 [停止/排空流程](docs/WORKER-SPLIT.md)。
 运行代码与实际合同见 [OpenAPI](contracts/openapi-v1.json)；本项目使用 `/api/v1`，未声称兼容托管 Neon `/api/v2`。
 
-[Object Storage REST v1](docs/OBJECT-STORAGE.md) 已增加真实分支文件服务；当前合同为 OpenAPI 0.16。现场验收按版本记录，仍未开放完整外部 S3 协议兼容。[SQL 脚本](docs/SQL-SCRIPTS.md)新增原生解析、逐条结果、事务结果和输出预算，是下一独立实际 UI 验收；原单条请求保持兼容。
+[Object Storage REST v1](docs/OBJECT-STORAGE.md) 已增加真实分支文件服务；当前合同为 OpenAPI 0.16。现场验收按版本记录，仍未开放完整外部 S3 协议兼容。[SQL 脚本](docs/SQL-SCRIPTS.md)新增原生解析、逐条结果、事务结果和输出预算，已在 0.1.23 通过首次实际 UI 六组检查；原单条请求保持兼容。新增 [Explain/Analyze 与 CSV/JSON 导出](docs/SQL-TOOLS.md)待独立现场验收。需人工提供的外部依赖统一见 [人工输入清单](docs/OPERATOR-INPUTS.md)，其余工程任务继续推进。
 
 ## 1. 功能范围
 
@@ -134,4 +134,4 @@ Postgres 下包含一个 Writer、多个 Readers、数据库、角色和 Data AP
 
 ## 2026-10-09 Object Storage increment
 
-[Branch Object Storage REST v1](docs/OBJECT-STORAGE.md) adds Go manifest/immutable-blob access and React bucket/file management while preserving native timeline inheritance and branch isolation. The 2026-10-09 seven-image deployment and 19 real Linux UI checks are recorded in its [versioned delivery](docs/DELIVERY-2026-10-09-OBJECT-STORAGE.md). Public S3 compatibility, multipart and physical GC remain future work. Native Functions deployment/invocation and manual lifecycle passed the exact 0.1.19 UI slice above; runtime monitoring has its own next gate. AI inference, HA/DR, external cross-instance fencing and whole-chain TLS remain unqualified. Historical receipts cannot replace the explicit active runtime image lock.
+[Branch Object Storage REST v1](docs/OBJECT-STORAGE.md) adds Go manifest/immutable-blob access and React bucket/file management while preserving native timeline inheritance and branch isolation. The 2026-10-09 seven-image deployment and 19 real Linux UI checks are recorded in its [versioned delivery](docs/DELIVERY-2026-10-09-OBJECT-STORAGE.md). Public S3 compatibility, multipart and physical GC remain future work. Native Functions deployment/invocation and manual lifecycle passed the exact 0.1.19 UI slice above; runtime monitoring and explicit retained wake have their own accepted version receipts. AI inference, HA/DR, external cross-instance fencing and whole-chain TLS remain unqualified. Historical receipts cannot replace the explicit active runtime image lock.

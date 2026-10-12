@@ -77,7 +77,9 @@ records; do not blindly rerun CREATE or DML after an unknown outcome.
 Protected fixture: `project_id`, `branch_id`, `writer_id`, `database`, `role` and
 `password_file`, all outside Git. Use the trusted Linux workflow and protected
 Console credentials. Product code is Go/TypeScript; private Python transport is
-not shipped. **New script live acceptance is pending until its exact receipt.**
+not shipped. **Actual Linux UI acceptance passed on its first run** at source
+`3b0eb7c` / Helm 0.1.23: six checkpoint groups, normal Compute zero and retained
+data. See the [exact version-specific receipt](https://github.com/william-lbn/neon-helm/blob/v0.1.23/docs/ACCEPTANCE-2026-10-13-SQL-SCRIPTS.md).
 
 ## 4. Independent production gates
 
