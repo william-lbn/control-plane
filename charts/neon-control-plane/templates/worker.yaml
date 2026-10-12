@@ -79,13 +79,21 @@ spec:
           imagePullPolicy: {{ .Values.api.image.pullPolicy }}
           command: [/opt/neon-control/control-worker]
           securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
-          ports: [{name: health, containerPort: 8789}]
+          ports:
+            - {name: health, containerPort: 8789}
+            {{- if .Values.functions.enabled }}
+            - {name: artifact-tls, containerPort: 8790}
+            {{- end }}
           resources: {{ toYaml .Values.worker.resources | nindent 12 }}
           env:
             - {name: NEON_CONTROL_PROCESS_ROLE, value: worker}
             - {name: NEON_WORKER_BIND, value: ':8789'}
             {{- include "neonControl.runtimeEnv" . | nindent 12 }}
           volumeMounts:
+            {{- include "neonControl.functionsMounts" . | nindent 12 }}
+            {{- if .Values.functions.enabled }}
+            - {name: functions-issuer, mountPath: /run/functions-issuer, readOnly: true}
+            {{- end }}
             {{- if .Values.objectStorage.enabled }}
             - {name: product-storage, mountPath: /run/product-storage, readOnly: true}
             {{- end }}
@@ -97,6 +105,17 @@ spec:
           readinessProbe: {httpGet: {path: /readyz, port: health}, periodSeconds: 5, timeoutSeconds: 4, failureThreshold: 3}
           livenessProbe: {httpGet: {path: /healthz, port: health}, periodSeconds: 15, timeoutSeconds: 3, failureThreshold: 3}
       volumes:
+        {{- include "neonControl.functionsVolumes" . | nindent 8 }}
+        {{- if .Values.functions.enabled }}
+        - name: functions-issuer
+          secret:
+            secretName: {{ required "functions.existingIssuerSecret is required" .Values.functions.existingIssuerSecret }}
+            defaultMode: 0440
+            items:
+              - {key: guest-ca.key, path: guest-ca.key}
+              - {key: artifact-tls.crt, path: artifact-tls.crt}
+              - {key: artifact-tls.key, path: artifact-tls.key}
+        {{- end }}
         {{- if .Values.objectStorage.enabled }}
         - name: product-storage
           secret:

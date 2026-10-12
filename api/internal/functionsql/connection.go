@@ -227,3 +227,35 @@ func ConnectRuntime(ctx context.Context, p ConnectionPolicy, password string) (*
 	}
 	return conn, nil
 }
+
+// ConnectProvisioner uses the same explicit TLS/address/authentication policy,
+// but only the persisted trusted creator can authenticate. It does not SET
+// ROLE, override createrole_self_grant or grant any SQL privilege. The leased
+// Driver owns the returned connection and its explicit ProvisionTx transaction.
+func ConnectProvisioner(ctx context.Context, p ConnectionPolicy, password string) (*pgx.Conn, error) {
+	if p.Scope.ProvisioningRole == "" {
+		return nil, errRuntimeConnection
+	}
+	cfg, err := runtimeConnectionConfig(p, password)
+	if err != nil {
+		return nil, errRuntimeConnection
+	}
+	cfg.User = p.Scope.ProvisioningRole
+	ctx, cancel := context.WithTimeout(ctx, p.Timeout)
+	defer cancel()
+	conn, err := pgx.ConnectConfig(ctx, cfg)
+	if err != nil {
+		return nil, errRuntimeConnection
+	}
+	var trusted bool
+	err = conn.QueryRow(ctx, `SELECT current_database()=$1 AND session_user::text=$2 AND current_user::text=$2
+ AND current_setting('createrole_self_grant')=''
+ AND EXISTS(SELECT 1 FROM pg_roles WHERE rolname=$2 AND NOT rolsuper AND rolcreaterole)`, p.Scope.Database, p.Scope.ProvisioningRole).Scan(&trusted)
+	if err != nil || !trusted {
+		closeCtx, cancelClose := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancelClose()
+		_ = conn.Close(closeCtx)
+		return nil, errRuntimeConnection
+	}
+	return conn, nil
+}

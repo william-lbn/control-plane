@@ -107,6 +107,20 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 			if stepErr == nil {
 				stepErr = s.reconcileEndpointDeletion(runCtx, id, workerID, p)
 			}
+		case "deploy_function":
+			var p functionInstanceTarget
+			if json.Unmarshal(payload, &p) != nil || p.ProjectID != projectID || p.FunctionID != resourceID || !p.valid() {
+				stepErr = errors.New("Function operation scope rejected")
+			} else {
+				stepErr = s.reconcileFunctionDeployment(runCtx, id, workerID, p)
+			}
+		case "suspend_function", "delete_function":
+			var p functionStopTarget
+			if json.Unmarshal(payload, &p) != nil || p.ProjectID != projectID || p.FunctionID != resourceID || !functionDefinitionID.MatchString(p.FunctionID) || p.Generation < 1 || p.Delete != (action == "delete_function") {
+				stepErr = errors.New("Function stop operation scope rejected")
+			} else {
+				stepErr = s.reconcileFunctionStop(runCtx, id, workerID, p)
+			}
 		case "enable_object_storage", "disable_object_storage":
 			var p objectStoragePayload
 			stepErr = json.Unmarshal(payload, &p)
@@ -276,6 +290,14 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 		return err
 	}
 	if state == "failed" {
+		if action == "deploy_function" {
+			if _, err = finishTx.Exec(ctx, `UPDATE function_definitions SET state='degraded',updated_at=now()
+ WHERE id=$1 AND project_id=$2 AND generation=(SELECT (payload->>'generation')::bigint FROM operations WHERE id=$3)
+ AND target_deployment_id=(SELECT payload->>'deployment_id' FROM operations WHERE id=$3)
+ AND state NOT IN ('deleting','deleted')`, resourceID, projectID, id); err != nil {
+				return err
+			}
+		}
 		if action == "enable_object_storage" || action == "disable_object_storage" {
 			if _, err = finishTx.Exec(ctx, `UPDATE object_storage_instances SET state='degraded',updated_at=now() WHERE branch_id=$1 AND project_id=$2 AND generation=(SELECT (payload->>'generation')::bigint FROM operations WHERE id=$3)`, resourceID, projectID, id); err != nil {
 				return err

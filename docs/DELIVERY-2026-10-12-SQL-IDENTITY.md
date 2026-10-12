@@ -2,7 +2,7 @@
 
 ## 1. 运行版本和结论
 
-当前 Linux 运行控制源码为 `f0b63f5eed0fc412960b8b7dc7e8cda34abf916f`，
+本历史 UI 验收的 Linux 控制源码为 `f0b63f5eed0fc412960b8b7dc7e8cda34abf916f`，
 统一 Helm 0.1.12 为 `57a08dd62e6db9649605acb9364821d373e9466f`，不可变标签
 `v0.1.12`。API/Worker 分开部署，metadata 21/21。Neon、autoscaling、PG16
 自己的 fork 版本未修改。Functions 执行仍禁用；这不是生产准入或官网功能全部完成。

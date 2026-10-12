@@ -112,6 +112,11 @@ func (s *server) routes() *http.ServeMux {
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/data-api", s.auth(http.HandlerFunc(s.dataAPIRead), false))
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/auth", s.auth(http.HandlerFunc(s.managedAuthRead), false))
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/functions", s.auth(http.HandlerFunc(s.functionsList), false))
+	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/functions", s.auth(http.HandlerFunc(s.functionCreate), true))
+	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/functions/{slug}/deployments", s.auth(http.HandlerFunc(s.functionDeploy), true))
+	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/functions/{slug}/console-invoke", s.auth(http.HandlerFunc(s.functionConsoleInvoke), true))
+	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/functions/{slug}/suspend", s.auth(http.HandlerFunc(s.functionStop), true))
+	mux.Handle("DELETE /api/v1/projects/{project}/branches/{branch}/functions/{slug}", s.auth(http.HandlerFunc(s.functionStop), true))
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/functions/{slug}", s.auth(http.HandlerFunc(s.functionRead), false))
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/functions/{slug}/deployments", s.auth(http.HandlerFunc(s.functionDeployments), false))
 	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/auth", s.auth(http.HandlerFunc(s.managedAuthMutate), true))
@@ -185,7 +190,7 @@ func (s *server) capabilities(w http.ResponseWriter, r *http.Request) {
 			"pitr_new_branch":    map[string]any{"enabled": pitrEnabled(), "reason": "retained_timestamp_or_lsn_new_branch"},
 		},
 		"services": map[string]any{"postgres": map[string]any{"enabled": true, "reason": "read_and_query_validated"},
-			"auth": map[string]any{"enabled": managedAuthEnabled(), "reason": "better_auth_branch_identity_lab_transport"}, "object_storage": map[string]any{"enabled": s.storage != nil, "reason": "branch_object_rest_v1_s3_gate_pending"}, "functions": disabled, "ai_gateway": disabled,
+			"auth": map[string]any{"enabled": managedAuthEnabled(), "reason": "better_auth_branch_identity_lab_transport"}, "object_storage": map[string]any{"enabled": s.storage != nil, "reason": "branch_object_rest_v1_s3_gate_pending"}, "functions": map[string]any{"enabled": s.functions != nil, "reason": "native_microvm_console_envelope_preview", "public_http_enabled": false, "automatic_zero_enabled": false}, "ai_gateway": disabled,
 			"data_api": map[string]any{"enabled": dataAPIEnabled(), "reason": "native_driver_lab_transport_gate"}},
 		"limits": map[string]any{"min_cpu_milli": 1000, "max_cpu_milli": 2000, "min_memory_mib": 1024, "max_memory_mib": 3072, "supported_memory_slot_mib": []int{1024}},
 	})

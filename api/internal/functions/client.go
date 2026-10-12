@@ -65,6 +65,13 @@ func NewInstanceClient(scope Scope, target netip.AddrPort, key []byte, caPEM str
 // retain its context until the stream completes; no automatic POST retry occurs.
 func (c *InstanceClient) Close() { c.transport.CloseIdleConnections() }
 
+// ValidateInvocation lets admission reject malformed input before any signed
+// manager request is dispatched. It shares the exact guest-manager validator.
+func ValidateInvocation(scope Scope, invocation Invocation) bool {
+	validator := &Manager{scope: scope, bootID: invocation.BootID}
+	return bootPattern.MatchString(invocation.BootID) && validator.validInvocation(invocation)
+}
+
 func (c *InstanceClient) request(ctx context.Context, method, path string, body []byte) (*http.Response, error) {
 	request, err := http.NewRequestWithContext(ctx, method, c.origin+path, bytes.NewReader(body))
 	if err != nil || SignManagerRequest(request, body, c.key, time.Now()) != nil {

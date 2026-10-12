@@ -55,6 +55,7 @@ spec:
             {{- end }}
             {{- include "neonControl.runtimeEnv" . | nindent 12 }}
           volumeMounts:
+            {{- include "neonControl.functionsMounts" . | nindent 12 }}
             {{- if .Values.objectStorage.enabled }}
             - {name: product-storage, mountPath: /run/product-storage, readOnly: true}
             {{- end }}
@@ -69,6 +70,7 @@ spec:
           readinessProbe: {httpGet: {path: /readyz, port: http}, periodSeconds: 10, timeoutSeconds: 4, failureThreshold: 3}
           livenessProbe: {httpGet: {path: /healthz, port: http}, periodSeconds: 15, timeoutSeconds: 3, failureThreshold: 3}
       volumes:
+        {{- include "neonControl.functionsVolumes" . | nindent 8 }}
         {{- if .Values.objectStorage.enabled }}
         - name: product-storage
           secret:

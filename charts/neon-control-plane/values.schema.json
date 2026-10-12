@@ -379,6 +379,65 @@
           }
         }
       ]
+    },
+    "functions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "existingConfigSecret",
+        "existingIssuerSecret",
+        "proxyCASecret",
+        "proxyCAKey"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "existingConfigSecret": {
+          "type": "string",
+          "maxLength": 253
+        },
+        "existingIssuerSecret": {
+          "type": "string",
+          "maxLength": 253
+        },
+        "proxyCASecret": {
+          "type": "string",
+          "maxLength": 253
+        },
+        "proxyCAKey": {
+          "type": "string",
+          "maxLength": 253
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "existingConfigSecret": {
+                "minLength": 1
+              },
+              "existingIssuerSecret": {
+                "minLength": 1
+              },
+              "proxyCASecret": {
+                "minLength": 1
+              },
+              "proxyCAKey": {
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
     }
   },
   "definitions": {

@@ -39,7 +39,7 @@ func validPGIdentifier(name string) bool {
 }
 func protectedPGRole(name string) bool {
 	n := strings.ToLower(name)
-	return n == "cloud_admin" || n == "postgres" || strings.HasPrefix(n, "pg_") || strings.HasPrefix(n, "neon_") || strings.HasPrefix(n, "control_") || strings.HasPrefix(n, "app_da_")
+	return n == "cloud_admin" || n == "postgres" || strings.HasPrefix(n, "pg_") || strings.HasPrefix(n, "neon_") || strings.HasPrefix(n, "control_") || strings.HasPrefix(n, "app_da_") || strings.HasPrefix(n, "fn_")
 }
 func protectedPGDatabase(name string) bool {
 	n := strings.ToLower(name)
@@ -293,6 +293,16 @@ func (s *server) catalogMutation(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if !isRole && r.Method == http.MethodDelete {
+		var functionsHeld bool
+		if err = tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM function_definitions f WHERE f.project_id=$1 AND f.branch_id=$2 AND f.database_name=$3
+ AND (f.state<>'deleted' OR EXISTS(SELECT 1 FROM function_instances i WHERE i.function_id=f.id AND i.state<>'retired')))`, project, branch, name).Scan(&functionsHeld); err != nil {
+			fail(w, r, 503, "metadata_unavailable", "Could not check Function database dependencies")
+			return
+		}
+		if functionsHeld {
+			fail(w, r, 409, "functions_retirement_required", "Delete dependent Functions and retire their original instances before deleting this database")
+			return
+		}
 		var retainedStorage bool
 		if err = tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM object_storage_instances WHERE branch_id=$1 AND spec->>'database'=$2)`, branch, name).Scan(&retainedStorage); err != nil {
 			fail(w, r, 503, "metadata_unavailable", "Could not check retained storage directory")

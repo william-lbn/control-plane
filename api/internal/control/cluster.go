@@ -13,6 +13,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/william-lbn/control-plane/api/internal/functionsql"
 )
 
 // The public compute specification is copied from the pinned laboratory Helm
@@ -593,12 +595,17 @@ func (k *kubeClient) publishRoute(ctx context.Context, p createPayload, vm map[s
 		}
 		// Service identities are SQL-created NOSUPERUSER/NOBYPASSRLS roles,
 		// deliberately absent from Compute's privileged ordinary role spec.
-		// Preserve only this branch's reserved identity when republishing a
-		// cold-start template; every other role still follows the catalog spec.
+		// Preserve this branch's reserved service identities on cold republish.
+		// They remain absent from Compute's ordinary privileged role spec.
 		if previous, ok := routes[key].(map[string]any); ok {
 			if previousRoles, ok := previous["roles"].(map[string]any); ok {
 				if verifier := stringVal(previousRoles[dataAPILogin(p.BranchID)]); verifier != "" {
 					roles[dataAPILogin(p.BranchID)] = verifier
+				}
+				for name, value := range previousRoles {
+					if reservedFunctionRole(name) && functionsql.ValidVerifier(stringVal(value)) {
+						roles[name] = stringVal(value)
+					}
 				}
 			}
 		}

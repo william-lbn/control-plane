@@ -54,11 +54,11 @@ func lockFunctionPublicationLease(ctx context.Context, tx pgx.Tx, operation, wor
  AND d.operation_id=$7 AND ((f.target_deployment_id=$4 AND d.state IN ('pending','building')) OR
   (f.active_deployment_id=$4 AND f.target_deployment_id IS NULL AND f.state='active' AND d.state='completed'))
  AND p.state='ready' AND p.source='managed' AND p.deleted_at IS NULL
- AND b.state='ready' AND b.deleted_at IS NULL
+ AND b.state='ready' AND b.deleted_at IS NULL AND org.state='active'
  AND e.endpoint_type='read_write' AND e.workload_kind='neonvm'
  AND e.state IN ('active','suspended') AND e.deleted_at IS NULL
  FROM function_definitions f JOIN function_deployments d ON d.id=$4 AND d.function_id=f.id
- JOIN projects p ON p.id=f.project_id JOIN branches b ON b.id=f.branch_id AND b.project_id=f.project_id
+ JOIN projects p ON p.id=f.project_id JOIN organizations org ON org.id=p.org_id JOIN branches b ON b.id=f.branch_id AND b.project_id=f.project_id
  JOIN endpoints e ON e.id=f.endpoint_id AND e.branch_id=f.branch_id AND e.project_id=f.project_id
  WHERE f.id=$1 AND f.project_id=$2 AND f.branch_id=$3 FOR UPDATE OF f,d,p,b,e`,
 		p.FunctionID, p.ProjectID, p.BranchID, p.DeploymentID, p.Generation, p.Slug, operation).Scan(&valid)

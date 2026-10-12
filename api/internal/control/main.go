@@ -37,6 +37,7 @@ type server struct {
 	backendKeys    *backendKeyring
 	processRole    processRole
 	storage        *storageBlobs
+	functions      *functionsPlatform
 }
 
 func env(name, fallback string) string {
@@ -156,6 +157,13 @@ func runProcess(ctx context.Context, role processRole) error {
 	if err != nil {
 		return err
 	}
+	s.functions, err = loadFunctionsPlatform(role)
+	if err != nil {
+		return err
+	}
+	if s.functions != nil && s.storage == nil {
+		return errFunctionsPlatform
+	}
 	if creationEnabled() || s.backendKeys != nil {
 		path := os.Getenv("NEON_V2_IDEMPOTENCY_KEY_FILE")
 		if path == "" {
@@ -195,7 +203,10 @@ func runProcess(ctx context.Context, role processRole) error {
 	}
 	httpServer := &http.Server{Addr: addr, Handler: handler, ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout: 30 * time.Second, WriteTimeout: 195 * time.Second, IdleTimeout: 60 * time.Second}
-	errCh := make(chan error, 1)
+	errCh := make(chan error, 2)
+	if role == roleWorker && s.functions != nil {
+		go func() { errCh <- s.serveFunctionArtifacts(processCtx, leadership) }()
+	}
 	go func() {
 		logger.Info("control process listening", "address", addr, "role", role)
 		errCh <- httpServer.ListenAndServe()

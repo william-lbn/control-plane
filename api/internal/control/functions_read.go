@@ -68,16 +68,17 @@ func (s *server) functionsList(w http.ResponseWriter, r *http.Request) {
 		next = items[len(items)-1]["slug"]
 	}
 	for _, item := range items {
-		functionReadSummary(item)
+		s.functionReadSummary(item)
 	}
-	jsonResponse(w, 200, record{"items": items, "next_cursor": next, "driver_enabled": false})
+	jsonResponse(w, 200, record{"items": items, "next_cursor": next, "driver_enabled": s.functions != nil, "execution_mode": "console_envelope_preview"})
 }
-func functionReadSummary(item record) {
+func (s *server) functionReadSummary(item record) {
 	// A deployment can be retained or have failed since the last VM observation.
 	// Never invent a public invocation URL or infer Node readiness from state.
 	item["invocation_url"] = nil
 	item["runtime_observed"] = false
-	item["driver_enabled"] = false
+	item["driver_enabled"] = s.functions != nil
+	item["version_token"] = fmt.Sprint(item["version"])
 }
 func (s *server) functionRead(w http.ResponseWriter, r *http.Request) {
 	if !s.functionReadBranch(w, r) {
@@ -96,7 +97,7 @@ func (s *server) functionRead(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	functionReadSummary(item)
+	s.functionReadSummary(item)
 	w.Header().Set("ETag", fmt.Sprintf(`"%d"`, item["version"].(int64)))
 	jsonResponse(w, 200, item)
 }

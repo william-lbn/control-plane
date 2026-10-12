@@ -1,4 +1,8 @@
 {{- define "neonControl.runtimeEnv" -}}
+{{- if .Values.functions.enabled }}
+- {name: NEON_FUNCTIONS_PREVIEW_ENABLED, value: 'true'}
+- {name: NEON_FUNCTIONS_CONFIG_FILE, value: /run/functions-common/config.json}
+{{- end }}
 {{- if .Values.objectStorage.enabled }}
 - {name: NEON_OBJECT_STORAGE_CONFIG_FILE, value: /run/product-storage/config.json}
 {{- end }}

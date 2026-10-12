@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.11.0",
+    "version": "0.12.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -2636,6 +2636,11 @@
           },
           "driver_enabled": {
             "const": false
+          },
+          "version_token": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$",
+            "description": "Exact bigint version; send quoted in If-Match rather than rounding through JavaScript number."
           }
         }
       },
@@ -2773,6 +2778,151 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "CreateFunction": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "slug",
+          "database_name",
+          "sql_schema"
+        ],
+        "properties": {
+          "slug": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,19}$"
+          },
+          "database_name": {
+            "type": "string",
+            "maxLength": 63
+          },
+          "sql_schema": {
+            "type": "string",
+            "maxLength": 63
+          }
+        }
+      },
+      "FunctionStop": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "acknowledge_background_work_stop"
+        ],
+        "properties": {
+          "acknowledge_background_work_stop": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        }
+      },
+      "FunctionConsoleInvocation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "method",
+          "path"
+        ],
+        "properties": {
+          "method": {
+            "type": "string",
+            "enum": [
+              "GET",
+              "HEAD",
+              "POST",
+              "PUT",
+              "PATCH",
+              "DELETE",
+              "OPTIONS"
+            ]
+          },
+          "path": {
+            "type": "string",
+            "description": "Application-relative path, starting with /. No dot segments or backslashes."
+          },
+          "headers": {
+            "type": "object",
+            "maxProperties": 64,
+            "additionalProperties": {
+              "type": "array",
+              "maxItems": 16,
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 1048576
+          }
+        }
+      },
+      "FunctionInvocationResult": {
+        "type": "object",
+        "required": [
+          "function_id",
+          "deployment_id",
+          "status_code",
+          "headers",
+          "body",
+          "body_encoding",
+          "request_id"
+        ],
+        "properties": {
+          "function_id": {
+            "type": "string"
+          },
+          "deployment_id": {
+            "type": "string"
+          },
+          "status_code": {
+            "type": "integer"
+          },
+          "headers": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "body": {
+            "type": "string",
+            "format": "byte"
+          },
+          "body_encoding": {
+            "type": "string",
+            "enum": [
+              "base64"
+            ]
+          },
+          "request_id": {
+            "type": "string"
+          }
+        }
+      },
+      "FunctionDeploymentUpload": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "zip": {
+            "type": "string",
+            "format": "binary",
+            "description": "Validated ZIP containing index.mjs, at most 8 MiB. Required for first deployment; omit to reuse exact previous completed source."
+          },
+          "runtime": {
+            "type": "string",
+            "enum": [
+              "nodejs24"
+            ]
+          },
+          "environment": {
+            "type": "string",
+            "description": "JSON string dictionary patch; at most 32 names. Omit or {} retains original completed environment. Nonempty value sets the name; empty value removes that name. Values never read back."
           }
         }
       }
@@ -11106,6 +11256,92 @@
             }
           }
         }
+      },
+      "post": {
+        "operationId": "createFunction",
+        "tags": [
+          "Functions"
+        ],
+        "summary": "Create branch-local Function definition without executing customer code",
+        "description": "Operator-configured native microVM preview. Disabled by default. Console JSON envelope only; public raw HTTP/SSE/WebSockets, idle autoscaling and external execution fencing are separate gates. Mutations never automatically replay unknown external outcomes.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateFunction"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Queued; follow Location header until succeeded",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
       }
     },
     "/api/v1/projects/{project}/branches/{branch}/functions/{slug}": {
@@ -11218,6 +11454,103 @@
                 }
               }
             }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteFunction",
+        "tags": [
+          "Functions"
+        ],
+        "summary": "Stop original instances and disable owned SQL login; retain data and backing evidence",
+        "description": "Operator-configured native microVM preview. Disabled by default. Console JSON envelope only; public raw HTTP/SSE/WebSockets, idle autoscaling and external execution fencing are separate gates. Mutations never automatically replay unknown external outcomes.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          },
+          {
+            "$ref": "#/components/parameters/resourceVersion"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FunctionStop"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Queued; follow Location header until succeeded",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
         }
       }
@@ -11342,6 +11675,291 @@
                 }
               }
             }
+          }
+        }
+      },
+      "post": {
+        "operationId": "deployFunction",
+        "tags": [
+          "Functions"
+        ],
+        "summary": "Upload immutable ZIP/environment and queue native deployment",
+        "description": "Operator-configured native microVM preview. Disabled by default. Console JSON envelope only; public raw HTTP/SSE/WebSockets, idle autoscaling and external execution fencing are separate gates. Mutations never automatically replay unknown external outcomes.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          },
+          {
+            "$ref": "#/components/parameters/resourceVersion"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/FunctionDeploymentUpload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Queued; follow Location header until succeeded",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/functions/{slug}/suspend": {
+      "post": {
+        "operationId": "suspendFunction",
+        "tags": [
+          "Functions"
+        ],
+        "summary": "Explicitly stop current/background work and retire original instances",
+        "description": "Operator-configured native microVM preview. Disabled by default. Console JSON envelope only; public raw HTTP/SSE/WebSockets, idle autoscaling and external execution fencing are separate gates. Mutations never automatically replay unknown external outcomes.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          },
+          {
+            "$ref": "#/components/parameters/resourceVersion"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FunctionStop"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Queued; follow Location header until succeeded",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/functions/{slug}/console-invoke": {
+      "post": {
+        "operationId": "invokeFunctionConsole",
+        "tags": [
+          "Functions"
+        ],
+        "summary": "Invoke one original ready boot; return non-executable JSON response",
+        "description": "Operator-configured native microVM preview. Disabled by default. Console JSON envelope only; public raw HTTP/SSE/WebSockets, idle autoscaling and external execution fencing are separate gates. Mutations never automatically replay unknown external outcomes. Maximum 45 seconds and 1 MiB response. 502 means outcome may be unknown; do not replay automatically. An application error is returned inside status_code, not as a control-plane error.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FunctionConsoleInvocation"
+              }
+            }
+          }
+        },
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          },
+          "200": {
+            "description": "Original application result, including application errors and redirects. Body is base64 and never rendered as Console HTML.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FunctionInvocationResult"
+                }
+              }
+            }
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
           }
         }
       }

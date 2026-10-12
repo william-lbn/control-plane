@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, projectPath } from '../../api';
-import type { Branch, Page } from '../../api';
+import type { Branch, Page, Operation } from '../../api';
 import { PageHeading, status } from '../../shared/ui';
 import { route } from '../../api';
 import './functions.css';
+import './authoring.css';
 
 type FunctionDefinition = {
   id: string;
@@ -13,6 +14,7 @@ type FunctionDefinition = {
   sql_schema: string;
   state: string;
   version: number;
+  version_token: string;
   generation: number;
   active_deployment_id: string | null;
   target_deployment_id: string | null;
@@ -65,8 +67,28 @@ export function Functions({ projectId, branches }: { projectId: string; branches
   const [historyError, setHistoryError] = useState('');
   const [refresh, setRefresh] = useState(0);
   const [observedAt, setObservedAt] = useState('');
+  const [driver, setDriver] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState('');
+  const [operation, setOperation] = useState<Operation | null>(null);
+  const [slug, setSlug] = useState('');
+  const [database, setDatabase] = useState('neondb');
+  const [schema, setSchema] = useState('app');
+  const [zip, setZip] = useState<File | null>(null);
+  const [environment, setEnvironment] = useState('');
+  const [invokePath, setInvokePath] = useState('/');
+  const [invokeMethod, setInvokeMethod] = useState('GET');
+  const [invokeBody, setInvokeBody] = useState('');
+  const [invokeResult, setInvokeResult] = useState('');
+  const actionEpoch = useRef(0);
   const historyEpoch = useRef(0);
   const path = `${projectPath(projectId)}/branches/${encodeURIComponent(branch)}/functions`;
+  useEffect(() => {
+    setEnvironment('');
+    setZip(null);
+    setInvokeBody('');
+    setOperation(null);
+  }, [projectId, branch]);
   useEffect(() => {
     const controller = new AbortController();
     let disposed = false;
@@ -78,14 +100,22 @@ export function Functions({ projectId, branches }: { projectId: string; branches
     setHistoryError('');
     setLoading(true);
     setObservedAt('');
+    setDriver(false);
+    setBusy(false);
+    setActionError('');
+    setInvokeResult('');
+    actionEpoch.current++;
     if (!branch) {
       setLoading(false);
       return () => controller.abort();
     }
-    api<Page<FunctionDefinition>>(path + '?limit=100', { signal: controller.signal })
+    api<Page<FunctionDefinition> & { driver_enabled: boolean }>(path + '?limit=100', {
+      signal: controller.signal,
+    })
       .then((data) => {
         if (disposed) return;
         setItems(data.items);
+        setDriver(data.driver_enabled);
         setObservedAt(new Date().toLocaleTimeString());
         setSelected(data.items[0]?.slug || '');
       })
@@ -130,6 +160,114 @@ export function Functions({ projectId, branches }: { projectId: string; branches
       historyEpoch.current++;
     };
   }, [path, selected]);
+  async function waitOperation(op: Operation, epoch: number) {
+    setOperation(op);
+    for (let attempt = 0; attempt < 240 && actionEpoch.current === epoch; attempt++) {
+      if (op.state === 'succeeded') return;
+      if (op.state === 'failed' || op.state === 'cancelled')
+        throw new Error(op.error_message || '操作失败，请查看原 Operation');
+      await new Promise((resolve) => setTimeout(resolve, 2500));
+      op = await api<Operation>(`${projectPath(projectId)}/operations/${op.id}`);
+      if (actionEpoch.current === epoch) setOperation(op);
+    }
+    throw new Error('已受理，请在 Operations 查看原任务；不要重复提交');
+  }
+  async function mutate(action: () => Promise<{ operation: Operation }>) {
+    const epoch = actionEpoch.current;
+    setBusy(true);
+    setActionError('');
+    try {
+      const accepted = await action();
+      if (actionEpoch.current !== epoch) return;
+      await waitOperation(accepted.operation, epoch);
+      if (actionEpoch.current === epoch) setRefresh((v) => v + 1);
+    } catch (e) {
+      if (actionEpoch.current === epoch) setActionError(e instanceof Error ? e.message : String(e));
+    } finally {
+      if (actionEpoch.current === epoch) setBusy(false);
+    }
+  }
+  async function create() {
+    await mutate(() =>
+      api(path, {
+        method: 'POST',
+        headers: { 'Idempotency-Key': crypto.randomUUID() },
+        body: JSON.stringify({ slug, database_name: database, sql_schema: schema }),
+      }),
+    );
+  }
+  async function deploy() {
+    if (!current) return;
+    let values: unknown;
+    try {
+      if (environment.trim()) values = JSON.parse(environment);
+    } catch {
+      setActionError('环境变量须为 JSON 字符串字典');
+      return;
+    }
+    const form = new FormData();
+    form.set('runtime', 'nodejs24');
+    if (values !== undefined) form.set('environment', JSON.stringify(values));
+    if (zip) form.set('zip', zip);
+    await mutate(() =>
+      api(`${path}/${current.slug}/deployments`, {
+        method: 'POST',
+        headers: {
+          'Idempotency-Key': crypto.randomUUID(),
+          'If-Match': `"${current.version_token}"`,
+        },
+        body: form,
+      }),
+    );
+  }
+  async function stop(deleting: boolean) {
+    if (
+      !current ||
+      !window.confirm(
+        `${deleting ? '删除' : '停止'} ${current.slug}？当前进程及后台任务将结束；数据与历史保留。`,
+      )
+    )
+      return;
+    await mutate(() =>
+      api(`${path}/${current.slug}${deleting ? '' : '/suspend'}`, {
+        method: deleting ? 'DELETE' : 'POST',
+        headers: {
+          'Idempotency-Key': crypto.randomUUID(),
+          'If-Match': `"${current.version_token}"`,
+        },
+        body: JSON.stringify({ acknowledge_background_work_stop: true }),
+      }),
+    );
+  }
+  async function invoke() {
+    if (!current) return;
+    const epoch = actionEpoch.current;
+    setBusy(true);
+    setActionError('');
+    setInvokeResult('');
+    try {
+      const result = await api<{
+        status_code: number;
+        body: string;
+        headers: Record<string, string[]>;
+      }>(`${path}/${current.slug}/console-invoke`, {
+        method: 'POST',
+        body: JSON.stringify({
+          method: invokeMethod,
+          path: invokePath,
+          headers: {},
+          body: invokeBody,
+        }),
+      });
+      const bytes = Uint8Array.from(atob(result.body), (c) => c.charCodeAt(0));
+      if (epoch === actionEpoch.current)
+        setInvokeResult(`HTTP ${result.status_code}\n${new TextDecoder().decode(bytes)}`);
+    } catch (e) {
+      if (epoch === actionEpoch.current) setActionError(e instanceof Error ? e.message : String(e));
+    } finally {
+      if (epoch === actionEpoch.current) setBusy(false);
+    }
+  }
   async function more() {
     if (!cursor || historyLoading) return;
     const epoch = historyEpoch.current;
@@ -183,11 +321,64 @@ export function Functions({ projectId, branches }: { projectId: string; branches
         {observedAt && <span className="muted">元数据读取于 {observedAt}</span>}
       </section>
       <section className="function-admission" role="status">
-        <strong>此集群尚未启用函数部署与调用</strong>
+        <strong>{driver ? '原生 microVM 函数执行预览' : '此集群尚未启用函数部署与调用'}</strong>
         <p>
-          当前可查看已保存的定义和历史。部署、公开访问、数据库授权及休眠唤醒需通过独立验收后开放。
+          {driver
+            ? '支持不可变 ZIP、环境版本、受控调用和手动停止。公开 HTTP/SSE/WS、自动休眠与生产准入仍需独立验收。数据库 owner 须明确授权；此页面不代替授权修改共享 PUBLIC 权限。'
+            : '当前可查看已保存的定义和历史。部署、公开访问、数据库授权及休眠唤醒需通过独立验收后开放。'}
         </p>
       </section>
+      {driver && (
+        <section className="panel function-authoring">
+          <h2>创建函数</h2>
+          <div className="function-form-grid">
+            <label>
+              函数名称
+              <input
+                aria-label="函数名称"
+                value={slug}
+                onChange={(e) => setSlug(e.target.value)}
+                maxLength={20}
+                placeholder="hello"
+              />
+            </label>
+            <label>
+              函数数据库
+              <input
+                aria-label="函数数据库"
+                value={database}
+                onChange={(e) => setDatabase(e.target.value)}
+              />
+            </label>
+            <label>
+              授权 Schema
+              <input
+                aria-label="授权 Schema"
+                value={schema}
+                onChange={(e) => setSchema(e.target.value)}
+              />
+            </label>
+          </div>
+          <button
+            className="button primary"
+            disabled={busy || !slug || !branch}
+            onClick={() => void create()}
+          >
+            创建函数定义
+          </button>
+        </section>
+      )}
+      {actionError && (
+        <div className="error-box" role="alert">
+          {actionError}
+        </div>
+      )}
+      {operation && (
+        <p role="status">
+          Operation {operation.id} · {operation.state}{' '}
+          <a href={route(projectId, 'operations')}>查看操作记录</a>
+        </p>
+      )}
       {error && (
         <div role="alert" className="error-box">
           {error} · 请刷新后重试
@@ -251,6 +442,102 @@ export function Functions({ projectId, branches }: { projectId: string; branches
                     <dd>{current.invocation_url || '尚未开放'}</dd>
                   </div>
                 </dl>
+                {driver && (
+                  <section className="function-authoring">
+                    <h3>代码与环境版本</h3>
+                    <p className="muted">
+                      ZIP 须包含 index.mjs 或 index.js。停止原实例后可更新部署；不选 ZIP
+                      时复用已完成版本。环境变量留空或 {} 保留上次版本；将某个变量设为 ""
+                      可删除该变量。已保存密钥不回显。
+                    </p>
+                    <label>
+                      函数 ZIP
+                      <input
+                        aria-label="函数 ZIP"
+                        type="file"
+                        accept=".zip"
+                        onChange={(e) => setZip(e.target.files?.[0] || null)}
+                      />
+                    </label>
+                    <label>
+                      环境变量 JSON
+                      <textarea
+                        aria-label="环境变量 JSON"
+                        value={environment}
+                        onChange={(e) => setEnvironment(e.target.value)}
+                        spellCheck={false}
+                      />
+                    </label>
+                    <div className="function-actions">
+                      <button
+                        className="button primary"
+                        disabled={
+                          busy || current.state === 'active' || current.state === 'deleting'
+                        }
+                        onClick={() => void deploy()}
+                      >
+                        部署函数版本
+                      </button>
+                      <button
+                        className="button"
+                        disabled={busy || current.state === 'deleting'}
+                        onClick={() => void stop(false)}
+                      >
+                        停止函数实例
+                      </button>
+                      <button
+                        className="button danger"
+                        disabled={busy || current.state === 'deleting'}
+                        onClick={() => void stop(true)}
+                      >
+                        删除函数
+                      </button>
+                    </div>
+                    <h3>受控调用</h3>
+                    <div className="function-form-grid">
+                      <label>
+                        调用方法
+                        <select
+                          aria-label="调用方法"
+                          value={invokeMethod}
+                          onChange={(e) => setInvokeMethod(e.target.value)}
+                        >
+                          {['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'].map(
+                            (method) => (
+                              <option key={method}>{method}</option>
+                            ),
+                          )}
+                        </select>
+                      </label>
+                      <label>
+                        调用路径
+                        <input
+                          aria-label="调用路径"
+                          value={invokePath}
+                          onChange={(e) => setInvokePath(e.target.value)}
+                        />
+                      </label>
+                    </div>
+                    <label>
+                      调用请求体
+                      <textarea
+                        aria-label="调用请求体"
+                        value={invokeBody}
+                        onChange={(e) => setInvokeBody(e.target.value)}
+                      />
+                    </label>
+                    <button
+                      className="button primary"
+                      disabled={busy || current.state !== 'active'}
+                      onClick={() => void invoke()}
+                    >
+                      调用函数
+                    </button>
+                    {invokeResult && (
+                      <pre data-testid="function-invocation-result">{invokeResult}</pre>
+                    )}
+                  </section>
+                )}
                 <h3>部署历史</h3>
                 <p className="muted">
                   密钥只显示变量名称。历史按稳定部署 ID 分页；创建时间单独列出。

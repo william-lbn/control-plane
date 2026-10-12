@@ -84,6 +84,35 @@ func (s Scope) marker() string {
 func quote(value string) string   { return pgx.Identifier{value}.Sanitize() }
 func literal(value string) string { return "'" + strings.ReplaceAll(value, "'", "''") + "'" }
 
+// DisableLoginTx changes only the original scoped, non-elevated service role's
+// LOGIN admission. It never drops ownership/data, adopts a foreign marker or
+// repairs unexpected elevation. Replays keep NOLOGIN; absence is terminal.
+func DisableLoginTx(ctx context.Context, tx pgx.Tx, s Scope) error {
+	if s.Validate() != nil || s.ProvisioningRole == "" {
+		return errors.New("Functions SQL disable scope rejected")
+	}
+	var trusted bool
+	if tx.QueryRow(ctx, `SELECT current_database()=$1 AND session_user::text=$2 AND current_user::text=$2
+ AND current_setting('createrole_self_grant')='' AND EXISTS(SELECT 1 FROM pg_roles WHERE rolname=$2 AND NOT rolsuper AND rolcreaterole)`, s.Database, s.ProvisioningRole).Scan(&trusted) != nil || !trusted {
+		return errors.New("Functions SQL disable principal rejected")
+	}
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,922743))`, s.FunctionID); err != nil {
+		return errors.New("Functions SQL disable unavailable")
+	}
+	var marker string
+	err := tx.QueryRow(ctx, `SELECT COALESCE(shobj_description(oid,'pg_authid'),'') FROM pg_roles WHERE rolname=$1`, s.Role()).Scan(&marker)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil || marker != s.marker() || verifyRole(ctx, tx, s) != nil {
+		return errors.New("Functions SQL disable identity rejected")
+	}
+	if _, err = tx.Exec(ctx, "ALTER ROLE "+quote(s.Role())+" NOLOGIN"); err != nil {
+		return errors.New("Functions SQL disable unavailable")
+	}
+	return nil
+}
+
 // ProvisionTx grants DML on existing ordinary tables and sequences in exactly
 // one explicitly selected schema. It does not grant ownership, CREATE, role
 // membership, functions/views, BYPASSRLS or database administration. New tables
