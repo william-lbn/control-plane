@@ -157,6 +157,7 @@ func (s *server) routes() *http.ServeMux {
 	mux.Handle("PATCH /api/v1/projects/{project}/endpoints/{endpoint}/lifecycle", s.auth(http.HandlerFunc(s.endpointLifecycle), true))
 	mux.Handle("POST /api/v1/projects/{project}/endpoints/{endpoint}/suspend", s.auth(http.HandlerFunc(s.suspendEndpoint), true))
 	mux.Handle("POST /api/v1/projects/{project}/endpoints/{endpoint}/query", s.auth(http.HandlerFunc(s.querySQL), true))
+	mux.Handle("POST /api/v1/projects/{project}/endpoints/{endpoint}/query-script", s.auth(http.HandlerFunc(s.querySQLScript), true))
 	mux.HandleFunc("GET /api/openapi.json", s.openapi)
 	mux.HandleFunc("GET /api/docs", s.swagger)
 	dist := env("NEON_V2_WEB_DIST", filepath.Join("..", "web", "dist"))
@@ -183,6 +184,7 @@ func (s *server) capabilities(w http.ResponseWriter, r *http.Request) {
 			"backend_credentials":  map[string]any{"enabled": s.backendKeys != nil, "reason": "branch_scoped_credentials_inference_independent"},
 			"database_management":  map[string]any{"enabled": true, "reason": "branch_catalog_operation_driver"},
 			"role_management":      map[string]any{"enabled": true, "reason": "branch_role_and_proxy_spec_reconciliation"},
+			"sql_scripts":          map[string]any{"enabled": true, "reason": "bounded_native_postgresql_simple_protocol"},
 			"project_create":       creation, "branch_create": creation, "endpoint_create": creation,
 			"neonvm_autoscaling": map[string]any{"enabled": true, "reason": "validated_on_vm_lab"},
 			"vm_scale_to_zero":   map[string]any{"enabled": os.Getenv("NEON_V2_SCALE_ZERO_ENABLED") == "true", "reason": "lab_idle_controller"},

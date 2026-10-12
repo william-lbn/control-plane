@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, endpointPath } from '../../api';
 import type { Endpoint, QueryResult } from '../../api';
 import { PageHeading } from '../../shared/ui';
 import { useEndpointSelection } from '../../shared/useEndpointSelection';
+import { ScriptResults, type ScriptResult } from './ScriptResults';
 
 export function Workbench({
   projectId,
@@ -21,32 +22,50 @@ export function Workbench({
   const [database, setDatabase] = useState('');
   const [sql, setSQL] = useState('SELECT current_database(), current_user, now();');
   const [result, setResult] = useState<QueryResult | null>(null);
+  const [scriptResult, setScriptResult] = useState<ScriptResult | null>(null);
+  const [mode, setMode] = useState<'single' | 'script'>('single');
+  const scopeEpoch = useRef(0);
   const [busy, setBusy] = useState(false);
   const endpoint = endpoints.find((e) => e.id === selected) || endpoints[0];
   useEffect(() => {
+    scopeEpoch.current++;
     setResult(null);
+    setScriptResult(null);
     setPassword('');
     setRole(endpoint?.role_name || '');
     setDatabase(endpoint?.database_name || '');
-  }, [endpoint?.id]);
+    setBusy(false);
+    return () => {
+      scopeEpoch.current++;
+    };
+  }, [projectId, endpoint?.id]);
   async function execute() {
     if (!endpoint) return;
+    const epoch = scopeEpoch.current;
     const submittedPassword = password;
     setBusy(true);
     setResult(null);
+    setScriptResult(null);
     try {
-      const data = await api<QueryResult>(endpointPath(projectId, endpoint.id) + '/query', {
-        method: 'POST',
-        body: JSON.stringify({ password, sql, role, database }),
-      });
-      setResult(data);
+      const data = await api<QueryResult | ScriptResult>(
+        endpointPath(projectId, endpoint.id) + (mode === 'script' ? '/query-script' : '/query'),
+        {
+          method: 'POST',
+          body: JSON.stringify({ password, sql, role, database }),
+        },
+      );
+      if (epoch !== scopeEpoch.current) return;
+      if (mode === 'script') setScriptResult(data as ScriptResult);
+      else setResult(data as QueryResult);
     } catch (e) {
-      showError(e);
+      if (epoch === scopeEpoch.current) showError(e);
     } finally {
       // Passwords are single-request input, including rejected SQL/network
       // errors. Preserve a different value entered while the request waited.
-      setPassword((current) => (current === submittedPassword ? '' : current));
-      setBusy(false);
+      if (epoch === scopeEpoch.current) {
+        setPassword((current) => (current === submittedPassword ? '' : current));
+        setBusy(false);
+      }
     }
   }
   return (
@@ -84,6 +103,7 @@ export function Workbench({
               setRole(e.target.value);
               setPassword('');
               setResult(null);
+              setScriptResult(null);
             }}
           />
         </label>
@@ -97,11 +117,28 @@ export function Workbench({
               setDatabase(e.target.value);
               setPassword('');
               setResult(null);
+              setScriptResult(null);
             }}
           />
         </label>
       </div>
       <div className="panel query-panel">
+        <label>
+          执行模式
+          <select
+            aria-label="执行模式"
+            value={mode}
+            disabled={busy}
+            onChange={(e) => {
+              setMode(e.target.value as 'single' | 'script');
+              setResult(null);
+              setScriptResult(null);
+            }}
+          >
+            <option value="single">单条 SQL</option>
+            <option value="script">SQL 脚本 · 逐条结果</option>
+          </select>
+        </label>
         <div className="query-toolbar">
           <span>SQL QUERY</span>
           <span>最多返回 200 行</span>
@@ -128,7 +165,7 @@ export function Workbench({
             disabled={busy || !password || !sql.trim()}
             onClick={execute}
           >
-            {busy ? '执行中…' : '▶ 执行 SQL'}
+            {busy ? '执行中…' : mode === 'script' ? '▶ 执行脚本' : '▶ 执行 SQL'}
           </button>
         </div>
       </div>
@@ -162,8 +199,11 @@ export function Workbench({
           </div>
         </div>
       )}
+      {scriptResult && <ScriptResults result={scriptResult} />}
       <div className="subtle-note">
-        此工作台是受控实验室能力。生产版将增加独立 Query Gateway、语句/字节/并发限制和细粒度授权。
+        脚本按 PostgreSQL 原生语义执行，最多显示 16 组结果及 200 行，单元格 JSON 预算 1
+        MiB。显示截断不会跳过后续命令。提交后连接中断时结果可能未知，请核验原数据，不要盲目重发。生产并发准入与独立
+        Query Gateway 仍需验收。
       </div>
     </>
   );

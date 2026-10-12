@@ -114,6 +114,12 @@ func TestFunctionsNativeAdmissionReplayAuthorizationAndManualLifecycle(t *testin
 	request("owner", "PATCH", ownerPath, "owner-change", "1", `{"owner":"app_old"}`, 422)
 	request("owner", "PATCH", ownerPath, "owner-change", "1", `{"owner":"app_new"}`, 409)
 	request("owner", "PATCH", ownerPath, "owner-change", "1", `{"owner":"control_probe"}`, 422)
+	scriptPath := "/api/v1/projects/" + project + "/endpoints/" + writer + "/query-script"
+	request("", "POST", scriptPath, "", "", `{"password":"unused","sql":"SELECT 1"}`, 401)
+	request("viewer", "POST", scriptPath, "", "", `{"password":"unused","sql":"SELECT 1"}`, 403)
+	request("stranger", "POST", scriptPath, "", "", `{"password":"unused","sql":"SELECT 1"}`, 404)
+	request("owner", "POST", scriptPath, "", "", `{"password":"unused","sql":" "}`, 422)
+	request("owner", "POST", scriptPath, "", "", `{"password":"unused","sql":"SELECT 1","role":"control_probe"}`, 422)
 	request("", "GET", base+"/hello/runtime", "", "", "", 401)
 	request("stranger", "GET", base+"/hello/runtime", "", "", "", 404)
 	for _, actor := range []string{"owner", "viewer"} {

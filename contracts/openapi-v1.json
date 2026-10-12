@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.15.0",
+    "version": "0.16.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -3045,6 +3045,102 @@
             }
           }
         ]
+      },
+      "SQLScriptStatement": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ordinal",
+          "columns",
+          "rows",
+          "command",
+          "truncated"
+        ],
+        "properties": {
+          "ordinal": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "columns": {
+            "type": "array",
+            "maxItems": 64,
+            "items": {
+              "type": "string"
+            }
+          },
+          "rows": {
+            "type": "array",
+            "maxItems": 200,
+            "items": {
+              "type": "array",
+              "maxItems": 64,
+              "items": {}
+            }
+          },
+          "command": {
+            "type": "string"
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SQLScriptResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "outcome",
+          "results",
+          "statements_completed",
+          "results_truncated",
+          "open_transaction_discarded"
+        ],
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "completed",
+              "failed"
+            ]
+          },
+          "results": {
+            "type": "array",
+            "maxItems": 16,
+            "items": {
+              "$ref": "#/components/schemas/SQLScriptStatement"
+            }
+          },
+          "statements_completed": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "results_truncated": {
+            "type": "boolean"
+          },
+          "open_transaction_discarded": {
+            "type": "boolean"
+          },
+          "error": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "code",
+              "sqlstate"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "enum": [
+                  "sql_error",
+                  "sql_script_transaction_open"
+                ]
+              },
+              "sqlstate": {
+                "type": "string"
+              }
+            }
+          }
+        }
       }
     },
     "responses": {
@@ -12396,6 +12492,176 @@
             "$ref": "#/components/responses/Error"
           }
         }
+      }
+    },
+    "/api/v1/projects/{project}/endpoints/{endpoint}/query-script": {
+      "post": {
+        "tags": [
+          "SQL"
+        ],
+        "summary": "Execute native PostgreSQL SQL script and return bounded per-statement results",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/endpoint"
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "password",
+                  "sql"
+                ],
+                "properties": {
+                  "password": {
+                    "type": "string",
+                    "format": "password"
+                  },
+                  "sql": {
+                    "type": "string",
+                    "maxLength": 32000
+                  },
+                  "role": {
+                    "type": "string",
+                    "maxLength": 63,
+                    "description": "Optional public role. Defaults to endpoint role; protected internal identities rejected."
+                  },
+                  "database": {
+                    "type": "string",
+                    "maxLength": 63,
+                    "description": "Optional database. Defaults to endpoint database."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Bounded native script outcome; SQL failure is explicit in the envelope",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SQLScriptResult"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input, database authentication or PostgreSQL query error; retryable=false.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "408": {
+            "description": "Request cancelled; retryable=false.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Invalid SQL gateway configuration; retryable=false.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Database TLS certificate verification failed; retryable=false.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Database connection unavailable. retryable=true only before user SQL was sent.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "Connection or query budget exceeded. retryable=true only before user SQL was sent; otherwise verify the outcome before retrying.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No valid console session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CSRF validation or global write-role validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project or endpoint not found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "description": "Authorized Editor/Admin with public role/password, same Proxy selector and TLS policy as single SQL. PostgreSQL simple protocol parses the complete supplied script, including semicolons in comments/quoted strings/dollar bodies. No client-side splitting, injected BEGIN/COMMIT or automatic replay. Maximum input 32000 bytes; retain 16 result sets, 64 columns/set, 200 total rows and 1 MiB encoded cell JSON; still drain subsequent commands without dropping execution intent. Eight MiB wire message body cap; submitted transport/decode failure returns 503 sql_script_outcome_unknown with retryable=false. SQL statement errors return HTTP 200 outcome=failed with sanitized SQLSTATE and bounded preceding results. Earlier explicit COMMITs may be durable; never claim the whole script rolled back. Unclosed transactions are marked and rolled back on connection close. int8 values outside JavaScript safe integer range and non-finite floats are strings. Audit contains actor/endpoint/outcome only, no script/password.",
+        "operationId": "executeSQLScript"
       }
     }
   }
