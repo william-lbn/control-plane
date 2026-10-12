@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.12.0",
+    "version": "0.13.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -2925,6 +2925,126 @@
             "description": "JSON string dictionary patch; at most 32 names. Omit or {} retains the eligible original immutable environment. Nonempty value sets the name; empty value removes that name. Values never read back."
           }
         }
+      },
+      "FunctionRuntimeObservation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "function_id",
+          "definition_state",
+          "definition_version_token",
+          "generation_token",
+          "observed",
+          "observation_source",
+          "checked_at",
+          "background_counters_trusted"
+        ],
+        "properties": {
+          "function_id": {
+            "type": "string",
+            "pattern": "^fnc_[a-f0-9]{16}$"
+          },
+          "definition_state": {
+            "type": "string",
+            "enum": [
+              "provisioning",
+              "active",
+              "suspended",
+              "degraded",
+              "deleting",
+              "deleted"
+            ]
+          },
+          "definition_version_token": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "generation_token": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "observed": {
+            "type": "boolean"
+          },
+          "observation_source": {
+            "type": "string",
+            "enum": [
+              "metadata_only",
+              "authenticated_supervisor"
+            ]
+          },
+          "checked_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "background_counters_trusted": {
+            "type": "boolean",
+            "const": false
+          },
+          "instance_id": {
+            "type": "string",
+            "pattern": "^fni_[a-f0-9]{16}$"
+          },
+          "deployment_id": {
+            "type": "string",
+            "pattern": "^fdp_[a-f0-9]{16}$"
+          },
+          "vm_phase": {
+            "type": "string",
+            "enum": [
+              "Running"
+            ]
+          },
+          "node_ready": {
+            "type": "boolean"
+          },
+          "draining": {
+            "type": "boolean"
+          },
+          "active_invocations": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 16
+          },
+          "last_activity": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "observed": {
+                  "const": true
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "instance_id",
+                "deployment_id",
+                "vm_phase",
+                "node_ready",
+                "draining",
+                "active_invocations",
+                "last_activity"
+              ],
+              "properties": {
+                "observation_source": {
+                  "const": "authenticated_supervisor"
+                }
+              }
+            },
+            "else": {
+              "properties": {
+                "observation_source": {
+                  "const": "metadata_only"
+                }
+              }
+            }
+          }
+        ]
       }
     },
     "responses": {
@@ -11959,6 +12079,116 @@
             }
           },
           "502": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/functions/{slug}/runtime": {
+      "get": {
+        "operationId": "observeFunctionRuntime",
+        "summary": "Observe original Functions runtime",
+        "description": "Explicit authorized observation of the published original VM/Service/bootstrap UID and TLS/HMAC supervisor identity. Does not invoke customer code, connect SQL, wake a suspended Compute, mutate Kubernetes or update activity. Inactive/disabled definitions return metadata_only with observed=false. No customer NodeObservation, secrets or private addresses are returned. Background work is unmetered; never use this response as automatic retirement authorization.",
+        "tags": [
+          "Functions"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Original authenticated supervisor observation or explicit metadata-only state",
+            "headers": {
+              "Cache-Control": {
+                "schema": {
+                  "type": "string",
+                  "const": "no-store"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FunctionRuntimeObservation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient project permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project, branch or Function not accessible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid bounded pagination",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
             "$ref": "#/components/responses/Error"
           }
         }

@@ -1,6 +1,6 @@
 # 生产门槛与官网对齐
 
-状态截至 2026-10-12；当前基础部署 `d1b1242` / 统一 Helm 0.1.13、22/22 migrations，Functions 执行禁用。`f0b63f5` / 0.1.12 的 UI 独立验收、原失败与续测范围见 [历史 UI 基线](DELIVERY-2026-10-12-SQL-IDENTITY.md)。[新增原生 Functions](FUNCTIONS-NATIVE-PREVIEW.md)已经接入执行 Driver/API/UI，并通过新增 Linux metadata/API/合同检查；实际 UI/guest/SQL 发布验收仍独立记录。未通过项不能被 Ready Pod 或 CI build 替代。
+状态截至 2026-10-12；实际运行基线 `bf0dd9e` / 统一 Helm 0.1.19。原生 Functions 已通过真实 Linux UI、guest、Proxy SQL 读写、权限、安全响应、停止/重部署及 NOLOGIN/保留数据验收，准确范围及原失败续测见 [交付报告](https://github.com/william-lbn/neon-helm/blob/v0.1.19/docs/ACCEPTANCE-2026-10-12-FUNCTIONS.md)。执行仍默认禁用，实验部署使用明确的不可变 operator 配置启用。[运行监控](FUNCTIONS-RUNTIME-OBSERVATION.md)为下一项独立验收；公开 HTTP/SSE/WS、自动 Functions 休眠/唤醒、服务一致性分支复制等未由本次验收覆盖。历史版本和失败文件保留，未通过项不能被 Ready Pod 或 CI build 替代。
 
 ## 1. 已实现路径
 

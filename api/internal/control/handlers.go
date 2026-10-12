@@ -118,6 +118,7 @@ func (s *server) routes() *http.ServeMux {
 	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/functions/{slug}/suspend", s.auth(http.HandlerFunc(s.functionStop), true))
 	mux.Handle("DELETE /api/v1/projects/{project}/branches/{branch}/functions/{slug}", s.auth(http.HandlerFunc(s.functionStop), true))
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/functions/{slug}", s.auth(http.HandlerFunc(s.functionRead), false))
+	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/functions/{slug}/runtime", s.auth(http.HandlerFunc(s.functionRuntimeRead), false))
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/functions/{slug}/deployments", s.auth(http.HandlerFunc(s.functionDeployments), false))
 	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/auth", s.auth(http.HandlerFunc(s.managedAuthMutate), true))
 	mux.Handle("DELETE /api/v1/projects/{project}/branches/{branch}/auth", s.auth(http.HandlerFunc(s.managedAuthMutate), true))

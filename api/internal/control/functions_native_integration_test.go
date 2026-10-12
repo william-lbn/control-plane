@@ -95,6 +95,14 @@ func TestFunctionsNativeAdmissionReplayAuthorizationAndManualLifecycle(t *testin
 	request("viewer", "POST", base, "native-create-1", "", body, 403)
 	request("stranger", "POST", base, "native-create-1", "", body, 404)
 	first := request("owner", "POST", base, "native-create-1", "", body, 202)
+	request("", "GET", base+"/hello/runtime", "", "", "", 401)
+	request("stranger", "GET", base+"/hello/runtime", "", "", "", 404)
+	for _, actor := range []string{"owner", "viewer"} {
+		observation := request(actor, "GET", base+"/hello/runtime", "", "", "", 200)
+		if observation["observed"] != false || observation["observation_source"] != "metadata_only" || observation["background_counters_trusted"] != false {
+			t.Fatal("inactive definition fabricated a runtime observation")
+		}
+	}
 	replay := request("owner", "POST", base, "native-create-1", "", body, 202)
 	if first["operation"].(map[string]any)["id"] != replay["operation"].(map[string]any)["id"] {
 		t.Fatal("replay duplicated operation")

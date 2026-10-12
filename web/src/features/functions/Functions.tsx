@@ -6,6 +6,7 @@ import { newRequestKey } from '../../shared/requestKey';
 import { route } from '../../api';
 import './functions.css';
 import './authoring.css';
+import { RuntimePanel } from './RuntimePanel';
 
 type FunctionDefinition = {
   id: string;
@@ -54,7 +55,15 @@ const deploymentLabel: Record<string, string> = {
 // Read-only branch metadata is useful independently of execution admission.
 // Never manufacture an invocation URL, infer Node health or show env values.
 // Customer response/code execution does not belong to the Console origin.
-export function Functions({ projectId, branches }: { projectId: string; branches: Branch[] }) {
+export function Functions({
+  projectId,
+  branches,
+  canEdit,
+}: {
+  projectId: string;
+  branches: Branch[];
+  canEdit: boolean;
+}) {
   const [branch, setBranch] = useState(
     branches.find((b) => b.is_default)?.id || branches[0]?.id || '',
   );
@@ -329,7 +338,7 @@ export function Functions({ projectId, branches }: { projectId: string; branches
             : '当前可查看已保存的定义和历史。部署、公开访问、数据库授权及休眠唤醒需通过独立验收后开放。'}
         </p>
       </section>
-      {driver && (
+      {driver && canEdit && (
         <section className="panel function-authoring">
           <h2>创建函数</h2>
           <div className="function-form-grid">
@@ -443,7 +452,13 @@ export function Functions({ projectId, branches }: { projectId: string; branches
                     <dd>{current.invocation_url || '尚未开放'}</dd>
                   </div>
                 </dl>
-                {driver && (
+                <RuntimePanel
+                  key={`${path}/${current.slug}/${current.version_token}`}
+                  path={`${path}/${current.slug}`}
+                  version={current.version_token}
+                  disabled={busy}
+                />
+                {driver && canEdit && (
                   <section className="function-authoring">
                     <h3>代码与环境版本</h3>
                     <p className="muted">

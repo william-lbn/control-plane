@@ -178,7 +178,8 @@ export function ProjectWorkspace({
   const canEdit =
     project.effective_permission === 'admin' || project.effective_permission === 'editor';
   const canAdmin = project.effective_permission === 'admin';
-  if (page === 'functions') return <Functions projectId={projectId} branches={branches} />;
+  if (page === 'functions')
+    return <Functions projectId={projectId} branches={branches} canEdit={canEdit} />;
   if (page === 'storage')
     return (
       <ObjectStorage

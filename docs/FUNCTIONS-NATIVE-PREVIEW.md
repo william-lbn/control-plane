@@ -5,8 +5,10 @@
 This slice adds a real Go API/Worker deployment Driver and React authoring UI to
 the existing isolated Node.js 24 microVM runtime. It is a preview, disabled by
 default. Source implementation, disposable metadata tests and live product
-acceptance are distinct gates. Do not mark this document as a successful live
-acceptance receipt; retain the actual Linux test result and source/image/chart
+acceptance are distinct gates. The native slice passed actual Linux UI acceptance
+on Helm 0.1.19 / runtime `bf0dd9e`; see the [exact continuation receipt](https://github.com/william-lbn/neon-helm/blob/v0.1.19/docs/ACCEPTANCE-2026-10-12-FUNCTIONS.md).
+This does not qualify the independent [runtime monitoring slice](FUNCTIONS-RUNTIME-OBSERVATION.md)
+or the broader production gates. Retain actual results and source/image/chart
 identities separately.
 
 Neon's current product includes branch-local Functions, Postgres, Auth, Object
