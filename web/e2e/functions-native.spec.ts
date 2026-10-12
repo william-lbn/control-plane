@@ -32,6 +32,7 @@ test('Functions native: UI ZIP deployment, SQL, safe invocation, stop, redeploy 
         function_id: string;
         failed_deployment_operation_id?: string;
         failed_suspend_operation_id?: string;
+        completed_suspend_operation_id?: string;
         recovery_mode?: 'retire_failed_candidate';
         database_password_file: string;
       })
@@ -46,7 +47,10 @@ test('Functions native: UI ZIP deployment, SQL, safe invocation, stop, redeploy 
           !/^op_[0-9a-f]{16}$/.test(resume.failed_deployment_operation_id || ''))) ||
       (resume.recovery_mode !== undefined && resume.recovery_mode !== 'retire_failed_candidate') ||
       (resume.failed_suspend_operation_id !== undefined &&
-        !/^op_[0-9a-f]{16}$/.test(resume.failed_suspend_operation_id))
+        !/^op_[0-9a-f]{16}$/.test(resume.failed_suspend_operation_id)) ||
+      (resume.completed_suspend_operation_id !== undefined &&
+        !/^op_[0-9a-f]{16}$/.test(resume.completed_suspend_operation_id)) ||
+      Boolean(resume.failed_suspend_operation_id && resume.completed_suspend_operation_id)
     )
       throw new Error('Exact original Function checkpoint required');
     project = resume.project_id;
@@ -244,7 +248,9 @@ test('Functions native: UI ZIP deployment, SQL, safe invocation, stop, redeploy 
         expect(originalFunction.database_name).toBe('fn_native');
         expect(originalFunction.sql_schema).toBe('app');
         expect(originalFunction.state).toBe(
-          resume!.failed_suspend_operation_id ? 'suspended' : 'degraded',
+          resume!.failed_suspend_operation_id || resume!.completed_suspend_operation_id
+            ? 'suspended'
+            : 'degraded',
         );
         expect(originalFunction.active_deployment_id).toBeNull();
         const deployments = await context.request.get(base() + '/hello/deployments');
@@ -293,7 +299,17 @@ test('Functions native: UI ZIP deployment, SQL, safe invocation, stop, redeploy 
         // real UI stop requires explicit acknowledgement and normal original
         // UID/Runner retirement before a new boot may reuse retained code.
         await page.getByRole('button', { name: '查看函数 hello', exact: true }).click();
-        if (resume!.failed_suspend_operation_id) {
+        if (resume!.completed_suspend_operation_id) {
+          const completed = await context.request.get(
+            `/api/v1/projects/${project}/operations/${resume!.completed_suspend_operation_id}`,
+          );
+          expect(completed.status()).toBe(200);
+          const originalStop = await completed.json();
+          expect(originalStop.state).toBe('succeeded');
+          expect(originalStop.action).toBe('suspend_function');
+          expect(originalStop.resource_id).toBe(functionID);
+          await record('resume_original_completed_stop_without_replaying_mutation');
+        } else if (resume!.failed_suspend_operation_id) {
           const originalStop = resume!.failed_suspend_operation_id;
           const stopRecord = await context.request.get(
             `/api/v1/projects/${project}/operations/${originalStop}`,

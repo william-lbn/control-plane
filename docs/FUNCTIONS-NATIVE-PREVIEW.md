@@ -60,6 +60,15 @@ the complete specification; alternative scaling modes and missing fields are
 rejected. A failed or unavailable candidate must be stopped before any new code
 deployment, including ZIP uploads.
 
+Retained hydration loads the full names-only environment inventory alongside
+the immutable backing reference. The recovered Secret's names must exactly
+match that inventory; the check must not be disabled when a field was omitted.
+After the original stop has already succeeded, the protected test checkpoint
+can use `completed_suspend_operation_id` to continue deployment without issuing
+another stop. The two stop checkpoint modes are mutually exclusive. Functions
+enabled also requires the conditional Worker-only Service retirement Role; API
+and Web must never receive that grant.
+
 ## 2. Architecture
 
 ```mermaid

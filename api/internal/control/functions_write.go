@@ -206,10 +206,12 @@ func (s *server) functionDeploy(w http.ResponseWriter, r *http.Request) {
 	var summary functions.DeploymentSummary
 	var envRef functionEnvironmentReference
 	var priorKeyVersion string
-	err = s.db.QueryRow(r.Context(), functionPreviousSourceQuery, functionID).
-		Scan(&summary.Runtime, &summary.BundleDigest, &summary.BundleBytes, &summary.Entry, &envRef.Namespace, &envRef.Name, &envRef.UID, &envRef.MAC, &priorKeyVersion, &envRef.DeploymentID)
+	summary, envRef, priorKeyVersion, err = s.loadPreviousFunctionSource(r.Context(), functionID)
 	if err == nil {
-		envRef.ProjectID, envRef.BranchID = r.PathValue("project"), r.PathValue("branch")
+		if envRef.ProjectID != r.PathValue("project") || envRef.BranchID != r.PathValue("branch") {
+			fail(w, r, 409, "function_scope_changed", "Original deployment scope rejected")
+			return
+		}
 		if priorKeyVersion != s.functions.input.KeyVersion {
 			fail(w, r, 409, "function_key_version_unavailable", "Original backing verification key is required")
 			return

@@ -16,4 +16,29 @@ spec:
   selector: {app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: worker}
   # Private TLS, original-instance HMAC and immutable artifact digest validation.
   ports: [{name: artifact-tls, port: 8790, targetPort: artifact-tls}]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "neonControl.name" . }}-functions-retirement
+  labels:
+    {{- include "neonControl.labels" . | nindent 4 }}
+rules:
+  # Dynamic Function Service names cannot be restricted by an RBAC prefix.
+  # The Driver requires the saved original UID/resourceVersion before normal
+  # deletion. This conditional namespace grant belongs only to the Worker;
+  # it grants no Secret deletion, Pod mutation or cluster-scoped permission.
+  - apiGroups: ['']
+    resources: [services]
+    verbs: [delete]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "neonControl.name" . }}-functions-retirement
+  labels:
+    {{- include "neonControl.labels" . | nindent 4 }}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: {{ include "neonControl.name" . }}-functions-retirement}
+subjects:
+  - {kind: ServiceAccount, name: {{ include "neonControl.name" . }}-worker, namespace: {{ .Release.Namespace }}}
 {{- end }}

@@ -1,12 +1,18 @@
 package control
 
+import (
+	"context"
+
+	"github.com/william-lbn/control-plane/api/internal/functions"
+)
+
 // Prefer the last successful deployment. A first failed deployment has no
 // successful source: reuse its immutable source only after the acknowledged
 // stop Operation completed for the current generation and every candidate was
 // retired. Neither a failed intent nor an unavailable guest permits replacement.
 // The API still verifies the backing MAC/UID and blob digest before admission.
-const functionPreviousSourceQuery = `SELECT d.runtime,d.bundle_digest,d.bundle_bytes,d.entry,
- b.environment_namespace,b.environment_secret_ref,b.environment_secret_uid,b.environment_mac,b.mac_key_version,d.id
+const functionPreviousSourceQuery = `SELECT d.runtime,d.bundle_digest,d.bundle_bytes,d.entry,d.environment_names,
+ b.environment_namespace,b.environment_secret_ref,b.environment_secret_uid,b.environment_mac,b.mac_key_version,d.id,f.project_id,f.branch_id
  FROM function_definitions f
  JOIN function_deployments d ON d.id=COALESCE(f.active_deployment_id,f.target_deployment_id)
  AND d.function_id=f.id AND d.project_id=f.project_id AND d.branch_id=f.branch_id
@@ -22,3 +28,17 @@ const functionPreviousSourceQuery = `SELECT d.runtime,d.bundle_digest,d.bundle_b
  AND EXISTS(SELECT 1 FROM operations o WHERE o.project_id=f.project_id AND o.resource_type='function'
  AND o.resource_id=f.id AND o.action='suspend_function' AND o.state='succeeded'
  AND o.payload->>'generation'=f.generation::text AND o.payload->>'branch_id'=f.branch_id)))`
+
+// Load the complete retained summary, including its names-only environment
+// inventory. Restoration compares this inventory against the MAC-verified
+// Secret; silently omitting it must never weaken that integrity check.
+func (s *server) loadPreviousFunctionSource(ctx context.Context, functionID string) (functions.DeploymentSummary, functionEnvironmentReference, string, error) {
+	var summary functions.DeploymentSummary
+	var reference functionEnvironmentReference
+	var keyVersion string
+	err := s.db.QueryRow(ctx, functionPreviousSourceQuery, functionID).Scan(
+		&summary.Runtime, &summary.BundleDigest, &summary.BundleBytes, &summary.Entry, &summary.EnvironmentNames,
+		&reference.Namespace, &reference.Name, &reference.UID, &reference.MAC, &keyVersion, &reference.DeploymentID,
+		&reference.ProjectID, &reference.BranchID)
+	return summary, reference, keyVersion, err
+}

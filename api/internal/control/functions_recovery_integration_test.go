@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/william-lbn/control-plane/api/internal/functions"
 )
 
 // Real disposable PostgreSQL lifecycle guards. Fixture retirement proves the
@@ -61,7 +62,7 @@ func TestFunctionRetainedFailedSourceRequiresCompletedStop(t *testing.T) {
 		t.Fatal(err)
 	}
 	environmentName := "fdp-" + suffix + "-environment"
-	exec(`INSERT INTO function_deployments(id,function_id,project_id,branch_id,runtime,bundle_digest,bundle_bytes,entry,artifact_key,environment_secret_ref,actor_id,operation_id) VALUES($1,$2,$3,$4,'nodejs24',$5,100,'index.mjs',$6,$7,'actor','deploy')`, deployment, function, project, branch, strings.Repeat("a", 64), artifactKey, environmentName)
+	exec(`INSERT INTO function_deployments(id,function_id,project_id,branch_id,runtime,bundle_digest,bundle_bytes,entry,artifact_key,environment_secret_ref,environment_names,actor_id,operation_id) VALUES($1,$2,$3,$4,'nodejs24',$5,100,'index.mjs',$6,$7,ARRAY['APP_MESSAGE'],'actor','deploy')`, deployment, function, project, branch, strings.Repeat("a", 64), artifactKey, environmentName)
 	exec(`UPDATE function_definitions SET target_deployment_id=$2 WHERE id=$1`, function, deployment)
 	exec(`INSERT INTO function_deployment_backings(deployment_id,function_id,project_id,branch_id,environment_namespace,environment_secret_ref,environment_secret_uid,environment_mac,mac_key_version) VALUES($1,$2,$3,$4,'neon-ci',$5,'11111111-2222-3333-4444-555555555555',$6,'ci-key-v1')`, deployment, function, project, branch, environmentName, strings.Repeat("b", 64))
 	exec(`INSERT INTO function_instances(id,function_id,deployment_id,project_id,branch_id,generation,vm_name,service_name,bootstrap_secret_ref,state) VALUES($1,$2,$3,$4,$5,1,$6,$6,$6||'-bootstrap','starting')`, "fni_"+suffix, function, deployment, project, branch, "fn-"+suffix)
@@ -83,6 +84,18 @@ func TestFunctionRetainedFailedSourceRequiresCompletedStop(t *testing.T) {
 	check("completed_stop_with_live_candidate_denied", 0)
 	exec(`UPDATE function_instances SET state='retired',retired_at=now() WHERE function_id=$1`, function)
 	check("completed_owned_stop_and_retirement_reuses_original_source", 1)
+	t.Run("full_summary_hydrates_inventory_and_exact_scope", func(t *testing.T) {
+		summary, ref, key, err := (&server{db: db}).loadPreviousFunctionSource(ctx, function)
+		if err != nil || ref.ProjectID != project || ref.BranchID != branch || ref.DeploymentID != deployment || ref.Name != environmentName || key != "ci-key-v1" {
+			t.Fatal("retained scope not hydrated", err)
+		}
+		if _, err := functions.RestoreDeploymentSnapshot(summary, map[string]string{"APP_MESSAGE": "retained"}); err != nil {
+			t.Fatal("nonempty retained environment inventory lost", err)
+		}
+		if _, err := functions.RestoreDeploymentSnapshot(summary, map[string]string{"FOREIGN_NAME": "retained"}); err == nil {
+			t.Fatal("foreign environment inventory accepted")
+		}
+	})
 	exec(`UPDATE operations SET payload=jsonb_set(payload,'{generation}','3') WHERE id='stop'`)
 	check("foreign_stop_generation_denied", 0)
 	exec(`UPDATE operations SET payload=jsonb_build_object('generation',2,'branch_id','br_ffffffffffffffff') WHERE id='stop'`)
