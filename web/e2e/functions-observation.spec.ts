@@ -18,6 +18,11 @@ test('Functions runtime monitoring: original identity, activity, stop and no SQL
     branch_id: string;
     writer_id: string;
     database_password_file: string;
+    resume?: {
+      function_id: string;
+      checks: string[];
+      operations: string[];
+    };
   };
   if (
     !/^prj_[0-9a-f]{16}$/.test(fixture.project_id) ||
@@ -28,10 +33,13 @@ test('Functions runtime monitoring: original identity, activity, stop and no SQL
   const { project_id: project, branch_id: branch, writer_id: writer } = fixture;
   const password = (await readFile(fixture.database_password_file, 'utf8')).trim();
   const base = `/api/v1/projects/${project}/branches/${branch}/functions`;
-  const checks: string[] = [],
-    operations: string[] = [];
+  const checks: string[] = [...(fixture.resume?.checks ?? [])],
+    operations: string[] = [...(fixture.resume?.operations ?? [])];
   let result = 'running',
-    functionID = '';
+    functionID = fixture.resume?.function_id ?? '';
+  if (fixture.resume && (!/^fnc_[a-f0-9]{16}$/.test(functionID) ||
+    !checks.includes('ui_stop_clears_old_runtime_health')))
+    throw new Error('Original stopped monitoring checkpoint required');
   async function save() {
     await writeFile(
       info.outputPath('result.json'),
@@ -101,7 +109,7 @@ test('Functions runtime monitoring: original identity, activity, stop and no SQL
       (r) => r.url().endsWith(`/endpoints/${writer}/suspend`) && r.request().method() === 'POST',
     );
     await page.getByRole('button', { name: '现在缩到 0', exact: true }).click();
-    expect((await pending).status()).toBe(202);
+    await wait(await pending);
     await expect(page.locator('.stats-grid .stat-card strong').first()).toHaveText('已休眠', {
       timeout: 150000,
     });
@@ -115,6 +123,7 @@ test('Functions runtime monitoring: original identity, activity, stop and no SQL
     await page.getByRole('button', { name: '登录控制台 →', exact: true }).click();
     await expect(page.getByRole('button', { name: '＋ 创建项目', exact: true })).toBeVisible();
     page.on('dialog', (d) => void d.accept());
+    if (!fixture.resume) {
     // One explicit retained-data observation, not a repeat of the native write.
     await page.goto(`/#/projects/${project}/query`);
     await page.getByLabel('目标数据库', { exact: true }).fill('fn_native');
@@ -195,12 +204,23 @@ test('Functions runtime monitoring: original identity, activity, stop and no SQL
     expect(stopped.active_invocations).toBeUndefined();
     await record('ui_stop_clears_old_runtime_health');
     await zero();
+    } else {
+      const original = await context.request.get(base + '/observe');
+      expect(original.status()).toBe(200);
+      const definition = await original.json();
+      expect(definition.id).toBe(functionID);
+      expect(definition.state).toBe('suspended');
+      const originalEndpoint = await context.request.get(`/api/v1/projects/${project}/endpoints/${writer}`);
+      expect(originalEndpoint.status()).toBe(200);
+      expect((await originalEndpoint.json()).observed_state).toBe('suspended');
+      await record('original_stopped_checkpoint_resumed_without_replaying_invocation');
+    }
     await page.goto(`/#/projects/${project}/functions`);
     await page.getByRole('button', { name: '查看函数 observe', exact: true }).click();
     await observe();
     const endpoint = await context.request.get(`/api/v1/projects/${project}/endpoints/${writer}`);
     expect(endpoint.status()).toBe(200);
-    expect((await endpoint.json()).state).toBe('suspended');
+    expect((await endpoint.json()).observed_state).toBe('suspended');
     await record('suspended_runtime_observation_does_not_wake_sql');
     await action('删除函数', '', 'DELETE');
     await zero();
