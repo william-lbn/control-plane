@@ -1,8 +1,13 @@
 # 生产门槛与官网对齐
 
-状态截至 2026-10-13；实际运行基线 `7c0ac72` / 统一 Helm 0.1.24，新增 SQL 脚本已通过首次实际 UI 六组检查。原生 Functions 的实际 SQL/生命周期见 [0.1.19](https://github.com/william-lbn/neon-helm/blob/v0.1.19/docs/ACCEPTANCE-2026-10-12-FUNCTIONS.md)；[运行监控](FUNCTIONS-RUNTIME-OBSERVATION.md)在 0.1.20 通过；[显式保留版本唤醒](FUNCTIONS-WAKE.md)在 0.1.21 通过实际 UI、新 boot、保留代码/环境/SQL 身份与幂等检查。执行仍默认禁用，实验部署由不可变 operator 配置明确启用。[数据库 Owner 变更](DATABASE-OWNER.md)在 0.1.22 通过原 fixture 的 UI/SQL、Writer/Reader 冷醒、幂等和正常回收验收；公开 HTTP/SSE/WS、自动 Functions 休眠/冷醒、Backend 分支复制等仍未放行。历史版本和失败文件保留，Ready Pod 或 CI build 不能替代未完成的验收。需人工提供的输入统一见 [OPERATOR-INPUTS.md](OPERATOR-INPUTS.md)，不阻止其他工程任务。
+状态截至 2026-10-13；实际运行基线 `1d4854e` / 统一 Helm 0.1.25，新增 SQL 脚本已通过首次实际 UI 六组检查。原生 Functions 的实际 SQL/生命周期见 [0.1.19](https://github.com/william-lbn/neon-helm/blob/v0.1.19/docs/ACCEPTANCE-2026-10-12-FUNCTIONS.md)；[运行监控](FUNCTIONS-RUNTIME-OBSERVATION.md)在 0.1.20 通过；[显式保留版本唤醒](FUNCTIONS-WAKE.md)在 0.1.21 通过实际 UI、新 boot、保留代码/环境/SQL 身份与幂等检查。执行仍默认禁用，实验部署由不可变 operator 配置明确启用。[数据库 Owner 变更](DATABASE-OWNER.md)在 0.1.22 通过原 fixture 的 UI/SQL、Writer/Reader 冷醒、幂等和正常回收验收；公开 HTTP/SSE/WS、自动 Functions 休眠/冷醒、Backend 分支复制等仍未放行。历史版本和失败文件保留，Ready Pod 或 CI build 不能替代未完成的验收。需人工提供的输入统一见 [OPERATOR-INPUTS.md](OPERATOR-INPUTS.md)，不阻止其他工程任务。
 
 ## 1. 已实现路径
+
+Functions 历史恢复在 0.1.25 通过原 fixture 的九组实际 UI 检查；SDK 空闲会话
+断开后进程存活、明确新连接与保留写入已验证，见 [恢复合同](FUNCTIONS-ROLLBACK.md)
+和 [SDK 可靠性](FUNCTIONS-SDK-RELIABILITY.md)。它们不关闭自动休眠、公开访问、
+分布式栅栏、HA/DR 或完整日志/计量门槛。
 
 原生项目/分支/Endpoint、一个 Writer/多个 Reader、Proxy SQL、
 数据库/角色目录及轮换、组织权限与 Key scope、持久 Operation、

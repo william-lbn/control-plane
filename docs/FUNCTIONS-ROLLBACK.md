@@ -56,7 +56,10 @@ Linux isolated PostgreSQL 检查选源归属、完整变量清单、未完成源
 `functions-rollback.spec.ts` 从实际 UI 创建一个受控函数，部署原 SQL 示例并实际写入
 一次；停止后部署不同 digest 的 replacement 示例；再停止，从历史恢复原代码/环境，
 验证新 boot、保留 SQL 身份和已写数据、来源记录、键重放/冲突/旧版本、正常回收。
-当前独立现场验收待精确版本回执。保留原数据、密码、失败和 Operation，不盲目重放写入。
+`1d4854e` / Helm 0.1.25 已在原 fixture 续测通过九组实际 Linux UI 检查；
+SDK/测试来源 `b4d6e27`，控制 API/Console/guest base image 未改变。
+见 [精确回执与保留失败](https://github.com/william-lbn/neon-helm/blob/v0.1.25/docs/ACCEPTANCE-2026-10-13-FUNCTIONS-ROLLBACK.md)。
+保留原数据、密码、失败和 Operation，不盲目重放写入。
 
 ## 4. 部署、演进与剩余门槛
 

@@ -4,7 +4,12 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 许可证：Apache-2.0。项目由自托管维护者开发，与 Neon 托管服务独立。
 
 **发行状态：预览版本。已经验证的实验环境功能不等于生产认证，也不等于 Neon 官网全部 Backend 服务。**
-[当前实际验收基线](https://github.com/william-lbn/neon-helm/blob/v0.1.19/docs/ACCEPTANCE-2026-10-12-FUNCTIONS.md)：`bf0dd9e` / 统一 Helm 0.1.19 的原生 Functions 已通过真实 Linux UI→microVM→Proxy→Neon SQL、停止/重部署和 NOLOGIN/保留数据验收；公开 Linux CI 722 项 Go/PostgreSQL、七镜像匿名核验和三节点串行部署通过。原失败与续测均独立保留。旧 UI 回执和当前这一切片不能冒充全部官网功能回归。
+当前已部署验收基线为 `1d4854e` / 统一 Helm 0.1.25；Functions 历史恢复的
+[精确回执](https://github.com/william-lbn/neon-helm/blob/v0.1.25/docs/ACCEPTANCE-2026-10-13-FUNCTIONS-ROLLBACK.md)
+记录原 fixture 实际 UI 九组检查、745 项公开 Go/PostgreSQL 检查、固定公开镜像和最终 Compute 零。
+测试/SDK 来源 `b4d6e27` 仅修正示例和验收，Go/Console runtime 与 guest base image 保持上述版本。
+下一切片须取得自己的现场回执，不能以源码 HEAD 替代运行版本。
+[历史原生 Functions 验收](https://github.com/william-lbn/neon-helm/blob/v0.1.19/docs/ACCEPTANCE-2026-10-12-FUNCTIONS.md)：`bf0dd9e` / 统一 Helm 0.1.19 已通过真实 Linux UI→microVM→Proxy→Neon SQL、停止/重部署和 NOLOGIN/保留数据验收。原失败与续测均独立保留，历史切片不能冒充全部官网功能回归。
 
 [Functions 原生执行](docs/FUNCTIONS-NATIVE-PREVIEW.md)默认禁用，实验部署由不可变 operator 配置明确启用；其实际验收范围见上述报告。[运行监控](docs/FUNCTIONS-RUNTIME-OBSERVATION.md)已在 `be557e0` / Helm 0.1.20 通过真实 Linux UI；[精确报告](https://github.com/william-lbn/neon-helm/blob/v0.1.20/docs/ACCEPTANCE-2026-10-12-FUNCTIONS-MONITORING.md)。[显式唤醒保留版本](docs/FUNCTIONS-WAKE.md)已在 `0198f7c` / Helm 0.1.21 通过实际 UI、保留身份、幂等与正常回收；[精确报告](https://github.com/william-lbn/neon-helm/blob/v0.1.21/docs/ACCEPTANCE-2026-10-12-FUNCTIONS-WAKE.md)。[数据库 Owner 变更](docs/DATABASE-OWNER.md)已在 `e2dc587` / Helm 0.1.22 通过原 fixture 的实际 UI/SQL、Writer/Reader 冷醒和正常回收；[精确报告](https://github.com/william-lbn/neon-helm/blob/v0.1.22/docs/ACCEPTANCE-2026-10-12-DATABASE-OWNER.md)。后续版本不能沿用旧版本通过结果。
 [历史 Compute 生命周期交付](docs/DELIVERY-2026-10-10-COMPUTE-LIFECYCLE.md)记录先前七镜像、统一 Helm 0.1.7、九套真实 Linux UI 共 146 项与 23 项原失败恢复检查；[先前 Object Storage](docs/DELIVERY-2026-10-09-OBJECT-STORAGE.md)、[Managed Auth](docs/DELIVERY-2026-10-08-MANAGED-AUTH.md)及历史报告保留各版本证据。
@@ -13,7 +18,7 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 旧合并版本升级前必须执行 [停止/排空流程](docs/WORKER-SPLIT.md)。
 运行代码与实际合同见 [OpenAPI](contracts/openapi-v1.json)；本项目使用 `/api/v1`，未声称兼容托管 Neon `/api/v2`。
 
-[Object Storage REST v1](docs/OBJECT-STORAGE.md) 已增加真实分支文件服务；源码合同为 OpenAPI 0.17。现场验收按版本记录，仍未开放完整外部 S3 协议兼容。[SQL 脚本](docs/SQL-SCRIPTS.md)新增原生解析、逐条结果、事务结果和输出预算，已在 0.1.23 通过首次实际 UI 六组检查；原单条请求保持兼容。[Explain/Analyze 与 CSV/JSON 导出](docs/SQL-TOOLS.md)已在 0.1.24 通过首次实际 UI 五组检查；新增 [Functions 历史部署恢复](docs/FUNCTIONS-ROLLBACK.md)待独立现场验收。需人工提供的外部依赖统一见 [人工输入清单](docs/OPERATOR-INPUTS.md)，其余工程任务继续推进。
+[Object Storage REST v1](docs/OBJECT-STORAGE.md) 已增加真实分支文件服务；源码合同为 OpenAPI 0.17。现场验收按版本记录，仍未开放完整外部 S3 协议兼容。[SQL 脚本](docs/SQL-SCRIPTS.md)新增原生解析、逐条结果、事务结果和输出预算，已在 0.1.23 通过首次实际 UI 六组检查；原单条请求保持兼容。[Explain/Analyze 与 CSV/JSON 导出](docs/SQL-TOOLS.md)已在 0.1.24 通过首次实际 UI 五组检查；[Functions 历史部署恢复](docs/FUNCTIONS-ROLLBACK.md)已在 0.1.25 通过原 fixture 实际 UI 九组检查；[SDK 空闲断开处理](docs/FUNCTIONS-SDK-RELIABILITY.md)已验证进程存活、明确重连和保留写入。需人工提供的外部依赖统一见 [人工输入清单](docs/OPERATOR-INPUTS.md)，其余工程任务继续推进。
 
 ## 1. 功能范围
 
