@@ -3,6 +3,8 @@ import { randomBytes } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
+test.use({ actionTimeout: 30_000 });
+
 test('Database owner transfer: actual SQL, replay, retained data and Reader cold configuration', async ({
   page,
   context,
@@ -16,6 +18,12 @@ test('Database owner transfer: actual SQL, replay, retained data and Reader cold
     project_id: string;
     branch_id: string;
     writer_id: string;
+    resume?: {
+      password_old_file: string;
+      password_new_file: string;
+      operations: string[];
+      original_failure_job: string;
+    };
   };
   const { project_id: project, branch_id: branch, writer_id: writer } = fixture;
   if (
@@ -28,21 +36,27 @@ test('Database owner transfer: actual SQL, replay, retained data and Reader cold
     db = 'owner_transfer_v1',
     old = 'owner_old_v1',
     next = 'owner_new_v1';
-  const passwordOld = randomBytes(30).toString('base64url'),
-    passwordNext = randomBytes(30).toString('base64url');
+  const passwordOld = fixture.resume
+      ? (await readFile(fixture.resume.password_old_file, 'utf8')).trim()
+      : randomBytes(30).toString('base64url'),
+    passwordNext = fixture.resume
+      ? (await readFile(fixture.resume.password_new_file, 'utf8')).trim()
+      : randomBytes(30).toString('base64url');
   await mkdir(privateDir, { recursive: true, mode: 0o700 });
-  await writeFile(path.join(privateRoot, 'owner-old-password'), passwordOld, {
-    mode: 0o600,
-    flag: 'wx',
-  });
-  await writeFile(path.join(privateRoot, 'owner-new-password'), passwordNext, {
-    mode: 0o600,
-    flag: 'wx',
-  });
+  if (!fixture.resume) {
+    await writeFile(path.join(privateRoot, 'owner-old-password'), passwordOld, {
+      mode: 0o600,
+      flag: 'wx',
+    });
+    await writeFile(path.join(privateRoot, 'owner-new-password'), passwordNext, {
+      mode: 0o600,
+      flag: 'wx',
+    });
+  }
   let result = 'running',
     reader = '';
   const checks: string[] = [],
-    operations: string[] = [];
+    operations: string[] = [...(fixture.resume?.operations ?? [])];
   async function save(name?: string) {
     if (name) checks.push(name);
     const report = {
@@ -59,6 +73,12 @@ test('Database owner transfer: actual SQL, replay, retained data and Reader cold
       data_deleted: false,
       production_qualified: false,
       credentials_in_evidence: false,
+      ...(fixture.resume
+        ? {
+            original_failure_job: fixture.resume.original_failure_job,
+            creates_new_roles_or_database: false,
+          }
+        : {}),
     };
     await writeFile(info.outputPath('result.json'), JSON.stringify(report) + '\n');
     await writeFile(
@@ -102,7 +122,7 @@ test('Database owner transfer: actual SQL, replay, retained data and Reader cold
   }
   async function sql(endpoint: string, role: string, password: string, query: string, want = 200) {
     await page.goto(`/#/projects/${project}/query`);
-    await page.getByLabel('目标 Endpoint', { exact: true }).selectOption(endpoint);
+    await page.getByLabel('目标 Endpoint').selectOption(endpoint);
     await page.getByLabel('数据库角色', { exact: true }).fill(role);
     await page.getByLabel('目标数据库', { exact: true }).fill(db);
     await page.getByLabel('SQL 查询').fill(query);
@@ -136,19 +156,44 @@ test('Database owner transfer: actual SQL, replay, retained data and Reader cold
     await page.getByRole('button', { name: '登录控制台 →', exact: true }).click();
     await expect(page.getByRole('button', { name: '＋ 创建项目', exact: true })).toBeVisible();
     await page.goto(`/#/projects/${project}/databases`);
-    for (const [role, password] of [
-      [old, passwordOld],
-      [next, passwordNext],
-    ] as const) {
-      await page.getByLabel('新角色名称', { exact: true }).fill(role);
-      await page.getByLabel('新角色密码', { exact: true }).fill(password);
-      await wait(await mutate('创建角色', base + '/roles'));
-      await expect(page.getByLabel('新角色名称', { exact: true })).toHaveValue('');
+    if (!fixture.resume) {
+      for (const [role, password] of [
+        [old, passwordOld],
+        [next, passwordNext],
+      ] as const) {
+        await page.getByLabel('新角色名称', { exact: true }).fill(role);
+        await page.getByLabel('新角色密码', { exact: true }).fill(password);
+        await wait(await mutate('创建角色', base + '/roles'));
+        await expect(page.getByLabel('新角色名称', { exact: true })).toHaveValue('');
+      }
+      await page.getByLabel('新数据库名称', { exact: true }).fill(db);
+      await page.getByLabel('数据库 Owner', { exact: true }).selectOption(old);
+      await wait(await mutate('创建数据库', base + '/databases'));
+      await expect(page.getByLabel('新数据库名称', { exact: true })).toHaveValue('');
+    } else {
+      const original = await context.request.get(base + '/databases');
+      expect(original.status()).toBe(200);
+      const database = (await original.json()).items.find((d: { name: string }) => d.name === db);
+      expect(database?.managed).toBe(true);
+      expect(database?.state).toBe('ready');
+      expect(database?.owner).toBe(old);
+      for (const id of fixture.resume.operations) {
+        const response = await context.request.get(`/api/v1/projects/${project}/operations/${id}`);
+        expect(response.status()).toBe(200);
+        expect((await response.json()).state).toBe('succeeded');
+      }
+      expect(
+        (
+          await sql(
+            writer,
+            old,
+            passwordOld,
+            "SELECT to_regclass('public.owner_before')::text,to_regclass('public.owner_after')::text",
+          )
+        ).rows,
+      ).toEqual([[null, null]]);
+      await save('original_created_roles_database_and_no_prior_sql_write_verified');
     }
-    await page.getByLabel('新数据库名称', { exact: true }).fill(db);
-    await page.getByLabel('数据库 Owner', { exact: true }).selectOption(old);
-    await wait(await mutate('创建数据库', base + '/databases'));
-    await expect(page.getByLabel('新数据库名称', { exact: true })).toHaveValue('');
     await sql(
       writer,
       old,
