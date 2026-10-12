@@ -42,6 +42,24 @@ through the real Operations UI. It continues SQL read/write, schema denial,
 safe response rendering, stop, configuration-only redeployment and deletion.
 Saved failures remain evidence, separate from successful recovery receipts.
 
+If the first deployment already created a guest and its one-shot bootstrap
+failed, retrying that same boot cannot restart initialization safely. Use
+**Stop function instance**, acknowledge background-work termination, and wait
+for normal original VM/Runner retirement. Then deploy with no ZIP and empty
+environment input: the API may reuse the original immutable failed source only
+when the owned stop Operation succeeded for the current generation and every
+candidate is retired. It preserves the definition, SQL role/password and data,
+creates a new deployment/boot, and keeps the original failed Operation/history.
+The protected browser checkpoint can explicitly select
+`recovery_mode: "retire_failed_candidate"` to verify this path. No force deletion,
+in-place guest repair or blind write replay is performed.
+
+The VM body explicitly binds `cpuScalingMode: QmpScaling`, matching the own-fork
+controller's immutable default. Post-controller resource verification compares
+the complete specification; alternative scaling modes and missing fields are
+rejected. A failed or unavailable candidate must be stopped before any new code
+deployment, including ZIP uploads.
+
 ## 2. Architecture
 
 ```mermaid

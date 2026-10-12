@@ -264,6 +264,9 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 	if errors.As(stepErr, &prerequisite) {
 		code, message = prerequisite.code, prerequisite.message
 	}
+	if errors.Is(stepErr, errFunctionRuntimeResource) {
+		code, message = "function_runtime_identity_rejected", "Original Function VM/Service UID, complete specification or availability rejected; preserve its identity and inspect before recovery"
+	}
 	if errors.As(stepErr, &waitErr) {
 		code = "compute_not_ready"
 		message = "NeonVM did not become Running; inspect VM, Pod and scheduler events before retrying"

@@ -179,8 +179,11 @@ func (s *server) functionDeploy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var functionID, state string
+	var unretired bool
 	var actualVersion, generation int64
-	err = s.db.QueryRow(r.Context(), `SELECT id,state,version,generation FROM function_definitions WHERE project_id=$1 AND branch_id=$2 AND slug=$3 AND state<>'deleted'`, r.PathValue("project"), r.PathValue("branch"), r.PathValue("slug")).Scan(&functionID, &state, &actualVersion, &generation)
+	err = s.db.QueryRow(r.Context(), `SELECT id,state,version,generation,
+ EXISTS(SELECT 1 FROM function_instances i WHERE i.function_id=f.id AND i.state<>'retired')
+ FROM function_definitions f WHERE project_id=$1 AND branch_id=$2 AND slug=$3 AND state<>'deleted'`, r.PathValue("project"), r.PathValue("branch"), r.PathValue("slug")).Scan(&functionID, &state, &actualVersion, &generation, &unretired)
 	if err != nil {
 		fail(w, r, 404, "not_found", "Function not found")
 		return
@@ -193,7 +196,7 @@ func (s *server) functionDeploy(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 409, "function_deleting", "Function is being deleted")
 		return
 	}
-	if state == "active" {
+	if state == "active" || unretired {
 		fail(w, r, 409, "stop_before_redeploy", "Explicitly stop the original Function before replacing code or environment")
 		return
 	}
@@ -203,9 +206,7 @@ func (s *server) functionDeploy(w http.ResponseWriter, r *http.Request) {
 	var summary functions.DeploymentSummary
 	var envRef functionEnvironmentReference
 	var priorKeyVersion string
-	err = s.db.QueryRow(r.Context(), `SELECT d.runtime,d.bundle_digest,d.bundle_bytes,d.entry,b.environment_namespace,b.environment_secret_ref,b.environment_secret_uid,b.environment_mac,b.mac_key_version,d.id
- FROM function_definitions f JOIN function_deployments d ON d.id=f.active_deployment_id
- JOIN function_deployment_backings b ON b.deployment_id=d.id WHERE f.id=$1 AND d.state='completed'`, functionID).
+	err = s.db.QueryRow(r.Context(), functionPreviousSourceQuery, functionID).
 		Scan(&summary.Runtime, &summary.BundleDigest, &summary.BundleBytes, &summary.Entry, &envRef.Namespace, &envRef.Name, &envRef.UID, &envRef.MAC, &priorKeyVersion, &envRef.DeploymentID)
 	if err == nil {
 		envRef.ProjectID, envRef.BranchID = r.PathValue("project"), r.PathValue("branch")
@@ -262,6 +263,7 @@ func (s *server) functionDeploy(w http.ResponseWriter, r *http.Request) {
 	defer tx.Rollback(r.Context())
 	var eligible bool
 	err = tx.QueryRow(r.Context(), `SELECT f.version=$4 AND f.state NOT IN ('active','deleting','deleted') AND p.state='ready' AND p.source='managed'
+	AND NOT EXISTS(SELECT 1 FROM function_instances i WHERE i.function_id=f.id AND i.state<>'retired')
  AND p.deleted_at IS NULL AND b.state='ready' AND b.deleted_at IS NULL AND o.state='active'
  AND e.endpoint_type='read_write' AND e.state IN ('active','suspended') AND e.deleted_at IS NULL,f.generation
  FROM function_definitions f JOIN projects p ON p.id=f.project_id JOIN branches b ON b.id=f.branch_id

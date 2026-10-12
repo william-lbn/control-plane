@@ -53,6 +53,10 @@ func functionRuntimeBody(p functionRuntimePlan, kind string) map[string]any {
 			"spec": map[string]any{"selector": map[string]string{"vm.neon.tech/name": p.Instance.VMName}, "ports": []any{map[string]any{"name": "manager", "port": 9090, "targetPort": "manager", "protocol": "TCP"}}}}
 	}
 	spec := map[string]any{"schedulerName": "autoscale-scheduler", "restartPolicy": "Never", "enableSSH": false, "enableAcceleration": true, "enableNetworkMonitoring": false, "service_links": false,
+		// NeonVM fills this immutable field during reconciliation if omitted.
+		// Declare the own-fork mode explicitly so post-controller GET verification
+		// checks the same complete spec; never ignore a foreign scaling mode.
+		"cpuScalingMode": "QmpScaling",
 		// The own-fork typed admission webhook serializes this empty struct.
 		// Bind the exact empty value instead of accepting arbitrary overrides.
 		"podResources": map[string]any{},

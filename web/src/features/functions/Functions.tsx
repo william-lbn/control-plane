@@ -448,7 +448,8 @@ export function Functions({ projectId, branches }: { projectId: string; branches
                     <h3>代码与环境版本</h3>
                     <p className="muted">
                       ZIP 须包含 index.mjs 或 index.js。停止原实例后可更新部署；不选 ZIP
-                      时复用已完成版本。环境变量留空或 {} 保留上次版本；将某个变量设为 ""
+                      时复用已完成版本；首次部署失败须先停止并回收原实例，再复用保留代码恢复。
+                      环境变量留空或 {} 保留上次版本；将某个变量设为 ""
                       可删除该变量。已保存密钥不回显。
                     </p>
                     <label>

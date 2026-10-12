@@ -2912,7 +2912,7 @@
           "zip": {
             "type": "string",
             "format": "binary",
-            "description": "Validated ZIP containing index.mjs, at most 8 MiB. Required for first deployment; omit to reuse exact previous completed source."
+            "description": "Validated ZIP containing index.mjs, at most 8 MiB. Required without retained source. Omit to reuse the exact previous completed source, or first failed source only after acknowledged stop completed for the current generation and every candidate retired."
           },
           "runtime": {
             "type": "string",
@@ -2922,7 +2922,7 @@
           },
           "environment": {
             "type": "string",
-            "description": "JSON string dictionary patch; at most 32 names. Omit or {} retains original completed environment. Nonempty value sets the name; empty value removes that name. Values never read back."
+            "description": "JSON string dictionary patch; at most 32 names. Omit or {} retains the eligible original immutable environment. Nonempty value sets the name; empty value removes that name. Values never read back."
           }
         }
       }
@@ -11146,7 +11146,7 @@
       "get": {
         "operationId": "listFunctions",
         "summary": "List branch Functions metadata",
-        "description": "Read-only Functions foundation. Deployment/invocation Driver remains disabled; a retained completed deployment is not current VM readiness.",
+        "description": "Authorized metadata only; does not wake SQL or probe guests. Native execution preview requires explicit operator configuration and defaults to disabled. Retained completed source does not establish current VM readiness.",
         "tags": [
           "Functions"
         ],
@@ -11348,7 +11348,7 @@
       "get": {
         "operationId": "getFunction",
         "summary": "Read a Function definition",
-        "description": "Read-only Functions foundation. Deployment/invocation Driver remains disabled; a retained completed deployment is not current VM readiness.",
+        "description": "Authorized metadata only; does not wake SQL or probe guests. Native execution preview requires explicit operator configuration and defaults to disabled. Retained completed source does not establish current VM readiness.",
         "tags": [
           "Functions"
         ],
@@ -11559,7 +11559,7 @@
       "get": {
         "operationId": "listFunctionDeployments",
         "summary": "Read immutable deployment history",
-        "description": "Read-only Functions foundation. Deployment/invocation Driver remains disabled; a retained completed deployment is not current VM readiness.",
+        "description": "Authorized metadata only; does not wake SQL or probe guests. Native execution preview requires explicit operator configuration and defaults to disabled. Retained completed source does not establish current VM readiness.",
         "tags": [
           "Functions"
         ],

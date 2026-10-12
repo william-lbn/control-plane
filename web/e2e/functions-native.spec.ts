@@ -31,6 +31,7 @@ test('Functions native: UI ZIP deployment, SQL, safe invocation, stop, redeploy 
         writer_id: string;
         function_id: string;
         failed_deployment_operation_id?: string;
+        recovery_mode?: 'retire_failed_candidate';
         database_password_file: string;
       })
     : null;
@@ -41,7 +42,8 @@ test('Functions native: UI ZIP deployment, SQL, safe invocation, stop, redeploy 
       !/^ep_[0-9a-f]{16}$/.test(resume.writer_id) ||
       (resume.function_id !== '' &&
         (!/^fnc_[0-9a-f]{16}$/.test(resume.function_id) ||
-          !/^op_[0-9a-f]{16}$/.test(resume.failed_deployment_operation_id || '')))
+          !/^op_[0-9a-f]{16}$/.test(resume.failed_deployment_operation_id || ''))) ||
+      (resume.recovery_mode !== undefined && resume.recovery_mode !== 'retire_failed_candidate')
     )
       throw new Error('Exact original Function checkpoint required');
     project = resume.project_id;
@@ -169,6 +171,7 @@ test('Functions native: UI ZIP deployment, SQL, safe invocation, stop, redeploy 
     await page.getByLabel('密码', { exact: true }).fill((await readFile(adminFile, 'utf8')).trim());
     await page.getByRole('button', { name: '登录控制台 →', exact: true }).click();
     await expect(page.getByRole('button', { name: '＋ 创建项目', exact: true })).toBeVisible();
+    page.on('dialog', (dialog) => void dialog.accept());
     if (!resume) {
       await page.getByRole('button', { name: '＋ 创建项目', exact: true }).click();
       await page.getByLabel('项目名称').fill('ci-functions-' + attempt);
@@ -280,30 +283,56 @@ test('Functions native: UI ZIP deployment, SQL, safe invocation, stop, redeploy 
       await action('部署函数版本', '/deployments');
     } else {
       const originalOperation = resume!.failed_deployment_operation_id!;
-      await page.goto(`/#/projects/${project}/operations`);
-      await page
-        .getByRole('button', { name: `查看操作 ${originalOperation} 的步骤`, exact: true })
-        .click();
-      const retry = page.waitForResponse(
-        (r) =>
-          new URL(r.url()).pathname ===
-            `/api/v1/projects/${project}/operations/${originalOperation}/retry` &&
-          r.request().method() === 'POST',
-        { timeout: 30000 },
-      );
-      await page.getByRole('button', { name: '重试原操作', exact: true }).click();
-      expect((await wait(await retry)).id).toBe(originalOperation);
-      const recovered = await context.request.get(base() + '/hello');
-      expect(recovered.status()).toBe(200);
-      const definition = await recovered.json();
-      expect(definition.id).toBe(functionID);
-      expect(definition.active_deployment_id).toBe(definition.target_deployment_id);
-      const deployments = await context.request.get(base() + '/hello/deployments');
-      expect(deployments.status()).toBe(200);
-      expect((await deployments.json()).items).toHaveLength(1);
-      await record('ui_retry_original_failed_deployment_without_new_bundle_or_identity');
-      await page.goto(`/#/projects/${project}/functions`);
-      await page.getByRole('button', { name: '查看函数 hello', exact: true }).click();
+      if (resume!.recovery_mode === 'retire_failed_candidate') {
+        // A failed one-shot guest may have run background initialization. The
+        // real UI stop requires explicit acknowledgement and normal original
+        // UID/Runner retirement before a new boot may reuse retained code.
+        await page.getByRole('button', { name: '查看函数 hello', exact: true }).click();
+        await action('停止函数实例', '/suspend');
+        await record('ui_failed_candidate_acknowledged_stop_and_normal_retirement');
+        await page.getByLabel('函数 ZIP', { exact: true }).setInputFiles([]);
+        await page.getByLabel('环境变量 JSON', { exact: true }).fill('');
+        await action('部署函数版本', '/deployments');
+        const deployments = await context.request.get(base() + '/hello/deployments');
+        expect(deployments.status()).toBe(200);
+        const history = (await deployments.json()).items;
+        expect(history).toHaveLength(2);
+        expect(history[0].bundle_digest).toBe(history[1].bundle_digest);
+        expect(
+          history.find((d: { operation_id: string }) => d.operation_id === originalOperation),
+        ).toBeTruthy();
+        const failure = await context.request.get(
+          `/api/v1/projects/${project}/operations/${originalOperation}`,
+        );
+        expect(failure.status()).toBe(200);
+        expect((await failure.json()).state).toBe('failed');
+        await record('ui_retained_failed_bundle_redeployed_original_definition_and_sql_identity');
+      } else {
+        await page.goto(`/#/projects/${project}/operations`);
+        await page
+          .getByRole('button', { name: `查看操作 ${originalOperation} 的步骤`, exact: true })
+          .click();
+        const retry = page.waitForResponse(
+          (r) =>
+            new URL(r.url()).pathname ===
+              `/api/v1/projects/${project}/operations/${originalOperation}/retry` &&
+            r.request().method() === 'POST',
+          { timeout: 30000 },
+        );
+        await page.getByRole('button', { name: '重试原操作', exact: true }).click();
+        expect((await wait(await retry)).id).toBe(originalOperation);
+        const recovered = await context.request.get(base() + '/hello');
+        expect(recovered.status()).toBe(200);
+        const definition = await recovered.json();
+        expect(definition.id).toBe(functionID);
+        expect(definition.active_deployment_id).toBe(definition.target_deployment_id);
+        const deployments = await context.request.get(base() + '/hello/deployments');
+        expect(deployments.status()).toBe(200);
+        expect((await deployments.json()).items).toHaveLength(1);
+        await record('ui_retry_original_failed_deployment_without_new_bundle_or_identity');
+        await page.goto(`/#/projects/${project}/functions`);
+        await page.getByRole('button', { name: '查看函数 hello', exact: true }).click();
+      }
     }
     await expect(page.getByRole('button', { name: '调用函数', exact: true })).toBeEnabled({
       timeout: 30000,
@@ -339,7 +368,6 @@ test('Functions native: UI ZIP deployment, SQL, safe invocation, stop, redeploy 
     expect(appError.status_code).toBe(500);
     await expect(page.getByTestId('function-invocation-result')).toContainText('HTTP 500');
     await record('application_error_preserved_inside_json_envelope');
-    page.on('dialog', (dialog) => void dialog.accept());
     await action('停止函数实例', '/suspend');
     await expect(page.getByRole('button', { name: '部署函数版本', exact: true })).toBeEnabled({
       timeout: 30000,

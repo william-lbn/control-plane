@@ -143,6 +143,8 @@ func TestFunctionRuntimeRejectsOverridesAndForeignOwnership(t *testing.T) {
 			m["spec"].(map[string]any)["extraInitContainers"] = []any{map[string]any{"image": "example/unsafe"}}
 		}},
 		{"ssh_enabled", "vm", func(m map[string]any) { m["spec"].(map[string]any)["enableSSH"] = true }},
+		{"foreign_cpu_mode", "vm", func(m map[string]any) { m["spec"].(map[string]any)["cpuScalingMode"] = "SysfsScaling" }},
+		{"missing_cpu_mode", "vm", func(m map[string]any) { delete(m["spec"].(map[string]any), "cpuScalingMode") }},
 		{"wrong_memory", "vm", func(m map[string]any) { m["spec"].(map[string]any)["guest"].(map[string]any)["memorySlotSize"] = "4Gi" }},
 		{"extra_network", "vm", func(m map[string]any) { m["spec"].(map[string]any)["extraNetwork"].(map[string]any)["enable"] = true }},
 		{"wrong_selector", "service", func(m map[string]any) {
