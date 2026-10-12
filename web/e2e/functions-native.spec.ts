@@ -255,6 +255,10 @@ test('Functions native: UI ZIP deployment, SQL, safe invocation, stop, redeploy 
     await record('ui_config_only_redeploy_new_boot_original_sql_role_and_data');
     await action('删除函数', '', 'DELETE');
     await expect(page.getByRole('button', { name: '查看函数 hello', exact: true })).toHaveCount(0);
+    const login = await sql(`SELECT rolcanlogin FROM pg_roles WHERE rolname='fn_${functionID.slice(4)}'`, 'fn_native');
+    expect(login.rows).toEqual([[false]]);
+    const retained = await sql('SELECT count(*)::integer FROM app.function_probe', 'fn_native');
+    expect(retained.rows).toEqual([[1]]);
     await record('ui_delete_original_guest_and_disable_owned_sql_login');
     await page.goto(`/#/projects/${project}/compute`);
     await page.locator('select').first().selectOption(writer);
