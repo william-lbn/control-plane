@@ -23,7 +23,7 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 | Console 邀请与受邀注册 | 账号绑定、一次性凭据、幂等/过期/撤销、事务审计、Go/React/PG 测试 | 手动安全交付邀请；邮件验证/OIDC/MFA 未完成，独立于 Managed Auth |
 | 项目、当前时间点分支、Writer、多个 Reader | 已实现，异步 Operation + SQL 就绪探针 | 单集群、单 Region、PG16；不支持所有项目/分支删除与恢复动作 |
 | PostgreSQL 连接与 SQL 工作台 | 通过独立 Neon Proxy 和 Endpoint selector | 应用不能直接连接控制 API；生产入口必须配置可信 TLS |
-| 数据库、角色与密码轮换 | 分支目录、Compute 原生配置、Proxy spec 调谐；新增原 OID/版本保护的自定义库 Owner 变更 | 新 Owner 路径待实际 UI；默认/系统 Owner 变更、rename、未知外部 DDL 恢复未完成 |
+| 数据库、角色与密码轮换 | 分支目录、Compute 原生配置、Proxy spec 调谐；原 OID/版本保护的自定义库 Owner 变更已通过实际 UI 和 Writer/Reader 冷醒 | 默认/系统 Owner 变更、rename、未知外部 DDL 恢复未完成；见 [Owner 回执](docs/DATABASE-OWNER.md) |
 | CPU / 内存边界、自动休眠、连接唤醒 | 已实现实验环境控制路径 | 整数 CPU 1→2→1 已验证；小数 CPU、完整内存缩回、跨实例栅栏未验收 |
 | 监控、Operation 步骤、错误与重试 | 已实现 | 长期指标持久化、SLO 告警、完整审计导出未完成 |
 | 分支 Managed Auth | Go/TS/React、真实 PG 与 Neon UI 注册/会话/JWT/克隆隔离/RLS/自动缩零通过 | 邮件/OAuth/MFA、完整身份管理、密钥轮换、全链路 TLS/HA 未完成；见本版交付 |

@@ -92,6 +92,18 @@ The UI test writes its role credentials/recovery fixture outside public Git and
 reports no credentials. A failed accepted Operation is inspected or continued
 with its original identity; do not rerun creation blindly.
 
-**Current owner-transfer live acceptance is pending.** New code, isolated tests
-and actual UI checks have independent gates. Functions monitoring and explicit
-wake acceptance stay pinned to their own releases.
+**Owner-transfer live acceptance passed by original-fixture continuation at
+runtime `e2dc587` / unified Helm 0.1.22.** Actual SQL ownership/data/ACLs, replay/
+conflict/stale checks, Writer and Reader cold wake, original credentials and
+normal resource retirement passed. Final Linux Job `publication-ui-20261012130243`
+completed on 2026-10-12 at 21:03 Asia/Shanghai; no managed Compute VM or Runner
+remained. Public CI `38246909591`: 13 successful jobs, 731 Go/PostgreSQL passing
+checks, zero failures/skips. See the [exact receipt, original test-only corrections
+and limits](https://github.com/william-lbn/neon-helm/blob/v0.1.22/docs/ACCEPTANCE-2026-10-12-DATABASE-OWNER.md).
+
+Neon Console/API roles inherit `pg_read_all_data` and `pg_write_all_data`; they
+are administrative roles. The test compares actual pre/post object ownership
+and ACLs, without inventing a least-privilege denial or reducing existing grants.
+The current single-statement workbench rejects multi-statement prepared queries;
+each setup statement is submitted separately. Script-mode support is a separate
+next product slice. Functions receipts remain pinned to their own releases.
