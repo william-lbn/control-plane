@@ -155,6 +155,11 @@ test('Database owner transfer: actual SQL, replay, retained data and Reader cold
       passwordOld,
       "CREATE TABLE public.owner_before(id integer PRIMARY KEY, marker text); INSERT INTO public.owner_before VALUES(1,'retained-owner-data')",
     );
+    // Console/API roles inherit Neon administrative read/write-all privileges.
+    // Compare actual ownership/ACLs; an Owner transfer must not manufacture a
+    // least-privilege denial that this existing role model does not promise.
+    const objectACLQuery = `SELECT pg_get_userbyid(relowner),relacl::text,has_table_privilege('${next}','public.owner_before','INSERT') FROM pg_class WHERE oid='public.owner_before'::regclass`;
+    const originalACL = (await sql(writer, old, passwordOld, objectACLQuery)).rows;
     await save('owned_roles_database_and_actual_original_owner_data_created');
     await page.goto(`/#/projects/${project}/databases`);
     await page.getByLabel('变更 Owner 的数据库', { exact: true }).selectOption(db);
@@ -208,7 +213,7 @@ test('Database owner transfer: actual SQL, replay, retained data and Reader cold
       passwordNext,
       'CREATE TABLE public.owner_after(id integer PRIMARY KEY); INSERT INTO public.owner_after VALUES(2)',
     );
-    await sql(writer, old, passwordOld, 'INSERT INTO public.owner_after VALUES(3)', 422);
+    expect((await sql(writer, old, passwordOld, objectACLQuery)).rows).toEqual(originalACL);
     await save('real_new_owner_login_create_and_original_object_ownership_acl_preserved');
     await zero(writer);
     expect(
