@@ -15,7 +15,7 @@ test('Functions native: UI ZIP deployment, SQL, safe invocation, stop, redeploy 
   if (!adminFile || !privateDir || !zipFile)
     throw new Error('Protected Linux native Functions inputs required');
   const attempt = process.env.NEON_E2E_ATTEMPT || String(Date.now());
-  const password = 'Fn-' + randomBytes(24).toString('base64url');
+  let password = 'Fn-' + randomBytes(24).toString('base64url');
   const checks: string[] = [];
   let project = '',
     branch = '',
@@ -23,6 +23,29 @@ test('Functions native: UI ZIP deployment, SQL, safe invocation, stop, redeploy 
     functionID = '',
     result = 'running';
   const operations: string[] = [];
+  const resumeFile = process.env.NEON_E2E_FUNCTIONS_RESUME_FIXTURE;
+  const resume = resumeFile
+    ? (JSON.parse(await readFile(resumeFile, 'utf8')) as {
+        project_id: string;
+        branch_id: string;
+        writer_id: string;
+        function_id: string;
+        database_password_file: string;
+      })
+    : null;
+  if (resume) {
+    if (
+      !/^prj_[0-9a-f]{16}$/.test(resume.project_id) ||
+      !/^br_[0-9a-f]{16}$/.test(resume.branch_id) ||
+      !/^ep_[0-9a-f]{16}$/.test(resume.writer_id) ||
+      resume.function_id !== ''
+    )
+      throw new Error('Original pre-Function checkpoint required');
+    project = resume.project_id;
+    branch = resume.branch_id;
+    writer = resume.writer_id;
+    password = (await readFile(resume.database_password_file, 'utf8')).trim();
+  }
   await mkdir(path.dirname(info.outputPath('result.json')), { recursive: true });
   async function save() {
     await writeFile(
@@ -140,51 +163,69 @@ test('Functions native: UI ZIP deployment, SQL, safe invocation, stop, redeploy 
     await page.getByLabel('用户名').fill('admin');
     await page.getByLabel('密码', { exact: true }).fill((await readFile(adminFile, 'utf8')).trim());
     await page.getByRole('button', { name: '登录控制台 →', exact: true }).click();
-    await page.getByRole('button', { name: '＋ 创建项目', exact: true }).click();
-    await page.getByLabel('项目名称').fill('ci-functions-' + attempt);
-    await page.locator('.create-modal input[type=password]').fill(password);
-    await page.getByLabel('最大 CPU', { exact: true }).selectOption('1000');
-    await page.getByLabel('最大内存', { exact: true }).selectOption('1024');
-    const created = page.waitForResponse(
-      (r) =>
-        new URL(r.url()).pathname === '/api/v1/organizations/local/projects' &&
-        r.request().method() === 'POST',
-      { timeout: 190000 },
-    );
-    await page.getByRole('button', { name: '创建并验证', exact: true }).click();
-    const response = await created;
-    expect(response.status()).toBe(202);
-    project = (await response.json()).resource.id;
-    await wait(response);
-    await expect(page.locator('.create-modal')).toBeHidden({ timeout: 490000 });
-    const endpoints = (
-      await (await context.request.get(`/api/v1/projects/${project}/endpoints`)).json()
-    ).items;
-    expect(endpoints).toHaveLength(1);
-    writer = endpoints[0].id;
-    branch = endpoints[0].branch_id;
-    await record('ui_native_owned_project_and_writer');
-    // Owner grants are explicit and confined to this fresh test database. They
-    // are not automatic global PUBLIC privilege changes made by the Driver.
-    for (const statement of [
-      'CREATE DATABASE fn_native TEMPLATE template0',
-      'ALTER ROLE control_probe CREATEROLE',
-    ])
-      await sql(statement);
-    for (const statement of [
-      'CREATE SCHEMA app',
-      'CREATE TABLE app.function_probe(id bigserial PRIMARY KEY,marker text NOT NULL)',
-      'CREATE SCHEMA private_area',
-      'CREATE TABLE private_area.secrets(value text)',
-      'REVOKE ALL ON SCHEMA public FROM PUBLIC',
-      'REVOKE TEMP ON DATABASE fn_native FROM PUBLIC',
-      'GRANT CONNECT ON DATABASE fn_native TO control_probe WITH GRANT OPTION',
-      'GRANT USAGE ON SCHEMA app TO control_probe WITH GRANT OPTION',
-      'GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA app TO control_probe WITH GRANT OPTION',
-      'GRANT USAGE,SELECT,UPDATE ON ALL SEQUENCES IN SCHEMA app TO control_probe WITH GRANT OPTION',
-    ])
-      await sql(statement, 'fn_native');
-    await record('ui_explicit_owned_database_schema_and_provisioner_grants');
+    if (!resume) {
+      await page.getByRole('button', { name: '＋ 创建项目', exact: true }).click();
+      await page.getByLabel('项目名称').fill('ci-functions-' + attempt);
+      await page.locator('.create-modal input[type=password]').fill(password);
+      await page.getByLabel('最大 CPU', { exact: true }).selectOption('1000');
+      await page.getByLabel('最大内存', { exact: true }).selectOption('1024');
+      const created = page.waitForResponse(
+        (r) =>
+          new URL(r.url()).pathname === '/api/v1/organizations/local/projects' &&
+          r.request().method() === 'POST',
+        { timeout: 190000 },
+      );
+      await page.getByRole('button', { name: '创建并验证', exact: true }).click();
+      const response = await created;
+      expect(response.status()).toBe(202);
+      project = (await response.json()).resource.id;
+      await wait(response);
+      await expect(page.locator('.create-modal')).toBeHidden({ timeout: 490000 });
+      const endpoints = (
+        await (await context.request.get(`/api/v1/projects/${project}/endpoints`)).json()
+      ).items;
+      expect(endpoints).toHaveLength(1);
+      writer = endpoints[0].id;
+      branch = endpoints[0].branch_id;
+      await record('ui_native_owned_project_and_writer');
+      // Owner grants are explicit and confined to this fresh test database. They
+      // are not automatic global PUBLIC privilege changes made by the Driver.
+      for (const statement of [
+        'CREATE DATABASE fn_native TEMPLATE template0',
+        'ALTER ROLE control_probe CREATEROLE',
+      ])
+        await sql(statement);
+      for (const statement of [
+        'CREATE SCHEMA app',
+        'CREATE TABLE app.function_probe(id bigserial PRIMARY KEY,marker text NOT NULL)',
+        'CREATE SCHEMA private_area',
+        'CREATE TABLE private_area.secrets(value text)',
+        'REVOKE ALL ON SCHEMA public FROM PUBLIC',
+        'REVOKE TEMP ON DATABASE fn_native FROM PUBLIC',
+        'GRANT CONNECT ON DATABASE fn_native TO control_probe WITH GRANT OPTION',
+        'GRANT USAGE ON SCHEMA app TO control_probe WITH GRANT OPTION',
+        'GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA app TO control_probe WITH GRANT OPTION',
+        'GRANT USAGE,SELECT,UPDATE ON ALL SEQUENCES IN SCHEMA app TO control_probe WITH GRANT OPTION',
+      ])
+        await sql(statement, 'fn_native');
+      await record('ui_explicit_owned_database_schema_and_provisioner_grants');
+    } else {
+      const endpoints = (
+        await (await context.request.get(`/api/v1/projects/${project}/endpoints`)).json()
+      ).items;
+      const original = endpoints.find((e: { id: string }) => e.id === writer);
+      expect(original.branch_id).toBe(branch);
+      expect(original.endpoint_type).toBe('read_write');
+      const probe = await sql(
+        "SELECT current_database(), current_user, (SELECT rolsuper FROM pg_roles WHERE rolname='control_probe'), (SELECT count(*)::integer FROM app.function_probe)",
+        'fn_native',
+      );
+      expect(probe.rows).toEqual([['fn_native', 'cloud_admin', false, 0]]);
+      const definitions = await context.request.get(base());
+      expect(definitions.status()).toBe(200);
+      expect((await definitions.json()).items).toHaveLength(0);
+      await record('resume_original_ui_project_and_grants_without_recreating_resources');
+    }
     await page.goto(`/#/projects/${project}/functions`);
     await expect(page.getByText('原生 microVM 函数执行预览', { exact: true })).toBeVisible();
     await page.getByLabel('函数名称', { exact: true }).fill('hello');
@@ -192,6 +233,7 @@ test('Functions native: UI ZIP deployment, SQL, safe invocation, stop, redeploy 
     await page.getByLabel('授权 Schema', { exact: true }).fill('app');
     const definition = page.waitForResponse(
       (r) => new URL(r.url()).pathname === base() && r.request().method() === 'POST',
+      { timeout: 30000 },
     );
     await page.getByRole('button', { name: '创建函数定义', exact: true }).click();
     functionID = (await wait(await definition)).function_id;
@@ -255,7 +297,10 @@ test('Functions native: UI ZIP deployment, SQL, safe invocation, stop, redeploy 
     await record('ui_config_only_redeploy_new_boot_original_sql_role_and_data');
     await action('删除函数', '', 'DELETE');
     await expect(page.getByRole('button', { name: '查看函数 hello', exact: true })).toHaveCount(0);
-    const login = await sql(`SELECT rolcanlogin FROM pg_roles WHERE rolname='fn_${functionID.slice(4)}'`, 'fn_native');
+    const login = await sql(
+      `SELECT rolcanlogin FROM pg_roles WHERE rolname='fn_${functionID.slice(4)}'`,
+      'fn_native',
+    );
     expect(login.rows).toEqual([[false]]);
     const retained = await sql('SELECT count(*)::integer FROM app.function_probe', 'fn_native');
     expect(retained.rows).toEqual([[1]]);

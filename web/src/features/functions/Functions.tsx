@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api, projectPath } from '../../api';
 import type { Branch, Page, Operation } from '../../api';
 import { PageHeading, status } from '../../shared/ui';
+import { newRequestKey } from '../../shared/requestKey';
 import { route } from '../../api';
 import './functions.css';
 import './authoring.css';
@@ -191,7 +192,7 @@ export function Functions({ projectId, branches }: { projectId: string; branches
     await mutate(() =>
       api(path, {
         method: 'POST',
-        headers: { 'Idempotency-Key': crypto.randomUUID() },
+        headers: { 'Idempotency-Key': newRequestKey() },
         body: JSON.stringify({ slug, database_name: database, sql_schema: schema }),
       }),
     );
@@ -213,7 +214,7 @@ export function Functions({ projectId, branches }: { projectId: string; branches
       api(`${path}/${current.slug}/deployments`, {
         method: 'POST',
         headers: {
-          'Idempotency-Key': crypto.randomUUID(),
+          'Idempotency-Key': newRequestKey(),
           'If-Match': `"${current.version_token}"`,
         },
         body: form,
@@ -232,7 +233,7 @@ export function Functions({ projectId, branches }: { projectId: string; branches
       api(`${path}/${current.slug}${deleting ? '' : '/suspend'}`, {
         method: deleting ? 'DELETE' : 'POST',
         headers: {
-          'Idempotency-Key': crypto.randomUUID(),
+          'Idempotency-Key': newRequestKey(),
           'If-Match': `"${current.version_token}"`,
         },
         body: JSON.stringify({ acknowledge_background_work_stop: true }),
