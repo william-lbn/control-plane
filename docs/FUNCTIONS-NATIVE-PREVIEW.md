@@ -21,6 +21,27 @@ and external execution fencing remain subsequent gates. They are not implied by
 a successful Console invocation. Real AI provider inference requires credentials
 and is deferred until the operator supplies them.
 
+### Proxy trust compatibility and deployment recovery
+
+A configured CA may omit the X.509 KeyUsage extension. Following
+[RFC 5280, section 6.1.4](https://www.rfc-editor.org/rfc/rfc5280#section-6.1.4)
+and [Go's CheckSignatureFrom](https://go.dev/src/crypto/x509/x509.go), an absent
+extension does not prohibit certificate signing. A present extension must allow
+certificate signing. CA basic constraints, validity, hostname verification,
+explicit trust roots, TLS 1.3 and SCRAM authentication remain mandatory; this
+compatibility rule does not enable insecure TLS or system-root fallback.
+
+If deployment fails before publication, retain its original Operation, bundle,
+environment version and credential identity. After correcting the prerequisite,
+open **Operations**, select that failed Operation and click **Retry original
+operation**. Do not create another definition or upload another bundle to hide
+the failure. The committed Linux browser suite accepts an optional protected
+checkpoint with `function_id` and `failed_deployment_operation_id`; it checks the
+original definition, target deployment and retryable Operation, then retries
+through the real Operations UI. It continues SQL read/write, schema denial,
+safe response rendering, stop, configuration-only redeployment and deletion.
+Saved failures remain evidence, separate from successful recovery receipts.
+
 ## 2. Architecture
 
 ```mermaid

@@ -14,13 +14,14 @@ import (
 	"encoding/pem"
 	"io"
 	"math/big"
+	"net"
 	"net/netip"
 	"strings"
 	"testing"
 	"time"
 )
 
-func runtimeTLSFixture(t *testing.T, hostname string) (string, tls.Certificate, string) {
+func runtimeTLSFixture(t *testing.T, hostname string, usage ...x509.KeyUsage) (string, tls.Certificate, string) {
 	t.Helper()
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
@@ -29,6 +30,9 @@ func runtimeTLSFixture(t *testing.T, hostname string) (string, tls.Certificate, 
 	now := time.Now()
 	root := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "Disposable SQL fixture CA"}, IsCA: true, BasicConstraintsValid: true,
 		KeyUsage: x509.KeyUsageCertSign | x509.KeyUsageDigitalSignature, NotBefore: now.Add(-time.Hour), NotAfter: now.Add(time.Hour)}
+	if len(usage) > 0 {
+		root.KeyUsage = usage[0]
+	}
 	der, err := x509.CreateCertificate(rand.Reader, root, root, &key.PublicKey, key)
 	if err != nil {
 		t.Fatal(err)
@@ -60,6 +64,51 @@ func runtimePolicyFixture(t *testing.T) ConnectionPolicy {
 	ca, _, _ := runtimeTLSFixture(t, "sql.example.test")
 	return ConnectionPolicy{Scope: Scope{FunctionID: "fnc_0123456789abcdef", ProjectID: "prj_0123456789abcdef", BranchID: "br_0123456789abcdef", Database: "neondb", Schema: "app", ProvisioningRole: "control_probe"},
 		WriterID: "ep_0123456789abcdef", Target: netip.MustParseAddrPort("127.0.0.1:5432"), Hostname: "sql.example.test", CA: ca, Timeout: 10 * time.Second}
+}
+
+func TestFunctionsSQLLegacyCAKeyUsageAndActualTLS(t *testing.T) {
+	ca, certificate, _ := runtimeTLSFixture(t, "sql.example.test", 0)
+	p := runtimePolicyFixture(t)
+	p.CA = ca
+	cfg, err := runtimeConnectionConfig(p, strings.Repeat("p", 40))
+	if err != nil {
+		t.Fatal("valid explicit CA without KeyUsage was rejected")
+	}
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+	done := make(chan error, 1)
+	go func() {
+		conn, e := listener.Accept()
+		if e != nil {
+			done <- e
+			return
+		}
+		defer conn.Close()
+		_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
+		done <- tls.Server(conn, &tls.Config{MinVersion: tls.VersionTLS13, Certificates: []tls.Certificate{certificate}}).Handshake()
+	}()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	conn, err := (&tls.Dialer{Config: cfg.TLSConfig}).DialContext(ctx, "tcp", listener.Addr().String())
+	if err != nil {
+		t.Fatal("actual verified TLS failed", err)
+	}
+	_ = conn.Close()
+	if err = <-done; err != nil {
+		t.Fatal("TLS peer failed", err)
+	}
+	for name, usage := range map[string]x509.KeyUsage{"explicit_non_signing": x509.KeyUsageDigitalSignature, "explicit_encipherment_only": x509.KeyUsageKeyEncipherment} {
+		t.Run(name, func(t *testing.T) {
+			bad, _, _ := runtimeTLSFixture(t, "sql.example.test", usage)
+			p.CA = bad
+			if _, err := runtimeConnectionConfig(p, strings.Repeat("p", 40)); err == nil {
+				t.Fatal("explicit signing prohibition bypassed")
+			}
+		})
+	}
 }
 
 func TestFunctionsSQLConnectionPolicyIgnoresAmbient(t *testing.T) {

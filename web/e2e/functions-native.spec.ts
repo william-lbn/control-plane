@@ -30,6 +30,7 @@ test('Functions native: UI ZIP deployment, SQL, safe invocation, stop, redeploy 
         branch_id: string;
         writer_id: string;
         function_id: string;
+        failed_deployment_operation_id?: string;
         database_password_file: string;
       })
     : null;
@@ -38,12 +39,15 @@ test('Functions native: UI ZIP deployment, SQL, safe invocation, stop, redeploy 
       !/^prj_[0-9a-f]{16}$/.test(resume.project_id) ||
       !/^br_[0-9a-f]{16}$/.test(resume.branch_id) ||
       !/^ep_[0-9a-f]{16}$/.test(resume.writer_id) ||
-      resume.function_id !== ''
+      (resume.function_id !== '' &&
+        (!/^fnc_[0-9a-f]{16}$/.test(resume.function_id) ||
+          !/^op_[0-9a-f]{16}$/.test(resume.failed_deployment_operation_id || '')))
     )
-      throw new Error('Original pre-Function checkpoint required');
+      throw new Error('Exact original Function checkpoint required');
     project = resume.project_id;
     branch = resume.branch_id;
     writer = resume.writer_id;
+    functionID = resume.function_id;
     password = (await readFile(resume.database_password_file, 'utf8')).trim();
   }
   await mkdir(path.dirname(info.outputPath('result.json')), { recursive: true });
@@ -91,7 +95,8 @@ test('Functions native: UI ZIP deployment, SQL, safe invocation, stop, redeploy 
   async function wait(response: Response) {
     expect(response.status()).toBe(202);
     const accepted = await response.json();
-    const op = accepted.operation.id;
+    const op = (accepted.operation || accepted).id;
+    expect(op).toMatch(/^op_[0-9a-f]{16}$/);
     operations.push(op);
     await save();
     await expect
@@ -224,25 +229,82 @@ test('Functions native: UI ZIP deployment, SQL, safe invocation, stop, redeploy 
       expect(probe.rows).toEqual([['fn_native', 'cloud_admin', false, 0]]);
       const definitions = await context.request.get(base());
       expect(definitions.status()).toBe(200);
-      expect((await definitions.json()).items).toHaveLength(0);
+      const originalDefinitions = (await definitions.json()).items;
+      expect(originalDefinitions).toHaveLength(functionID ? 1 : 0);
+      if (functionID) {
+        const originalFunction = originalDefinitions[0];
+        expect(originalFunction.id).toBe(functionID);
+        expect(originalFunction.slug).toBe('hello');
+        expect(originalFunction.database_name).toBe('fn_native');
+        expect(originalFunction.sql_schema).toBe('app');
+        expect(originalFunction.state).toBe('degraded');
+        expect(originalFunction.active_deployment_id).toBeNull();
+        const deployments = await context.request.get(base() + '/hello/deployments');
+        expect(deployments.status()).toBe(200);
+        const originalDeployments = (await deployments.json()).items;
+        expect(originalDeployments).toHaveLength(1);
+        expect(originalDeployments[0].id).toBe(originalFunction.target_deployment_id);
+        expect(originalDeployments[0].operation_id).toBe(resume!.failed_deployment_operation_id);
+        expect(originalDeployments[0].bundle_digest).toMatch(/^[a-f0-9]{64}$/);
+        const failedOperation = await context.request.get(
+          `/api/v1/projects/${project}/operations/${resume!.failed_deployment_operation_id}`,
+        );
+        expect(failedOperation.status()).toBe(200);
+        const originalOperation = await failedOperation.json();
+        expect(originalOperation.state).toBe('failed');
+        expect(originalOperation.action).toBe('deploy_function');
+        expect(originalOperation.resource_id).toBe(functionID);
+        expect(originalOperation.retryable).toBe(true);
+        await record('original_failed_deployment_bundle_and_operation_identity_verified');
+      }
       await record('resume_original_ui_project_and_grants_without_recreating_resources');
     }
     await page.goto(`/#/projects/${project}/functions`);
     await expect(page.getByText('原生 microVM 函数执行预览', { exact: true })).toBeVisible();
-    await page.getByLabel('函数名称', { exact: true }).fill('hello');
-    await page.getByLabel('函数数据库', { exact: true }).fill('fn_native');
-    await page.getByLabel('授权 Schema', { exact: true }).fill('app');
-    const definition = page.waitForResponse(
-      (r) => new URL(r.url()).pathname === base() && r.request().method() === 'POST',
-      { timeout: 30000 },
-    );
-    await page.getByRole('button', { name: '创建函数定义', exact: true }).click();
-    functionID = (await wait(await definition)).function_id;
-    await expect(page.getByRole('button', { name: '查看函数 hello', exact: true })).toBeVisible();
-    await record('ui_function_definition_created');
-    await page.getByLabel('函数 ZIP', { exact: true }).setInputFiles(zipFile);
-    await page.getByLabel('环境变量 JSON', { exact: true }).fill('{"APP_MESSAGE":"first-version"}');
-    await action('部署函数版本', '/deployments');
+    if (!functionID) {
+      await page.getByLabel('函数名称', { exact: true }).fill('hello');
+      await page.getByLabel('函数数据库', { exact: true }).fill('fn_native');
+      await page.getByLabel('授权 Schema', { exact: true }).fill('app');
+      const definition = page.waitForResponse(
+        (r) => new URL(r.url()).pathname === base() && r.request().method() === 'POST',
+        { timeout: 30000 },
+      );
+      await page.getByRole('button', { name: '创建函数定义', exact: true }).click();
+      functionID = (await wait(await definition)).function_id;
+      await expect(page.getByRole('button', { name: '查看函数 hello', exact: true })).toBeVisible();
+      await record('ui_function_definition_created');
+      await page.getByLabel('函数 ZIP', { exact: true }).setInputFiles(zipFile);
+      await page
+        .getByLabel('环境变量 JSON', { exact: true })
+        .fill('{"APP_MESSAGE":"first-version"}');
+      await action('部署函数版本', '/deployments');
+    } else {
+      const originalOperation = resume!.failed_deployment_operation_id!;
+      await page.goto(`/#/projects/${project}/operations`);
+      await page
+        .getByRole('button', { name: `查看操作 ${originalOperation} 的步骤`, exact: true })
+        .click();
+      const retry = page.waitForResponse(
+        (r) =>
+          new URL(r.url()).pathname ===
+            `/api/v1/projects/${project}/operations/${originalOperation}/retry` &&
+          r.request().method() === 'POST',
+        { timeout: 30000 },
+      );
+      await page.getByRole('button', { name: '重试原操作', exact: true }).click();
+      expect((await wait(await retry)).id).toBe(originalOperation);
+      const recovered = await context.request.get(base() + '/hello');
+      expect(recovered.status()).toBe(200);
+      const definition = await recovered.json();
+      expect(definition.id).toBe(functionID);
+      expect(definition.active_deployment_id).toBe(definition.target_deployment_id);
+      const deployments = await context.request.get(base() + '/hello/deployments');
+      expect(deployments.status()).toBe(200);
+      expect((await deployments.json()).items).toHaveLength(1);
+      await record('ui_retry_original_failed_deployment_without_new_bundle_or_identity');
+      await page.goto(`/#/projects/${project}/functions`);
+      await page.getByRole('button', { name: '查看函数 hello', exact: true }).click();
+    }
     await expect(page.getByRole('button', { name: '调用函数', exact: true })).toBeEnabled({
       timeout: 30000,
     });

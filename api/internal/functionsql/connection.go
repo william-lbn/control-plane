@@ -53,7 +53,10 @@ func runtimeRoots(value string, now time.Time) (*x509.CertPool, error) {
 			return nil, errRuntimeConnection
 		}
 		certificate, err := x509.ParseCertificate(block.Bytes)
-		if err != nil || !certificate.IsCA || !certificate.BasicConstraintsValid || certificate.KeyUsage&x509.KeyUsageCertSign == 0 ||
+		// RFC 5280 constrains signing when KeyUsage is present. An absent
+		// extension (zero) does not prohibit signing; match Go CheckSignatureFrom.
+		// Explicit non-signing usage remains rejected, as do non-CA/expired roots.
+		if err != nil || !certificate.IsCA || !certificate.BasicConstraintsValid || (certificate.KeyUsage != 0 && certificate.KeyUsage&x509.KeyUsageCertSign == 0) ||
 			now.Before(certificate.NotBefore) || !now.Before(certificate.NotAfter) || seen[string(certificate.Raw)] {
 			return nil, errRuntimeConnection
 		}
