@@ -16,6 +16,13 @@ test('Functions history restores actual original code and environment, preserves
     project_id: string;
     branch_id: string;
     writer_id: string;
+    resume?: {
+      phase: 'original_active_no_write';
+      function_id: string;
+      first_deployment_id: string;
+      operations: string[];
+      original_failure_job: string;
+    };
   };
   for (const [key, prefix] of [
     ['project_id', 'prj'],
@@ -89,7 +96,8 @@ test('Functions history restores actual original code and environment, preserves
     expect(response.status()).toBe(200);
     const envelope = await response.json();
     expect(envelope.status_code).toBe(200);
-    return JSON.parse(envelope.body);
+    expect(envelope.body_encoding).toBe('base64');
+    return JSON.parse(Buffer.from(envelope.body, 'base64').toString('utf8'));
   }
   async function observe() {
     const pending = page.waitForResponse((r) => new URL(r.url()).pathname === path + '/runtime');
@@ -109,23 +117,55 @@ test('Functions history restores actual original code and environment, preserves
     await expect(page.getByRole('button', { name: '＋ 创建项目', exact: true })).toBeVisible();
     page.on('dialog', (d) => void d.accept());
     await page.goto(`/#/projects/${project}/functions`);
-    await page.getByLabel('函数名称', { exact: true }).fill('roll');
-    await page.getByLabel('函数数据库', { exact: true }).fill('fn_native');
-    await page.getByLabel('授权 Schema', { exact: true }).fill('app');
-    const create = page.waitForResponse(
-      (r) => new URL(r.url()).pathname === base && r.request().method() === 'POST',
-    );
-    await page.getByRole('button', { name: '创建函数定义', exact: true }).click();
-    functionID = (await wait(await create)).function_id;
-    await page.getByRole('button', { name: '查看函数 roll', exact: true }).click();
-    await page.getByLabel('函数 ZIP', { exact: true }).setInputFiles(zip);
-    await page
-      .getByLabel('环境变量 JSON', { exact: true })
-      .fill('{"APP_MESSAGE":"rollback-original"}');
-    await wait(await action('部署函数版本', '/deployments'));
+    if (fixture.resume) {
+      const original = fixture.resume;
+      if (
+        original.phase !== 'original_active_no_write' ||
+        !/^fnc_[a-f0-9]{16}$/.test(original.function_id) ||
+        !/^fdp_[a-f0-9]{16}$/.test(original.first_deployment_id) ||
+        original.operations.length !== 2 ||
+        !/^publication-ui-[0-9]{14}$/.test(original.original_failure_job)
+      )
+        throw new Error('Exact original no-write checkpoint required');
+      functionID = original.function_id;
+      const definition = await context.request.get(path);
+      expect(definition.status()).toBe(200);
+      const value = await definition.json();
+      expect(value.id).toBe(functionID);
+      expect(value.state).toBe('active');
+      expect(value.active_deployment_id).toBe(original.first_deployment_id);
+      for (const [index, id] of original.operations.entries()) {
+        if (!/^op_[a-f0-9]{16,24}$/.test(id)) throw new Error('Original Operation ID required');
+        const response = await context.request.get(`/api/v1/projects/${project}/operations/${id}`);
+        expect(response.status()).toBe(200);
+        const op = await response.json();
+        expect(op.state).toBe('succeeded');
+        expect(op.resource_id).toBe(functionID);
+        expect(op.action).toBe(index === 0 ? 'create_function' : 'deploy_function');
+      }
+      operations.push(...original.operations);
+      await page.getByRole('button', { name: '查看函数 roll', exact: true }).click();
+      await save('original_completed_definition_and_deployment_verified_before_continuation');
+    } else {
+      await page.getByLabel('函数名称', { exact: true }).fill('roll');
+      await page.getByLabel('函数数据库', { exact: true }).fill('fn_native');
+      await page.getByLabel('授权 Schema', { exact: true }).fill('app');
+      const create = page.waitForResponse(
+        (r) => new URL(r.url()).pathname === base && r.request().method() === 'POST',
+      );
+      await page.getByRole('button', { name: '创建函数定义', exact: true }).click();
+      functionID = (await wait(await create)).function_id;
+      await page.getByRole('button', { name: '查看函数 roll', exact: true }).click();
+      await page.getByLabel('函数 ZIP', { exact: true }).setInputFiles(zip);
+      await page
+        .getByLabel('环境变量 JSON', { exact: true })
+        .fill('{"APP_MESSAGE":"rollback-original"}');
+      await wait(await action('部署函数版本', '/deployments'));
+    }
     await expect(page.getByRole('button', { name: '调用函数', exact: true })).toBeEnabled();
     const firstBoot = await observe();
     firstID = firstBoot.deployment_id;
+    if (fixture.resume) expect(firstID).toBe(fixture.resume.first_deployment_id);
     const before = await invoke();
     expect(before.message).toBe('rollback-original');
     expect(before.rows).toBe(1);
