@@ -307,7 +307,7 @@ func (s *server) branch(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, 200, item)
 }
 func (s *server) branchServices(w http.ResponseWriter, r *http.Request) {
-	branch, err := s.one(r.Context(), "SELECT id FROM branches WHERE project_id=$1 AND id=$2 AND deleted_at IS NULL", r.PathValue("project"), r.PathValue("branch"))
+	branch, err := s.one(r.Context(), "SELECT id,state FROM branches WHERE project_id=$1 AND id=$2 AND deleted_at IS NULL", r.PathValue("project"), r.PathValue("branch"))
 	if err != nil {
 		if isNoRows(err) {
 			fail(w, r, 404, "not_found", "Branch not found")
