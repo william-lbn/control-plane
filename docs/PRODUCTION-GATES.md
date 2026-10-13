@@ -1,6 +1,6 @@
 # 生产门槛与官网对齐
 
-状态截至 2026-10-13；实际运行基线 `73ae9bb` / 统一 Helm 0.1.26，新增 SQL 脚本已通过首次实际 UI 六组检查。原生 Functions 的实际 SQL/生命周期见 [0.1.19](https://github.com/william-lbn/neon-helm/blob/v0.1.19/docs/ACCEPTANCE-2026-10-12-FUNCTIONS.md)；[运行监控](FUNCTIONS-RUNTIME-OBSERVATION.md)在 0.1.20 通过；[显式保留版本唤醒](FUNCTIONS-WAKE.md)在 0.1.21 通过实际 UI、新 boot、保留代码/环境/SQL 身份与幂等检查。执行仍默认禁用，实验部署由不可变 operator 配置明确启用。[数据库 Owner 变更](DATABASE-OWNER.md)在 0.1.22 通过原 fixture 的 UI/SQL、Writer/Reader 冷醒、幂等和正常回收验收；公开 HTTP/SSE/WS、自动 Functions 休眠/冷醒、Backend 分支复制等仍未放行。历史版本和失败文件保留，Ready Pod 或 CI build 不能替代未完成的验收。需人工提供的输入统一见 [OPERATOR-INPUTS.md](OPERATOR-INPUTS.md)，不阻止其他工程任务。
+状态截至 2026-10-13；实际运行基线 `8c1b777` / 统一 Helm 0.1.27，新增 SQL 脚本已通过首次实际 UI 六组检查。原生 Functions 的实际 SQL/生命周期见 [0.1.19](https://github.com/william-lbn/neon-helm/blob/v0.1.19/docs/ACCEPTANCE-2026-10-12-FUNCTIONS.md)；[运行监控](FUNCTIONS-RUNTIME-OBSERVATION.md)在 0.1.20 通过；[显式保留版本唤醒](FUNCTIONS-WAKE.md)在 0.1.21 通过实际 UI、新 boot、保留代码/环境/SQL 身份与幂等检查。执行仍默认禁用，实验部署由不可变 operator 配置明确启用。[数据库 Owner 变更](DATABASE-OWNER.md)在 0.1.22 通过原 fixture 的 UI/SQL、Writer/Reader 冷醒、幂等和正常回收验收；公开 HTTP/SSE/WS、自动 Functions 休眠/冷醒、Backend 分支复制等仍未放行。历史版本和失败文件保留，Ready Pod 或 CI build 不能替代未完成的验收。需人工提供的输入统一见 [OPERATOR-INPUTS.md](OPERATOR-INPUTS.md)，不阻止其他工程任务。
 
 ## 1. 已实现路径
 
@@ -69,4 +69,4 @@ Linux 真实场景正反例 + 恢复证据共同验收。
 
 ## 2026-10-13：本地真实推理已解除外部凭据阻塞
 
-独立 Go AI 网关、限定列权限元数据库身份、AI UI 和持久用量已完成代码/Helm/实际 UI 闭环。769 个公开 Linux Go/PG 测试与九组真实 UI 检查通过，见 [交付](DELIVERY-2026-10-13-AI-GATEWAY.md)。只验收文本 Chat Completions；动态供应商管理、完整协议/计费、HA 和全链路 TLS 仍未完成。个人保存查询已进入代码实现，尚待该版本 UI 验收。
+独立 Go AI 网关、限定列权限元数据库身份、AI UI 和持久用量已完成代码/Helm/实际 UI 闭环。769 个公开 Linux Go/PG 测试与九组真实 UI 检查通过，见 [交付](DELIVERY-2026-10-13-AI-GATEWAY.md)。只验收文本 Chat Completions；动态供应商管理、完整协议/计费、HA 和全链路 TLS 仍未完成。个人保存查询已在 0.1.27 通过实际 UI 六组检查；完整交付见 [当前报告](DELIVERY-2026-10-13-SAVED-QUERIES.md)。查询历史、共享查询仍未实现。

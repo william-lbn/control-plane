@@ -24,7 +24,7 @@
 - Object Storage 完整 S3/SigV4、multipart/CORS、引用安全 GC、配额和独立网关。
 - 完整目录/删除/恢复：rename、系统身份迁移、TTL/物理 GC、原分支恢复和 Backend 一致性。
 - 小数 CPU 实际配额、完整内存归还、跨实例外部栅栏、软件 HA/DR 流程和本地全链路 TLS。
-- Console 查询历史、个人保存查询（本轮开发中）、XLSX/图形计划等缺失交互；脚本、计划和 CSV/JSON 已验收。
+- Console 查询历史、XLSX/图形计划等缺失交互；脚本、计划、CSV/JSON 和个人保存查询已验收。
 
 这些项目的现有代码、版本现场结果和生产门槛分别查看
 [PRODUCTION-GATES.md](PRODUCTION-GATES.md)、[PRODUCT-COMPLETION-PLAN.md](PRODUCT-COMPLETION-PLAN.md)
