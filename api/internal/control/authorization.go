@@ -112,6 +112,9 @@ func (s *server) authorizeRoute(w http.ResponseWriter, r *http.Request, u user) 
 		if strings.Contains(r.URL.Path, "/roles") || strings.Contains(r.URL.Path, "/databases") {
 			required = 2 // Live catalog reads may cold wake a compute.
 		}
+		if strings.Contains(r.URL.Path, "/saved-queries") {
+			required = 2
+		}
 	} else if org != "" {
 		err := s.db.QueryRow(r.Context(), `SELECT m.role FROM organization_members m
             JOIN organizations o ON o.id=m.org_id AND o.state='active'

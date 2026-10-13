@@ -1,6 +1,6 @@
 # 生产门槛与官网对齐
 
-状态截至 2026-10-13；实际运行基线 `1d4854e` / 统一 Helm 0.1.25，新增 SQL 脚本已通过首次实际 UI 六组检查。原生 Functions 的实际 SQL/生命周期见 [0.1.19](https://github.com/william-lbn/neon-helm/blob/v0.1.19/docs/ACCEPTANCE-2026-10-12-FUNCTIONS.md)；[运行监控](FUNCTIONS-RUNTIME-OBSERVATION.md)在 0.1.20 通过；[显式保留版本唤醒](FUNCTIONS-WAKE.md)在 0.1.21 通过实际 UI、新 boot、保留代码/环境/SQL 身份与幂等检查。执行仍默认禁用，实验部署由不可变 operator 配置明确启用。[数据库 Owner 变更](DATABASE-OWNER.md)在 0.1.22 通过原 fixture 的 UI/SQL、Writer/Reader 冷醒、幂等和正常回收验收；公开 HTTP/SSE/WS、自动 Functions 休眠/冷醒、Backend 分支复制等仍未放行。历史版本和失败文件保留，Ready Pod 或 CI build 不能替代未完成的验收。需人工提供的输入统一见 [OPERATOR-INPUTS.md](OPERATOR-INPUTS.md)，不阻止其他工程任务。
+状态截至 2026-10-13；实际运行基线 `73ae9bb` / 统一 Helm 0.1.26，新增 SQL 脚本已通过首次实际 UI 六组检查。原生 Functions 的实际 SQL/生命周期见 [0.1.19](https://github.com/william-lbn/neon-helm/blob/v0.1.19/docs/ACCEPTANCE-2026-10-12-FUNCTIONS.md)；[运行监控](FUNCTIONS-RUNTIME-OBSERVATION.md)在 0.1.20 通过；[显式保留版本唤醒](FUNCTIONS-WAKE.md)在 0.1.21 通过实际 UI、新 boot、保留代码/环境/SQL 身份与幂等检查。执行仍默认禁用，实验部署由不可变 operator 配置明确启用。[数据库 Owner 变更](DATABASE-OWNER.md)在 0.1.22 通过原 fixture 的 UI/SQL、Writer/Reader 冷醒、幂等和正常回收验收；公开 HTTP/SSE/WS、自动 Functions 休眠/冷醒、Backend 分支复制等仍未放行。历史版本和失败文件保留，Ready Pod 或 CI build 不能替代未完成的验收。需人工提供的输入统一见 [OPERATOR-INPUTS.md](OPERATOR-INPUTS.md)，不阻止其他工程任务。
 
 ## 1. 已实现路径
 
@@ -48,7 +48,7 @@ Managed Auth 已有 Go Driver、Better Auth 1.7.7 运行时、React UI、注册/
 产品 Object Storage 已实现分支目录、独立受限对象凭据、Go REST Driver、React UI、条件写入、签名下载和分支继承，详见 [Object Storage 合同](OBJECT-STORAGE.md)。当前是 `neon-object-rest-v1`；f0b63f5 Linux 现场 UI 19 项已通过，实际版本与其余回归见 [当前交付](DELIVERY-2026-10-12-SQL-IDENTITY.md)。外部 S3 协议兼容、多段上传、物理 GC、分布式网关隔离及 HA/DR 仍未完成。
 
 Functions 已有 guest、不可变存储、持久候选/引导/SQL 身份及新增原生执行
-Driver/API/UI，默认禁用，实际发布验收见 [执行合同](FUNCTIONS-NATIVE-PREVIEW.md)；AI Gateway 真实推理服务未验收。Data API 已有原生 Driver、
+Driver/API/UI，默认禁用，实际发布验收见 [执行合同](FUNCTIONS-NATIVE-PREVIEW.md)；AI Gateway 文本 Chat/SSE、目录、Playground、应用授权和用量已通过本地真实 Ollama UI；商业上游/其他协议/预算和生产门槛仍缺。Data API 已有原生 Driver、
 异步生命周期、最小权限角色、PostgREST、UI 和 RLS 集成测试；默认禁用、仅实验传输开关。
 现场 Neon UI 验收与生产 TLS/HA 是独立门槛，具体结果以该版本交付证据为准。
 应用凭据管理及分支/模型授权检查已有代码和真实 PostgreSQL 验收；不代表 AI 推理可用。
@@ -66,3 +66,7 @@ SQL 工作台不能冒充 Data API。现有 fork Proxy 的 REST 构建依赖包�
 当前版本可以作为自托管开发与实验验收基线，必须保留上述限制。
 达到生产门槛后再提升 release 状态；每项变更以代码 + API/模型 + UI +
 Linux 真实场景正反例 + 恢复证据共同验收。
+
+## 2026-10-13：本地真实推理已解除外部凭据阻塞
+
+独立 Go AI 网关、限定列权限元数据库身份、AI UI 和持久用量已完成代码/Helm/实际 UI 闭环。769 个公开 Linux Go/PG 测试与九组真实 UI 检查通过，见 [交付](DELIVERY-2026-10-13-AI-GATEWAY.md)。只验收文本 Chat Completions；动态供应商管理、完整协议/计费、HA 和全链路 TLS 仍未完成。个人保存查询已进入代码实现，尚待该版本 UI 验收。

@@ -144,7 +144,7 @@ export function AIGateway({
     }
   }
   return (
-    <>
+    <div className="ai-workspace">
       <PageHeading
         kicker="BACKEND / AI GATEWAY"
         title="AI Gateway"
@@ -214,7 +214,7 @@ export function AIGateway({
               <strong>{usage?.summary.unknown_usage || 0}</strong>
             </div>
           </div>
-          <section className="panel">
+          <section className="panel ai-playground">
             <div className="panel-heading">
               <h2>Playground</h2>
               <span className="tag">Text Chat · Preview</span>
@@ -245,7 +245,7 @@ export function AIGateway({
                 onChange={(e) => setPrompt(e.target.value)}
               />
             </label>
-            <label>
+            <label className="ai-stream-mode">
               <input
                 aria-label="AI 流式输出"
                 type="checkbox"
@@ -262,7 +262,7 @@ export function AIGateway({
             >
               {busy ? '模型生成中…' : '发送到模型'}
             </button>
-            <pre data-testid="ai-answer" style={{ whiteSpace: 'pre-wrap' }}>
+            <pre className="ai-response" data-testid="ai-answer">
               {answer || '模型输出将显示在这里'}
             </pre>
             {requestId && <small data-testid="ai-request-id">Request ID · {requestId}</small>}
@@ -312,6 +312,6 @@ export function AIGateway({
           </div>
         </>
       )}
-    </>
+    </div>
   );
 }

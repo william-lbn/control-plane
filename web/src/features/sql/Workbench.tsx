@@ -5,6 +5,7 @@ import { PageHeading } from '../../shared/ui';
 import { useEndpointSelection } from '../../shared/useEndpointSelection';
 import { ScriptResults, type ScriptResult } from './ScriptResults';
 import { ResultExports } from './ResultExports';
+import { SavedQueries } from './SavedQueries';
 
 export function Workbench({
   projectId,
@@ -174,6 +175,17 @@ export function Workbench({
             Analyze 会实际执行当前语句，包括 INSERT / UPDATE / DELETE 的写入。提交后不会自动重试。
           </p>
         )}
+        <SavedQueries
+          projectId={projectId}
+          sql={sql}
+          onLoad={(value) => {
+            setSQL(value);
+            setMode('script');
+            setPassword('');
+            setResult(null);
+            setScriptResult(null);
+          }}
+        />
         <div className="query-toolbar">
           <span>SQL QUERY</span>
           <span>最多返回 200 行</span>

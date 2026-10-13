@@ -9,9 +9,8 @@
 普通项目用户在模型目录和 Playground 选择模型，应用只使用平台凭据。
 
 本文件主要是**演进合同**。分支应用凭据管理、权限检查及 UI 已有实现，实际接口以
-[凭据手册](BACKEND-CREDENTIALS.md)和 OpenAPI 为准。`ai_gateway` 仍未实现推理服务，
-没有已配置的模型供应商凭据；已有 Data API 代码与它分属不同服务。
-下文尚未实现的供应商、模型目录、计量和推理 API 不应提前添加为可用路由或 capability。
+[凭据手册](BACKEND-CREDENTIALS.md)和 OpenAPI 为准。`ai_gateway` 已实现独立 Go 文本 Chat/SSE 推理、静态运营方目录、Playground 与持久用量，并在 0.1.26 通过真实本地 Ollama UI，见 [交付](DELIVERY-2026-10-13-AI-GATEWAY.md)。已有 Data API 与它分属不同服务。
+下文动态供应商管理、完整协议/计费等仍是演进设计。准确已实现接口以 [实施合同](AI-GATEWAY-IMPLEMENTATION.md)和 OpenAPI 为准。
 
 ### 核验依据
 

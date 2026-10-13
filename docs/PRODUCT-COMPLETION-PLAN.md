@@ -116,3 +116,7 @@ shutdown recovery, guest UID/cgroup/egress primitives and actual Node Fetch/SSE/
 waitUntil execution. The internal contract and outstanding F1–F4 exits are in
 [FUNCTIONS-IMPLEMENTATION.md](FUNCTIONS-IMPLEMENTATION.md). It remains disabled
 until the real microVM, native Driver, Console and zero/wake acceptance exist.
+
+## 2026-10-13：真实本地 AI Gateway
+
+`73ae9bb` / Helm 0.1.26 已完成独立 Go 网关、React 目录/Playground、分支应用授权、文本 JSON/SSE 与 PostgreSQL 用量，真实 Windows Ollama 小模型由 Linux 浏览器端到端调用，九组检查通过且没有创建 Compute。外部模型账号不再阻塞本地推理闭环。动态供应商 UI、其他协议/计费仍继续开发；接着实现个人保存查询，不重复历史全量 UI 套件。
