@@ -1,0 +1,552 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Neon Self-hosted Functions Public HTTP Preview",
+    "version": "0.20.0"
+  },
+  "servers": [
+    {
+      "url": "{origin}",
+      "variables": {
+        "origin": {
+          "default": "http://192.168.146.100:30892",
+          "description": "Operator-owned separate Functions origin; explicit laboratory HTTP exception"
+        }
+      }
+    }
+  ],
+  "paths": {
+    "/functions/v1/{branch}/{slug}": {
+      "get": {
+        "operationId": "invokeFunctionGet",
+        "summary": "Raw application HTTP/SSE on the separate Functions origin",
+        "description": "Public opt-in only. Application authentication/CORS is the handler responsibility. Control cookies, Set-Cookie and proxy/platform headers are excluded. This listener never serves Console API. No automatic invocation replay; 502 can mean unknown execution outcome. Fifteen-minute request bound; no WebSocket.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "branch",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^br_[a-f0-9]{16}$"
+            }
+          },
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9]{1,20}$"
+            }
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Original application response (other application statuses are also forwarded)",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "421": {
+            "description": "Configured authority rejected"
+          },
+          "422": {
+            "description": "Invalid method/path/header rejected before cold wake"
+          },
+          "413": {
+            "description": "Body exceeds 1 MiB"
+          },
+          "426": {
+            "description": "WebSocket unavailable"
+          },
+          "502": {
+            "description": "Dispatch outcome unknown; do not replay automatically"
+          },
+          "503": {
+            "description": "No dispatch: disabled, manual suspension, revoked owner, quota, cold-wake deadline or admission busy"
+          },
+          "default": {
+            "description": "Original application HTTP status, headers and body"
+          }
+        }
+      },
+      "head": {
+        "operationId": "invokeFunctionHead",
+        "summary": "Raw application HTTP/SSE on the separate Functions origin",
+        "description": "Public opt-in only. Application authentication/CORS is the handler responsibility. Control cookies, Set-Cookie and proxy/platform headers are excluded. This listener never serves Console API. No automatic invocation replay; 502 can mean unknown execution outcome. Fifteen-minute request bound; no WebSocket.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "branch",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^br_[a-f0-9]{16}$"
+            }
+          },
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9]{1,20}$"
+            }
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Original application response (other application statuses are also forwarded)",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "421": {
+            "description": "Configured authority rejected"
+          },
+          "422": {
+            "description": "Invalid method/path/header rejected before cold wake"
+          },
+          "413": {
+            "description": "Body exceeds 1 MiB"
+          },
+          "426": {
+            "description": "WebSocket unavailable"
+          },
+          "502": {
+            "description": "Dispatch outcome unknown; do not replay automatically"
+          },
+          "503": {
+            "description": "No dispatch: disabled, manual suspension, revoked owner, quota, cold-wake deadline or admission busy"
+          },
+          "default": {
+            "description": "Original application HTTP status, headers and body"
+          }
+        }
+      },
+      "post": {
+        "operationId": "invokeFunctionPost",
+        "summary": "Raw application HTTP/SSE on the separate Functions origin",
+        "description": "Public opt-in only. Application authentication/CORS is the handler responsibility. Control cookies, Set-Cookie and proxy/platform headers are excluded. This listener never serves Console API. No automatic invocation replay; 502 can mean unknown execution outcome. Fifteen-minute request bound; no WebSocket.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "branch",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^br_[a-f0-9]{16}$"
+            }
+          },
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9]{1,20}$"
+            }
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Original application response (other application statuses are also forwarded)",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "421": {
+            "description": "Configured authority rejected"
+          },
+          "422": {
+            "description": "Invalid method/path/header rejected before cold wake"
+          },
+          "413": {
+            "description": "Body exceeds 1 MiB"
+          },
+          "426": {
+            "description": "WebSocket unavailable"
+          },
+          "502": {
+            "description": "Dispatch outcome unknown; do not replay automatically"
+          },
+          "503": {
+            "description": "No dispatch: disabled, manual suspension, revoked owner, quota, cold-wake deadline or admission busy"
+          },
+          "default": {
+            "description": "Original application HTTP status, headers and body"
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary",
+                "maxLength": 1048576
+              }
+            },
+            "application/json": {
+              "schema": {}
+            }
+          }
+        }
+      },
+      "put": {
+        "operationId": "invokeFunctionPut",
+        "summary": "Raw application HTTP/SSE on the separate Functions origin",
+        "description": "Public opt-in only. Application authentication/CORS is the handler responsibility. Control cookies, Set-Cookie and proxy/platform headers are excluded. This listener never serves Console API. No automatic invocation replay; 502 can mean unknown execution outcome. Fifteen-minute request bound; no WebSocket.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "branch",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^br_[a-f0-9]{16}$"
+            }
+          },
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9]{1,20}$"
+            }
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Original application response (other application statuses are also forwarded)",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "421": {
+            "description": "Configured authority rejected"
+          },
+          "422": {
+            "description": "Invalid method/path/header rejected before cold wake"
+          },
+          "413": {
+            "description": "Body exceeds 1 MiB"
+          },
+          "426": {
+            "description": "WebSocket unavailable"
+          },
+          "502": {
+            "description": "Dispatch outcome unknown; do not replay automatically"
+          },
+          "503": {
+            "description": "No dispatch: disabled, manual suspension, revoked owner, quota, cold-wake deadline or admission busy"
+          },
+          "default": {
+            "description": "Original application HTTP status, headers and body"
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary",
+                "maxLength": 1048576
+              }
+            },
+            "application/json": {
+              "schema": {}
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "invokeFunctionPatch",
+        "summary": "Raw application HTTP/SSE on the separate Functions origin",
+        "description": "Public opt-in only. Application authentication/CORS is the handler responsibility. Control cookies, Set-Cookie and proxy/platform headers are excluded. This listener never serves Console API. No automatic invocation replay; 502 can mean unknown execution outcome. Fifteen-minute request bound; no WebSocket.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "branch",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^br_[a-f0-9]{16}$"
+            }
+          },
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9]{1,20}$"
+            }
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Original application response (other application statuses are also forwarded)",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "421": {
+            "description": "Configured authority rejected"
+          },
+          "422": {
+            "description": "Invalid method/path/header rejected before cold wake"
+          },
+          "413": {
+            "description": "Body exceeds 1 MiB"
+          },
+          "426": {
+            "description": "WebSocket unavailable"
+          },
+          "502": {
+            "description": "Dispatch outcome unknown; do not replay automatically"
+          },
+          "503": {
+            "description": "No dispatch: disabled, manual suspension, revoked owner, quota, cold-wake deadline or admission busy"
+          },
+          "default": {
+            "description": "Original application HTTP status, headers and body"
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary",
+                "maxLength": 1048576
+              }
+            },
+            "application/json": {
+              "schema": {}
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "invokeFunctionDelete",
+        "summary": "Raw application HTTP/SSE on the separate Functions origin",
+        "description": "Public opt-in only. Application authentication/CORS is the handler responsibility. Control cookies, Set-Cookie and proxy/platform headers are excluded. This listener never serves Console API. No automatic invocation replay; 502 can mean unknown execution outcome. Fifteen-minute request bound; no WebSocket.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "branch",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^br_[a-f0-9]{16}$"
+            }
+          },
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9]{1,20}$"
+            }
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Original application response (other application statuses are also forwarded)",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "421": {
+            "description": "Configured authority rejected"
+          },
+          "422": {
+            "description": "Invalid method/path/header rejected before cold wake"
+          },
+          "413": {
+            "description": "Body exceeds 1 MiB"
+          },
+          "426": {
+            "description": "WebSocket unavailable"
+          },
+          "502": {
+            "description": "Dispatch outcome unknown; do not replay automatically"
+          },
+          "503": {
+            "description": "No dispatch: disabled, manual suspension, revoked owner, quota, cold-wake deadline or admission busy"
+          },
+          "default": {
+            "description": "Original application HTTP status, headers and body"
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary",
+                "maxLength": 1048576
+              }
+            },
+            "application/json": {
+              "schema": {}
+            }
+          }
+        }
+      },
+      "options": {
+        "operationId": "invokeFunctionOptions",
+        "summary": "Raw application HTTP/SSE on the separate Functions origin",
+        "description": "Public opt-in only. Application authentication/CORS is the handler responsibility. Control cookies, Set-Cookie and proxy/platform headers are excluded. This listener never serves Console API. No automatic invocation replay; 502 can mean unknown execution outcome. Fifteen-minute request bound; no WebSocket.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "branch",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^br_[a-f0-9]{16}$"
+            }
+          },
+          {
+            "in": "path",
+            "name": "slug",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9]{1,20}$"
+            }
+          }
+        ],
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Original application response (other application statuses are also forwarded)",
+            "content": {
+              "application/octet-stream": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "421": {
+            "description": "Configured authority rejected"
+          },
+          "422": {
+            "description": "Invalid method/path/header rejected before cold wake"
+          },
+          "413": {
+            "description": "Body exceeds 1 MiB"
+          },
+          "426": {
+            "description": "WebSocket unavailable"
+          },
+          "502": {
+            "description": "Dispatch outcome unknown; do not replay automatically"
+          },
+          "503": {
+            "description": "No dispatch: disabled, manual suspension, revoked owner, quota, cold-wake deadline or admission busy"
+          },
+          "default": {
+            "description": "Original application HTTP status, headers and body"
+          }
+        },
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary",
+                "maxLength": 1048576
+              }
+            },
+            "application/json": {
+              "schema": {}
+            }
+          }
+        }
+      }
+    }
+  }
+}

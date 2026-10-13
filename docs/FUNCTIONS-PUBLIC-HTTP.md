@@ -62,6 +62,8 @@ idle_suspended、actor_id、updated_at。超时继续使用 definition.idle_time
 PUT/PATCH/DELETE/OPTIONS、真实状态/正文/Location、SSE flush。请求正文上限 1 MiB，
 headers 16 KiB；每个调用最多 15 分钟。本版本没有 request streaming 或 WS upgrade。
 Header 中代理与平台身份不传入 Node；不自动跟随应用重定向。
+公开入口合同见 `contracts/functions-http-v1.json`；Control Swagger 仍使用
+`contracts/openapi-v1.json`，包含完整 policy mutation 和返回类型。
 
 策略 owner 必须未禁用且持续拥有当前项目 Editor 权限，项目/组织/分支必须 ready/active。
 每次请求重新检查；跨分支路径匹配原 scope。响应不泄漏 manager 地址、密钥或 SQL URL。
@@ -94,6 +96,8 @@ sequenceDiagram
 公开和 Console 调用都持有同一 PostgreSQL **会话级共享 advisory lock**，直到正文/
 stream 结束；Idle controller 每 5 秒尝试独占锁，锁不到就跳过。专用连接不可在锁定
 状态返还 pool；unlock 失败关闭物理连接。controller 仍在既有 Worker leadership 下运行。
+每个进程按 metadata pool 大小限制持锁数量，并保留查询连接余量；池满或独占回收
+期间拒绝新 admission，返回 dispatch 前的 503，避免所有连接持锁后互相等待查询。
 原 supervisor 的 active count/last activity 是回收依据，不信任客户 Node 的后台计数。
 运营方明确开启策略时承认后台任务可能因 idle eviction 结束；不虚称支持持久任务队列。
 

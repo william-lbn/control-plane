@@ -17,6 +17,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -28,18 +29,20 @@ import (
 var migrations embed.FS
 
 type server struct {
-	db             *pgxpool.Pool
-	kube           *kubeClient
-	logger         *slog.Logger
-	idempotencyKey []byte
-	proxyHost      string
-	proxyPort      string
-	secureCookies  bool
-	backendKeys    *backendKeyring
-	processRole    processRole
-	storage        *storageBlobs
-	functions      *functionsPlatform
-	ai             *aigateway.Config
+	db                *pgxpool.Pool
+	kube              *kubeClient
+	logger            *slog.Logger
+	idempotencyKey    []byte
+	proxyHost         string
+	proxyPort         string
+	secureCookies     bool
+	backendKeys       *backendKeyring
+	processRole       processRole
+	storage           *storageBlobs
+	functions         *functionsPlatform
+	ai                *aigateway.Config
+	functionSlotsOnce sync.Once
+	functionSlots     chan struct{}
 }
 
 func env(name, fallback string) string {

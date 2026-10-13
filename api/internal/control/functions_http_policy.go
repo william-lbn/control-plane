@@ -124,6 +124,24 @@ func (s *server) functionHTTPPolicy(w http.ResponseWriter, r *http.Request) {
 // Close on unlock failure so the pool never transfers an advisory lock owner.
 // This is a cooperative admission barrier, not an external guest epoch fence.
 func (s *server) functionAdmissionLock(ctx context.Context, id string, exclusive bool) (func(), bool) {
+	// A held lock consumes a pool connection while metadata checks need another.
+	// Reserve query headroom rather than letting all requests hold the complete
+	// pool and deadlock each other until their invocation deadlines expire.
+	s.functionSlotsOnce.Do(func() {
+		limit := max(1, min(16, int(s.db.Config().MaxConns-1)/2))
+		s.functionSlots = make(chan struct{}, limit)
+	})
+	select {
+	case s.functionSlots <- struct{}{}:
+	default:
+		return nil, false
+	}
+	acquired := false
+	defer func() {
+		if !acquired {
+			<-s.functionSlots
+		}
+	}()
 	connection, e := s.db.Acquire(ctx)
 	if e != nil {
 		return nil, false
@@ -144,7 +162,9 @@ func (s *server) functionAdmissionLock(ctx context.Context, id string, exclusive
 		connection.Release()
 		return nil, false
 	}
+	acquired = true
 	return func() {
+		defer func() { <-s.functionSlots }()
 		c, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
 		var released bool
