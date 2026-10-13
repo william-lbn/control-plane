@@ -121,6 +121,9 @@ func RunWorker(ctx context.Context) error {
 }
 
 func runProcess(ctx context.Context, role processRole) error {
+	if err := validateFunctionPublicOrigin(); err != nil {
+		return err
+	}
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	if _, err := sqlConnectTimeout(); err != nil {
 		return err
@@ -210,6 +213,11 @@ func runProcess(ctx context.Context, role processRole) error {
 	httpServer := &http.Server{Addr: addr, Handler: handler, ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout: 30 * time.Second, WriteTimeout: 195 * time.Second, IdleTimeout: 60 * time.Second}
 	errCh := make(chan error, 2)
+	var functionsHTTP *http.Server
+	if role != roleWorker && s.functions != nil && functionPublicOrigin() != "" {
+		functionsHTTP = &http.Server{Addr: env("NEON_FUNCTIONS_PUBLIC_BIND", ":8792"), Handler: s.functionPublicHandler(), ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
+		go func() { errCh <- functionsHTTP.ListenAndServe() }()
+	}
 	if role == roleWorker && s.functions != nil {
 		go func() { errCh <- s.serveFunctionArtifacts(processCtx, leadership) }()
 	}
@@ -231,6 +239,11 @@ func runProcess(ctx context.Context, role processRole) error {
 	cancelProcess()
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
+	if functionsHTTP != nil {
+		if err := functionsHTTP.Shutdown(shutdownCtx); err != nil {
+			functionsHTTP.Close()
+		}
+	}
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {
 		return fmt.Errorf("shutdown: %w", err)
 	}

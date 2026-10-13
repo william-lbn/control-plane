@@ -23,6 +23,14 @@ aiGateway:
 # Existing Secrets are operator-managed and are retained across Helm upgrades.
 functions:
   enabled: false
+  # Dedicated web origin. Never proxy customer responses through Console nginx.
+  # With a shared lab host, Cookie/Set-Cookie are suppressed in both directions.
+  publicHTTP:
+    enabled: false
+    origin: ''
+    labHTTP: false
+    serviceType: ClusterIP
+    nodePort: 30892
   existingConfigSecret: ''
   existingIssuerSecret: ''
   proxyCASecret: ''

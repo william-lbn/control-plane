@@ -44,7 +44,11 @@ spec:
           image: {{ required "api.image.reference is required" .Values.api.image.reference | quote }}
           imagePullPolicy: {{ .Values.api.image.pullPolicy }}
           securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
-          ports: [{name: http, containerPort: 8788}]
+          ports:
+            - {name: http, containerPort: 8788}
+            {{- if and .Values.functions.enabled .Values.functions.publicHTTP.enabled }}
+            - {name: functions-http, containerPort: 8792}
+            {{- end }}
           resources: {{ toYaml .Values.api.resources | nindent 12 }}
           env:
             - {name: NEON_CONTROL_PROCESS_ROLE, value: {{ ternary "api" "all" .Values.worker.enabled | quote }}}
@@ -113,3 +117,22 @@ metadata:
 spec:
   selector: {app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: api}
   ports: [{name: http, port: 8788, targetPort: http}]
+{{- if and .Values.functions.enabled .Values.functions.publicHTTP.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}-functions-http
+  labels:
+    {{- include "neonControl.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.functions.publicHTTP.serviceType }}
+  selector: {app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: api}
+  ports:
+    - name: functions-http
+      port: 8792
+      targetPort: functions-http
+      {{- if eq .Values.functions.publicHTTP.serviceType "NodePort" }}
+      nodePort: {{ .Values.functions.publicHTTP.nodePort }}
+      {{- end }}
+{{- end }}

@@ -7,6 +7,7 @@ import { route } from '../../api';
 import './functions.css';
 import './authoring.css';
 import { RuntimePanel } from './RuntimePanel';
+import { HTTPPolicyPanel } from './HTTPPolicyPanel';
 
 type FunctionDefinition = {
   id: string;
@@ -21,6 +22,10 @@ type FunctionDefinition = {
   active_deployment_id: string | null;
   target_deployment_id: string | null;
   invocation_url: string | null;
+  public_enabled?: boolean;
+  idle_enabled?: boolean;
+  idle_suspended?: boolean;
+  idle_timeout_seconds: number;
   runtime_observed: boolean;
 };
 type Deployment = {
@@ -358,7 +363,7 @@ export function Functions({
         <strong>{driver ? '原生 microVM 函数执行预览' : '此集群尚未启用函数部署与调用'}</strong>
         <p>
           {driver
-            ? '支持不可变 ZIP、环境版本、受控调用和手动停止。公开 HTTP/SSE/WS、自动休眠与生产准入仍需独立验收。数据库 owner 须明确授权；此页面不代替授权修改共享 PUBLIC 权限。'
+            ? '支持不可变 ZIP、环境版本、受控调用和手动停止。可显式开启独立 HTTP/SSE 入口及自动休眠唤醒；WebSocket、外部栅栏和生产准入尚未完成。数据库 owner 须明确授权；此页面不代替授权修改共享 PUBLIC 权限。'
             : '当前可查看已保存的定义和历史。部署、公开访问、数据库授权及休眠唤醒需通过独立验收后开放。'}
         </p>
       </section>
@@ -482,6 +487,18 @@ export function Functions({
                   version={current.version_token}
                   disabled={busy}
                 />
+                {driver && (
+                  <HTTPPolicyPanel
+                    key={`${current.id}/${current.version_token}`}
+                    path={`${path}/${current.slug}`}
+                    version={current.version_token}
+                    enabled={!!current.public_enabled}
+                    idle={!!current.idle_enabled}
+                    timeout={current.idle_timeout_seconds}
+                    canEdit={canEdit && !busy}
+                    onSaved={() => setRefresh((v) => v + 1)}
+                  />
+                )}
                 {driver && canEdit && (
                   <section className="function-authoring">
                     <h3>代码与环境版本</h3>

@@ -1,3 +1,6 @@
+{{- if and .Values.functions.publicHTTP.enabled (not .Values.functions.enabled) -}}
+{{- fail "Functions publicHTTP requires functions.enabled" -}}
+{{- end -}}
 {{- if .Values.functions.enabled -}}
 {{- if or (not .Values.worker.enabled) (not .Values.objectStorage.enabled) -}}
 {{- fail "Functions preview requires separate Worker and configured product Object Storage" -}}

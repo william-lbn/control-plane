@@ -87,6 +87,11 @@ func (s *server) functionStop(w http.ResponseWriter, r *http.Request) {
 	payload, _ := json.Marshal(p)
 	_, err = tx.Exec(r.Context(), `UPDATE function_definitions SET state=$2,generation=$3,version=version+1,updated_at=now() WHERE id=$1`, id, next, p.Generation)
 	if err == nil {
+		// Atomic marker avoids a crash between a durable stop and reopening wake.
+		automatic, _ := r.Context().Value(functionAutomaticStopKey{}).(bool)
+		_, err = tx.Exec(r.Context(), `UPDATE function_http_policies SET idle_suspended=$2 WHERE function_id=$1`, id, automatic)
+	}
+	if err == nil {
 		_, err = tx.Exec(r.Context(), `INSERT INTO operations(id,project_id,resource_type,resource_id,action,state,actor_id,request_id,payload) VALUES($1,$2,'function',$3,$4,'queued',$5,$6,$7)`, op, p.ProjectID, id, action, userFrom(r).ID, requestID(r), payload)
 	}
 	if err == nil {

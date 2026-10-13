@@ -1,10 +1,12 @@
 package control
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"regexp"
 	"strconv"
+	"time"
 
 	"github.com/william-lbn/control-plane/api/internal/functions"
 )
@@ -76,6 +78,15 @@ func (s *server) functionReadSummary(item record) {
 	// A deployment can be retained or have failed since the last VM observation.
 	// Never invent a public invocation URL or infer Node readiness from state.
 	item["invocation_url"] = nil
+	var public, idle, asleep bool
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	if s.db.QueryRow(ctx, `SELECT public_enabled,idle_enabled,idle_suspended FROM function_http_policies WHERE function_id=$1`, item["id"]).Scan(&public, &idle, &asleep) == nil {
+		item["public_enabled"], item["idle_enabled"], item["idle_suspended"] = public, idle, asleep
+		if public && functionPublicOrigin() != "" {
+			item["invocation_url"] = functionPublicOrigin() + "/functions/v1/" + fmt.Sprint(item["branch_id"]) + "/" + fmt.Sprint(item["slug"])
+		}
+	}
 	item["runtime_observed"] = false
 	item["driver_enabled"] = s.functions != nil
 	item["version_token"] = fmt.Sprint(item["version"])

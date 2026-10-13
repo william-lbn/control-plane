@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.19.0",
+    "version": "0.20.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -2649,6 +2649,15 @@
             "type": "string",
             "pattern": "^[1-9][0-9]*$",
             "description": "Exact bigint version; send quoted in If-Match rather than rounding through JavaScript number."
+          },
+          "public_enabled": {
+            "type": "boolean"
+          },
+          "idle_enabled": {
+            "type": "boolean"
+          },
+          "idle_suspended": {
+            "type": "boolean"
           }
         }
       },
@@ -13831,6 +13840,147 @@
           }
         },
         "description": "Current project Editor+ and owner-only access. Versioned AES-GCM envelopes bind owner/project/id/generation. Durable mutation replay contains metadata only."
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/functions/{slug}/http-policy": {
+      "patch": {
+        "operationId": "setFunctionHTTPPolicy",
+        "tags": [
+          "Functions"
+        ],
+        "summary": "Opt in to a separate public HTTP origin and idle eviction/cold wake",
+        "description": "Editor authorization, durable metadata-only Idempotency-Key replay and exact numeric If-Match. Existing functions remain private. Idle eviction ends background work after active requests/streams finish. Manual suspension is not automatically woken. Cookie and WebSocket are not supported on this preview listener.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          },
+          {
+            "$ref": "#/components/parameters/resourceVersion"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "public_enabled",
+                  "idle_enabled",
+                  "idle_timeout_seconds",
+                  "acknowledge_public_access_and_background_eviction"
+                ],
+                "properties": {
+                  "public_enabled": {
+                    "type": "boolean"
+                  },
+                  "idle_enabled": {
+                    "type": "boolean"
+                  },
+                  "idle_timeout_seconds": {
+                    "type": "integer",
+                    "minimum": 30,
+                    "maximum": 3600
+                  },
+                  "acknowledge_public_access_and_background_eviction": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed metadata policy; no runtime probe or invocation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "function_id",
+                    "version_token",
+                    "public_enabled",
+                    "idle_enabled",
+                    "idle_timeout_seconds"
+                  ],
+                  "properties": {
+                    "function_id": {
+                      "type": "string"
+                    },
+                    "version_token": {
+                      "type": "string"
+                    },
+                    "public_enabled": {
+                      "type": "boolean"
+                    },
+                    "idle_enabled": {
+                      "type": "boolean"
+                    },
+                    "idle_timeout_seconds": {
+                      "type": "integer",
+                      "minimum": 30,
+                      "maximum": 3600
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
       }
     }
   }

@@ -2,6 +2,17 @@
 {{- if .Values.functions.enabled }}
 - {name: NEON_FUNCTIONS_PREVIEW_ENABLED, value: 'true'}
 - {name: NEON_FUNCTIONS_CONFIG_FILE, value: /run/functions-common/config.json}
+{{- if .Values.functions.publicHTTP.enabled }}
+{{- if eq .Values.functions.publicHTTP.origin .Values.managedAuth.publicOrigin }}
+{{- fail "Functions HTTP must use a separate origin from Console/Auth" }}
+{{- end }}
+{{- if and (hasPrefix "http://" .Values.functions.publicHTTP.origin) (not .Values.functions.publicHTTP.labHTTP) }}
+{{- fail "Functions cleartext requires explicit functions.publicHTTP.labHTTP" }}
+{{- end }}
+- {name: NEON_FUNCTIONS_PUBLIC_ORIGIN, value: {{ required "Functions publicHTTP.origin is required" .Values.functions.publicHTTP.origin | quote }}}
+- {name: NEON_FUNCTIONS_PUBLIC_BIND, value: ':8792'}
+- {name: NEON_FUNCTIONS_PUBLIC_LAB_HTTP, value: {{ .Values.functions.publicHTTP.labHTTP | quote }}}
+{{- end }}
 {{- end }}
 {{- if .Values.objectStorage.enabled }}
 - {name: NEON_OBJECT_STORAGE_CONFIG_FILE, value: /run/product-storage/config.json}

@@ -409,6 +409,40 @@
         "proxyCAKey": {
           "type": "string",
           "maxLength": 253
+        },
+        "publicHTTP": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "origin",
+            "labHTTP",
+            "serviceType",
+            "nodePort"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "origin": {
+              "type": "string",
+              "maxLength": 255
+            },
+            "labHTTP": {
+              "type": "boolean"
+            },
+            "serviceType": {
+              "enum": [
+                "ClusterIP",
+                "NodePort"
+              ]
+            },
+            "nodePort": {
+              "type": "integer",
+              "minimum": 30000,
+              "maximum": 32767
+            }
+          }
         }
       },
       "allOf": [

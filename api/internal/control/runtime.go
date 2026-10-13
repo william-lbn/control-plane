@@ -162,6 +162,9 @@ func (s *server) runLeaderControllers(ctx context.Context, role processRole, sta
 	start(s.runWorker)
 	start(s.runMonitor)
 	start(s.cleanSessions)
+	if s.functions != nil && functionPublicOrigin() != "" {
+		start(s.runFunctionIdleController)
+	}
 	if os.Getenv("NEON_V2_SCALE_ZERO_ENABLED") == "true" {
 		start(s.runIdleController)
 	}

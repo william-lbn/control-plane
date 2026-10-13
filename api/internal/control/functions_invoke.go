@@ -42,6 +42,12 @@ func (s *server) functionConsoleInvoke(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	p, instance, bootID := runtime.target, runtime.instance, runtime.bootID
+	release, admitted := s.functionAdmissionLock(ctx, p.FunctionID, false)
+	if !admitted {
+		fail(w, r, 503, "function_admission_busy", "Function retirement admission busy; request not dispatched")
+		return
+	}
+	defer release()
 	if input.Headers == nil {
 		input.Headers = map[string][]string{}
 	}

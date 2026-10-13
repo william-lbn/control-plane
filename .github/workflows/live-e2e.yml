@@ -5,7 +5,7 @@ on:
       suite:
         description: Real Linux UI acceptance slice
         type: choice
-        options: [native-product.spec.ts, restore.spec.ts, lifecycle.spec.ts, endpoint-deletion.spec.ts, data-api.spec.ts, backend-credentials.spec.ts, console-invitations.spec.ts, managed-auth.spec.ts, object-storage.spec.ts, functions-metadata.spec.ts, functions-native.spec.ts, functions-observation.spec.ts, functions-wake.spec.ts, database-owner.spec.ts, sql-script.spec.ts, sql-tools.spec.ts, functions-rollback.spec.ts, ai-gateway.spec.ts, saved-queries.spec.ts]
+        options: [native-product.spec.ts, restore.spec.ts, lifecycle.spec.ts, endpoint-deletion.spec.ts, data-api.spec.ts, backend-credentials.spec.ts, console-invitations.spec.ts, managed-auth.spec.ts, object-storage.spec.ts, functions-metadata.spec.ts, functions-native.spec.ts, functions-observation.spec.ts, functions-http.spec.ts, functions-wake.spec.ts, database-owner.spec.ts, sql-script.spec.ts, sql-tools.spec.ts, functions-rollback.spec.ts, ai-gateway.spec.ts, saved-queries.spec.ts]
         default: native-product.spec.ts
       poll_fault:
         description: Inject transient read failures for native/Data API observation recovery
@@ -53,7 +53,7 @@ jobs:
           test -n "$ADMIN_PASSWORD"
           case "$NEON_E2E_SUITE" in
             native-product.spec.ts|restore.spec.ts|lifecycle.spec.ts|endpoint-deletion.spec.ts|data-api.spec.ts|console-invitations.spec.ts|managed-auth.spec.ts|object-storage.spec.ts|functions-native.spec.ts) ;;
-            functions-observation.spec.ts|functions-wake.spec.ts|functions-rollback.spec.ts) test -f "$NEON_E2E_FUNCTIONS_MONITOR_FIXTURE" ;;
+            functions-http.spec.ts|functions-observation.spec.ts|functions-wake.spec.ts|functions-rollback.spec.ts) test -f "$NEON_E2E_FUNCTIONS_MONITOR_FIXTURE" ;;
             database-owner.spec.ts) test -f "$NEON_E2E_CATALOG_OWNER_FIXTURE" ;;
             sql-script.spec.ts|sql-tools.spec.ts) test -f "$NEON_E2E_SQL_SCRIPT_FIXTURE" ;;
             backend-credentials.spec.ts|functions-metadata.spec.ts|ai-gateway.spec.ts|saved-queries.spec.ts) [[ "$NEON_E2E_CREDENTIAL_PROJECT" =~ ^prj_[a-f0-9]{16}$ ]] ;;
@@ -66,11 +66,15 @@ jobs:
       - run: npx playwright install --with-deps chromium
         working-directory: web
       - name: Package pinned Functions example outside the checkout
-        if: inputs.suite == 'functions-native.spec.ts' || inputs.suite == 'functions-observation.spec.ts' || inputs.suite == 'functions-wake.spec.ts' || inputs.suite == 'functions-rollback.spec.ts'
+        if: inputs.suite == 'functions-http.spec.ts' || inputs.suite == 'functions-native.spec.ts' || inputs.suite == 'functions-observation.spec.ts' || inputs.suite == 'functions-wake.spec.ts' || inputs.suite == 'functions-rollback.spec.ts'
         run: |
           npm ci --prefix examples/functions/postgres --ignore-scripts --no-audit --fund=false
           node tools/package-function-example.mjs examples/functions/postgres "$NEON_E2E_PRIVATE_DIR/function-example.zip"
           echo "NEON_E2E_FUNCTION_ZIP=$NEON_E2E_PRIVATE_DIR/function-example.zip" >> "$GITHUB_ENV"
+          if [ "$NEON_E2E_SUITE" = functions-http.spec.ts ]; then
+            node tools/rebundle-function-example.mjs "$NEON_E2E_PRIVATE_DIR/function-example.zip" examples/functions/http/index.mjs "$NEON_E2E_PRIVATE_DIR/function-http.zip"
+            echo "NEON_E2E_FUNCTION_ZIP=$NEON_E2E_PRIVATE_DIR/function-http.zip" >> "$GITHUB_ENV"
+          fi
           if [ "$NEON_E2E_SUITE" = functions-rollback.spec.ts ]; then
             node tools/package-function-example.mjs examples/functions/replacement "$NEON_E2E_PRIVATE_DIR/function-replacement.zip"
             echo "NEON_E2E_FUNCTION_ROLLBACK_ZIP=$NEON_E2E_PRIVATE_DIR/function-replacement.zip" >> "$GITHUB_ENV"
