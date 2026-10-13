@@ -120,3 +120,14 @@ until the real microVM, native Driver, Console and zero/wake acceptance exist.
 ## 2026-10-13：真实本地 AI Gateway
 
 `73ae9bb` / Helm 0.1.26 已完成独立 Go 网关、React 目录/Playground、分支应用授权、文本 JSON/SSE 与 PostgreSQL 用量，真实 Windows Ollama 小模型由 Linux 浏览器端到端调用，九组检查通过且没有创建 Compute。外部模型账号不再阻塞本地推理闭环。动态供应商 UI、其他协议/计费仍继续开发；接着实现个人保存查询，不重复历史全量 UI 套件。
+
+## 2026-10-13：个人保存查询已完成现场验收
+
+`8c1b777` / Helm 0.1.27 已完成个人 SQL 草稿保存、重载、加载、更新、删除、
+版本化 AES-GCM 加密、元数据幂等重放、Owner/租户隔离和审计。首次实际 Linux UI
+六组检查通过，AI Gateway 在同一版本九组回归通过；没有执行 SQL 或创建 Compute。
+772 个公开 Linux Go/PG 测试零失败、零跳过。准确接口和复测见
+[SAVED-QUERIES.md](SAVED-QUERIES.md)及[当前交付](DELIVERY-2026-10-13-SAVED-QUERIES.md)。
+历史源/失败记录保留，不把完成的切片重复记为待开发。下一批优先 Functions
+公开独立入口/自动休眠冷醒、对象 S3 兼容和 Auth 本地高级流程；后续继续按功能闭环
+实现及串行验收，域名/商业模型/外部 IdP 输入仍后置。所有生产门槛继续以当前清单为准。
