@@ -1399,17 +1399,79 @@ textarea:focus {
 }
 
 /* Product inference and personal SQL controls share the Console's typography. */
-.ai-workspace > .panel { padding: 20px 24px; margin-bottom: 20px; }
-.ai-playground { padding: 24px; margin: 20px 0; }
-.ai-playground label { display: flex; flex-direction: column; gap: 8px; margin: 16px 0; font-size: 13px; color: #aab7be; }
-.ai-playground select, .ai-playground textarea { width: 100%; }
-.ai-playground textarea { min-height: 120px; padding: 14px; resize: vertical; line-height: 1.6; }
-.ai-playground label.ai-stream-mode { flex-direction: row; align-items: center; }
-.ai-response { white-space: pre-wrap; min-height: 110px; margin: 20px 0 10px; padding: 18px; border: 1px solid #2c383d; border-radius: 8px; background: #0e1518; line-height: 1.7; overflow-wrap: anywhere; }
-.ai-workspace .table-card > .panel-heading { padding: 20px 24px; }
-.saved-query-panel { border: 1px solid #2c383d; border-radius: 8px; margin: 0 0 20px; padding: 20px; }
-.saved-query-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 14px 0; }
-.saved-query-controls label { display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
-.saved-query-controls input, .saved-query-controls select { width: 100%; }
-.saved-query-actions { display: flex; gap: 10px; flex-wrap: wrap; }
-@media (max-width: 900px) { .saved-query-controls { grid-template-columns: 1fr; } }
+.ai-workspace > .panel {
+  padding: 20px 24px;
+  margin-bottom: 20px;
+}
+.ai-playground {
+  padding: 24px;
+  margin: 20px 0;
+}
+.ai-playground label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 16px 0;
+  font-size: 13px;
+  color: #aab7be;
+}
+.ai-playground select,
+.ai-playground textarea {
+  width: 100%;
+}
+.ai-playground textarea {
+  min-height: 120px;
+  padding: 14px;
+  resize: vertical;
+  line-height: 1.6;
+}
+.ai-playground label.ai-stream-mode {
+  flex-direction: row;
+  align-items: center;
+}
+.ai-response {
+  white-space: pre-wrap;
+  min-height: 110px;
+  margin: 20px 0 10px;
+  padding: 18px;
+  border: 1px solid #2c383d;
+  border-radius: 8px;
+  background: #0e1518;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.ai-workspace .table-card > .panel-heading {
+  padding: 20px 24px;
+}
+.saved-query-panel {
+  border: 1px solid #2c383d;
+  border-radius: 8px;
+  margin: 0 0 20px;
+  padding: 20px;
+}
+.saved-query-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 14px 0;
+}
+.saved-query-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+}
+.saved-query-controls input,
+.saved-query-controls select {
+  width: 100%;
+}
+.saved-query-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+@media (max-width: 900px) {
+  .saved-query-controls {
+    grid-template-columns: 1fr;
+  }
+}

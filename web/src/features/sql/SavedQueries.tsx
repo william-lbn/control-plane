@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api, projectPath } from '../../api';
+import { newRequestKey } from '../../shared/requestKey';
 type Saved = { id: string; name: string; generation: number; updated_at: string };
 export function SavedQueries({
   projectId,
@@ -54,7 +55,7 @@ export function SavedQueries({
       const result = await api<{ query: Saved }>(path, {
         method: action === 'create' ? 'POST' : action === 'update' ? 'PATCH' : 'DELETE',
         headers: {
-          'Idempotency-Key': crypto.randomUUID(),
+          'Idempotency-Key': newRequestKey(),
           ...(current ? { 'If-Match': `"${current.generation}"` } : {}),
         },
         ...(action !== 'delete' ? { body: JSON.stringify({ name, sql }) } : {}),
