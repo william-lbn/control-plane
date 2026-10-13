@@ -154,7 +154,7 @@ func (s *server) backendCredentials(w http.ResponseWriter, r *http.Request) {
 		if more {
 			next = stringVal(items[len(items)-1]["id"])
 		}
-		jsonResponse(w, 200, map[string]any{"items": items, "has_more": more, "next_cursor": next, "enabled": s.backendKeys != nil, "inference_available": false})
+		jsonResponse(w, 200, map[string]any{"items": items, "has_more": more, "next_cursor": next, "enabled": s.backendKeys != nil, "inference_available": s.aiEnabled()})
 		return
 	}
 	s.mutateBackendCredential(w, r)
@@ -336,7 +336,7 @@ func (s *server) mutateBackendCredential(w http.ResponseWriter, r *http.Request)
 		fail(w, r, 503, "metadata_unavailable", "Could not collect credential result")
 		return
 	}
-	reply := map[string]any{"credential": items[0], "secret_available": false, "inference_available": false}
+	reply := map[string]any{"credential": items[0], "secret_available": false, "inference_available": s.aiEnabled()}
 	encoded, _ := json.Marshal(reply)
 	if _, err = tx.Exec(r.Context(), `INSERT INTO backend_credential_requests(actor_id,key_hash,request_hash,response) VALUES($1,$2,$3,$4)`, actor.ID, keyHash, requestHash, encoded); err != nil {
 		fail(w, r, 503, "metadata_unavailable", "Could not persist credential replay")
@@ -419,7 +419,7 @@ func (s *server) verifyBackendCredential(ctx context.Context, token, target, sco
 	if !permitted || effectivePermission(orgRole, grant) < 2 || !hasScope || !hasModel {
 		return nil, errBackendCredentialForbidden
 	}
-	return map[string]any{"valid": true, "credential_id": id, "branch_id": target, "scopes": scopes, "expires_at": expiry, "inference_available": false}, nil
+	return map[string]any{"valid": true, "credential_id": id, "branch_id": target, "scopes": scopes, "expires_at": expiry, "inference_available": s.aiEnabled()}, nil
 }
 
 // A Console-only access check provides a real authentication/lineage probe.

@@ -21,6 +21,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/william-lbn/control-plane/api/internal/aigateway"
 )
 
 //go:embed migrations/*.sql
@@ -38,6 +39,7 @@ type server struct {
 	processRole    processRole
 	storage        *storageBlobs
 	functions      *functionsPlatform
+	ai             *aigateway.Config
 }
 
 func env(name, fallback string) string {
@@ -150,6 +152,10 @@ func runProcess(ctx context.Context, role processRole) error {
 		proxyPort:     env("NEON_PROXY_PORT", "30432"),
 		secureCookies: os.Getenv("NEON_COOKIE_SECURE") == "true"}
 	s.backendKeys, err = loadBackendKeyring()
+	if err != nil {
+		return err
+	}
+	s.ai, err = loadAIConfig()
 	if err != nil {
 		return err
 	}

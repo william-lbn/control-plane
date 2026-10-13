@@ -1,0 +1,79 @@
+{{- if .Values.aiGateway.enabled -}}
+{{- $name := include "neonControl.name" . -}}
+{{- if not (and .Values.backendCredentials.enabled .Values.aiGateway.labHTTP) -}}
+{{- fail "AI Gateway preview requires backendCredentials.enabled and explicit aiGateway.labHTTP; production TLS is a separate gate" -}}
+{{- end -}}
+{{- if not (regexMatch "^[a-z0-9./-]+@sha256:[a-f0-9]{64}$" .Values.aiGateway.image) -}}
+{{- fail "AI Gateway requires an immutable digest image" -}}
+{{- end -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}-ai
+  labels:
+    {{- include "neonControl.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: ai}
+  template:
+    metadata:
+      labels:
+        {{- include "neonControl.labels" . | nindent 8 }}
+        app.kubernetes.io/component: ai
+    spec:
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+      securityContext: {runAsNonRoot: true, runAsUser: 65532, runAsGroup: 65532, fsGroup: 65532, seccompProfile: {type: RuntimeDefault}}
+      terminationGracePeriodSeconds: 15
+      containers:
+        - name: ai
+          image: {{ .Values.aiGateway.image | quote }}
+          imagePullPolicy: IfNotPresent
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+          ports: [{name: http, containerPort: 8791}]
+          resources: {{ toYaml .Values.aiGateway.resources | nindent 12 }}
+          env:
+            - {name: NEON_AI_BIND, value: ':8791'}
+            - {name: NEON_AI_CONFIG_FILE, value: /run/ai-config/config.json}
+            - {name: NEON_AI_DATABASE_URL_FILE, value: /run/ai-database/database-url}
+            - {name: NEON_BACKEND_CREDENTIAL_KEYS_FILE, value: /run/backend-keys/keyring.json}
+          volumeMounts:
+            - {name: ai-config, mountPath: /run/ai-config, readOnly: true}
+            - {name: ai-database, mountPath: /run/ai-database, readOnly: true}
+            - {name: backend-keys, mountPath: /run/backend-keys, readOnly: true}
+          startupProbe: {httpGet: {path: /readyz, port: http}, periodSeconds: 5, failureThreshold: 30}
+          readinessProbe: {httpGet: {path: /readyz, port: http}, periodSeconds: 10, timeoutSeconds: 3}
+          livenessProbe: {httpGet: {path: /healthz, port: http}, periodSeconds: 15}
+      volumes:
+        - name: ai-config
+          secret: {secretName: {{ required "aiGateway.existingConfigSecret required" .Values.aiGateway.existingConfigSecret }}, defaultMode: 0440}
+        - name: ai-database
+          secret:
+            secretName: {{ required "aiGateway.existingDatabaseSecret required" .Values.aiGateway.existingDatabaseSecret }}
+            defaultMode: 0440
+            items: [{key: database-url, path: database-url}]
+        - name: backend-keys
+          secret:
+            secretName: {{ .Values.backendCredentials.existingSecret }}
+            defaultMode: 0440
+            items: [{key: keyring.json, path: keyring.json}]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}-ai
+spec:
+  selector: {app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: ai}
+  ports: [{name: http, port: 8791, targetPort: http}]
+{{- end }}

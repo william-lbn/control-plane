@@ -128,7 +128,7 @@ export function BackendCredentials({
       });
       if (epoch.current === current)
         setCheckResult(
-          `授权通过 · ${value.credential_id} → ${value.branch_id}。此检查不调用模型，AI Gateway 推理仍待实现。`,
+          `授权通过 · ${value.credential_id} → ${value.branch_id}。此检查不调用模型；实际模型状态见 AI Gateway 页面。`,
         );
     } catch (error) {
       if (epoch.current === current) {
@@ -186,8 +186,8 @@ export function BackendCredentials({
         )}
       </div>
       <div className="subtle-note">
-        当前支持 ai_gateway:invoke 的凭据管理和真实授权检查。模型供应商、推理网关及 Playground
-        尚未启用；创建凭据不会产生可调用的模型服务。Token 到期会强制失效。
+        当前支持 ai_gateway:invoke 的凭据管理和真实授权检查。可用模型和 Playground 见 AI Gateway
+        页面；创建凭据本身不会部署模型服务。Token 到期会强制失效。
       </div>
       {oneTime && (
         <section

@@ -50,11 +50,18 @@ spec:
             - {name: NEON_CONTROL_PROCESS_ROLE, value: {{ ternary "api" "all" .Values.worker.enabled | quote }}}
             - {name: NEON_V2_BIND, value: ':8788'}
             - {name: NEON_V2_ADMIN_PASSWORD_FILE, value: /run/neon-secrets/admin-password}
+            {{- if .Values.aiGateway.enabled }}
+            - {name: NEON_AI_CONFIG_FILE, value: /run/ai-config/config.json}
+            - {name: NEON_AI_GATEWAY_URL, value: 'http://{{ $name }}-ai:8791'}
+            {{- end }}
             {{- if .Values.backendCredentials.enabled }}
             - {name: NEON_BACKEND_CREDENTIAL_KEYS_FILE, value: /run/backend-keys/keyring.json}
             {{- end }}
             {{- include "neonControl.runtimeEnv" . | nindent 12 }}
           volumeMounts:
+            {{- if .Values.aiGateway.enabled }}
+            - {name: ai-config, mountPath: /run/ai-config, readOnly: true}
+            {{- end }}
             {{- include "neonControl.functionsMounts" . | nindent 12 }}
             {{- if .Values.objectStorage.enabled }}
             - {name: product-storage, mountPath: /run/product-storage, readOnly: true}
@@ -70,6 +77,13 @@ spec:
           readinessProbe: {httpGet: {path: /readyz, port: http}, periodSeconds: 10, timeoutSeconds: 4, failureThreshold: 3}
           livenessProbe: {httpGet: {path: /healthz, port: http}, periodSeconds: 15, timeoutSeconds: 3, failureThreshold: 3}
       volumes:
+        {{- if .Values.aiGateway.enabled }}
+        - name: ai-config
+          secret:
+            secretName: {{ .Values.aiGateway.existingConfigSecret }}
+            defaultMode: 0440
+            items: [{key: config.json, path: config.json}]
+        {{- end }}
         {{- include "neonControl.functionsVolumes" . | nindent 8 }}
         {{- if .Values.objectStorage.enabled }}
         - name: product-storage

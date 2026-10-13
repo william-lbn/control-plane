@@ -227,6 +227,12 @@ function App() {
                 <span>♙</span>项目权限
               </a>
               <a
+                className={page === 'ai-gateway' ? 'active' : ''}
+                href={route(projectId, 'ai-gateway')}
+              >
+                <span>✧</span>AI Gateway
+              </a>
+              <a
                 className={page === 'credentials' ? 'active' : ''}
                 href={route(projectId, 'credentials')}
               >

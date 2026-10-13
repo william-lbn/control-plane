@@ -6,6 +6,18 @@ objectStorage:
   existingSecret: ''
 
 fullnameOverride: neon-control
+# Independent inference process. It has no Kubernetes service-account token.
+# config.json is an operator-approved immutable route snapshot; provider keys
+# are mounted only in the gateway, never in the Console or API projection.
+aiGateway:
+  enabled: false
+  image: ''
+  existingConfigSecret: ''
+  existingDatabaseSecret: ''
+  labHTTP: false
+  resources:
+    requests: {cpu: 50m, memory: 64Mi}
+    limits: {cpu: 500m, memory: 256Mi}
 # Native Functions preview uses private TLS between the Worker and microVM.
 # Config/MAC/public certificates are separate from Worker-only issuer keys.
 # Existing Secrets are operator-managed and are retained across Helm upgrades.

@@ -47,6 +47,11 @@ func (s *server) many(ctx context.Context, query string, args ...any) ([]record,
 
 func (s *server) routes() *http.ServeMux {
 	mux := http.NewServeMux()
+	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/ai-gateway", s.auth(http.HandlerFunc(s.aiRead), false))
+	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/ai-gateway/usage", s.auth(http.HandlerFunc(s.aiRead), false))
+	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/ai-gateway/request", s.auth(http.HandlerFunc(s.aiConsoleRequest), true))
+	mux.HandleFunc("GET /ai/v1/{aiBranch}/v1/models", s.aiRelay)
+	mux.HandleFunc("POST /ai/v1/{aiBranch}/v1/chat/completions", s.aiRelay)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { jsonResponse(w, 200, map[string]string{"status": "ok"}) })
 	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
@@ -196,7 +201,7 @@ func (s *server) capabilities(w http.ResponseWriter, r *http.Request) {
 			"pitr_new_branch":    map[string]any{"enabled": pitrEnabled(), "reason": "retained_timestamp_or_lsn_new_branch"},
 		},
 		"services": map[string]any{"postgres": map[string]any{"enabled": true, "reason": "read_and_query_validated"},
-			"auth": map[string]any{"enabled": managedAuthEnabled(), "reason": "better_auth_branch_identity_lab_transport"}, "object_storage": map[string]any{"enabled": s.storage != nil, "reason": "branch_object_rest_v1_s3_gate_pending"}, "functions": map[string]any{"enabled": s.functions != nil, "reason": "native_microvm_console_envelope_preview", "public_http_enabled": false, "automatic_zero_enabled": false}, "ai_gateway": disabled,
+			"auth": map[string]any{"enabled": managedAuthEnabled(), "reason": "better_auth_branch_identity_lab_transport"}, "object_storage": map[string]any{"enabled": s.storage != nil, "reason": "branch_object_rest_v1_s3_gate_pending"}, "functions": map[string]any{"enabled": s.functions != nil, "reason": "native_microvm_console_envelope_preview", "public_http_enabled": false, "automatic_zero_enabled": false}, "ai_gateway": map[string]any{"enabled": s.aiEnabled(), "reason": "approved_routes_text_chat_preview", "production_qualified": false},
 			"data_api": map[string]any{"enabled": dataAPIEnabled(), "reason": "native_driver_lab_transport_gate"}},
 		"limits": map[string]any{"min_cpu_milli": 1000, "max_cpu_milli": 2000, "min_memory_mib": 1024, "max_memory_mib": 3072, "supported_memory_slot_mib": []int{1024}},
 	})

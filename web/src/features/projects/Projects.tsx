@@ -1,5 +1,6 @@
 import { ObjectStorage } from '../storage/ObjectStorage';
 import { Functions } from '../functions/Functions';
+import { AIGateway } from '../ai/AIGateway';
 import { useEffect, useState } from 'react';
 import { api, route, projectPath } from '../../api';
 import type {
@@ -180,6 +181,8 @@ export function ProjectWorkspace({
   const canAdmin = project.effective_permission === 'admin';
   if (page === 'functions')
     return <Functions projectId={projectId} branches={branches} canEdit={canEdit} />;
+  if (page === 'ai-gateway')
+    return <AIGateway projectId={projectId} branches={branches} canEdit={canEdit} />;
   if (page === 'storage')
     return (
       <ObjectStorage

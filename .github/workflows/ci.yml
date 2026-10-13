@@ -130,7 +130,7 @@ jobs:
     strategy:
       fail-fast: false
       max-parallel: 2
-      matrix: {component: [api, web, gateway, dataapi, postgrest, adapter, auth]}
+      matrix: {component: [api, web, gateway, dataapi, postgrest, adapter, auth, ai]}
     env:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}

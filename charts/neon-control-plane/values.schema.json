@@ -438,6 +438,38 @@
           }
         }
       ]
+    },
+    "aiGateway": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "image",
+        "existingConfigSecret",
+        "existingDatabaseSecret",
+        "labHTTP",
+        "resources"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "image": {
+          "type": "string"
+        },
+        "existingConfigSecret": {
+          "type": "string"
+        },
+        "existingDatabaseSecret": {
+          "type": "string"
+        },
+        "labHTTP": {
+          "type": "boolean"
+        },
+        "resources": {
+          "type": "object"
+        }
+      }
     }
   },
   "definitions": {

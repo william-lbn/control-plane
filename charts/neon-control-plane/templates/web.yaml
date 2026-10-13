@@ -1,11 +1,15 @@
 {{- $name := include "neonControl.name" . -}}
+{{- $config := .Files.Get "files/nginx.conf" -}}
+{{- if not .Values.aiGateway.enabled -}}
+{{- $config = regexReplaceAll "(?s)    location \\^~ /ai/v1/ \\{.*?    \\}\\r?\\n" $config "" -}}
+{{- end -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ $name }}-web
 data:
   nginx.conf: |
-    {{- .Files.Get "files/nginx.conf" | replace "neon-control-api:8788" (printf "%s-api:8788" $name) | nindent 4 }}
+    {{- $config | replace "neon-control-api:8788" (printf "%s-api:8788" $name) | replace "neon-control-ai:8791" (printf "%s-ai:8791" $name) | nindent 4 }}
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -24,7 +28,7 @@ spec:
         {{- include "neonControl.labels" . | nindent 8 }}
         app.kubernetes.io/component: web
       annotations:
-        checksum/config: {{ .Files.Get "files/nginx.conf" | sha256sum }}
+        checksum/config: {{ printf "%s-%t" (.Files.Get "files/nginx.conf") .Values.aiGateway.enabled | sha256sum }}
     spec:
       automountServiceAccountToken: false
       {{- with .Values.imagePullSecrets }}

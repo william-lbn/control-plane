@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "generation": 1,
+  "timeout_seconds": 120,
+  "max_concurrent_per_branch": 1,
+  "requests_per_minute": 12,
+  "routes": [{
+    "id": "local-small",
+    "name": "Ollama · Qwen 0.5B",
+    "provider": "openai_compatible",
+    "base_url": "http://127.0.0.1:11434/v1",
+    "upstream_model": "qwen2.5:0.5b",
+    "allowed_ips": ["127.0.0.1"],
+    "lab_allow_http": true,
+    "max_output_tokens": 256
+  }]
+}
