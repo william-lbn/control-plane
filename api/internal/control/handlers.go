@@ -328,6 +328,13 @@ func (s *server) branchServices(w http.ResponseWriter, r *http.Request) {
 	}
 	items := []record{}
 	for _, kind := range []string{"postgres", "auth", "object_storage", "functions", "ai_gateway", "data_api"} {
+		// Approved inference routes do not allocate a per-branch Compute. Report
+		// configuration separately from upstream health, instead of the legacy
+		// "driver_not_implemented" placeholder after a real gateway is installed.
+		if kind == "ai_gateway" && s.aiEnabled() && branch["state"] == "ready" {
+			items = append(items, record{"service_kind": kind, "desired_state": "active", "observed_state": "configured", "enabled": true, "reason": "approved_routes_text_chat_preview", "public_endpoint": "/ai/v1/" + stringVal(branch["id"]) + "/v1", "driver_version": "go-ai-text-chat-v1"})
+			continue
+		}
 		if item, ok := byKind[kind]; ok {
 			item["enabled"] = (kind == "postgres" || kind == "data_api" && dataAPIEnabled() || kind == "auth" && managedAuthEnabled() || kind == "object_storage" && s.storage != nil) && item["observed_state"] == "active"
 			item["reason"] = ""

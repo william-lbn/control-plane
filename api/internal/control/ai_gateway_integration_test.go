@@ -99,6 +99,10 @@ func TestAIGatewayIntegration(t *testing.T) {
 		t.Fatal("unauthorized inference reached provider")
 	}
 	reply := call("alice", "POST", "/api/v1/projects/prj_ai/branches/br_ai/ai-gateway/request", "", 200)
+	services := call("alice", "GET", "/api/v1/projects/prj_ai/branches/br_ai/services", "", 200)
+	if !strings.Contains(services.Body.String(), `"observed_state":"configured"`) || !strings.Contains(services.Body.String(), `"driver_version":"go-ai-text-chat-v1"`) {
+		t.Fatal("installed inference still advertised as an unimplemented branch service")
+	}
 	if !strings.Contains(reply.Body.String(), "actual upstream") || calls.Load() != 1 {
 		t.Fatal("Console did not invoke real independent gateway")
 	}
