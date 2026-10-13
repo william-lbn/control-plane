@@ -30,9 +30,11 @@ flowchart LR
 ```
 
 Console 原路径只返回 JSON envelope。公开服务没有 `/api/*`、Console 静态资源或
-Console 会话鉴权。`Host` 必须与运营方配置 origin 完全匹配。实验室可使用相同 IP
-的不同端口；浏览器 cookies 不按端口隔离，因此公开入口移除请求 Cookie 和响应
-Set-Cookie/Clear-Site-Data。应用可自行验证 Bearer/JWT；公开开关意味着匿名流量
+Console 会话鉴权。`Host` 必须与运营方配置 origin 完全匹配。实验室使用与 Console
+不同节点的 IP（Console .100，Functions .101）；端口本身不能隔离 Cookie，不能
+以移除 HTTP headers 代替 HTML/JavaScript 的主机隔离。Helm 拒绝相同 hostname/IP。
+公开入口额外移除请求 Cookie 和响应 Set-Cookie/Clear-Site-Data。
+应用可自行验证 Bearer/JWT；公开开关意味着匿名流量
 能够进入函数，必须明确确认。函数返回 HTML 仅在 Functions origin 执行。
 
 ## 3. 数据与 API
@@ -113,7 +115,7 @@ Operation。quota/原 Operation 失败不派发请求、不自动重放失败调
 ## 5. Helm 与复测
 
 `functions.publicHTTP.enabled=true` 必须同时启用 Functions，且 origin 与 Console/Auth
-不同。默认 ClusterIP；本地可以 NodePort 30892 + 显式 labHTTP。不要将 Functions raw
+不同 hostname/IP。默认 ClusterIP；本地可以 NodePort 30892 + 显式 labHTTP。不要将 Functions raw
 响应代理到 Console nginx。公网应有独立 hostname/TLS edge；`https` origin 不会让
 Go listener 自动生成证书，TLS 必须由显式可信 ingress termination 提供。
 
@@ -121,7 +123,7 @@ Go listener 自动生成证书，TLS 必须由显式可信 ingress termination �
 functions:
   publicHTTP:
     enabled: true
-    origin: http://192.168.146.100:30892
+    origin: http://192.168.146.101:30892
     labHTTP: true
     serviceType: NodePort
     nodePort: 30892

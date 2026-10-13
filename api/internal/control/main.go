@@ -124,6 +124,9 @@ func RunWorker(ctx context.Context) error {
 }
 
 func runProcess(ctx context.Context, role processRole) error {
+	if err := validateS3Config(); err != nil {
+		return err
+	}
 	if err := validateFunctionPublicOrigin(); err != nil {
 		return err
 	}
@@ -176,6 +179,9 @@ func runProcess(ctx context.Context, role processRole) error {
 	if s.functions != nil && s.storage == nil {
 		return errFunctionsPlatform
 	}
+	if role != roleWorker && s3Origin() != "" && (s.storage == nil || s.backendKeys == nil) {
+		return errors.New("S3 requires product Object Storage and versioned Backend credential keys")
+	}
 	if creationEnabled() || s.backendKeys != nil {
 		path := os.Getenv("NEON_V2_IDEMPOTENCY_KEY_FILE")
 		if path == "" {
@@ -215,7 +221,12 @@ func runProcess(ctx context.Context, role processRole) error {
 	}
 	httpServer := &http.Server{Addr: addr, Handler: handler, ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout: 30 * time.Second, WriteTimeout: 195 * time.Second, IdleTimeout: 60 * time.Second}
-	errCh := make(chan error, 2)
+	errCh := make(chan error, 3)
+	var storageHTTP *http.Server
+	if role != roleWorker && s3Origin() != "" {
+		storageHTTP = &http.Server{Addr: env("NEON_S3_BIND", ":8793"), Handler: s.s3Handler(), ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 150 * time.Second, WriteTimeout: 155 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
+		go func() { errCh <- storageHTTP.ListenAndServe() }()
+	}
 	var functionsHTTP *http.Server
 	if role != roleWorker && s.functions != nil && functionPublicOrigin() != "" {
 		functionsHTTP = &http.Server{Addr: env("NEON_FUNCTIONS_PUBLIC_BIND", ":8792"), Handler: s.functionPublicHandler(), ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
@@ -242,6 +253,11 @@ func runProcess(ctx context.Context, role processRole) error {
 	cancelProcess()
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
+	if storageHTTP != nil {
+		if err := storageHTTP.Shutdown(shutdownCtx); err != nil {
+			storageHTTP.Close()
+		}
+	}
 	if functionsHTTP != nil {
 		if err := functionsHTTP.Shutdown(shutdownCtx); err != nil {
 			functionsHTTP.Close()

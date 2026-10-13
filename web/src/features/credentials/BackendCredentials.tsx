@@ -24,7 +24,13 @@ type Listing = {
   inference_available: boolean;
   next_cursor: string;
 };
-type Reply = { credential: Credential; secret_available: boolean; api_token?: string };
+type Reply = {
+  credential: Credential;
+  secret_available: boolean;
+  api_token?: string;
+  token_id?: string;
+  s3_secret_access_key?: string;
+};
 
 export function BackendCredentials({
   projectId,
@@ -45,8 +51,9 @@ export function BackendCredentials({
   const [days, setDays] = useState(7);
   const [scope, setScope] = useState<Credential['branch_scope']>('self_and_descendants');
   const [models, setModels] = useState('');
+  const [capability, setCapability] = useState('ai_gateway:invoke');
   const [busy, setBusy] = useState(false);
-  const [oneTime, setOneTime] = useState<{ id: string; token: string } | null>(null);
+  const [oneTime, setOneTime] = useState<{ id: string; token: string; s3?: string } | null>(null);
   const [visible, setVisible] = useState(false);
   const [checkToken, setCheckToken] = useState('');
   const [checkModel, setCheckModel] = useState('');
@@ -83,11 +90,13 @@ export function BackendCredentials({
     try {
       const body = {
         name: credential?.name || name,
-        scopes: ['ai_gateway:invoke'],
+        scopes:
+          credential?.scopes ||
+          (capability === 'combined' ? ['ai_gateway:invoke', 'storage:write'] : [capability]),
         branch_scope: credential?.branch_scope || scope,
         allowed_models:
           credential?.allowed_models ||
-          models
+          (capability.startsWith('storage:') ? '' : models)
             .split(',')
             .map((m) => m.trim())
             .filter(Boolean),
@@ -105,7 +114,12 @@ export function BackendCredentials({
         },
       );
       if (epoch.current !== current) return;
-      if (reply.api_token) setOneTime({ id: reply.credential.id, token: reply.api_token });
+      if (reply.api_token)
+        setOneTime({
+          id: reply.credential.id,
+          token: reply.api_token,
+          s3: reply.s3_secret_access_key,
+        });
       else if (action !== 'revoke' && !reply.secret_available)
         showError('本次请求已处理，Token 无法再次读回。请轮换凭据取得新 Token。');
       const updated = await api<Listing>(base);
@@ -209,6 +223,22 @@ export function BackendCredentials({
             autoComplete="off"
             style={{ width: '100%' }}
           />
+          {oneTime.s3 && (
+            <>
+              <p>
+                S3 Access Key ID：<code>{oneTime.id}</code>。Secret Access Key
+                同样仅返回一次；不要放入浏览器应用或日志。
+              </p>
+              <input
+                aria-label="新 S3 Secret Access Key"
+                type={visible ? 'text' : 'password'}
+                value={oneTime.s3}
+                readOnly
+                autoComplete="off"
+                style={{ width: '100%' }}
+              />
+            </>
+          )}
           <div className="toolbar">
             <button className="button" onClick={() => setVisible(!visible)}>
               {visible ? '隐藏 Token' : '显示 Token'}
@@ -245,6 +275,19 @@ export function BackendCredentials({
             }}
           >
             <div className="toolbar">
+              <label>
+                能力
+                <select
+                  aria-label="凭据能力"
+                  value={capability}
+                  onChange={(e) => setCapability(e.target.value)}
+                >
+                  <option value="ai_gateway:invoke">AI 推理</option>
+                  <option value="storage:read">S3 只读</option>
+                  <option value="storage:write">S3 读写</option>
+                  <option value="combined">AI 与 S3 读写</option>
+                </select>
+              </label>
               <label>
                 名称{' '}
                 <input
@@ -286,13 +329,16 @@ export function BackendCredentials({
               <input
                 aria-label="凭据模型约束"
                 value={models}
+                disabled={capability.startsWith('storage:')}
                 onChange={(e) => setModels(e.target.value)}
                 placeholder="逗号分隔；留空仍受实际模型权限控制"
                 style={{ width: '100%' }}
               />
             </label>
             <p>
-              <span className="tag">ai_gateway:invoke</span>{' '}
+              <span className="tag">
+                {capability === 'combined' ? 'ai_gateway:invoke + storage:write' : capability}
+              </span>{' '}
               模型约束只收窄访问权，不授予模型或平台运营权限。
             </p>
             <button className="button primary" disabled={busy || !listing?.enabled}>
@@ -316,6 +362,8 @@ export function BackendCredentials({
             {listing?.items.map((c) => (
               <tr key={c.id} data-testid={`backend-row-${c.id}`}>
                 <td>
+                  <small>{c.scopes.join(', ')}</small>
+                  <br />
                   <strong>{c.name}</strong>
                   <br />
                   <small>

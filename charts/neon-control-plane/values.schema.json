@@ -359,6 +359,45 @@
         "existingSecret": {
           "type": "string",
           "pattern": "^$|^[a-z0-9][a-z0-9.-]{0,252}$"
+        },
+        "s3": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "origin",
+            "region",
+            "labHTTP",
+            "serviceType",
+            "nodePort"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "origin": {
+              "type": "string",
+              "maxLength": 255
+            },
+            "region": {
+              "type": "string",
+              "pattern": "^[a-z0-9-]{1,32}$"
+            },
+            "labHTTP": {
+              "type": "boolean"
+            },
+            "serviceType": {
+              "enum": [
+                "ClusterIP",
+                "NodePort"
+              ]
+            },
+            "nodePort": {
+              "type": "integer",
+              "minimum": 30000,
+              "maximum": 32767
+            }
+          }
         }
       },
       "allOf": [

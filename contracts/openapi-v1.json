@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.20.0",
+    "version": "0.21.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -1474,13 +1474,16 @@
           "scopes": {
             "type": "array",
             "minItems": 1,
-            "maxItems": 1,
+            "maxItems": 3,
             "items": {
               "type": "string",
               "enum": [
-                "ai_gateway:invoke"
+                "ai_gateway:invoke",
+                "storage:read",
+                "storage:write"
               ]
-            }
+            },
+            "uniqueItems": true
           },
           "branch_scope": {
             "enum": [
@@ -1540,7 +1543,9 @@
             "type": "array",
             "items": {
               "type": "string"
-            }
+            },
+            "maxItems": 3,
+            "uniqueItems": true
           },
           "branch_scope": {
             "enum": [
@@ -1616,6 +1621,15 @@
             "enum": [
               false
             ]
+          },
+          "token_id": {
+            "type": "string",
+            "description": "S3 access key ID, present for storage-scoped initial issue/rotation only."
+          },
+          "s3_secret_access_key": {
+            "type": "string",
+            "writeOnly": true,
+            "description": "S3 secret returned once only. Never persisted in replay or returned by metadata GET."
           }
         }
       },
@@ -1696,7 +1710,9 @@
             "type": "array",
             "items": {
               "type": "string"
-            }
+            },
+            "maxItems": 3,
+            "uniqueItems": true
           },
           "expires_at": {
             "type": "string",

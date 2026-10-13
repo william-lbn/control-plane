@@ -57,7 +57,15 @@ func (s *server) objectStorageRead(w http.ResponseWriter, r *http.Request) {
 	}
 	item["driver_enabled"] = s.storage != nil
 	item["protocol"] = "neon-object-rest-v1"
-	item["s3_compatible"] = false
+	item["s3_compatible"] = s3Origin() != "" && s.backendKeys != nil && s.storage != nil
+	item["s3_protocol"] = "sigv4-core-preview"
+	item["s3_endpoint"] = ""
+	if s3Origin() != "" {
+		item["s3_endpoint"] = s3Origin() + "/s3/" + r.PathValue("branch")
+	}
+	item["s3_region"] = s3Region()
+	item["s3_supported"] = []string{"ListBuckets", "CreateBucket", "DeleteBucket", "HeadBucket", "GetBucketLocation", "ListObjects", "ListObjectsV2", "PutObject", "GetObject", "HeadObject", "DeleteObject", "PresignedGet"}
+	item["s3_missing"] = []string{"multipart", "copy", "bulk_delete", "anonymous_public_read", "custom_metadata", "CORS", "streaming_signature", "presigned_put", "large_objects", "physical_gc"}
 	item["limits"] = record{"object_bytes": storageObjectLimit, "branch_bytes": storageBranchLimit, "buckets": 32, "objects": 1000}
 	w.Header().Set("ETag", fmt.Sprintf(`"%d"`, item["generation"].(int64)))
 	jsonResponse(w, 200, item)

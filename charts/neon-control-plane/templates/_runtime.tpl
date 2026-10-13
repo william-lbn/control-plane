@@ -3,6 +3,15 @@
 - {name: NEON_FUNCTIONS_PREVIEW_ENABLED, value: 'true'}
 - {name: NEON_FUNCTIONS_CONFIG_FILE, value: /run/functions-common/config.json}
 {{- if .Values.functions.publicHTTP.enabled }}
+{{- if not (regexMatch "^https?://[a-zA-Z0-9.-]+(:[0-9]{1,5})?$" .Values.functions.publicHTTP.origin) }}
+{{- fail "Functions origin must be a path-free HTTP(S) IPv4/DNS authority" }}
+{{- end }}
+{{- $functionHost := lower (regexReplaceAll "^https?://([^/:]+)(:[0-9]+)?$" .Values.functions.publicHTTP.origin "${1}") }}
+{{- $consoleOrigin := required "Functions requires managedAuth.publicOrigin as the Console origin reference, including when Auth is disabled" .Values.managedAuth.publicOrigin }}
+{{- $consoleHost := lower (regexReplaceAll "^https?://([^/:]+)(:[0-9]+)?$" $consoleOrigin "${1}") }}
+{{- if and $consoleHost (eq $functionHost $consoleHost) }}
+{{- fail "Functions requires a separate hostname/IP; ports alone do not isolate browser cookies" }}
+{{- end }}
 {{- if eq .Values.functions.publicHTTP.origin .Values.managedAuth.publicOrigin }}
 {{- fail "Functions HTTP must use a separate origin from Console/Auth" }}
 {{- end }}
@@ -16,6 +25,18 @@
 {{- end }}
 {{- if .Values.objectStorage.enabled }}
 - {name: NEON_OBJECT_STORAGE_CONFIG_FILE, value: /run/product-storage/config.json}
+{{- if .Values.objectStorage.s3.enabled }}
+{{- if not .Values.backendCredentials.enabled }}
+{{- fail "S3 requires backendCredentials.enabled" }}
+{{- end }}
+{{- if and (hasPrefix "http://" .Values.objectStorage.s3.origin) (not .Values.objectStorage.s3.labHTTP) }}
+{{- fail "S3 cleartext requires explicit objectStorage.s3.labHTTP" }}
+{{- end }}
+- {name: NEON_S3_PUBLIC_ORIGIN, value: {{ required "S3 origin required" .Values.objectStorage.s3.origin | quote }}}
+- {name: NEON_S3_REGION, value: {{ .Values.objectStorage.s3.region | quote }}}
+- {name: NEON_S3_LAB_HTTP, value: {{ .Values.objectStorage.s3.labHTTP | quote }}}
+- {name: NEON_S3_BIND, value: ':8793'}
+{{- end }}
 {{- end }}
 {{- if .Values.managedAuth.enabled }}
 {{- if or (not .Values.managedAuth.labHTTP) (not .Values.managedAuth.publicOrigin) }}

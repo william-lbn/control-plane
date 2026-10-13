@@ -39,6 +39,20 @@
   font-size: 13px;
   margin: 12px 0;
 }
+.function-http-policy label:has(input[type='checkbox']) {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+}
+.function-http-policy input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  margin: 0;
+  flex: 0 0 18px;
+  accent-color: #35ddb0;
+}
 .function-authoring input,
 .function-authoring select,
 .function-authoring textarea {

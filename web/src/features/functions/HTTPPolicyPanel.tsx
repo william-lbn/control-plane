@@ -50,7 +50,7 @@ export function HTTPPolicyPanel({
     }
   }
   return (
-    <section className="function-authoring" data-testid="function-http-policy">
+    <section className="function-authoring function-http-policy" data-testid="function-http-policy">
       <h3>HTTP 入口与自动休眠</h3>
       <p className="muted">
         公开入口无需控制台登录；应用鉴权由函数代码负责。活动 HTTP/SSE

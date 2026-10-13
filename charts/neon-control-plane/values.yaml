@@ -4,6 +4,14 @@
 objectStorage:
   enabled: false
   existingSecret: ''
+  # Core S3 protocol preview: application credentials, never MinIO root keys.
+  s3:
+    enabled: false
+    origin: ''
+    region: us-east-2
+    labHTTP: false
+    serviceType: ClusterIP
+    nodePort: 30893
 
 fullnameOverride: neon-control
 # Independent inference process. It has no Kubernetes service-account token.

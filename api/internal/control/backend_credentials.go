@@ -87,8 +87,19 @@ func validateBackendCredentialSpec(spec *backendCredentialSpec, now time.Time) e
 	if len(spec.Name) < 1 || len(spec.Name) > 100 || strings.ContainsAny(spec.Name, "\r\n\x00") {
 		return errors.New("Name must contain 1 to 100 bytes")
 	}
-	if len(spec.Scopes) != 1 || spec.Scopes[0] != "ai_gateway:invoke" {
-		return errors.New("This version supports only ai_gateway:invoke")
+	if len(spec.Scopes) < 1 || len(spec.Scopes) > 3 {
+		return errors.New("One to three known Backend scopes required")
+	}
+	scopeSeen := map[string]bool{}
+	for _, scope := range spec.Scopes {
+		if (scope != "ai_gateway:invoke" && scope != "storage:read" && scope != "storage:write") || scopeSeen[scope] {
+			return errors.New("Unknown or duplicate Backend scope")
+		}
+		scopeSeen[scope] = true
+	}
+	sort.Strings(spec.Scopes)
+	if !scopeSeen["ai_gateway:invoke"] && len(spec.AllowedModels) > 0 {
+		return errors.New("Model restrictions require ai_gateway:invoke scope")
 	}
 	if spec.BranchScope != "self" && spec.BranchScope != "self_and_descendants" {
 		return errors.New("Invalid branch scope")
@@ -326,6 +337,12 @@ func (s *server) mutateBackendCredential(w http.ResponseWriter, r *http.Request)
 		fail(w, r, 503, "metadata_unavailable", "Could not write credential")
 		return
 	}
+	if token != "" && backendStorageScope(spec.Scopes) {
+		if err = s.storeStorageSigning(r.Context(), tx, id, generation, token); err != nil {
+			fail(w, r, 503, "metadata_unavailable", "Could not seal storage signing material")
+			return
+		}
+	}
 	rows, err := tx.Query(r.Context(), `SELECT `+backendPublicColumns+` FROM backend_credentials WHERE id=$1`, id)
 	if err != nil {
 		fail(w, r, 503, "metadata_unavailable", "Could not read credential result")
@@ -358,6 +375,10 @@ func (s *server) mutateBackendCredential(w http.ResponseWriter, r *http.Request)
 	if token != "" {
 		reply["api_token"] = token
 		reply["secret_available"] = true
+		if backendStorageScope(spec.Scopes) {
+			reply["token_id"] = id
+			reply["s3_secret_access_key"] = storageSigningSecret(token)
+		}
 	}
 	jsonResponse(w, code, reply)
 }
@@ -406,7 +427,7 @@ func (s *server) verifyBackendCredential(ctx context.Context, token, target, sco
 	}
 	hasScope := false
 	for _, value := range scopes {
-		if value == scope {
+		if value == scope || (scope == "storage:read" && value == "storage:write") {
 			hasScope = true
 		}
 	}

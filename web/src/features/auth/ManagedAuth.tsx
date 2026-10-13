@@ -4,6 +4,7 @@ import type { Branch, Operation, Runtime } from '../../api';
 import { PageHeading, status } from '../../shared/ui';
 import { newRequestKey } from '../../shared/requestKey';
 import { followOperation } from '../../shared/followOperation';
+import { AuthSecurityPanel } from './AuthSecurityPanel';
 
 type Instance = {
   branch_id: string;
@@ -419,6 +420,18 @@ export function ManagedAuth({
           <p>
             JWT 已就绪（不展示凭据）。可从应用 SDK 使用 <code>/token</code> 获取并调用 Data API。
           </p>
+        )}
+        {session && active && (
+          <AuthSecurityPanel
+            key={`${branch}/${session.id}`}
+            branch={branch}
+            onChanged={() => {
+              setSession(null);
+              token.current = '';
+              setTokenReady(false);
+              setAppNotice('应用凭据已更新，请重新登录。');
+            }}
+          />
         )}
         <div role="status" data-testid="auth-app-result">
           {appNotice}

@@ -46,6 +46,9 @@ spec:
           securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
           ports:
             - {name: http, containerPort: 8788}
+            {{- if and .Values.objectStorage.enabled .Values.objectStorage.s3.enabled }}
+            - {name: s3, containerPort: 8793}
+            {{- end }}
             {{- if and .Values.functions.enabled .Values.functions.publicHTTP.enabled }}
             - {name: functions-http, containerPort: 8792}
             {{- end }}
@@ -117,6 +120,25 @@ metadata:
 spec:
   selector: {app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: api}
   ports: [{name: http, port: 8788, targetPort: http}]
+{{- if and .Values.objectStorage.enabled .Values.objectStorage.s3.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}-s3
+  labels:
+    {{- include "neonControl.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.objectStorage.s3.serviceType }}
+  selector: {app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: api}
+  ports:
+    - name: s3
+      port: 8793
+      targetPort: s3
+      {{- if eq .Values.objectStorage.s3.serviceType "NodePort" }}
+      nodePort: {{ .Values.objectStorage.s3.nodePort }}
+      {{- end }}
+{{- end }}
 {{- if and .Values.functions.enabled .Values.functions.publicHTTP.enabled }}
 ---
 apiVersion: v1

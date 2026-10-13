@@ -207,7 +207,7 @@ func (s *server) openObjectStorage(r *http.Request, project, branch string) (*pg
 		cleanup()
 		return nil, p, nil, err
 	}
-	err = tx.QueryRow(r.Context(), `SELECT a.endpoint_id,a.generation,a.spec FROM object_storage_instances a JOIN endpoints e ON e.id=a.endpoint_id WHERE a.branch_id=$1 AND a.project_id=$2 AND a.state='active' AND e.state='active' AND e.deleted_at IS NULL FOR SHARE OF a`, branch, p.ProjectID).Scan(&p.EndpointID, &p.Generation, &raw)
+	err = tx.QueryRow(r.Context(), `SELECT a.endpoint_id,a.generation,a.spec FROM object_storage_instances a JOIN endpoints e ON e.id=a.endpoint_id WHERE a.branch_id=$1 AND a.project_id=$2 AND a.state='active' AND e.state IN ('active','suspended') AND e.deleted_at IS NULL FOR SHARE OF a`, branch, p.ProjectID).Scan(&p.EndpointID, &p.Generation, &raw)
 	if err != nil {
 		cleanup()
 		return nil, p, nil, err

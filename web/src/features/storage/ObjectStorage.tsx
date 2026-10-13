@@ -10,6 +10,10 @@ type Instance = {
   generation: number;
   state: string;
   driver_enabled: boolean;
+  s3_compatible?: boolean;
+  s3_endpoint?: string;
+  s3_region?: string;
+  s3_missing?: string[];
   spec: { database: string } | null;
 };
 type Bucket = {
@@ -281,8 +285,35 @@ export function ObjectStorage({
         </div>
         <p className="muted">
           REST v1 · 单文件 8 MiB · 分支目录 100 MiB / 1000 个对象 ·
-          物理文件保留以保护分支和恢复历史。S3 客户端兼容性仍待实现。
+          物理文件保留以保护分支和恢复历史。S3 基础兼容的部署状态与范围见下方。
         </p>
+        <section className="storage-s3-panel" data-testid="storage-s3-panel">
+          <h3>S3 应用连接</h3>
+          {instance?.s3_compatible ? (
+            <>
+              <label>
+                分支 S3 Endpoint
+                <input
+                  aria-label="S3 Endpoint"
+                  readOnly
+                  value={instance.s3_endpoint || ''}
+                  style={{ width: '100%' }}
+                />
+              </label>
+              <p>
+                Region：<code>{instance.s3_region}</code> · SDK 使用
+                forcePathStyle。应用凭据页面可签发 S3 只读/读写密钥、轮换或撤销；Secret 只返回一次。
+              </p>
+              <a href={`#/projects/${projectId}/credentials`}>管理应用凭据 →</a>
+              <p className="muted">
+                基础 SigV4 与预签名下载预览；单文件仍为 8 MiB。未支持：
+                {(instance.s3_missing || []).join('、')}。
+              </p>
+            </>
+          ) : (
+            <p>此环境尚未配置 S3 兼容入口；REST 上传下载保持可用。</p>
+          )}
+        </section>
         <div className="storage-actions">
           {canAdmin && (
             <button

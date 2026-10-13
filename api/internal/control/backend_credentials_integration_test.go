@@ -83,6 +83,57 @@ func TestBackendCredentialsIntegration(t *testing.T) {
 		return value
 	}
 	base := "/api/v1/projects/prj_a/branches/"
+	t.Run("storage signing issue replay lineage rotation and revoke", func(t *testing.T) {
+		storageSpec := backendCredentialSpec{Name: "storage-reader", Scopes: []string{"storage:read"}, BranchScope: "self_and_descendants", ExpiresAt: time.Now().UTC().Add(time.Hour), AllowedModels: []string{}}
+		issued := call("alice", "POST", base+"br_main/credentials", storageSpec, "s3-issue-original", "", 201)
+		id := issued["credential"].(map[string]any)["id"].(string)
+		token := issued["api_token"].(string)
+		if issued["token_id"] != id || issued["s3_secret_access_key"] != storageSigningSecret(token) {
+			t.Fatal("S3 one-time signing identity mismatch")
+		}
+		sealedToken, anchor, e := s.loadStorageSigning(ctx, id)
+		if e != nil || anchor != "br_main" || sealedToken != token {
+			t.Fatal("authenticated storage envelope unavailable")
+		}
+		if _, e = s.verifyBackendCredential(ctx, token, "br_child", "storage:read", ""); e != nil {
+			t.Fatal("descendant read denied")
+		}
+		if _, e = s.verifyBackendCredential(ctx, token, "br_child", "storage:write", ""); e == nil {
+			t.Fatal("read credential allowed write")
+		}
+		replay := call("alice", "POST", base+"br_main/credentials", storageSpec, "s3-issue-original", "", 200)
+		if replay["api_token"] != nil || replay["s3_secret_access_key"] != nil {
+			t.Fatal("durable replay revealed signing secret")
+		}
+		storageSpec.Scopes = []string{"storage:write"}
+		rotated := call("alice", "POST", base+"br_main/credentials/"+id+"/rotate", storageSpec, "s3-rotate-original", `"1"`, 200)
+		nextToken := rotated["api_token"].(string)
+		if rotated["token_id"] != id || nextToken == token || storageSigningSecret(nextToken) == storageSigningSecret(token) {
+			t.Fatal("rotation did not replace both secrets in place")
+		}
+		if _, e = s.verifyBackendCredential(ctx, token, "br_main", "storage:read", ""); e == nil {
+			t.Fatal("old token valid after rotation")
+		}
+		if _, e = s.verifyBackendCredential(ctx, nextToken, "br_child", "storage:read", ""); e != nil {
+			t.Fatal("write scope must include reads")
+		}
+		current, _, e := s.loadStorageSigning(ctx, id)
+		if e != nil || current != nextToken {
+			t.Fatal("rotated ciphertext generation mismatch")
+		}
+		var encrypted []byte
+		var replies string
+		if db.QueryRow(ctx, `SELECT sealed_token FROM backend_storage_signing WHERE credential_id=$1`, id).Scan(&encrypted) != nil || db.QueryRow(ctx, `SELECT string_agg(response::text,',') FROM backend_credential_requests`).Scan(&replies) != nil {
+			t.Fatal("storage secrecy check unavailable")
+		}
+		if bytes.Contains(encrypted, []byte(token)) || bytes.Contains(encrypted, []byte(nextToken)) || strings.Contains(replies, token) || strings.Contains(replies, nextToken) || strings.Contains(replies, storageSigningSecret(nextToken)) {
+			t.Fatal("cleartext storage signing material persisted")
+		}
+		call("alice", "DELETE", base+"br_main/credentials/"+id, nil, "s3-revoke-original", `"2"`, 200)
+		if _, _, e = s.loadStorageSigning(ctx, id); e == nil {
+			t.Fatal("revoked signing material still admitted")
+		}
+	})
 	consoleRequest := map[string]any{"method": "GET", "table": "notes", "application_token": "not-a-real-token"}
 	call("viewer", "POST", base+"br_main/data-api/request", consoleRequest, "", "", 403)
 	call("outsider", "POST", base+"br_main/data-api/request", consoleRequest, "", "", 404)
