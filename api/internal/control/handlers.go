@@ -175,7 +175,6 @@ func (s *server) routes() *http.ServeMux {
 }
 
 func (s *server) capabilities(w http.ResponseWriter, r *http.Request) {
-	disabled := map[string]any{"enabled": false, "reason": "not_implemented"}
 	creation := map[string]any{"enabled": creationEnabled(), "reason": "m2_create_driver"}
 	if !creationEnabled() {
 		creation["reason"] = "creation_driver_disabled"
