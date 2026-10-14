@@ -21,6 +21,7 @@ jobs:
       - run: '"$RUNNER_TEMP/neon-actionlint/actionlint" -color'
       - run: node --check tools/lifecycle-recovery-fault.mjs
       - run: node tools/check-live-suites.mjs
+      - run: node tools/generate-api-docs.mjs --check
   go:
     name: Go + real PostgreSQL
     runs-on: ubuntu-24.04

@@ -9,7 +9,7 @@ S3 服务为目标，[认证](https://neon.com/docs/storage/authentication) 使�
 部署的专用不可变 blob bucket；不会把 MinIO root/Pageserver 凭据交给应用。
 
 **这是基础协议预览，不是官网完整 S3 准入。** 支持 List/Create/Delete/HeadBucket、
-GetBucketLocation、ListObjects/V2（平铺列表）、Put/Get/Head/DeleteObject、单 Range、
+GetBucketLocation、ListObjects/V2（平铺列表、fetch-owner、分页）、Put/Get/Head/DeleteObject、单 Range、
 条件写、SigV4 Header 和预签名 GET。尚缺 multipart、server COPY、bulk delete、
 层级 delimiter/CORS、完整 user metadata/checksum、anonymous public_read、STS、
 SigV4 checksum trailers 与预签名 PUT；单对象仍 8 MiB，分支 100 MiB/1000 objects。
@@ -59,6 +59,11 @@ URI 编码、scalar query、Host、sorted signed headers 和 SHA256 body；重�
 锁定 MinIO SDK 的普通 HTTP PutObject 会使用这种逐块签名，不能只用 SignV4 helper 验证兼容。
 算法参考 [AWS chained signing](https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-streaming.html)
 和 [MinIO 7.2.0 streaming signer](https://github.com/minio/minio-go/blob/v7.2.0/pkg/signer/request-signature-streaming.go)。
+
+ListObjectsV2 的 `fetch-owner=true` 返回已授权 branch ID 作为目录的对象 Owner，
+不暴露控制台或应用用户身份；`false` 省略 Owner。真实 MinIO SDK 与 PostgreSQL 清单
+验证了中文/空格 key、encoding-type=url 和 max-keys=1 的两页读取。其他未知子资源
+仍明确拒绝，不能通过忽略参数伪造 multipart/user metadata 支持。
 
 S3 的普通 PUT 是授权的 unconditional overwrite；存在 If-Match/If-None-Match 时
 应用真实 precondition。它不伪造 Console REST v1 强制版本条件。清单变更由 branch

@@ -43,6 +43,7 @@ test('S3 product starts at UI and uses actual SDK signing, object bytes, rotatio
         key: Key;
         checks: string[];
         operations: string[];
+        primary_uploaded?: boolean;
       })
     : undefined;
   if (
@@ -210,7 +211,10 @@ test('S3 product starts at UI and uses actual SDK signing, object bytes, rotatio
       await save('original_storage_writer_reused_no_duplicate_credential_issue');
     }
     await save('ui_unified_storage_writer_issued_once_and_secret_masked_then_cleared');
-    await sdk(writer, resume ? 'continue_write' : 'write');
+    await sdk(
+      writer,
+      resume ? (resume.primary_uploaded ? 'continue_existing' : 'continue_write') : 'write',
+    );
     await sdk(writer, 'read');
     const reader = await issue('storage:read', 's3-reader-' + Date.now());
     await sdk(reader, 'read');

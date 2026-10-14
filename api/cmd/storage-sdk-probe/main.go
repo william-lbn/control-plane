@@ -91,14 +91,14 @@ func main() {
 		key := "folder/中文 file.bin"
 		payload := []byte("Neon real S3 SDK bytes 中文\n")
 		switch c.Mode {
-		case "write", "continue_write":
+		case "write", "continue_write", "continue_existing":
 			if c.Mode == "write" {
 				stage = "make_bucket"
 				if e = client.MakeBucket(ctx, c.Bucket, minio.MakeBucketOptions{Region: c.Region}); e != nil {
 					return e
 				}
 				checks = append(checks, "real_sdk_create_private_bucket")
-			} else {
+			} else if c.Mode == "continue_write" {
 				// Continue only the owned empty bucket. A successful/unknown PUT
 				// outcome must never be overwritten as a test retry.
 				stage = "verify_original_empty_bucket"
@@ -112,12 +112,26 @@ func main() {
 				}
 				checks = append(checks, "original_owned_bucket_reused_primary_key_confirmed_absent_before_single_put")
 			}
-			stage = "put_object"
-			_, e = client.PutObject(ctx, c.Bucket, key, bytes.NewReader(payload), int64(len(payload)), minio.PutObjectOptions{ContentType: "application/octet-stream", DisableMultipart: true, SendContentMd5: true})
-			if e != nil {
-				return e
+			if c.Mode == "continue_existing" {
+				stage = "verify_original_retained_bytes"
+				object, err := client.GetObject(ctx, c.Bucket, key, minio.GetObjectOptions{})
+				if err != nil {
+					return err
+				}
+				data, err := io.ReadAll(io.LimitReader(object, 1024))
+				object.Close()
+				if err != nil || !bytes.Equal(data, payload) {
+					return errors.New("original bytes require inspection")
+				}
+				checks = append(checks, "original_primary_object_verified_no_upload_repeated")
+			} else {
+				stage = "put_object"
+				_, e = client.PutObject(ctx, c.Bucket, key, bytes.NewReader(payload), int64(len(payload)), minio.PutObjectOptions{ContentType: "application/octet-stream", DisableMultipart: true, SendContentMd5: true})
+				if e != nil {
+					return e
+				}
+				checks = append(checks, "real_sdk_put_unicode_key")
 			}
-			checks = append(checks, "real_sdk_put_unicode_key")
 			stage = "head_object"
 			stat, e := client.StatObject(ctx, c.Bucket, key, minio.StatObjectOptions{})
 			if e != nil || stat.Size != int64(len(payload)) {

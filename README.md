@@ -63,7 +63,7 @@ docs/                 架构、对象模型、部署、测试、来源及生产�
 
 - [独立 Compute 删除、重建与保留数据](docs/ENDPOINT-DELETION.md)
 - [架构与模型](docs/ARCHITECTURE.md)
-- [90 个实际 API 操作](docs/API.md)
+- [实际 API 操作索引与自动同步](docs/API.md)
 - [原 Operation 恢复与未知 DDL 的受控修复](docs/OPERATION-RECOVERY.md)
 - [Linux 部署与回滚](docs/DEPLOYMENT.md)
 - [测试与交付标准](docs/TESTING.md)

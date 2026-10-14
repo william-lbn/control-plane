@@ -112,16 +112,9 @@ func (s *server) s3Invoke(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Reject unsupported subresources before opening SQL or changing an object.
-	for name := range query {
-		if strings.HasPrefix(name, "X-Amz-") {
-			continue
-		}
-		switch name {
-		case "list-type", "prefix", "marker", "max-keys", "continuation-token", "start-after", "delimiter", "encoding-type", "location":
-		default:
-			s3Error(w, r, 501, "NotImplemented")
-			return
-		}
+	if !s3QuerySupported(query) {
+		s3Error(w, r, 501, "NotImplemented")
+		return
 	}
 	conn, p, close, e := s.openObjectStorage(r, "", target)
 	if e != nil {
@@ -435,15 +428,38 @@ func (s *server) s3WriteObject(w http.ResponseWriter, r *http.Request, conn *pgx
 	return true
 }
 
+func s3QuerySupported(q url.Values) bool {
+	for name := range q {
+		if strings.HasPrefix(name, "X-Amz-") {
+			continue
+		}
+		switch name {
+		case "list-type", "prefix", "marker", "max-keys", "continuation-token", "start-after", "delimiter", "encoding-type", "location", "fetch-owner":
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+type s3ObjectOwner struct {
+	ID   string `xml:"ID"`
+	Name string `xml:"DisplayName"`
+}
 type s3ListedObject struct {
-	Key          string `xml:"Key"`
-	Modified     string `xml:"LastModified"`
-	ETag         string `xml:"ETag"`
-	Size         int64  `xml:"Size"`
-	StorageClass string `xml:"StorageClass"`
+	Key          string         `xml:"Key"`
+	Modified     string         `xml:"LastModified"`
+	ETag         string         `xml:"ETag"`
+	Size         int64          `xml:"Size"`
+	StorageClass string         `xml:"StorageClass"`
+	Owner        *s3ObjectOwner `xml:"Owner,omitempty"`
 }
 
 func (s *server) s3ListObjects(w http.ResponseWriter, r *http.Request, conn *pgx.Conn, p objectStoragePayload, bucket string, q url.Values) {
+	if q.Has("fetch-owner") && q.Get("fetch-owner") != "true" && q.Get("fetch-owner") != "false" {
+		s3Error(w, r, 400, "InvalidArgument")
+		return
+	}
 	if q.Get("delimiter") != "" || (q.Get("encoding-type") != "" && q.Get("encoding-type") != "url") || (q.Get("list-type") != "" && q.Get("list-type") != "2") {
 		s3Error(w, r, 501, "NotImplemented")
 		return
@@ -491,6 +507,11 @@ func (s *server) s3ListObjects(w http.ResponseWriter, r *http.Request, conn *pgx
 		o.Modified = modified.UTC().Format(time.RFC3339)
 		o.ETag = "\"" + etag + "\""
 		o.StorageClass = "STANDARD"
+		if q.Get("fetch-owner") == "true" {
+			// All private objects belong to the authorized branch catalogue.
+			// Never expose Console/application user identities as S3 owners.
+			o.Owner = &s3ObjectOwner{ID: p.BranchID, Name: p.BranchID}
+		}
 		items = append(items, o)
 	}
 	if rows.Err() != nil {

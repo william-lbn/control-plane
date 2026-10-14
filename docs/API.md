@@ -1,7 +1,7 @@
 # 实际 API 合同
 
 OpenAPI 3 合同的权威源是 [openapi-v1.json](../contracts/openapi-v1.json)。
-版本 0.11.0，61 个路径、90 个操作，全部拥有稳定且唯一的 operationId。
+版本 0.21.0，75 个路径、111 个操作，全部拥有稳定且唯一的 operationId。
 运行 Swagger 位于 `/api/docs`，JSON 位于 `/api/openapi.json`。
 本合同是自托管 `/api/v1`，不声称兼容 Neon SaaS `/api/v2`。
 
@@ -20,8 +20,7 @@ request_id/operation_id/error_code，再由显式 retry 接口恢复可重试操
 
 ## 2. 操作索引
 
-保护、删除与恢复的新合同见 [保留删除手册](RETAINED-DELETION.md)。
-项目回收列表使用 `deleted=true`，只向有效 Admin 返回已删除项目。
+以下索引由 `tools/generate-api-docs.mjs` 从实际 OpenAPI 生成，Linux CI 检查同步。
 
 | Method | Path | operationId | Success responses |
 | --- | --- | --- | --- |
@@ -29,30 +28,17 @@ request_id/operation_id/error_code，再由显式 retry 接口恢复可重试操
 | GET | `/readyz` | `getReadiness` | 200 |
 | POST | `/auth/login` | `login` | 200 |
 | POST | `/auth/logout` | `logout` | 200 |
-| POST | `/auth/signup` | `registerInvitedConsoleAccount` | 201 |
-| POST | `/api/v1/invitations/accept` | `acceptConsoleInvitation` | 201 |
-| GET | `/api/v1/organizations/{org}/invitations` | `listConsoleInvitations` | 200 |
-| POST | `/api/v1/organizations/{org}/invitations` | `createConsoleInvitation` | 201 / 200 replay |
-| DELETE | `/api/v1/organizations/{org}/invitations/{invitation}` | `revokeConsoleInvitation` | 200 |
 | GET | `/api/v1/session` | `getSession` | 200 |
 | GET | `/api/v1/capabilities` | `getCapabilities` | 200 |
 | GET | `/api/v1/organizations/{org}/projects` | `listProjects` | 200 |
 | POST | `/api/v1/organizations/{org}/projects` | `createProject` | 202 |
 | GET | `/api/v1/projects/{project}` | `getProject` | 200 |
 | DELETE | `/api/v1/projects/{project}` | `DeleteProject` | 202 |
-| GET | `/api/v1/projects/{project}/lifecycle` | `GetProjectLifecycle` | 200 |
-| PATCH | `/api/v1/projects/{project}/protection` | `SetProjectProtection` | 200 |
-| POST | `/api/v1/projects/{project}/recover` | `RecoverProject` | 202 |
 | GET | `/api/v1/projects/{project}/branches` | `listBranches` | 200 |
 | POST | `/api/v1/projects/{project}/branches` | `createBranch` | 202 |
 | GET | `/api/v1/projects/{project}/branches/{branch}` | `getBranch` | 200 |
 | DELETE | `/api/v1/projects/{project}/branches/{branch}` | `DeleteBranch` | 202 |
-| PATCH | `/api/v1/projects/{project}/branches/{branch}/protection` | `SetBranchProtection` | 200 |
-| GET | `/api/v1/projects/{project}/branches/{branch}/restore-window` | `readBranchRestoreWindow` | 200 |
 | GET | `/api/v1/projects/{project}/branches/{branch}/services` | `listBranchServices` | 200 |
-| GET | `/api/v1/projects/{project}/branches/{branch}/functions` | `listFunctions` | 200 |
-| GET | `/api/v1/projects/{project}/branches/{branch}/functions/{slug}` | `getFunction` | 200 + ETag |
-| GET | `/api/v1/projects/{project}/branches/{branch}/functions/{slug}/deployments` | `listFunctionDeployments` | 200 |
 | GET | `/api/v1/projects/{project}/endpoints` | `listEndpoints` | 200 |
 | POST | `/api/v1/projects/{project}/endpoints` | `createEndpoint` | 202 |
 | GET | `/api/v1/projects/{project}/endpoints/{endpoint}` | `getEndpoint` | 200 |
@@ -84,10 +70,11 @@ request_id/operation_id/error_code，再由显式 retry 接口恢复可重试操
 | DELETE | `/api/v1/organizations/{org}/api-keys/{key}` | `revokeOrganizationAPIKey` | 200 |
 | GET | `/api/v1/projects/{project}/branches/{branch}/roles` | `GetBranchRoles` | 200 |
 | POST | `/api/v1/projects/{project}/branches/{branch}/roles` | `PostBranchRoles` | 202 |
-| DELETE | `/api/v1/projects/{project}/branches/{branch}/roles/{role}` | `DeleteBranchRole` | 202 |
 | PATCH | `/api/v1/projects/{project}/branches/{branch}/roles/{role}` | `PatchBranchRole` | 202 |
+| DELETE | `/api/v1/projects/{project}/branches/{branch}/roles/{role}` | `DeleteBranchRole` | 202 |
 | GET | `/api/v1/projects/{project}/branches/{branch}/databases` | `GetBranchDatabases` | 200 |
 | POST | `/api/v1/projects/{project}/branches/{branch}/databases` | `PostBranchDatabases` | 202 |
+| PATCH | `/api/v1/projects/{project}/branches/{branch}/databases/{database}` | `updateDatabaseOwner` | 202 |
 | DELETE | `/api/v1/projects/{project}/branches/{branch}/databases/{database}` | `DeleteBranchDatabase` | 202 |
 | GET | `/api/v1/projects/{project}/branches/{branch}/data-api` | `getDataAPI` | 200 |
 | POST | `/api/v1/projects/{project}/branches/{branch}/data-api` | `enableDataAPI` | 202 |
@@ -98,12 +85,56 @@ request_id/operation_id/error_code，再由显式 retry 接口恢复可重试操
 | POST | `/api/v1/projects/{project}/branches/{branch}/credentials/{credential}/rotate` | `rotateBackendCredential` | 200 |
 | DELETE | `/api/v1/projects/{project}/branches/{branch}/credentials/{credential}` | `revokeBackendCredential` | 200 |
 | POST | `/api/v1/projects/{project}/branches/{branch}/data-api/request` | `testDataAPIConsoleRequest` | 200 |
+| GET | `/api/v1/organizations/{org}/invitations` | `listConsoleInvitations` | 200 |
+| POST | `/api/v1/organizations/{org}/invitations` | `createConsoleInvitation` | 200, 201 |
+| DELETE | `/api/v1/organizations/{org}/invitations/{invitation}` | `revokeConsoleInvitation` | 200 |
+| POST | `/api/v1/invitations/accept` | `acceptConsoleInvitation` | 201 |
+| POST | `/auth/signup` | `registerInvitedConsoleAccount` | 201 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/restore-window` | `readBranchRestoreWindow` | 200 |
+| GET | `/api/v1/projects/{project}/lifecycle` | `GetProjectLifecycle` | 200 |
+| PATCH | `/api/v1/projects/{project}/protection` | `SetProjectProtection` | 200 |
+| PATCH | `/api/v1/projects/{project}/branches/{branch}/protection` | `SetBranchProtection` | 200 |
+| POST | `/api/v1/projects/{project}/recover` | `RecoverProject` | 202 |
 | GET | `/api/v1/projects/{project}/branches/{branch}/auth` | `getManagedAuth` | 200 |
 | POST | `/api/v1/projects/{project}/branches/{branch}/auth` | `enableManagedAuth` | 202 |
 | DELETE | `/api/v1/projects/{project}/branches/{branch}/auth` | `disableManagedAuth` | 202 |
-| POST | `/api/v1/projects/{project}/branches/{branch}/auth/users` | `listManagedAuthUsers` | 200 |
-
-分支应用协议 `/auth/v1/{branch}/...` 不使用 Console session 或 `/api/v1` 权限语义；受限协议及 cookie/JWT/数据库边界见 [Managed Auth 合同](MANAGED-AUTH.md)。
+| POST | `/api/v1/projects/{project}/branches/{branch}/auth/users` | `inspectManagedAuthUsers` | 200 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/storage` | `getObjectStorage` | 200 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/storage` | `enableObjectStorage` | 202 |
+| DELETE | `/api/v1/projects/{project}/branches/{branch}/storage` | `disableObjectStorage` | 202 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/storage/buckets` | `listStorageBuckets` | 200 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/storage/buckets` | `createStorageBucket` | 201 |
+| DELETE | `/api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}` | `deleteStorageBucket` | 200 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/objects` | `getStorageObject` | 200, 206 |
+| HEAD | `/api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/objects` | `headStorageObject` | 200, 206 |
+| PUT | `/api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/objects` | `putStorageObject` | 200 |
+| DELETE | `/api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/objects` | `deleteStorageObject` | 200 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/presign` | `presignStorageDownload` | 200 |
+| GET | `/storage/v1/{storageBranch}/{bucket}` | `getPublicStorageObject` | 200 |
+| HEAD | `/storage/v1/{storageBranch}/{bucket}` | `headPublicStorageObject` | 200 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/functions` | `listFunctions` | 200 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/functions` | `createFunction` | 202 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/functions/{slug}` | `getFunction` | 200 |
+| DELETE | `/api/v1/projects/{project}/branches/{branch}/functions/{slug}` | `deleteFunction` | 202 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/functions/{slug}/deployments` | `listFunctionDeployments` | 200 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/functions/{slug}/deployments` | `deployFunction` | 202 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/functions/{slug}/suspend` | `suspendFunction` | 202 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/functions/{slug}/console-invoke` | `invokeFunctionConsole` | 200 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/functions/{slug}/runtime` | `observeFunctionRuntime` | 200 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/functions/{slug}/resume` | `resumeFunction` | 202 |
+| POST | `/api/v1/projects/{project}/endpoints/{endpoint}/query-script` | `executeSQLScript` | 200 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/functions/{slug}/rollback` | `rollbackFunction` | 202 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/ai-gateway` | `getAIGateway` | 200 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/usage` | `getAIGatewayUsage` | 200 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/request` | `invokeAIPlayground` | 200 |
+| GET | `/ai/v1/{aiBranch}/v1/models` | `listAIModels` | 200 |
+| POST | `/ai/v1/{aiBranch}/v1/chat/completions` | `createAIChatCompletion` | 200 |
+| GET | `/api/v1/projects/{project}/saved-queries` | `listSavedQueries` | 200 |
+| POST | `/api/v1/projects/{project}/saved-queries` | `createSavedQuery` | 200, 201 |
+| GET | `/api/v1/projects/{project}/saved-queries/{query}` | `getSavedQuery` | 200 |
+| PATCH | `/api/v1/projects/{project}/saved-queries/{query}` | `updateSavedQuery` | 200 |
+| DELETE | `/api/v1/projects/{project}/saved-queries/{query}` | `deleteSavedQuery` | 200 |
+| PATCH | `/api/v1/projects/{project}/branches/{branch}/functions/{slug}/http-policy` | `setFunctionHTTPPolicy` | 200 |
 
 ## 3. 实现映射与演进
 
@@ -124,7 +155,7 @@ Operation 一并持久化。时间点、保留窗口、租约、错误与历史�
 
 ## 5. 分支 Object Storage REST v1
 
-参见 [存储合同](OBJECT-STORAGE.md)。元数据状态读取不唤醒 Compute；目录/文件读取会按需唤醒。公开下载使用短期签名或明确的 public_read ACL。服务配置需要管理员、If-Match 与 Idempotency-Key；文件修改需要内容 ETag 条件。外部 S3 兼容仍为 false。
+参见 [REST 存储合同](OBJECT-STORAGE.md)与 [S3 基础协议合同](OBJECT-STORAGE-S3-CORE.md)。元数据状态读取不唤醒 Compute；目录/文件读取会按需唤醒。REST 公开下载使用短期签名或明确的 public_read ACL。服务配置需要管理员、If-Match 与 Idempotency-Key；REST 文件修改需要内容 ETag 条件。独立 S3 入口只在 operator 显式启用后开放已列明的基础能力；不声称完整 S3 兼容。
 
 | Method | Path | operationId |
 | --- | --- | --- |
