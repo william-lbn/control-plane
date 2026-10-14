@@ -75,12 +75,13 @@ func (s *server) s3Invoke(w http.ResponseWriter, r *http.Request) {
 		s3Error(w, r, 403, "InvalidAccessKeyId")
 		return
 	}
-	data, e := io.ReadAll(io.LimitReader(r.Body, storageObjectLimit+1))
-	if e != nil || len(data) > storageObjectLimit {
+	wire, e := io.ReadAll(io.LimitReader(r.Body, storageObjectLimit+(1<<20)+1))
+	if e != nil || len(wire) > storageObjectLimit+(1<<20) {
 		s3Error(w, r, 413, "EntityTooLarge")
 		return
 	}
-	if signature.Verify(r, data, storageSigningSecret(token), s3Region()) != nil {
+	data, e := signature.VerifyAndDecode(r, wire, storageSigningSecret(token), s3Region(), storageObjectLimit)
+	if e != nil {
 		s3Error(w, r, 403, "SignatureDoesNotMatch")
 		return
 	}

@@ -29,7 +29,7 @@ type Signature struct {
 }
 
 // Parse rejects ambiguous authentication, duplicate control query parameters,
-// temporary credentials, unsupported streaming signatures and expired dates.
+// temporary credentials, unsupported authentication algorithms and expired dates.
 func Parse(r *http.Request, region string, now time.Time) (Signature, error) {
 	var out Signature
 	if len(r.URL.RawQuery) > 16<<10 || len(r.Header.Get("Authorization")) > 2048 || len(r.Header.Values("Authorization")) > 1 || r.Header.Get("X-Amz-Security-Token") != "" {
@@ -167,8 +167,8 @@ func mac(key []byte, value string) []byte {
 }
 
 // Verify binds the original method/path/query/authority and signed headers.
-// UNSIGNED-PAYLOAD is accepted only for bodyless reads, never a write. Large
-// uploads require a separate streaming/chunk-signature implementation gate.
+// UNSIGNED-PAYLOAD is accepted only for bodyless reads, never a write.
+// Signed chunk payloads must use VerifyAndDecode, before any object mutation.
 func (s Signature) Verify(r *http.Request, body []byte, secret, region string) error {
 	if len(s.Date) != 16 || len(secret) < 32 || len(secret) > 256 || !keyID.MatchString(s.KeyID) || !digestPattern.MatchString(s.Value) {
 		return ErrSignature
@@ -184,6 +184,15 @@ func (s Signature) Verify(r *http.Request, body []byte, secret, region string) e
 	} else if !digestPattern.MatchString(payload) || !hmac.Equal([]byte(payload), []byte(Hash(body))) {
 		return ErrSignature
 	}
+	return s.verifyCanonical(r, payload, secret, region)
+}
+func (s Signature) signingKey(secret, region string) []byte {
+	key := mac([]byte("AWS4"+secret), s.Date[:8])
+	key = mac(key, region)
+	key = mac(key, "s3")
+	return mac(key, "aws4_request")
+}
+func (s Signature) verifyCanonical(r *http.Request, payload, secret, region string) error {
 	query, e := canonicalQuery(r, s.Presigned)
 	if e != nil {
 		return e
@@ -210,10 +219,7 @@ func (s Signature) Verify(r *http.Request, body []byte, secret, region string) e
 		uri = "/"
 	}
 	canonical := r.Method + "\n" + uri + "\n" + query + "\n" + headers.String() + "\n" + s.Headers + "\n" + payload
-	signing := mac([]byte("AWS4"+secret), s.Date[:8])
-	signing = mac(signing, region)
-	signing = mac(signing, "s3")
-	signing = mac(signing, "aws4_request")
+	signing := s.signingKey(secret, region)
 	expected := hex.EncodeToString(mac(signing, "AWS4-HMAC-SHA256\n"+s.Date+"\n"+s.Scope+"\n"+Hash([]byte(canonical))))
 	if !hmac.Equal([]byte(expected), []byte(s.Value)) {
 		return ErrSignature

@@ -1,4 +1,7 @@
 {{- define "neonControl.runtimeEnv" -}}
+{{- if and .Values.objectStorage.s3.enabled (not .Values.objectStorage.enabled) }}
+{{- fail "S3 requires objectStorage.enabled" }}
+{{- end }}
 {{- if .Values.functions.enabled }}
 - {name: NEON_FUNCTIONS_PREVIEW_ENABLED, value: 'true'}
 - {name: NEON_FUNCTIONS_CONFIG_FILE, value: /run/functions-common/config.json}
@@ -26,6 +29,9 @@
 {{- if .Values.objectStorage.enabled }}
 - {name: NEON_OBJECT_STORAGE_CONFIG_FILE, value: /run/product-storage/config.json}
 {{- if .Values.objectStorage.s3.enabled }}
+{{- if not (regexMatch "^https?://[a-zA-Z0-9.-]+(:[0-9]{1,5})?$" .Values.objectStorage.s3.origin) }}
+{{- fail "S3 origin must be a path-free HTTP(S) IPv4/DNS authority" }}
+{{- end }}
 {{- if not .Values.backendCredentials.enabled }}
 {{- fail "S3 requires backendCredentials.enabled" }}
 {{- end }}

@@ -12,7 +12,7 @@ S3 服务为目标，[认证](https://neon.com/docs/storage/authentication) 使�
 GetBucketLocation、ListObjects/V2（平铺列表）、Put/Get/Head/DeleteObject、单 Range、
 条件写、SigV4 Header 和预签名 GET。尚缺 multipart、server COPY、bulk delete、
 层级 delimiter/CORS、完整 user metadata/checksum、anonymous public_read、STS、
-SigV4 streaming/chunk 与预签名 PUT；单对象仍 8 MiB，分支 100 MiB/1000 objects。
+SigV4 checksum trailers 与预签名 PUT；单对象仍 8 MiB，分支 100 MiB/1000 objects。
 官网最大单对象 5 GiB，不能用当前实验室配额声称等价。物理 GC/HA/DR/TLS 另行准入。
 
 ## 2. 组件、密钥与模型
@@ -53,7 +53,12 @@ S3 root endpoint 根据签名 key 的 anchor branch 选清单。显式 branch ba
 Region 必须匹配配置，实验室默认 us-east-2。签名绑定 method、decoded path 的标准
 URI 编码、scalar query、Host、sorted signed headers 和 SHA256 body；重复 query
 拒绝，不接受 SDK/proxy 对重复排序的不同解释。Header 时间窗 ±5 分钟；presign
-最长 86400 秒，但凭据到期/撤销先结束授权。未验收 STS 或 unsigned write。
+最长 86400 秒，但凭据到期/撤销先结束授权。实现有界的 `STREAMING-AWS4-HMAC-SHA256-PAYLOAD`，
+验证 seed、每块与末尾零块的链式签名，确认完整 decoded length 后才访问 SQL/blob。
+解码配额 8 MiB、wire overhead 最多 1 MiB、最多 4096 块；不接受 trailers/unsigned write/STS。
+锁定 MinIO SDK 的普通 HTTP PutObject 会使用这种逐块签名，不能只用 SignV4 helper 验证兼容。
+算法参考 [AWS chained signing](https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-streaming.html)
+和 [MinIO 7.2.0 streaming signer](https://github.com/minio/minio-go/blob/v7.2.0/pkg/signer/request-signature-streaming.go)。
 
 S3 的普通 PUT 是授权的 unconditional overwrite；存在 If-Match/If-None-Match 时
 应用真实 precondition。它不伪造 Console REST v1 强制版本条件。清单变更由 branch
@@ -98,8 +103,9 @@ query/authority tamper、presign expiry。真实 PG integration 验证 signing c
 
 `cmd/storage-sdk-probe` 是 Linux 验收工具，正式 CI 编译并记录 source_commit/hash，
 不进入 runtime image。只读 0600 config 文件；CLI stdout 仅 stage/checks，不输出
-secret、signed URL、对象正文或 provider errors。Transport 在首次 mutation 后
-拒绝 SDK 自动重发；unknown outcome 必须由运营人员检查原请求。
+secret、signed URL、对象正文或 provider errors；可记录 HTTP 状态数字。Transport 在首次 mutation 后
+拒绝 SDK 自动重发；unknown outcome 必须由运营人员检查原请求。`continue_write` 先确认原有
+自有 bucket 和 primary key 不存在，再执行一次 PUT；存在对象或未知响应必须停止检查。
 
 `web/e2e/s3-storage.spec.ts` 从 SQL/UI 开始真实配置、签发密钥，随后调用该 Go SDK
 工具验 Put/Get/Head/List/Range/presign、只读拒写、原地轮换和撤销。辅助对象/空

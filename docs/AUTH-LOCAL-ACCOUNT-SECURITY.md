@@ -17,7 +17,7 @@
 |---|---|---|
 | GET `/list-sessions` | 当前应用会话 | 返回当前用户有效会话；含 revoke token 的 API 返回只供当前用户，不能公开记录 |
 | POST `/change-password` | currentPassword、newPassword、revokeOtherSessions=true | 验证旧密码，保存 library 密码 hash，撤销其他会话；新密码 12–128 字符 |
-| POST `/revoke-session` | token | 只撤销当前用户拥有的指定会话 |
+| POST `/revoke-session` | token | 只撤销当前用户拥有的指定会话；未知/他人 token 返回同样 200，但不删除，避免泄露归属 |
 | POST `/revoke-other-sessions` | `{}` | 保留当前会话，撤销其余会话 |
 | POST `/revoke-sessions` | `{}` | 撤销全部会话，包括当前会话 |
 | GET `/get-session` | 应用 Cookie | 返回当前用户/会话或 null |
@@ -62,5 +62,5 @@ sequenceDiagram
 错误密码不改变会话、指定/其他/全部撤销。现场套件 `web/e2e/auth-security.spec.ts`
 从 SQL Workbench 开始，由已保存 database owner 明确委托 CREATE/CONNECT，然后
 UI 启用 Auth、注册应用用户、测试安全面板。独立浏览器请求上下文作为 peer 与
-其他用户，验证跨用户撤销拒绝。测试结束正常停用自有 Auth runtime、SQL compute
+其他用户，以实际会话仍有效验证跨用户撤销无效（库返回 200 无操作，不约定 403）。测试结束正常停用自有 Auth runtime、SQL compute
 缩到 0，应用账号行与全部证据保留。状态以本次精确版本的交付报告为准。

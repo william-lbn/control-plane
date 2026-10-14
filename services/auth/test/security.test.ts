@@ -40,6 +40,13 @@ test('application password change and owned session revocation use actual Postgr
   const revoked=await call('revoke-session',{token:otherSession.token},nextCookie);assert.equal(revoked.status,200);
   assert.equal((await (await call('get-session',undefined,nextOtherCookie)).json())===null,true);
   assert.equal((await (await call('get-session',undefined,nextCookie)).json())!==null,true);
+  // Better Auth intentionally makes unknown/unowned token revocation a 200
+  // no-op. Test the database-backed isolation rather than a guessed status.
+  const outsider=await call('sign-up/email',{email:'outsider@example.test',name:'Other user',password:newPassword});
+  assert.equal(outsider.status,200);const outsiderCookie=cookie(outsider);
+  const outsiderSession=(await (await call('get-session',undefined,outsiderCookie)).json()).session;
+  assert.equal((await call('revoke-session',{token:outsiderSession.token},nextCookie)).status,200);
+  assert.equal((await (await call('get-session',undefined,outsiderCookie)).json())!==null,true);
   const again=await call('sign-in/email',{email:identity.email,password:newPassword});assert.equal(again.status,200);const againCookie=cookie(again);
   assert.equal((await call('revoke-other-sessions',{},nextCookie)).status,200);
   assert.equal((await (await call('get-session',undefined,againCookie)).json())===null,true);

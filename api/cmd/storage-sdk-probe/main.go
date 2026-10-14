@@ -29,8 +29,9 @@ type config struct {
 }
 type onceTransport struct {
 	http.RoundTripper
-	mu   sync.Mutex
-	sent map[string]bool
+	mu       sync.Mutex
+	sent     map[string]bool
+	statuses []int
 }
 
 func (t *onceTransport) RoundTrip(r *http.Request) (*http.Response, error) {
@@ -44,7 +45,13 @@ func (t *onceTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 			return nil, errors.New("mutation retry blocked before dispatch")
 		}
 	}
-	return t.RoundTripper.RoundTrip(r)
+	response, err := t.RoundTripper.RoundTrip(r)
+	if response != nil {
+		t.mu.Lock()
+		t.statuses = append(t.statuses, response.StatusCode)
+		t.mu.Unlock()
+	}
+	return response, err
 }
 func main() {
 	if runtime.GOOS != "linux" || len(os.Args) != 2 {
@@ -84,12 +91,27 @@ func main() {
 		key := "folder/中文 file.bin"
 		payload := []byte("Neon real S3 SDK bytes 中文\n")
 		switch c.Mode {
-		case "write":
-			stage = "make_bucket"
-			if e = client.MakeBucket(ctx, c.Bucket, minio.MakeBucketOptions{Region: c.Region}); e != nil {
-				return e
+		case "write", "continue_write":
+			if c.Mode == "write" {
+				stage = "make_bucket"
+				if e = client.MakeBucket(ctx, c.Bucket, minio.MakeBucketOptions{Region: c.Region}); e != nil {
+					return e
+				}
+				checks = append(checks, "real_sdk_create_private_bucket")
+			} else {
+				// Continue only the owned empty bucket. A successful/unknown PUT
+				// outcome must never be overwritten as a test retry.
+				stage = "verify_original_empty_bucket"
+				found, err := client.BucketExists(ctx, c.Bucket)
+				if err != nil || !found {
+					return errors.New("owned bucket missing")
+				}
+				_, err = client.StatObject(ctx, c.Bucket, key, minio.StatObjectOptions{})
+				if err == nil || minio.ToErrorResponse(err).Code != "NoSuchKey" {
+					return errors.New("original object outcome requires inspection")
+				}
+				checks = append(checks, "original_owned_bucket_reused_primary_key_confirmed_absent_before_single_put")
 			}
-			checks = append(checks, "real_sdk_create_private_bucket")
 			stage = "put_object"
 			_, e = client.PutObject(ctx, c.Bucket, key, bytes.NewReader(payload), int64(len(payload)), minio.PutObjectOptions{ContentType: "application/octet-stream", DisableMultipart: true, SendContentMd5: true})
 			if e != nil {
@@ -200,7 +222,7 @@ func main() {
 	if e = run(); e == nil {
 		result = "pass"
 	}
-	json.NewEncoder(os.Stdout).Encode(map[string]any{"result": result, "stage": stage, "checks": checks, "credentials_in_output": false})
+	json.NewEncoder(os.Stdout).Encode(map[string]any{"result": result, "stage": stage, "checks": checks, "http_statuses": transport.statuses, "credentials_in_output": false})
 	if result != "pass" {
 		os.Exit(1)
 	}

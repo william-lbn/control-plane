@@ -33,13 +33,33 @@ test('S3 product starts at UI and uses actual SDK signing, object bytes, rotatio
   const project = f.project_id,
     branch = f.branch_id,
     base = `/api/v1/projects/${project}/branches/${branch}`,
-    bucket = 'ci-s3-' + Date.now();
+    resumeFile = process.env.NEON_E2E_S3_RESUME;
+  type Key = { id: string; secret: string };
+  const resume = resumeFile
+    ? (JSON.parse(await readFile(resumeFile, 'utf8')) as {
+        project_id: string;
+        branch_id: string;
+        bucket: string;
+        key: Key;
+        checks: string[];
+        operations: string[];
+      })
+    : undefined;
+  if (
+    resume &&
+    (resume.project_id !== project ||
+      resume.branch_id !== branch ||
+      !/^ci-s3-[0-9]+$/.test(resume.bucket) ||
+      !/^bcr_[a-f0-9]{24}$/.test(resume.key.id) ||
+      resume.key.secret.length !== 43)
+  )
+    throw new Error('Original owned S3 checkpoint required');
+  const bucket = resume?.bucket ?? 'ci-s3-' + Date.now();
   let result = 'running';
   const checks: string[] = [],
     operations: string[] = [],
     credentials: string[] = [];
   let sequence = 0;
-  type Key = { id: string; secret: string };
   async function save(check?: string) {
     if (check) checks.push(check);
     await writeFile(
@@ -99,7 +119,10 @@ test('S3 product starts at UI and uses actual SDK signing, object bytes, rotatio
       const output = (e as { stdout?: string }).stdout;
       if (output) {
         const report = JSON.parse(output);
-        throw new Error(`SDK ${mode} failed at ${report.stage}`);
+        for (const item of report.checks) await save(item);
+        throw new Error(
+          `SDK ${mode} failed at ${report.stage}; HTTP ${report.http_statuses?.join(',') ?? 'unavailable'}`,
+        );
       }
       throw new Error(`SDK ${mode} did not complete; inspect private process evidence`);
     }
@@ -155,17 +178,39 @@ test('S3 product starts at UI and uses actual SDK signing, object bytes, rotatio
     await page.getByRole('button', { name: '▶ 执行 SQL', exact: true }).click();
     expect((await grant).status()).toBe(200);
     await page.goto(`/#/projects/${project}/storage`);
-    await page.getByLabel('存储数据库').fill(f.database);
-    const enable = page.waitForResponse(
-      (r) => new URL(r.url()).pathname === base + '/storage' && r.request().method() === 'POST',
-    );
-    await page.getByRole('button', { name: '启用对象存储', exact: true }).click();
-    await wait(await enable);
+    if (resume) {
+      const response = await context.request.get(base + '/storage');
+      expect(response.status()).toBe(200);
+      const service = await response.json();
+      expect(service.state).toBe('active');
+      expect(service.spec.database).toBe(f.database);
+      checks.push(...resume.checks);
+      operations.push(...resume.operations);
+      await save('original_owned_active_storage_service_verified_and_reused');
+    } else {
+      await page.getByLabel('存储数据库').fill(f.database);
+      const enable = page.waitForResponse(
+        (r) => new URL(r.url()).pathname === base + '/storage' && r.request().method() === 'POST',
+      );
+      await page.getByRole('button', { name: '启用对象存储', exact: true }).click();
+      await wait(await enable);
+    }
     await expect(page.getByTestId('storage-s3-panel')).toContainText('forcePathStyle');
     await save('ui_owner_grant_and_native_branch_storage_s3_endpoint_enabled');
-    const writer = await issue('storage:write', 's3-writer-' + Date.now());
+    const writer = resume?.key ?? (await issue('storage:write', 's3-writer-' + Date.now()));
+    if (resume) {
+      const response = await context.request.get(base + '/credentials');
+      expect(response.status()).toBe(200);
+      const credential = (await response.json()).items.find(
+        (item: { id: string }) => item.id === writer.id,
+      );
+      expect(credential.state).toBe('active');
+      expect(credential.scopes).toContain('storage:write');
+      credentials.push(writer.id);
+      await save('original_storage_writer_reused_no_duplicate_credential_issue');
+    }
     await save('ui_unified_storage_writer_issued_once_and_secret_masked_then_cleared');
-    await sdk(writer, 'write');
+    await sdk(writer, resume ? 'continue_write' : 'write');
     await sdk(writer, 'read');
     const reader = await issue('storage:read', 's3-reader-' + Date.now());
     await sdk(reader, 'read');
