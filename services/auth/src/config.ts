@@ -12,6 +12,7 @@ export interface AuthConfig {
   databaseTLS: { caFile: "/run/auth-ca/ca.crt"; serverName: string };
   mail?: MailConfig;
   requireEmailVerification?: boolean;
+  emailOTPEnabled?: boolean;
 }
 
 // Both the URL and SQL credential come from an immutable, owned Secret file.
@@ -20,6 +21,8 @@ export function parseConfig(value: unknown): AuthConfig {
   if (!value || typeof value !== "object")
     throw new Error("Invalid Auth configuration");
   const c = value as AuthConfig;
+  if (c.emailOTPEnabled !== undefined && typeof c.emailOTPEnabled !== "boolean")
+    throw new Error("Invalid email OTP policy");
   if (
     c.requireEmailVerification !== undefined &&
     typeof c.requireEmailVerification !== "boolean"
@@ -89,7 +92,10 @@ export function loadConfig(): AuthConfig {
   if (!file) throw new Error("NEON_AUTH_CONFIG_FILE is required");
   const config = parseConfig(JSON.parse(readFileSync(file, "utf8")));
   config.mail = loadMailConfig();
-  if (config.requireEmailVerification && !config.mail)
+  if (
+    (config.requireEmailVerification || config.emailOTPEnabled) &&
+    !config.mail
+  )
     throw new Error("Email verification requires a mail transport");
   return config;
 }

@@ -5,7 +5,7 @@ on:
       suite:
         description: Real Linux UI acceptance slice
         type: choice
-        options: [auth-mail.spec.ts, auth-security.spec.ts, s3-storage.spec.ts, native-product.spec.ts, restore.spec.ts, lifecycle.spec.ts, endpoint-deletion.spec.ts, data-api.spec.ts, backend-credentials.spec.ts, console-invitations.spec.ts, managed-auth.spec.ts, object-storage.spec.ts, functions-metadata.spec.ts, functions-native.spec.ts, functions-observation.spec.ts, functions-http.spec.ts, functions-wake.spec.ts, database-owner.spec.ts, sql-script.spec.ts, sql-tools.spec.ts, functions-rollback.spec.ts, ai-gateway.spec.ts, saved-queries.spec.ts]
+        options: [auth-otp.spec.ts, auth-mail.spec.ts, auth-security.spec.ts, s3-storage.spec.ts, native-product.spec.ts, restore.spec.ts, lifecycle.spec.ts, endpoint-deletion.spec.ts, data-api.spec.ts, backend-credentials.spec.ts, console-invitations.spec.ts, managed-auth.spec.ts, object-storage.spec.ts, functions-metadata.spec.ts, functions-native.spec.ts, functions-observation.spec.ts, functions-http.spec.ts, functions-wake.spec.ts, database-owner.spec.ts, sql-script.spec.ts, sql-tools.spec.ts, functions-rollback.spec.ts, ai-gateway.spec.ts, saved-queries.spec.ts]
         default: native-product.spec.ts
       poll_fault:
         description: Inject transient read failures for native/Data API observation recovery
@@ -58,7 +58,7 @@ jobs:
             functions-http.spec.ts|functions-observation.spec.ts|functions-wake.spec.ts|functions-rollback.spec.ts) test -f "$NEON_E2E_FUNCTIONS_MONITOR_FIXTURE" ;;
             database-owner.spec.ts) test -f "$NEON_E2E_CATALOG_OWNER_FIXTURE" ;;
             auth-security.spec.ts|s3-storage.spec.ts|sql-script.spec.ts|sql-tools.spec.ts) test -f "$NEON_E2E_SQL_SCRIPT_FIXTURE" ;;
-            auth-mail.spec.ts) test -f "$NEON_E2E_SQL_SCRIPT_FIXTURE"; test -f "$NEON_E2E_MAILBOX_FIXTURE" ;;
+            auth-otp.spec.ts|auth-mail.spec.ts) test -f "$NEON_E2E_SQL_SCRIPT_FIXTURE"; test -f "$NEON_E2E_MAILBOX_FIXTURE" ;;
             backend-credentials.spec.ts|functions-metadata.spec.ts|ai-gateway.spec.ts|saved-queries.spec.ts) [[ "$NEON_E2E_CREDENTIAL_PROJECT" =~ ^prj_[a-f0-9]{16}$ ]] ;;
             *) exit 1 ;;
           esac

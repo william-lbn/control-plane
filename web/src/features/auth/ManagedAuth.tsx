@@ -6,6 +6,7 @@ import { newRequestKey } from '../../shared/requestKey';
 import { followOperation } from '../../shared/followOperation';
 import { AuthSecurityPanel } from './AuthSecurityPanel';
 import { AuthRecoveryPanel } from './AuthRecoveryPanel';
+import { AuthOTPPanel } from './AuthOTPPanel';
 
 type Instance = {
   branch_id: string;
@@ -19,6 +20,7 @@ type Instance = {
     database: string;
     allowed_origins: string[];
     require_email_verification?: boolean;
+    email_otp_enabled?: boolean;
   } | null;
   mail_operator_enabled?: boolean;
   mail_runtime_enabled?: boolean;
@@ -55,6 +57,7 @@ export function ManagedAuth({
   const [database, setDatabase] = useState('postgres');
   const [origins, setOrigins] = useState('');
   const [requireEmailVerification, setRequireEmailVerification] = useState(false);
+  const [emailOTPEnabled, setEmailOTPEnabled] = useState(false);
   const [busy, setBusy] = useState(false);
   const [operation, setOperation] = useState<Operation | null>(null);
   const [notice, setNotice] = useState('');
@@ -79,6 +82,7 @@ export function ManagedAuth({
       setDatabase(value.spec.database);
       setOrigins(value.spec.allowed_origins.join('\n'));
       setRequireEmailVerification(value.spec.require_email_verification ?? false);
+      setEmailOTPEnabled(value.spec.email_otp_enabled ?? false);
     }
   }
   useEffect(() => {
@@ -96,6 +100,7 @@ export function ManagedAuth({
     setDatabase('postgres');
     setOrigins('');
     setRequireEmailVerification(false);
+    setEmailOTPEnabled(false);
     setNotice('');
     setAppNotice('');
     if (branch && canAdmin) void load(current).catch(showError);
@@ -113,6 +118,7 @@ export function ManagedAuth({
             .map((v) => v.trim())
             .filter(Boolean),
           ...(requireEmailVerification ? { require_email_verification: true } : {}),
+          ...(emailOTPEnabled ? { email_otp_enabled: true } : {}),
         };
     const fingerprint = JSON.stringify([path, instance.generation, disable, body]);
     if (uncertainKey.current?.fingerprint !== fingerprint)
@@ -268,9 +274,18 @@ export function ManagedAuth({
       </div>
       <section className="table-card backend-panel" style={{ padding: 24 }}>
         <h3>分支身份服务</h3>
+        <a
+          className="button"
+          href={`/api/docs?schema=auth&branch_id=${encodeURIComponent(branch)}`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          应用 Auth API 文档
+        </a>
         <p>
           注册、登录、会话撤销与短期 JWT/JWKS 已提供。本版本需要显式启用实验室
-          HTTP；邮件验证、OAuth、MFA 和全链路可信 TLS 尚未验收。
+          HTTP；邮箱链接验证与密码找回已有本地验收；OTP 需本阶段独立验收，OAuth、MFA 和全链路可信
+          TLS 仍有门槛。
         </p>
         <p className="subtle-note">
           首次启用前，由数据库所有者通过 SQL 工作台执行权限委托。已有同名业务 schema 不会被接管。
@@ -314,6 +329,16 @@ export function ManagedAuth({
               onChange={(e) => setRequireEmailVerification(e.target.checked)}
             />
             要求邮箱验证后才能登录（需要已配置的邮件服务）
+          </label>
+          <label className="auth-mail-policy backend-wide">
+            <input
+              aria-label="启用应用邮箱验证码"
+              type="checkbox"
+              checked={emailOTPEnabled}
+              disabled={busy || active || !instance?.mail_operator_enabled}
+              onChange={(e) => setEmailOTPEnabled(e.target.checked)}
+            />
+            允许通过邮件验证码登录、注册、验证邮箱和找回密码
           </label>
           <div className="backend-wide button-row">
             <button
@@ -482,6 +507,21 @@ export function ManagedAuth({
             setSession(null);
             token.current = '';
             setTokenReady(false);
+          }}
+        />
+      )}
+      {active && instance?.mail_runtime_enabled && instance.spec?.email_otp_enabled && (
+        <AuthOTPPanel
+          key={branch}
+          branch={branch}
+          emailHint={session?.email}
+          onUser={(user) => {
+            setSession(user);
+            token.current = '';
+            setTokenReady(false);
+            setAppNotice(
+              user ? '已通过邮箱验证码登录' : '应用身份状态已更新，请检查会话或重新登录',
+            );
           }}
         />
       )}

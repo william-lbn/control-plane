@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.22.0",
+    "version": "0.23.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -2355,6 +2355,11 @@
             "type": "boolean",
             "default": false,
             "description": "Optional policy. Requires operator SMTP. False is omitted from the canonical spec to retain old idempotency hashes. Changing policy requires normal disable/re-enable and a new identity generation."
+          },
+          "email_otp_enabled": {
+            "type": "boolean",
+            "default": false,
+            "description": "Opt-in branch email OTP login/signup, verification and password recovery using the configured operator transport; requires immutable runtime regeneration."
           }
         }
       },
@@ -14004,6 +14009,43 @@
             "$ref": "#/components/responses/Error"
           },
           "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/application-auth-openapi.json": {
+      "get": {
+        "operationId": "getApplicationAuthOpenAPI",
+        "summary": "Read the separate branch application Auth protocol contract",
+        "description": "Fixed packaged schema only; no SQL/Compute wake or runtime readiness claim. Optional validated branch customizes server/cookie defaults.",
+        "security": [],
+        "parameters": [
+          {
+            "name": "branch_id",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^br_[a-f0-9]{16}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OpenAPI 3.1 application Auth document",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "422": {
             "$ref": "#/components/responses/Error"
           },
           "503": {

@@ -55,3 +55,32 @@ func TestManagedAuthMailCallbackTrust(t *testing.T) {
 		}
 	}
 }
+
+func TestManagedAuthOTPPolicyIsOptInAndDoesNotExposeCodeRetrieval(t *testing.T) {
+	t.Setenv("NEON_AUTH_MAIL_ENABLED", "")
+	t.Setenv("NEON_AUTH_MAIL_SECRET", "")
+	p := managedAuthPayload{BranchID: "br_0123456789abcdef", Spec: ManagedAuthSpec{Database: "postgres", AllowedOrigins: []string{}, EmailOTPEnabled: true}}
+	if validateManagedAuth(p) == nil {
+		t.Fatal("OTP enabled without operator mail")
+	}
+	if managedAuthAllowedAction("sign-in/email-otp", "POST") {
+		t.Fatal("OTP exposed without operator mail")
+	}
+	t.Setenv("NEON_AUTH_MAIL_ENABLED", "true")
+	t.Setenv("NEON_AUTH_MAIL_SECRET", "auth-mail-ci")
+	if validateManagedAuth(p) != nil {
+		t.Fatal("Configured OTP policy rejected")
+	}
+	for _, route := range []string{"email-otp/send-verification-otp", "email-otp/verify-email", "email-otp/check-verification-otp", "email-otp/request-password-reset", "email-otp/reset-password", "sign-in/email-otp"} {
+		if !managedAuthAllowedAction(route, "POST") || managedAuthAllowedAction(route, "GET") {
+			t.Fatal("OTP method boundary violated")
+		}
+	}
+	if managedAuthAllowedAction("email-otp/get-verification-otp", "POST") {
+		t.Fatal("Private stored code retrieval exposed")
+	}
+	data, e := json.Marshal(ManagedAuthSpec{Database: "postgres", AllowedOrigins: []string{}})
+	if e != nil || strings.Contains(string(data), "email_otp_enabled") {
+		t.Fatal("Default policy changes legacy request hashes")
+	}
+}

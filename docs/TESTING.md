@@ -530,3 +530,7 @@ catalog/原表读取，不接受任意 SELECT、调用任意 function 或重放�
 ## Auth SMTP verification and recovery
 
 See [the branch email/recovery contract](AUTH-EMAIL-RECOVERY.md). The protected Linux workflow advertises `auth-mail.spec.ts`, requires both `NEON_E2E_SQL_SCRIPT_FIXTURE` and `NEON_E2E_MAILBOX_FIXTURE`, and never uploads private mailbox bodies. Deploy the exact runtime images and operator mail configuration before this suite. The fixture receiver is optional, acknowledged, authenticated, internal and persistent. A mail submission response does not prove delivery or verified identity; acceptance reads the actual message and uses the actual UI account.
+
+## Email OTP candidate
+
+`auth-otp.spec.ts` uses the protected owner/mailbox fixtures and actual SMTP. Deploy the version declaring `ManagedAuthSpec.email_otp_enabled` before running it. It verifies native passwordless signup, incorrect/replayed codes, verification of a password user, and an independently captured server cookie before/after OTP recovery. Normal cleanup retains data/mail and retires owned Auth/Compute. See [the OTP contract](AUTH-EMAIL-OTP.md).

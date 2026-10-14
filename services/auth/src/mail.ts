@@ -151,5 +151,39 @@ export function createMailer(c: MailConfig, branch: string, baseURL: string) {
       throw new Error("Auth mail transport unavailable");
     }
   }
-  return { send, close: () => transport.close() };
+  async function sendOTP(kind: string, email: string, otp: string) {
+    const subjects: Record<string, string> = {
+      "sign-in": "Your application sign-in code",
+      "email-verification": "Your application email verification code",
+      "forget-password": "Your application password recovery code",
+    };
+    if (
+      !Object.hasOwn(subjects, kind) ||
+      !/^\d{6}$/.test(otp) ||
+      typeof email !== "string" ||
+      email.length > 254 ||
+      /[\r\n\0<>,;]/.test(email)
+    )
+      throw new Error("Invalid Auth OTP destination");
+    try {
+      await transport.sendMail({
+        from: c.from,
+        to: { name: "", address: email },
+        subject: subjects[kind],
+        text:
+          "Your one-time code is:\n\n" +
+          otp +
+          "\n\nIt expires in five minutes. If you did not request this, ignore it.",
+        headers: {
+          "X-Neon-Auth-Branch": branch,
+          "X-Neon-Auth-Event": "email-otp:" + kind,
+        },
+        disableFileAccess: true,
+        disableUrlAccess: true,
+      });
+    } catch {
+      throw new Error("Auth mail transport unavailable");
+    }
+  }
+  return { send, sendOTP, close: () => transport.close() };
 }

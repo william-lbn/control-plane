@@ -82,7 +82,7 @@ Conditional raw relay actions under `/auth/v1/{branch_id}`:
 | GET | `reset-password/{token}` | bounded opaque-token path; validates callback and redirects |
 | POST | `reset-password` | token, newPassword; consumes once and revokes server sessions |
 
-These actions are only exposed when operator mail is configured. The official versioned OpenAPI contract defines ManagedAuthSpec and the raw relay. Raw library responses and redirects are preserved; a 302 alone is not evidence that an email was verified. The UI confirms state by logging in and reading the real user.
+These actions are only exposed when operator mail is configured. The official versioned OpenAPI contract defines ManagedAuthSpec; raw branch actions have a separate application Auth contract. Raw library responses and redirects are preserved; a 302 alone is not evidence that an email was verified. The UI confirms state by logging in and reading the real user.
 
 ## Flows
 

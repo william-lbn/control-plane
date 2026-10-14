@@ -171,6 +171,7 @@ func (s *server) routes() *http.ServeMux {
 	mux.Handle("POST /api/v1/projects/{project}/endpoints/{endpoint}/query", s.auth(http.HandlerFunc(s.querySQL), true))
 	mux.Handle("POST /api/v1/projects/{project}/endpoints/{endpoint}/query-script", s.auth(http.HandlerFunc(s.querySQLScript), true))
 	mux.HandleFunc("GET /api/openapi.json", s.openapi)
+	mux.HandleFunc("GET /api/application-auth-openapi.json", s.applicationAuthOpenAPI)
 	mux.HandleFunc("GET /api/docs", s.swagger)
 	dist := env("NEON_V2_WEB_DIST", filepath.Join("..", "web", "dist"))
 	mux.Handle("GET /api/docs/assets/", http.StripPrefix("/api/docs/assets/", http.FileServer(http.Dir(filepath.Join(dist, "api", "docs", "assets")))))

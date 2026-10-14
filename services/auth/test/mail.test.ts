@@ -363,3 +363,349 @@ test("real SMTP mode refuses a peer without STARTTLS before sending a message", 
     await smtp.close();
   }
 });
+
+test("email OTP uses actual SMTP, hashed PostgreSQL records and one-time account flows", async () => {
+  const dsn = process.env.AUTH_TEST_DATABASE_URL;
+  if (!dsn) throw new Error("Dedicated auth_ci required");
+  const parsed = new URL(dsn);
+  if (
+    parsed.pathname != "/auth_ci" ||
+    parsed.username !== "auth_ci" ||
+    !["127.0.0.1", "localhost", "[::1]"].includes(parsed.hostname)
+  )
+    throw new Error("Disposable local auth_ci only");
+  const smtp = await mailbox(),
+    schema = "auth_otp_" + randomBytes(8).toString("hex");
+  const admin = new pg.Pool({ connectionString: dsn, max: 1 }),
+    db = new pg.Pool({
+      connectionString: dsn,
+      options: `-c search_path=${schema},pg_catalog`,
+      max: 2,
+    });
+  const branch = "br_0123456789abcdef";
+  const config: AuthConfig = {
+    version: 1,
+    branchID: branch,
+    baseURL: `https://auth.example.test/auth/v1/${branch}`,
+    secret: randomBytes(48).toString("base64url"),
+    trustedOrigins: [],
+    allowLabHTTP: false,
+    databaseURL:
+      "postgresql://synthetic:synthetic@proxy.example.test/postgres?sslmode=verify-full&options=endpoint%3Dep-0123456789abcdef",
+    databaseTLS: {
+      caFile: "/run/auth-ca/ca.crt",
+      serverName: "proxy.example.test",
+    },
+    mail: {
+      version: 1,
+      host: "127.0.0.1",
+      port: smtp.port,
+      from: "noreply@example.test",
+      secure: false,
+      labCleartext: true,
+    },
+    emailOTPEnabled: true,
+  };
+  function code(raw: string) {
+    const end = raw.indexOf("\r\n\r\n"),
+      headers = raw.slice(0, end),
+      body = raw.slice(end + 4);
+    const text = /Content-Transfer-Encoding: base64/i.test(headers)
+      ? Buffer.from(body.replace(/\s/g, ""), "base64").toString()
+      : body.replace(/=\r\n/g, "");
+    const match = text.match(/\b[0-9]{6}\b/);
+    if (!match) throw new Error("Private SMTP OTP absent");
+    return match[0];
+  }
+  try {
+    const ddl = readFileSync(
+      new URL(
+        "../../../api/internal/control/assets/auth-schema.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+    await admin.query(
+      `CREATE SCHEMA ${schema}; SET search_path=${schema},pg_catalog; ${ddl}`,
+    );
+    const auth = createAuth(config, db);
+    const call = (
+      action: string,
+      body?: unknown,
+      cookie?: string,
+      client = "192.0.2.11",
+    ) =>
+      auth.handler(
+        new Request(config.baseURL + "/" + action, {
+          method: body ? "POST" : "GET",
+          headers: {
+            Origin: new URL(config.baseURL).origin,
+            "X-Neon-Client-IP": client,
+            ...(body ? { "Content-Type": "application/json" } : {}),
+            ...(cookie ? { Cookie: cookie } : {}),
+          },
+          body: body ? JSON.stringify(body) : undefined,
+        }),
+      );
+    const cookie = (r: Response) =>
+      r.headers
+        .getSetCookie()
+        .map((v) => v.split(";")[0])
+        .join("; ");
+    const email = "otp-existing@example.test",
+      password = randomBytes(24).toString("base64url"),
+      next = randomBytes(24).toString("base64url");
+    const signup = await call("sign-up/email", {
+      email,
+      name: "OTP existing",
+      password,
+    });
+    assert.equal(signup.status, 200);
+    const originalID = (await signup.json()).user.id,
+      firstCookie = cookie(signup);
+    assert.equal(
+      (
+        await call("email-otp/send-verification-otp", {
+          email,
+          type: "email-verification",
+        })
+      ).status,
+      200,
+    );
+    assert.equal(smtp.messages.length, 1);
+    const verification = code(smtp.messages.pop()!);
+    const rows = await db.query(
+      'SELECT value,EXTRACT(EPOCH FROM ("expiresAt"-now()))::int AS seconds FROM verification',
+    );
+    assert.equal(rows.rows.length, 1);
+    assert.equal(rows.rows[0].value.split(":")[0] === verification, false);
+    assert.equal(
+      rows.rows[0].seconds <= 300 && rows.rows[0].seconds >= 290,
+      true,
+    );
+    assert.equal(
+      (await call("email-otp/verify-email", { email, otp: verification }))
+        .status,
+      200,
+    );
+    assert.equal(
+      (await (await call("get-session", undefined, firstCookie)).json()).user
+        .emailVerified,
+      true,
+    );
+    assert.equal(
+      (
+        await call("email-otp/send-verification-otp", {
+          email,
+          type: "sign-in",
+        })
+      ).status,
+      200,
+    );
+    assert.equal(smtp.messages.length, 1);
+    const signIn = code(smtp.messages.pop()!);
+    const wrong = signIn === "000000" ? "000001" : "000000";
+    assert.ok(
+      (await call("sign-in/email-otp", { email, otp: wrong })).status >= 400,
+    );
+    const login = await call("sign-in/email-otp", { email, otp: signIn });
+    assert.equal(login.status, 200);
+    assert.equal((await login.json()).user.id, originalID);
+    const secondCookie = cookie(login);
+    assert.ok(
+      (await call("sign-in/email-otp", { email, otp: signIn })).status >= 400,
+    );
+    assert.equal(
+      (await call("email-otp/request-password-reset", { email })).status,
+      200,
+    );
+    assert.equal(smtp.messages.length, 1);
+    const reset = code(smtp.messages.pop()!);
+    assert.equal(
+      (
+        await call("email-otp/reset-password", {
+          email,
+          otp: reset,
+          password: next,
+        })
+      ).status,
+      200,
+    );
+    assert.equal(
+      await (await call("get-session", undefined, firstCookie)).json(),
+      null,
+    );
+    assert.equal(
+      await (await call("get-session", undefined, secondCookie)).json(),
+      null,
+    );
+    assert.equal((await call("token", undefined, secondCookie)).status, 401);
+    assert.ok(
+      (await call("email-otp/reset-password", { email, otp: reset, password }))
+        .status >= 400,
+    );
+    assert.equal(
+      (
+        await call(
+          "sign-in/email",
+          { email, password },
+          undefined,
+          "192.0.2.12",
+        )
+      ).status,
+      401,
+    );
+    assert.equal(
+      (
+        await call(
+          "sign-in/email",
+          { email, password: next },
+          undefined,
+          "192.0.2.12",
+        )
+      ).status,
+      200,
+    );
+    const newEmail = "otp-new@example.test";
+    assert.equal(
+      (
+        await call(
+          "email-otp/send-verification-otp",
+          { email: newEmail, type: "sign-in" },
+          undefined,
+          "192.0.2.13",
+        )
+      ).status,
+      200,
+    );
+    const auto = code(smtp.messages.pop()!);
+    const created = await call(
+      "sign-in/email-otp",
+      { email: newEmail, otp: auto, name: "OTP native signup" },
+      undefined,
+      "192.0.2.13",
+    );
+    assert.equal(created.status, 200);
+    const user = (await created.json()).user;
+    assert.equal(user.email, newEmail);
+    assert.equal(user.emailVerified, true);
+    assert.equal(
+      (
+        await db.query('SELECT count(*)::int AS n FROM "user" WHERE email=$1', [
+          newEmail,
+        ])
+      ).rows[0].n,
+      1,
+    );
+    // Email ownership must retire a password/session planted before the
+    // account was verified. This checks the maintained library's takeover guard.
+    const unverified = "otp-unverified@example.test";
+    const planted = await call(
+      "sign-up/email",
+      { email: unverified, name: "Unverified baseline", password },
+      undefined,
+      "192.0.2.20",
+    );
+    assert.equal(planted.status, 200);
+    const plantedCookie = cookie(planted);
+    assert.equal(
+      (
+        await call(
+          "email-otp/send-verification-otp",
+          { email: unverified, type: "sign-in" },
+          undefined,
+          "192.0.2.20",
+        )
+      ).status,
+      200,
+    );
+    const ownership = code(smtp.messages.pop()!);
+    const owned = await call(
+      "sign-in/email-otp",
+      { email: unverified, otp: ownership },
+      undefined,
+      "192.0.2.20",
+    );
+    assert.equal(owned.status, 200);
+    assert.equal((await owned.json()).user.emailVerified, true);
+    assert.equal(
+      await (
+        await call("get-session", undefined, plantedCookie, "192.0.2.20")
+      ).json(),
+      null,
+    );
+    assert.equal(
+      (
+        await call(
+          "sign-in/email",
+          { email: unverified, password },
+          undefined,
+          "192.0.2.20",
+        )
+      ).status,
+      401,
+    );
+    assert.equal(
+      (
+        await call(
+          "email-otp/send-verification-otp",
+          { email: newEmail, type: "sign-in" },
+          undefined,
+          "192.0.2.14",
+        )
+      ).status,
+      200,
+    );
+    const attempts = code(smtp.messages.pop()!);
+    const bad = attempts === "000000" ? "000001" : "000000";
+    for (let i = 0; i < 3; i++)
+      assert.ok(
+        (
+          await call(
+            "email-otp/check-verification-otp",
+            { email: newEmail, type: "sign-in", otp: bad },
+            undefined,
+            "192.0.2.14",
+          )
+        ).status >= 400,
+      );
+    const exhausted = await call(
+      "email-otp/check-verification-otp",
+      { email: newEmail, type: "sign-in", otp: attempts },
+      undefined,
+      "192.0.2.15",
+    );
+    assert.ok(exhausted.status >= 400);
+    assert.equal((await exhausted.json()).code, "TOO_MANY_ATTEMPTS");
+    assert.equal(
+      (
+        await call(
+          "email-otp/send-verification-otp",
+          { email: newEmail, type: "email-verification" },
+          undefined,
+          "192.0.2.16",
+        )
+      ).status,
+      200,
+    );
+    const expired = code(smtp.messages.pop()!);
+    await db.query(
+      "UPDATE verification SET \"expiresAt\"=now()-interval '1 minute'",
+    );
+    assert.ok(
+      (
+        await call(
+          "email-otp/verify-email",
+          { email: newEmail, otp: expired },
+          undefined,
+          "192.0.2.16",
+        )
+      ).status >= 400,
+    );
+  } finally {
+    await db.end();
+    await admin.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
+    await admin.end();
+    await smtp.close();
+  }
+});

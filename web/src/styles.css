@@ -1484,3 +1484,18 @@ textarea:focus {
   width: 18px;
   flex: 0 0 18px;
 }
+
+.backend-panel .auth-mail-policy {
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.backend-panel .auth-mail-policy input[type='checkbox'] {
+  margin: 0;
+  width: 18px;
+  max-width: 18px;
+  flex: 0 0 18px;
+  accent-color: var(--accent, #31cf9a);
+}

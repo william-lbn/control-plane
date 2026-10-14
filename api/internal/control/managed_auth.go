@@ -17,6 +17,7 @@ type ManagedAuthSpec struct {
 	AllowedOrigins []string `json:"allowed_origins"`
 	// Omit false to preserve existing durable request hashes and old specs.
 	RequireEmailVerification bool `json:"require_email_verification,omitempty"`
+	EmailOTPEnabled          bool `json:"email_otp_enabled,omitempty"`
 }
 type managedAuthPayload struct {
 	ProjectID  string          `json:"project_id"`
@@ -54,8 +55,8 @@ func validAuthOrigin(origin string) bool {
 	return e == nil && u.Host != "" && !strings.Contains(u.Host, "*") && u.User == nil && u.Path == "" && u.RawQuery == "" && u.Fragment == "" && (u.Scheme == "https" || (os.Getenv("NEON_AUTH_LAB_HTTP") == "true" && u.Scheme == "http"))
 }
 func validateManagedAuth(p managedAuthPayload) error {
-	if p.Spec.RequireEmailVerification && !managedAuthMailConfigured() {
-		return errors.New("email verification requires the operator mail transport")
+	if (p.Spec.RequireEmailVerification || p.Spec.EmailOTPEnabled) && !managedAuthMailConfigured() {
+		return errors.New("email authentication requires the operator mail transport")
 	}
 	if !dataBranchID.MatchString(p.BranchID) || !validPGIdentifier(p.Spec.Database) || p.Spec.AllowedOrigins == nil || len(p.Spec.AllowedOrigins) > 8 {
 		return errors.New("invalid Managed Auth configuration; database and allowed_origins array are required")

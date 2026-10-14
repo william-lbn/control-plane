@@ -14,6 +14,7 @@ import (
 
 var managedAuthRelaySlots = make(chan struct{}, 32)
 var managedAuthActions = map[string]bool{"sign-up/email": true, "sign-in/email": true, "sign-out": true, "get-session": true, "token": true, "jwks": true, "list-sessions": true, "revoke-session": true, "revoke-sessions": true, "revoke-other-sessions": true, "change-password": true, "update-user": true}
+var managedAuthOTPActions = map[string]bool{"email-otp/send-verification-otp": true, "email-otp/check-verification-otp": true, "email-otp/verify-email": true, "email-otp/request-password-reset": true, "email-otp/reset-password": true, "sign-in/email-otp": true}
 var managedAuthResetCallback = regexp.MustCompile(`^reset-password/[a-zA-Z0-9_-]{20,128}$`)
 
 func managedAuthAllowedAction(action, method string) bool {
@@ -22,6 +23,9 @@ func managedAuthAllowedAction(action, method string) bool {
 	}
 	if !managedAuthMailConfigured() {
 		return false
+	}
+	if managedAuthOTPActions[action] {
+		return method == "POST" || method == "OPTIONS"
 	}
 	if managedAuthResetCallback.MatchString(action) {
 		return method == "GET"
@@ -123,6 +127,10 @@ func (s *server) managedAuthRelay(w http.ResponseWriter, r *http.Request) {
 	var spec ManagedAuthSpec
 	if json.Unmarshal(rawSpec, &spec) != nil {
 		fail(w, r, 503, "auth_unavailable", "Branch Auth configuration unavailable")
+		return
+	}
+	if managedAuthOTPActions[r.PathValue("rest")] && !spec.EmailOTPEnabled {
+		http.NotFound(w, r)
 		return
 	}
 	if managedAuthCORS(w, r, spec, os.Getenv("NEON_AUTH_PUBLIC_ORIGIN")) {

@@ -31,6 +31,16 @@ const allowed = new Set([
   "revoke-other-sessions",
   "change-password",
   "update-user",
+  ...(config.mail && config.emailOTPEnabled
+    ? [
+        "email-otp/send-verification-otp",
+        "email-otp/check-verification-otp",
+        "email-otp/verify-email",
+        "email-otp/request-password-reset",
+        "email-otp/reset-password",
+        "sign-in/email-otp",
+      ]
+    : []),
   ...(config.mail
     ? [
         "request-password-reset",

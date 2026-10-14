@@ -1,11 +1,11 @@
 import { betterAuth } from "better-auth";
-import { jwt } from "better-auth/plugins";
+import { jwt, emailOTP } from "better-auth/plugins";
 import type { Pool } from "pg";
 import type { AuthConfig } from "./config.ts";
 import { createMailer } from "./mail.ts";
 
 export function authOptions(c: AuthConfig, database: Pool) {
-  if (c.requireEmailVerification && !c.mail)
+  if ((c.requireEmailVerification || c.emailOTPEnabled) && !c.mail)
     throw new Error("Email verification requires a mail transport");
   const mail = c.mail ? createMailer(c.mail, c.branchID, c.baseURL) : undefined;
   return {
@@ -85,6 +85,21 @@ export function authOptions(c: AuthConfig, database: Pool) {
       storage: "database" as const,
     },
     plugins: [
+      ...(mail && c.emailOTPEnabled
+        ? [
+            emailOTP({
+              otpLength: 6,
+              expiresIn: 300,
+              allowedAttempts: 3,
+              storeOTP: "hashed",
+              disableSignUp: false,
+              sendVerificationOnSignUp: false,
+              sendVerificationOTP: async ({ email, otp, type }) => {
+                await mail.sendOTP(type, email, otp);
+              },
+            }),
+          ]
+        : []),
       jwt({
         jwt: {
           issuer: c.baseURL,
