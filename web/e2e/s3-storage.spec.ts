@@ -8,6 +8,9 @@ test('S3 product starts at UI and uses actual SDK signing, object bytes, rotatio
   page,
   context,
 }, info) => {
+  // Bound changed selectors separately from the cold Compute budget.
+  page.setDefaultTimeout(30000);
+  page.setDefaultNavigationTimeout(30000);
   const file = process.env.NEON_E2E_SQL_SCRIPT_FIXTURE,
     admin = process.env.NEON_E2E_ADMIN_PASSWORD_FILE,
     privateDir = process.env.NEON_E2E_PRIVATE_DIR,
@@ -44,6 +47,8 @@ test('S3 product starts at UI and uses actual SDK signing, object bytes, rotatio
         checks: string[];
         operations: string[];
         primary_uploaded?: boolean;
+        reader?: Key;
+        pre_rotation?: boolean;
       })
     : undefined;
   if (
@@ -207,18 +212,34 @@ test('S3 product starts at UI and uses actual SDK signing, object bytes, rotatio
       );
       expect(credential.state).toBe('active');
       expect(credential.scopes).toContain('storage:write');
+      if (resume.pre_rotation) expect(credential.generation).toBe(1);
       credentials.push(writer.id);
       await save('original_storage_writer_reused_no_duplicate_credential_issue');
     }
     await save('ui_unified_storage_writer_issued_once_and_secret_masked_then_cleared');
-    await sdk(
-      writer,
-      resume ? (resume.primary_uploaded ? 'continue_existing' : 'continue_write') : 'write',
-    );
-    await sdk(writer, 'read');
-    const reader = await issue('storage:read', 's3-reader-' + Date.now());
-    await sdk(reader, 'read');
-    await sdk(reader, 'deny_write');
+    if (!resume?.pre_rotation) {
+      await sdk(
+        writer,
+        resume ? (resume.primary_uploaded ? 'continue_existing' : 'continue_write') : 'write',
+      );
+      await sdk(writer, 'read');
+    }
+    const reader = resume?.reader ?? (await issue('storage:read', 's3-reader-' + Date.now()));
+    if (resume?.reader) {
+      const response = await context.request.get(base + '/credentials');
+      expect(response.status()).toBe(200);
+      const credential = (await response.json()).items.find(
+        (item: { id: string }) => item.id === reader.id,
+      );
+      expect(credential.state).toBe('active');
+      expect(credential.scopes).toEqual(['storage:read']);
+      expect(credential.generation).toBe(1);
+      credentials.push(reader.id);
+      await save('original_readonly_credential_and_accepted_sdk_checkpoint_reused');
+    } else {
+      await sdk(reader, 'read');
+      await sdk(reader, 'deny_write');
+    }
     await save('actual_sdk_scoped_reads_and_write_denial');
     const listing = await context.request.get(base + '/credentials');
     expect(listing.status()).toBe(200);
@@ -229,8 +250,9 @@ test('S3 product starts at UI and uses actual SDK signing, object bytes, rotatio
     const row = page.getByTestId('backend-row-' + writer.id);
     const rotated = page.waitForResponse(
       (r) => new URL(r.url()).pathname === base + '/credentials/' + writer.id + '/rotate',
+      { timeout: 30000 },
     );
-    await row.getByRole('button', { name: '轮换', exact: true }).click();
+    await row.getByRole('button', { name: '轮换凭据', exact: true }).click();
     const rr = await rotated;
     expect(rr.status()).toBe(200);
     const rv = await rr.json();
@@ -249,7 +271,7 @@ test('S3 product starts at UI and uses actual SDK signing, object bytes, rotatio
     );
     await page
       .getByTestId('backend-row-' + writer.id)
-      .getByRole('button', { name: '撤销', exact: true })
+      .getByRole('button', { name: '撤销凭据', exact: true })
       .click();
     expect((await revoked).status()).toBe(200);
     await sdk(next, 'deny_read');
@@ -261,10 +283,11 @@ test('S3 product starts at UI and uses actual SDK signing, object bytes, rotatio
     );
     await page
       .getByTestId('backend-row-' + reader.id)
-      .getByRole('button', { name: '撤销', exact: true })
+      .getByRole('button', { name: '撤销凭据', exact: true })
       .click();
     expect((await otherRevoked).status()).toBe(200);
     await page.goto(`/#/projects/${project}/storage`);
+    await expect(page.getByLabel('存储数据库')).toHaveValue(f.database);
     await page.screenshot({ path: info.outputPath('s3-storage.png'), fullPage: true });
     const disable = page.waitForResponse(
       (r) => new URL(r.url()).pathname === base + '/storage' && r.request().method() === 'DELETE',
