@@ -2,12 +2,12 @@
 
 ## 1. 前提与边界
 
-本仓库发布 API、Web、Compute Management Gateway、Data API Gateway 和 PostgREST。
+本仓库发布 API、Web、Compute Management Gateway、Data API Gateway、PostgREST、Go Adapter、Auth 与 AI 共八个组件镜像。
 API 镜像也包含独立 control-worker 二进制；Chart 0.3.0 默认使用 split profile。
 旧版本升级必须先执行 WORKER-SPLIT.md 的停止/排空步骤，不能直接覆盖运行中的合并 Worker。
 Neon/Autoscaling 完整基础设施须先安装并验收：CRD/NeonVM controller、Agent/Scheduler、
 Storage Controller、Pageserver、Safekeeper、Proxy、持久对象存储和兼容 adapter。
-当前依赖外部 adapter，不能只安装本仓库 Chart 就获得完整数据库服务。
+本仓库 Go adapter 需与基础设施一起部署，不能只安装本仓库 Chart 就获得完整数据库服务。
 
 要求：Linux amd64、Kubernetes >=1.30、NeonVM 所需虚拟化能力、固定 PG16 guest、
 可用 metadata PostgreSQL、可信 SQL/管理证书以及明确的 namespace 与内部 DNS。

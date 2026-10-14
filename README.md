@@ -4,11 +4,12 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 许可证：Apache-2.0。项目由自托管维护者开发，与 Neon 托管服务独立。
 
 **发行状态：预览版本。已经验证的实验环境功能不等于生产认证，也不等于 Neon 官网全部 Backend 服务。**
-当前已部署验收基线为 `1d4854e` / 统一 Helm 0.1.25；Functions 历史恢复的
-[精确回执](https://github.com/william-lbn/neon-helm/blob/v0.1.25/docs/ACCEPTANCE-2026-10-13-FUNCTIONS-ROLLBACK.md)
-记录原 fixture 实际 UI 九组检查、745 项公开 Go/PostgreSQL 检查、固定公开镜像和最终 Compute 零。
-测试/SDK 来源 `b4d6e27` 仅修正示例和验收，Go/Console runtime 与 guest base image 保持上述版本。
-下一切片须取得自己的现场回执，不能以源码 HEAD 替代运行版本。
+当前运行基线 `be04cb4` / 统一 Helm 0.1.29，控制面八镜像由同次 Linux CI 发布。
+[Auth/S3 当前交付](docs/DELIVERY-2026-10-14-AUTH-S3.md)记录 788 项公开 Go/真实 PG 检查、
+应用密码/会话安全十组实际 UI，以及原对象/凭据保留的实际 S3 SDK 验收。
+S3 的 test-only `875e48b` 只修正选择器和原 checkpoint 续测，不改变运行时代码。
+[Functions HTTP/SSE 与自动零/冷醒](docs/DELIVERY-2026-10-14-FUNCTIONS-HTTP.md)
+在 0.1.28 通过十组实际 UI。历史版本保留自己的回执，不能当作所有当前代码的全量回归。
 [历史原生 Functions 验收](https://github.com/william-lbn/neon-helm/blob/v0.1.19/docs/ACCEPTANCE-2026-10-12-FUNCTIONS.md)：`bf0dd9e` / 统一 Helm 0.1.19 已通过真实 Linux UI→microVM→Proxy→Neon SQL、停止/重部署和 NOLOGIN/保留数据验收。原失败与续测均独立保留，历史切片不能冒充全部官网功能回归。
 
 [Functions 原生执行](docs/FUNCTIONS-NATIVE-PREVIEW.md)默认禁用，实验部署由不可变 operator 配置明确启用；其实际验收范围见上述报告。[运行监控](docs/FUNCTIONS-RUNTIME-OBSERVATION.md)已在 `be557e0` / Helm 0.1.20 通过真实 Linux UI；[精确报告](https://github.com/william-lbn/neon-helm/blob/v0.1.20/docs/ACCEPTANCE-2026-10-12-FUNCTIONS-MONITORING.md)。[显式唤醒保留版本](docs/FUNCTIONS-WAKE.md)已在 `0198f7c` / Helm 0.1.21 通过实际 UI、保留身份、幂等与正常回收；[精确报告](https://github.com/william-lbn/neon-helm/blob/v0.1.21/docs/ACCEPTANCE-2026-10-12-FUNCTIONS-WAKE.md)。[数据库 Owner 变更](docs/DATABASE-OWNER.md)已在 `e2dc587` / Helm 0.1.22 通过原 fixture 的实际 UI/SQL、Writer/Reader 冷醒和正常回收；[精确报告](https://github.com/william-lbn/neon-helm/blob/v0.1.22/docs/ACCEPTANCE-2026-10-12-DATABASE-OWNER.md)。后续版本不能沿用旧版本通过结果。
@@ -18,7 +19,7 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 旧合并版本升级前必须执行 [停止/排空流程](docs/WORKER-SPLIT.md)。
 运行代码与实际合同见 [OpenAPI](contracts/openapi-v1.json)；本项目使用 `/api/v1`，未声称兼容托管 Neon `/api/v2`。
 
-[Object Storage REST v1](docs/OBJECT-STORAGE.md) 已增加真实分支文件服务；源码合同为 OpenAPI 0.17。现场验收按版本记录，仍未开放完整外部 S3 协议兼容。[SQL 脚本](docs/SQL-SCRIPTS.md)新增原生解析、逐条结果、事务结果和输出预算，已在 0.1.23 通过首次实际 UI 六组检查；原单条请求保持兼容。[Explain/Analyze 与 CSV/JSON 导出](docs/SQL-TOOLS.md)已在 0.1.24 通过首次实际 UI 五组检查；[Functions 历史部署恢复](docs/FUNCTIONS-ROLLBACK.md)已在 0.1.25 通过原 fixture 实际 UI 九组检查；[SDK 空闲断开处理](docs/FUNCTIONS-SDK-RELIABILITY.md)已验证进程存活、明确重连和保留写入。需人工提供的外部依赖统一见 [人工输入清单](docs/OPERATOR-INPUTS.md)，其余工程任务继续推进。
+[Object Storage REST v1](docs/OBJECT-STORAGE.md) 已增加真实分支文件服务；源码合同为 OpenAPI 0.21.0。现场验收按版本记录，现有基础 S3 独立入口、signed chunks 与统一凭据；完整兼容仍有独立门槛。[SQL 脚本](docs/SQL-SCRIPTS.md)新增原生解析、逐条结果、事务结果和输出预算，已在 0.1.23 通过首次实际 UI 六组检查；原单条请求保持兼容。[Explain/Analyze 与 CSV/JSON 导出](docs/SQL-TOOLS.md)已在 0.1.24 通过首次实际 UI 五组检查；[Functions 历史部署恢复](docs/FUNCTIONS-ROLLBACK.md)已在 0.1.25 通过原 fixture 实际 UI 九组检查；[SDK 空闲断开处理](docs/FUNCTIONS-SDK-RELIABILITY.md)已验证进程存活、明确重连和保留写入。需人工提供的外部依赖统一见 [人工输入清单](docs/OPERATOR-INPUTS.md)，其余工程任务继续推进。
 
 ## 1. 功能范围
 
@@ -31,15 +32,15 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 | 数据库、角色与密码轮换 | 分支目录、Compute 原生配置、Proxy spec 调谐；原 OID/版本保护的自定义库 Owner 变更已通过实际 UI 和 Writer/Reader 冷醒 | 默认/系统 Owner 变更、rename、未知外部 DDL 恢复未完成；见 [Owner 回执](docs/DATABASE-OWNER.md) |
 | CPU / 内存边界、自动休眠、连接唤醒 | 已实现实验环境控制路径 | 整数 CPU 1→2→1 已验证；小数 CPU、完整内存缩回、跨实例栅栏未验收 |
 | 监控、Operation 步骤、错误与重试 | 已实现 | 长期指标持久化、SLO 告警、完整审计导出未完成 |
-| 分支 Managed Auth | Go/TS/React、真实 PG 与 Neon UI 注册/会话/JWT/克隆隔离/RLS/自动缩零通过 | 邮件/OAuth/MFA、完整身份管理、密钥轮换、全链路 TLS/HA 未完成；见本版交付 |
+| 分支 Managed Auth | Go/TS/React、真实 PG 与 Neon UI 注册/会话/JWT/克隆隔离/RLS/自动缩零通过 | 密码/会话安全已独立验收；邮件/OAuth/MFA、完整身份管理、密钥轮换、全链路 TLS/HA 未完成；见本版交付 |
 | 时间点恢复到新分支 | 原生时间戳/LSN、存储保留租约、异步调谐、历史目录隔离、React UI | 默认禁用；仅受管理分支；原地恢复、Time Travel Assist、完整 Backend 一致性恢复未实现 |
 | 项目/分支保留删除与独立 Compute 删除 | 保护/依赖图、关闭 Proxy 和服务、正常 Runner 回收、held tombstone、项目恢复、原密码重建与 React UI | 物理 GC、TTL、失败创建回收与跨实例栅栏未开放；详见 [删除手册](docs/RETAINED-DELETION.md)和本版交付 |
 | HA / DR | 部分租约与恢复工具 | 未通过独立故障域 HA/DR；历史新分支恢复不等于完整 DR |
-| 产品 Object Storage | Go REST Driver、独立受限 bucket、随分支目录、上传下载 UI、条件写入、预签名与保留恢复 | REST v1 真实 UI 19 项及原失败项目恢复 4 项通过；完整 S3/multipart/GC/HA/TLS 仍未完成 |
-| Functions | Go Driver、隔离 Node guest、ZIP/环境、真实 SQL、停止/重部署/删除、监控与显式保留版本唤醒已通过实际 UI；默认关闭 | 公开流式入口、自动休眠/唤醒、触发器与 Backend 分支复制仍缺 |
-| AI Gateway 推理 | 模型/分支应用凭据合同已有代码 | 真实 Gateway/供应商调用仍需实现与凭据；不能用聊天会话替代 API 凭据 |
+| 产品 Object Storage | Go REST Driver、独立受限 bucket、随分支目录、REST/S3、SigV4/signed chunks、统一密钥、上传下载 UI、条件写与预签名 | REST 与基础 S3 分别实际验收；multipart/COPY/bulk/CORS/大文件/GC/HA/TLS 仍未完成 |
+| Functions | Go Driver、隔离 Node guest、ZIP/环境、真实 SQL、停止/重部署/删除、监控与显式保留版本唤醒已通过实际 UI；默认关闭 | 公开 HTTP/SSE、自动休眠/一次冷醒已实际验收；WS、触发器与 Backend 分支复制仍缺 |
+| AI Gateway 推理 | 独立 Go 网关、模型目录/Playground、文本 Chat/SSE、分支应用授权与用量，本地 Ollama 已真实 UI 验收 | 动态供应商管理、其他协议/预算、商业上游、HA/可信 TLS 尚有缺口 |
 | Data API | 原生 Go Driver、持久 Operation、React UI、分支 JWT Gateway 和固定 PostgREST 镜像 | 默认禁用；须显式 labHTTP，真实 Neon UI 验收独立于 PG CI；RPC/views 等不在首版范围 |
-| 分支应用凭据 | 一次性 Token、范围/到期、轮换/撤销、哈希存储、当前权限检查和 UI | 当前仅 ai_gateway:invoke；凭据不等于 AI 推理服务可用 |
+| 分支应用凭据 | 一次性 Token、范围/到期、轮换/撤销、哈希存储、当前权限检查和 UI | ai_gateway:invoke、storage:read/write；加密 signing material、同 ID 轮换和即时撤销；不替代供应商/租户生产准入 |
 
 **外部依赖**：Neon Storage Controller、Pageserver、Safekeeper、Proxy、持久对象存储、
 NeonVM、Autoscaling Agent/Scheduler，以及与本版合同匹配的 Proxy/Storage adapter。

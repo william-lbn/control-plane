@@ -2,11 +2,13 @@
 
 ## 1. 本轮约束
 
-SQL 工作台验收：`7c0ac72` / Helm 0.1.24 的 SQL 计划/CSV/JSON 下载与 0.1.23
-原生脚本均通过首次实际 Linux UI。原生 Functions、监控、显式唤醒、自定义数据库 Owner
-保留 0.1.19–0.1.22 的精确版本回执；这些不代表对应全部功能组完成。
-[Functions 历史恢复](FUNCTIONS-ROLLBACK.md)已在 `1d4854e` / Helm 0.1.25 通过原 fixture 九组现场检查，SDK 的真实空闲断开/重新连接也已验证；后续 Functions 公开入口、自动零/唤醒、日志/计量仍待实现与验收。
-下文带日期的增量段落记录历史进展，以当前功能合同/回执和 PRODUCTION-GATES 为状态依据。
+当前基线 `be04cb4` / Helm 0.1.29。本地 Functions 独立 HTTP/SSE 与自动零/冷醒、
+Auth 应用密码/会话安全、S3 基础真实 SDK 均已有现场 UI 结果；分别见
+[Functions](DELIVERY-2026-10-14-FUNCTIONS-HTTP.md)与[Auth/S3](DELIVERY-2026-10-14-AUTH-S3.md)。
+历史 SQL、Owner、Functions、REST 存储和推理回执保留各自版本，不重复宣称全量生产准入。
+下一阶段优先真实本地邮件验证/密码找回、Email OTP/Magic Link 等 Auth 路径；
+随后继续完整对象协议与 Functions 未完成部分。当前工程门槛由 PRODUCTION-GATES 约束。
+下方带日期段落是历史增量，不覆盖本节当前状态。
 
 继续执行完整官网 Backend 目标。需要外部账号、模型调用凭据、SMTP 或 OAuth
 应用的真实接入放在后面；这些依赖不阻止我们实现本地服务、API、数据模型、UI、
@@ -131,3 +133,10 @@ until the real microVM, native Driver, Console and zero/wake acceptance exist.
 历史源/失败记录保留，不把完成的切片重复记为待开发。下一批优先 Functions
 公开独立入口/自动休眠冷醒、对象 S3 兼容和 Auth 本地高级流程；后续继续按功能闭环
 实现及串行验收，域名/商业模型/外部 IdP 输入仍后置。所有生产门槛继续以当前清单为准。
+
+## 2026-10-14：本阶段退出与下一阶段
+
+Functions HTTP/SSE、自动零/一次冷醒、Auth 密码/会话、S3 基础 SDK 已分别通过实际 UI；
+源/镜像/Helm 锁、失败恢复、原对象和剩余门槛见当前交付。本地先完成 Auth 邮件验证、
+找回、Email OTP/Magic Link 和管理流程；公网与外部送信后置。MFA 在官方 roadmap
+仍为 coming soon，本项目既定 MFA 也须独立实现，不能用当前会话安全代替。

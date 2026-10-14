@@ -1,5 +1,12 @@
 # 测试与交付标准
 
+当前新功能与原 fixture 续测入口见 [Auth/S3 交付](DELIVERY-2026-10-14-AUTH-S3.md)
+和 [Functions HTTP](DELIVERY-2026-10-14-FUNCTIONS-HTTP.md)。所有业务/浏览器测试在 Linux，
+单集群串行、retries=0。新套件 selector/action/response 等待须单独有界；
+不能以全套 30 分钟冷醒预算等待一个已改名按钮。已通过 checkpoint 保留后只续验未通过步骤。
+API.md 由 `node tools/generate-api-docs.mjs` 生成，Linux CI 使用 `--check` 检查同步。
+
+
 独立 Compute 删除增量使用 `web/e2e/endpoint-deletion.spec.ts`，手动步骤与实际 API
 合同见 [ENDPOINT-DELETION.md](ENDPOINT-DELETION.md)。从登录/点击验证丢失 202 后
 的原请求重放、服务依赖、Writer/Reader 连续性、完全无 Compute 后重建和项目恢复。
@@ -16,7 +23,7 @@
 | Workflows | 固定 actionlint 1.7.12 / Linux ShellCheck | 校验全部 CI/live workflow；拒绝非法上下文和 shell 问题 |
 | Helm | tools/ci-helm.sh | lint/template；拒绝多 API 副本、缺 CA、浮动 tag；gateway 无 hostPath |
 | Auth | 独立 auth_ci PostgreSQL + Better Auth；原生 Node TLS 测试 | 注册/密码/会话/JWT/克隆身份，严格配置与 cookie、CA/名称负例；零 skipped |
-| Image | protected main/tag after gates | 固定 builder、SHA tag、API/Web/Gateway/DataAPI/PostgREST/Adapter/Auth 七镜像、SBOM/provenance、digest receipt |
+| Image | protected main/tag after gates | 固定 builder、SHA tag、API/Web/Gateway/DataAPI/PostgREST/Adapter/Auth/AI 八镜像、SBOM/provenance、digest receipt |
 
 ```bash
 export NEON_V2_TEST_DATABASE_URL='postgres://ci:ci-disposable@127.0.0.1:5432/control_ci?sslmode=disable'
