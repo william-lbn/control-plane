@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon self-hosted application Auth protocol",
-    "version": "0.23.0",
+    "version": "0.24.0",
     "description": "Curated allowlisted Better Auth 1.7.7 branch protocol. Separate from Console identity/control API. Conditional routes require operator mail and branch policy. The schema documents protocols; it does not assert a runtime is enabled or healthy."
   },
   "servers": [
@@ -2932,6 +2932,125 @@
         },
         "x-required-branch-policy": "email_otp_enabled",
         "x-required-operator-capability": "managed-auth-mail"
+      }
+    },
+    "/sign-in/magic-link": {
+      "post": {
+        "operationId": "signInMagicLink",
+        "tags": [
+          "Magic Link"
+        ],
+        "summary": "Send a passwordless email link",
+        "description": "Requires branch Magic Link and operator mail. Library verifies exact trusted callback origins. Registration defaults off. No token is returned.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "email"
+                ],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "callbackURL": {
+                    "type": "string",
+                    "description": "Relative path or exact trusted absolute callback URL."
+                  },
+                  "newUserCallbackURL": {
+                    "type": "string",
+                    "description": "Relative path or exact trusted absolute callback URL."
+                  },
+                  "errorCallbackURL": {
+                    "type": "string",
+                    "description": "Relative path or exact trusted absolute callback URL."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Delivery request processed"
+          },
+          "400": {
+            "description": "Invalid request"
+          },
+          "404": {
+            "description": "Disabled branch plugin"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
+      }
+    },
+    "/magic-link/verify": {
+      "get": {
+        "operationId": "verifyMagicLink",
+        "tags": [
+          "Magic Link"
+        ],
+        "summary": "Redeem one-time email link",
+        "description": "Consumes maintained Better Auth PostgreSQL verification atomically. Establishes branch application cookie; redirects only to trusted callbacks. Never logs or persistently stores caller token.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "callbackURL",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "newUserCallbackURL",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "errorCallbackURL",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Application session without callback"
+          },
+          "302": {
+            "description": "Trusted callback or error redirect; inspect session"
+          },
+          "400": {
+            "description": "Invalid or expired link"
+          },
+          "404": {
+            "description": "Disabled plugin"
+          },
+          "422": {
+            "description": "Untrusted callback"
+          },
+          "429": {
+            "description": "Rate limited"
+          }
+        }
       }
     }
   },

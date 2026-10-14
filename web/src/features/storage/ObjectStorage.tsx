@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import './storage.css';
+import { sha256 } from '@noble/hashes/sha2.js';
+import { bytesToHex } from '@noble/hashes/utils.js';
 import { api, projectPath } from '../../api';
 import type { Branch, Operation } from '../../api';
 import { PageHeading, status } from '../../shared/ui';
@@ -54,11 +56,30 @@ export function ObjectStorage({
   const [bucketName, setBucketName] = useState('');
   const [access, setAccess] = useState<'private' | 'public_read'>('private');
   const [objects, setObjects] = useState<ObjectEntry[]>([]);
+  const [selectedKeys, setSelectedKeys] = useState<string[]>([]);
   const [prefix, setPrefix] = useState('');
+  const [folders, setFolders] = useState<string[]>([]);
+  const [directoryMode, setDirectoryMode] = useState(false);
+  const [copySource, setCopySource] = useState<(ObjectEntry & { bucket: string }) | null>(null);
+  const [copyBucket, setCopyBucket] = useState('');
+  const [copyKey, setCopyKey] = useState('');
   const [after, setAfter] = useState('');
   const [key, setKey] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [overwrite, setOverwrite] = useState(false);
+  const [metadataJSON, setMetadataJSON] = useState('{}');
+  const [corsJSON, setCORSJSON] = useState('[]');
+  const [corsETag, setCORSETag] = useState('');
+  const [objectMetadata, setObjectMetadata] = useState<Record<string, string> | null>(null);
+  const [metadataSelection, setMetadataSelection] = useState<{ key: string; etag: string } | null>(
+    null,
+  );
+  const [metadataEdit, setMetadataEdit] = useState('{}');
+  const [uploadCapability, setUploadCapability] = useState<{
+    url: string;
+    headers: Record<string, string>;
+    expires_at: string;
+  } | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
   const [operation, setOperation] = useState<Operation | null>(null);
@@ -67,6 +88,12 @@ export function ObjectStorage({
   const uncertainKey = useRef<{ fingerprint: string; key: string } | null>(null);
   const path = `${projectPath(projectId)}/branches/${encodeURIComponent(branch)}/storage`;
   const bucketPath = `${path}/buckets/${encodeURIComponent(bucket)}`;
+  useEffect(() => {
+    setCORSETag('');
+    setCORSJSON('[]');
+    setObjectMetadata(null);
+    setUploadCapability(null);
+  }, [branch, bucket]);
   async function loadState(current: number) {
     const value = await api<Instance>(path);
     if (epoch.current !== current) return;
@@ -78,16 +105,29 @@ export function ObjectStorage({
     tracking.current?.abort();
     uncertainKey.current = null;
     setInstance(null);
+    setSelectedKeys([]);
     setBuckets([]);
     setBucket('');
     setObjects([]);
+    setSelectedKeys([]);
     setNotice('');
     setOperation(null);
     setBusy(false);
     setFile(null);
     setKey('');
     setOverwrite(false);
+    setMetadataJSON('{}');
+    setCORSJSON('[]');
+    setCORSETag('');
+    setObjectMetadata(null);
+    setUploadCapability(null);
     setAfter('');
+    setPrefix('');
+    setFolders([]);
+    setDirectoryMode(false);
+    setCopySource(null);
+    setCopyBucket('');
+    setCopyKey('');
     if (branch) void loadState(current).catch(showError);
     const timer = setInterval(() => {
       if (branch) void loadState(current).catch(() => {});
@@ -152,6 +192,7 @@ export function ObjectStorage({
         setBuckets([]);
         setBucket('');
         setObjects([]);
+        setSelectedKeys([]);
         setNotice(
           disable
             ? '对象存储已禁用；目录与文件保留，旧下载链接失效。'
@@ -167,16 +208,75 @@ export function ObjectStorage({
     if (!value.items.some((b) => b.name === bucket)) {
       setBucket(value.items[0]?.name || '');
       setObjects([]);
+      setSelectedKeys([]);
       setAfter('');
     }
   }
-  async function loadObjects(current: number, cursor = '') {
-    const value = await api<{ items: ObjectEntry[]; next_after: string }>(
-      `${bucketPath}/objects?${new URLSearchParams({ prefix, after: cursor })}`,
+  async function loadObjects(
+    current: number,
+    cursor = '',
+    selectedPrefix = prefix,
+    selectedBucket = bucket,
+  ) {
+    const value = await api<{
+      items: ObjectEntry[];
+      next_after: string;
+      common_prefixes?: string[];
+    }>(
+      `${path}/buckets/${encodeURIComponent(selectedBucket)}/objects?${new URLSearchParams({ prefix: selectedPrefix, after: cursor, ...(directoryMode ? { delimiter: '/' } : {}) })}`,
     );
     if (epoch.current !== current) return;
     setObjects(value.items);
+    setSelectedKeys([]);
+    setFolders(value.common_prefixes ?? []);
     setAfter(value.next_after);
+  }
+  async function copyObject() {
+    if (!copySource || !copyBucket || !copyKey) return;
+    await run(async (current) => {
+      await api(`${path}/buckets/${encodeURIComponent(copyBucket)}/copy`, {
+        method: 'POST',
+        headers: { 'If-None-Match': '*' },
+        body: JSON.stringify({
+          source_bucket: copySource.bucket,
+          source_key: copySource.key,
+          source_sha256: copySource.sha256,
+          destination_key: copyKey,
+        }),
+      });
+      if (epoch.current !== current) return;
+      setCopySource(null);
+      setCopyKey('');
+      setNotice('对象已复制；原对象和共享不可变内容保留。');
+      setBucket(copyBucket);
+      setPrefix('');
+      setAfter('');
+      await loadBuckets(current);
+      await loadObjects(current, '', '', copyBucket);
+    });
+  }
+  async function deleteSelected() {
+    const selected = objects.filter((item) => selectedKeys.includes(item.key));
+    if (!selected.length) return;
+    if (
+      !window.confirm(
+        `删除所选 ${selected.length} 个对象的当前目录记录？原内容仍按分支和历史引用保留。`,
+      )
+    )
+      return;
+    await run(async (current) => {
+      await api(`${bucketPath}/delete-batch`, {
+        method: 'POST',
+        body: JSON.stringify({
+          objects: selected.map((item) => ({ key: item.key, sha256: item.sha256 })),
+        }),
+      });
+      if (epoch.current !== current) return;
+      setSelectedKeys([]);
+      setNotice(`已删除 ${selected.length} 个对象的当前目录记录，物理内容仍保留。`);
+      await loadBuckets(current);
+      await loadObjects(current);
+    });
   }
   async function createBucket() {
     await run(async (current) => {
@@ -189,6 +289,7 @@ export function ObjectStorage({
       setBucket(bucketName);
       setBucketName('');
       setObjects([]);
+      setSelectedKeys([]);
       setAfter('');
       setNotice('存储桶已创建');
     });
@@ -205,6 +306,7 @@ export function ObjectStorage({
         method: 'PUT',
         headers: {
           'Content-Type': file.type || 'application/octet-stream',
+          'X-Neon-Object-Metadata': JSON.stringify(JSON.parse(metadataJSON)),
           ...(overwrite ? { 'If-Match': `"${existing!.sha256}"` } : { 'If-None-Match': '*' }),
         },
         body: file,
@@ -213,6 +315,113 @@ export function ObjectStorage({
       await loadObjects(current);
       await loadBuckets(current);
       setNotice('上传已完成，SHA-256 和目录已提交');
+    });
+  }
+  async function loadCORS() {
+    await run(async (current) => {
+      const response = await fetch(`${bucketPath}/cors`, { credentials: 'same-origin' });
+      if (!response.ok) throw new Error(`加载 CORS 失败 (${response.status})`);
+      const value = await response.json();
+      if (epoch.current !== current) return;
+      setCORSJSON(JSON.stringify(value.rules, null, 2));
+      setCORSETag(response.headers.get('ETag') || '');
+    });
+  }
+  async function saveCORS() {
+    await run(async (current) => {
+      await api(`${bucketPath}/cors`, {
+        method: 'PUT',
+        headers: { 'If-Match': corsETag },
+        body: JSON.stringify({ rules: JSON.parse(corsJSON) }),
+      });
+      if (epoch.current !== current) return;
+      setCORSETag('');
+      setNotice('CORS 已提交；签名与权限仍必需，浏览器 cookie 不获授权。');
+    });
+  }
+  async function inspectMetadata(item: ObjectEntry) {
+    await run(async (current) => {
+      const response = await fetch(
+        `${bucketPath}/objects?${new URLSearchParams({ key: item.key })}`,
+        { method: 'HEAD', credentials: 'same-origin' },
+      );
+      if (!response.ok) throw new Error(`读取元数据失败 (${response.status})`);
+      const data: Record<string, string> = {};
+      response.headers.forEach((value, name) => {
+        if (name.startsWith('x-amz-meta-')) data[name.slice(11)] = value;
+      });
+      if (epoch.current === current) {
+        setObjectMetadata(data);
+        setMetadataEdit(JSON.stringify(data, null, 2));
+        setMetadataSelection({
+          key: item.key,
+          etag: response.headers.get('X-Neon-Metadata-ETag') || '',
+        });
+      }
+    });
+  }
+  async function saveMetadata() {
+    if (!metadataSelection) return;
+    await run(async (current) => {
+      const value = await api<{ metadata: Record<string, string>; metadata_etag: string }>(
+        `${bucketPath}/objects/metadata?${new URLSearchParams({ key: metadataSelection.key })}`,
+        {
+          method: 'PATCH',
+          headers: { 'If-Match': metadataSelection.etag },
+          body: JSON.stringify({ metadata: JSON.parse(metadataEdit) }),
+        },
+      );
+      if (epoch.current !== current) return;
+      setObjectMetadata(value.metadata);
+      setMetadataEdit(JSON.stringify(value.metadata, null, 2));
+      setMetadataSelection({ ...metadataSelection, etag: value.metadata_etag });
+      setNotice('对象元数据已更新，文件字节未改变。');
+    });
+  }
+  async function prepareUpload() {
+    if (!file || !key || overwrite || file.size > objectLimit) return;
+    await run(async (current) => {
+      const digest = bytesToHex(sha256(new Uint8Array(await file.arrayBuffer())));
+      const value = await api<{ url: string; headers: Record<string, string>; expires_at: string }>(
+        `${bucketPath}/presign-upload`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            key,
+            sha256: digest,
+            size: file.size,
+            content_type: file.type || 'application/octet-stream',
+            expires_seconds: 300,
+          }),
+        },
+      );
+      if (epoch.current !== current) return;
+      setUploadCapability(value);
+      setNotice(
+        '临时上传地址已生成：5 分钟内有效，只允许此文件创建新对象。地址持有者可上传，请勿公开。',
+      );
+    });
+  }
+  async function uploadPrepared() {
+    if (!file || !uploadCapability) return;
+    const capability = uploadCapability;
+    await run(async (current) => {
+      // No Console cookie or CSRF is required by the capability endpoint.
+      const response = await fetch(capability.url, {
+        method: 'PUT',
+        headers: capability.headers,
+        body: file,
+        credentials: 'omit',
+        redirect: 'error',
+        referrerPolicy: 'no-referrer',
+      });
+      if (!response.ok)
+        throw new Error(`临时上传失败 (${response.status})；请检查文件、有效期和对象版本。`);
+      if (epoch.current !== current) return;
+      setUploadCapability(null);
+      await loadObjects(current);
+      await loadBuckets(current);
+      setNotice('预签名上传已完成，文件摘要与大小已校验。');
     });
   }
   async function removeObject(item: ObjectEntry) {
@@ -419,6 +628,7 @@ export function ObjectStorage({
                         onClick={() => {
                           setBucket(b.name);
                           setObjects([]);
+                          setSelectedKeys([]);
                           setAfter('');
                         }}
                       >
@@ -455,6 +665,35 @@ export function ObjectStorage({
                 >
                   加载对象
                 </button>
+                <label>
+                  <input
+                    aria-label="按目录浏览"
+                    type="checkbox"
+                    checked={directoryMode}
+                    disabled={busy}
+                    onChange={(e) => {
+                      setDirectoryMode(e.target.checked);
+                      setAfter('');
+                      setFolders([]);
+                      setObjects([]);
+                      setSelectedKeys([]);
+                    }}
+                  />
+                  按目录浏览
+                </label>
+                {directoryMode && prefix && (
+                  <button
+                    className="button ghost"
+                    disabled={busy}
+                    onClick={() => {
+                      const parent = prefix.replace(/\/$/, '').replace(/[^/]*$/, '');
+                      setPrefix(parent);
+                      void run((current) => loadObjects(current, '', parent));
+                    }}
+                  >
+                    上级目录
+                  </button>
+                )}
                 {after && (
                   <button
                     className="button"
@@ -465,6 +704,136 @@ export function ObjectStorage({
                   </button>
                 )}
               </div>
+              {folders.length > 0 && (
+                <nav aria-label="对象子目录" className="storage-actions">
+                  {folders.map((folder) => (
+                    <button
+                      key={folder}
+                      className="button ghost"
+                      disabled={busy}
+                      onClick={() => {
+                        setPrefix(folder);
+                        void run((current) => loadObjects(current, '', folder));
+                      }}
+                    >
+                      📁 {folder}
+                    </button>
+                  ))}
+                </nav>
+              )}
+              <section className="backend-panel" data-testid="storage-cors-panel">
+                <h3>浏览器跨域访问</h3>
+                <p>
+                  仅控制浏览器许可；实际请求仍需签名和当前存储权限。默认无规则。保存前加载当前版本。
+                </p>
+                <button
+                  className="button ghost"
+                  disabled={busy || !bucket}
+                  onClick={() => void loadCORS()}
+                >
+                  加载 CORS 规则
+                </button>
+                <label>
+                  CORS 规则 JSON
+                  <textarea
+                    aria-label="CORS 规则 JSON"
+                    value={corsJSON}
+                    disabled={busy || !canEdit}
+                    onChange={(e) => setCORSJSON(e.target.value)}
+                  />
+                </label>
+                {canEdit && (
+                  <button
+                    className="button"
+                    disabled={busy || !corsETag}
+                    onClick={() => void saveCORS()}
+                  >
+                    保存 CORS 规则
+                  </button>
+                )}
+              </section>
+              {objectMetadata && (
+                <section className="backend-panel" data-testid="storage-object-metadata">
+                  <h3>对象元数据</h3>
+                  <pre>{JSON.stringify(objectMetadata, null, 2)}</pre>
+                  {canEdit && metadataSelection && (
+                    <>
+                      <label>
+                        编辑对象元数据 JSON
+                        <textarea
+                          aria-label="编辑对象元数据 JSON"
+                          value={metadataEdit}
+                          disabled={busy}
+                          onChange={(e) => setMetadataEdit(e.target.value)}
+                        />
+                      </label>
+                      <button
+                        className="button"
+                        disabled={busy || !metadataSelection.etag}
+                        onClick={() => void saveMetadata()}
+                      >
+                        保存对象元数据
+                      </button>
+                      <p>以已读取状态为条件；冲突后请重新读取，不自动覆盖新属性。</p>
+                    </>
+                  )}
+                </section>
+              )}
+              {canEdit && copySource && (
+                <section className="backend-panel" data-testid="storage-copy-panel">
+                  <h3>复制对象</h3>
+                  <p>
+                    来源：{copySource.bucket}/{copySource.key}
+                    。目标必须不存在；源版本有变化时会拒绝复制。
+                  </p>
+                  <div className="storage-actions">
+                    <label>
+                      复制目标存储桶
+                      <select
+                        aria-label="复制目标存储桶"
+                        value={copyBucket}
+                        disabled={busy}
+                        onChange={(e) => setCopyBucket(e.target.value)}
+                      >
+                        {buckets.map((item) => (
+                          <option key={item.name} value={item.name}>
+                            {item.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      复制目标对象键
+                      <input
+                        aria-label="复制目标对象键"
+                        value={copyKey}
+                        disabled={busy}
+                        maxLength={1024}
+                        onChange={(e) => setCopyKey(e.target.value)}
+                      />
+                    </label>
+                    <button
+                      className="button"
+                      disabled={
+                        busy ||
+                        !copyBucket ||
+                        !copyKey ||
+                        (copyBucket === copySource.bucket && copyKey === copySource.key)
+                      }
+                      onClick={() => void copyObject()}
+                    >
+                      确认复制对象
+                    </button>
+                    <button
+                      className="button ghost"
+                      disabled={busy}
+                      onClick={() => setCopySource(null)}
+                    >
+                      取消复制
+                    </button>
+                  </div>
+                </section>
+              )}
               {canEdit && (
                 <div className="storage-actions">
                   <label>
@@ -472,7 +841,10 @@ export function ObjectStorage({
                     <input
                       aria-label="对象键"
                       value={key}
-                      onChange={(e) => setKey(e.target.value)}
+                      onChange={(e) => {
+                        setKey(e.target.value);
+                        setUploadCapability(null);
+                      }}
                       disabled={busy}
                       placeholder="documents/report.txt"
                     />
@@ -486,6 +858,7 @@ export function ObjectStorage({
                       onChange={(e) => {
                         const value = e.target.files?.[0] || null;
                         setFile(value);
+                        setUploadCapability(null);
                         if (!key && value) setKey(value.name);
                       }}
                     />
@@ -507,12 +880,87 @@ export function ObjectStorage({
                   >
                     上传对象
                   </button>
+                  <label>
+                    对象元数据 JSON
+                    <textarea
+                      aria-label="对象元数据 JSON"
+                      value={metadataJSON}
+                      disabled={busy}
+                      onChange={(e) => setMetadataJSON(e.target.value)}
+                    />
+                  </label>
+                  <button
+                    className="button ghost"
+                    disabled={busy || !file || !key || overwrite || file.size > objectLimit}
+                    onClick={() => void prepareUpload()}
+                  >
+                    生成临时上传地址
+                  </button>
+                  {uploadCapability && (
+                    <section className="backend-panel" data-testid="storage-upload-capability">
+                      <p>
+                        临时地址到期：{new Date(uploadCapability.expires_at).toLocaleString()}
+                        。仅创建已选择的文件，不覆盖现有对象。
+                      </p>
+                      <label>
+                        临时上传地址
+                        <input
+                          aria-label="临时上传地址"
+                          type="password"
+                          readOnly
+                          value={uploadCapability.url}
+                        />
+                      </label>
+                      <button
+                        className="button"
+                        disabled={busy || !file}
+                        onClick={() => void uploadPrepared()}
+                      >
+                        使用临时地址上传
+                      </button>
+                      <button
+                        className="button ghost"
+                        disabled={busy}
+                        onClick={() => setUploadCapability(null)}
+                      >
+                        清除临时地址
+                      </button>
+                    </section>
+                  )}
                 </div>
               )}
               {file && file.size > objectLimit && <p role="alert">文件超过 8 MiB 上限</p>}
+              {canEdit && (
+                <div className="storage-actions">
+                  <button
+                    className="button danger"
+                    aria-label="删除所选对象"
+                    disabled={busy || selectedKeys.length === 0}
+                    onClick={() => void deleteSelected()}
+                  >
+                    删除所选（{selectedKeys.length}）
+                  </button>
+                  <span className="subtle-note">
+                    版本变动将拒绝整批删除。仅选择当前页面的对象。
+                  </span>
+                </div>
+              )}
               <table>
                 <thead>
                   <tr>
+                    {canEdit && (
+                      <th>
+                        <input
+                          aria-label="选择当前页全部对象"
+                          type="checkbox"
+                          disabled={busy || objects.length === 0}
+                          checked={objects.length > 0 && selectedKeys.length === objects.length}
+                          onChange={(e) =>
+                            setSelectedKeys(e.target.checked ? objects.map((item) => item.key) : [])
+                          }
+                        />
+                      </th>
+                    )}
                     <th>对象键</th>
                     <th>大小</th>
                     <th>类型</th>
@@ -523,6 +971,23 @@ export function ObjectStorage({
                 <tbody>
                   {objects.map((item) => (
                     <tr key={item.key}>
+                      {canEdit && (
+                        <td>
+                          <input
+                            aria-label={`选择对象 ${item.key}`}
+                            type="checkbox"
+                            disabled={busy}
+                            checked={selectedKeys.includes(item.key)}
+                            onChange={(e) =>
+                              setSelectedKeys(
+                                e.target.checked
+                                  ? [...selectedKeys, item.key]
+                                  : selectedKeys.filter((key) => key !== item.key),
+                              )
+                            }
+                          />
+                        </td>
+                      )}
                       <td>{item.key}</td>
                       <td>{item.size} B</td>
                       <td>{item.content_type}</td>
@@ -537,14 +1002,34 @@ export function ObjectStorage({
                         >
                           下载
                         </button>
+                        <button
+                          className="button ghost"
+                          disabled={busy}
+                          onClick={() => void inspectMetadata(item)}
+                        >
+                          元数据
+                        </button>
                         {canEdit && (
-                          <button
-                            className="button danger"
-                            disabled={busy}
-                            onClick={() => void removeObject(item)}
-                          >
-                            删除
-                          </button>
+                          <>
+                            <button
+                              className="button danger"
+                              disabled={busy}
+                              onClick={() => void removeObject(item)}
+                            >
+                              删除
+                            </button>
+                            <button
+                              className="button"
+                              disabled={busy}
+                              onClick={() => {
+                                setCopySource({ ...item, bucket });
+                                setCopyBucket(bucket);
+                                setCopyKey('');
+                              }}
+                            >
+                              复制
+                            </button>
+                          </>
                         )}
                       </td>
                     </tr>
@@ -561,6 +1046,7 @@ export function ObjectStorage({
                       await api(bucketPath, { method: 'DELETE' });
                       if (epoch.current === current) {
                         setObjects([]);
+                        setSelectedKeys([]);
                         setAfter('');
                         await loadBuckets(current);
                         setNotice('空存储桶已删除');

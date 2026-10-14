@@ -1,3 +1,4 @@
+import { FunctionRequestLogs } from './FunctionRequestLogs';
 import { useEffect, useRef, useState } from 'react';
 import { api, projectPath } from '../../api';
 import type { Branch, Page, Operation } from '../../api';
@@ -487,6 +488,7 @@ export function Functions({
                   version={current.version_token}
                   disabled={busy}
                 />
+                <FunctionRequestLogs path={`${path}/${current.slug}`} />
                 {driver && (
                   <HTTPPolicyPanel
                     key={`${current.id}/${current.version_token}`}

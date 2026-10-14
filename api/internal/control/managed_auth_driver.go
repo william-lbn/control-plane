@@ -30,7 +30,7 @@ func (s *server) reserveManagedAuth(ctx context.Context, p managedAuthPayload) e
 	q.Set("sslmode", "verify-full")
 	q.Set("options", "endpoint="+selector(p.EndpointID))
 	dsn.RawQuery = q.Encode()
-	config, _ := json.Marshal(record{"version": 1, "branchID": p.BranchID, "baseURL": managedAuthBase(p.BranchID), "databaseURL": dsn.String(), "databaseTLS": record{"caFile": "/run/auth-ca/ca.crt", "serverName": env("NEON_AUTH_PG_SERVER_NAME", "")}, "secret": randomToken(48), "trustedOrigins": p.Spec.AllowedOrigins, "allowLabHTTP": true, "requireEmailVerification": p.Spec.RequireEmailVerification, "emailOTPEnabled": p.Spec.EmailOTPEnabled})
+	config, _ := json.Marshal(record{"version": 1, "branchID": p.BranchID, "baseURL": managedAuthBase(p.BranchID), "databaseURL": dsn.String(), "databaseTLS": record{"caFile": "/run/auth-ca/ca.crt", "serverName": env("NEON_AUTH_PG_SERVER_NAME", "")}, "secret": randomToken(48), "trustedOrigins": p.Spec.AllowedOrigins, "allowLabHTTP": true, "requireEmailVerification": p.Spec.RequireEmailVerification, "emailOTPEnabled": p.Spec.EmailOTPEnabled, "magicLinkEnabled": p.Spec.MagicLinkEnabled, "magicLinkExpiresIn": p.Spec.MagicLinkExpiresIn, "magicLinkAllowRegistration": p.Spec.MagicLinkAllowRegistration})
 	_, err = s.kube.createOwned(ctx, "secret", record{"apiVersion": "v1", "kind": "Secret", "type": "Opaque", "immutable": true, "metadata": record{"name": p.SecretRef, "labels": managedAuthLabels(p)}, "stringData": map[string]string{"config.json": string(config), "password": password, "verifier": verifier}}, p.ProjectID, p.EndpointID)
 	return err
 }

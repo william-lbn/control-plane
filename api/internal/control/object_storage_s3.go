@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"mime"
@@ -54,6 +55,10 @@ func (s *server) s3Handler() http.Handler {
 		origin, e := url.Parse(s3Origin())
 		if e != nil || origin.Host == "" || !strings.EqualFold(r.Host, origin.Host) {
 			s3Error(w, r, 400, "InvalidRequest")
+			return
+		}
+		if r.Method == http.MethodOptions {
+			s.s3Preflight(w, r)
 			return
 		}
 		s.s3Invoke(w, r)
@@ -106,6 +111,16 @@ func (s *server) s3Invoke(w http.ResponseWriter, r *http.Request) {
 		s3Error(w, r, 403, "AccessDenied")
 		return
 	}
+	if r.Header.Get("X-Amz-Copy-Source") != "" {
+		if r.Method != http.MethodPut {
+			s3Error(w, r, 400, "InvalidRequest")
+			return
+		}
+		if _, e = s.verifyBackendCredential(r.Context(), token, target, "storage:read", ""); e != nil {
+			s3Error(w, r, 403, "AccessDenied")
+			return
+		}
+	}
 	query, e := url.ParseQuery(r.URL.RawQuery)
 	if e != nil {
 		s3Error(w, r, 400, "InvalidArgument")
@@ -147,6 +162,30 @@ func (s *server) s3Invoke(w http.ResponseWriter, r *http.Request) {
 		s3Error(w, r, 400, "InvalidBucketName")
 		return
 	}
+	if origin := r.Header.Get("Origin"); origin != "" {
+		rules, err := loadStorageCORS(r, conn, bucket)
+		if err == nil {
+			if rule := matchStorageCORS(rules, origin, r.Method, nil); rule != nil {
+				applyStorageCORS(w, rule, origin, nil, false)
+			}
+		}
+	}
+	if query.Has("cors") {
+		if key != "" {
+			s3Error(w, r, 400, "InvalidRequest")
+			return
+		}
+		s.s3CORSConfiguration(w, r, conn, bucket, data)
+		return
+	}
+	if query.Has("delete") {
+		if key != "" || r.Method != http.MethodPost {
+			s3Error(w, r, 400, "InvalidRequest")
+			return
+		}
+		s.s3DeleteObjects(w, r, conn, bucket, data)
+		return
+	}
 	if key == "" {
 		s.s3Bucket(w, r, conn, p, bucket, data, query)
 		return
@@ -163,15 +202,71 @@ func (s *server) s3Invoke(w http.ResponseWriter, r *http.Request) {
 		s3Error(w, r, 501, "NotImplemented")
 		return
 	}
+	if source := r.Header.Get("X-Amz-Copy-Source"); source != "" {
+		var replacement []storageCopyMetadata
+		if r.Header.Get("X-Amz-Metadata-Directive") == "REPLACE" {
+			metadata, e := metadataFromHeaders(r, true)
+			if e != nil {
+				s3Error(w, r, 400, "InvalidArgument")
+				return
+			}
+			contentType := r.Header.Get("Content-Type")
+			if contentType == "" {
+				contentType = "application/octet-stream"
+			}
+			replacement = []storageCopyMetadata{{metadata, contentType}}
+		} else {
+			for header := range r.Header {
+				if strings.HasPrefix(strings.ToLower(header), "x-amz-meta-") {
+					s3Error(w, r, 400, "InvalidArgument")
+					return
+				}
+			}
+		}
+		for _, header := range []string{"X-Amz-Acl", "X-Amz-Tagging", "X-Amz-Tagging-Directive", "X-Amz-Storage-Class"} {
+			if r.Header.Get(header) != "" {
+				s3Error(w, r, 501, "NotImplemented")
+				return
+			}
+		}
+
+		if len(data) != 0 || r.Header.Get("X-Amz-Server-Side-Encryption") != "" || (r.Header.Get("X-Amz-Metadata-Directive") != "" && r.Header.Get("X-Amz-Metadata-Directive") != "COPY" && r.Header.Get("X-Amz-Metadata-Directive") != "REPLACE") || r.Header.Get("X-Amz-Copy-Source-If-None-Match") != "" || r.Header.Get("X-Amz-Copy-Source-If-Modified-Since") != "" || r.Header.Get("X-Amz-Copy-Source-If-Unmodified-Since") != "" {
+			s3Error(w, r, 501, "NotImplemented")
+			return
+		}
+		srcBucket, srcKey, err := parseS3CopySource(source)
+		if err != nil {
+			s3Error(w, r, 400, "InvalidArgument")
+			return
+		}
+		item, err := copyStorageObject(r.Context(), conn, p.ProjectID, srcBucket, srcKey, bucket, key, r.Header.Get("X-Amz-Copy-Source-If-Match"), r.Header.Get("If-Match"), r.Header.Get("If-None-Match"), replacement...)
+		if err != nil {
+			var fault *storageMutationFault
+			if errors.As(err, &fault) {
+				s3Error(w, r, fault.Status, fault.Code)
+			} else {
+				s3Error(w, r, 503, "ServiceUnavailable")
+			}
+			return
+		}
+		s3XML(w, 200, struct {
+			XMLName  xml.Name `xml:"CopyObjectResult"`
+			XMLNS    string   `xml:"xmlns,attr"`
+			ETag     string   `xml:"ETag"`
+			Modified string   `xml:"LastModified"`
+		}{XMLNS: s3XMLNamespace, ETag: "\"" + stringVal(item["sha256"]) + "\"", Modified: item["updated_at"].(time.Time).Format(time.RFC3339)})
+		return
+	}
 	if !s.s3WriteObject(w, r, conn, p, bucket, key, data) {
 		return
 	}
 }
 func (s *server) serveS3Object(w http.ResponseWriter, r *http.Request, conn *pgx.Conn, p objectStoragePayload, bucket, key string) {
 	var blob, digest, contentType string
+	var metadata map[string]string
 	var size int64
 	var modified time.Time
-	e := conn.QueryRow(r.Context(), `SELECT blob_key,sha256,size,content_type,updated_at FROM neon_storage.objects WHERE bucket=$1 AND key=$2`, bucket, key).Scan(&blob, &digest, &size, &contentType, &modified)
+	e := conn.QueryRow(r.Context(), `SELECT blob_key,sha256,size,content_type,updated_at,metadata FROM neon_storage.objects WHERE bucket=$1 AND key=$2`, bucket, key).Scan(&blob, &digest, &size, &contentType, &modified, &metadata)
 	if isNoRows(e) {
 		s3Error(w, r, 404, "NoSuchKey")
 		return
@@ -187,6 +282,8 @@ func (s *server) serveS3Object(w http.ResponseWriter, r *http.Request, conn *pgx
 	}
 	w.Header().Set("ETag", "\""+digest+"\"")
 	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("X-Neon-Metadata-ETag", storageMetadataState(p.BranchID, bucket, key, blob, digest, contentType, metadata))
+	writeStorageMetadata(w, metadata)
 	w.Header().Set("Content-Security-Policy", "sandbox; default-src 'none'")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": key[strings.LastIndex(key, "/")+1:]}))
@@ -404,13 +501,18 @@ func (s *server) s3WriteObject(w http.ResponseWriter, r *http.Request, conn *pgx
 			s3Error(w, r, 429, "QuotaExceeded")
 			return false
 		}
+		metadata, metadataErr := metadataFromHeaders(r, true)
+		if metadataErr != nil {
+			s3Error(w, r, 400, "InvalidArgument")
+			return false
+		}
 		digest := fmt.Sprintf("%x", sha256.Sum256(data))
 		blob := p.ProjectID + "/" + newID("blob_")
 		if s.storage.put(r.Context(), blob, contentType, data) != nil {
 			s3Error(w, r, 503, "ServiceUnavailable")
 			return false
 		}
-		_, e = tx.Exec(r.Context(), `INSERT INTO neon_storage.objects(bucket,key,blob_key,sha256,size,content_type) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(bucket,key) DO UPDATE SET blob_key=$3,sha256=$4,size=$5,content_type=$6,updated_at=now()`, bucket, key, blob, digest, len(data), contentType)
+		_, e = tx.Exec(r.Context(), `INSERT INTO neon_storage.objects(bucket,key,blob_key,sha256,size,content_type,metadata) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(bucket,key) DO UPDATE SET blob_key=$3,sha256=$4,size=$5,content_type=$6,metadata=$7,updated_at=now()`, bucket, key, blob, digest, len(data), contentType, metadata)
 		w.Header().Set("ETag", "\""+digest+"\"")
 	}
 	if e == nil {
@@ -434,7 +536,7 @@ func s3QuerySupported(q url.Values) bool {
 			continue
 		}
 		switch name {
-		case "list-type", "prefix", "marker", "max-keys", "continuation-token", "start-after", "delimiter", "encoding-type", "location", "fetch-owner":
+		case "cors", "delete", "list-type", "prefix", "marker", "max-keys", "continuation-token", "start-after", "delimiter", "encoding-type", "location", "fetch-owner":
 		default:
 			return false
 		}
@@ -448,6 +550,7 @@ type s3ObjectOwner struct {
 }
 type s3ListedObject struct {
 	Key          string         `xml:"Key"`
+	Grouped      bool           `xml:"-"`
 	Modified     string         `xml:"LastModified"`
 	ETag         string         `xml:"ETag"`
 	Size         int64          `xml:"Size"`
@@ -460,12 +563,12 @@ func (s *server) s3ListObjects(w http.ResponseWriter, r *http.Request, conn *pgx
 		s3Error(w, r, 400, "InvalidArgument")
 		return
 	}
-	if q.Get("delimiter") != "" || (q.Get("encoding-type") != "" && q.Get("encoding-type") != "url") || (q.Get("list-type") != "" && q.Get("list-type") != "2") {
+	if (q.Get("encoding-type") != "" && q.Get("encoding-type") != "url") || (q.Get("list-type") != "" && q.Get("list-type") != "2") {
 		s3Error(w, r, 501, "NotImplemented")
 		return
 	}
-	prefix, after := q.Get("prefix"), q.Get("marker")
-	if !utf8.ValidString(prefix) || len(prefix) > 1024 {
+	prefix, after, delimiter := q.Get("prefix"), q.Get("marker"), q.Get("delimiter")
+	if !utf8.ValidString(prefix) || len(prefix) > 1024 || !utf8.ValidString(delimiter) || len(delimiter) > 1024 {
 		s3Error(w, r, 400, "InvalidArgument")
 		return
 	}
@@ -480,6 +583,10 @@ func (s *server) s3ListObjects(w http.ResponseWriter, r *http.Request, conn *pgx
 		}
 		after = string(b)
 	}
+	if !utf8.ValidString(after) || len(after) > 1024 {
+		s3Error(w, r, 400, "InvalidArgument")
+		return
+	}
 	limit := 1000
 	if q.Has("max-keys") {
 		n, e := strconv.Atoi(q.Get("max-keys"))
@@ -489,7 +596,10 @@ func (s *server) s3ListObjects(w http.ResponseWriter, r *http.Request, conn *pgx
 		}
 		limit = n
 	}
-	rows, e := conn.Query(r.Context(), `SELECT key,sha256,size,updated_at FROM neon_storage.objects WHERE bucket=$1 AND starts_with(key,$2) AND key>$3 COLLATE "C" ORDER BY key COLLATE "C" LIMIT $4`, bucket, prefix, after, limit+1)
+	// Group before applying cursor and max-keys. A common prefix counts once;
+	// filtering raw keys first would repeat a directory on every page or return
+	// a prefix preceding StartAfter. SQL character lengths preserve UTF-8.
+	rows, e := conn.Query(r.Context(), storageListingSQL, bucket, prefix, after, delimiter, limit+1)
 	if e != nil {
 		s3Error(w, r, 503, "ServiceUnavailable")
 		return
@@ -499,15 +609,15 @@ func (s *server) s3ListObjects(w http.ResponseWriter, r *http.Request, conn *pgx
 	for rows.Next() {
 		var o s3ListedObject
 		var modified time.Time
-		var etag string
-		if rows.Scan(&o.Key, &etag, &o.Size, &modified) != nil {
+		var etag, contentType string
+		if rows.Scan(&o.Key, &o.Grouped, &etag, &o.Size, &contentType, &modified) != nil {
 			s3Error(w, r, 503, "ServiceUnavailable")
 			return
 		}
 		o.Modified = modified.UTC().Format(time.RFC3339)
 		o.ETag = "\"" + etag + "\""
 		o.StorageClass = "STANDARD"
-		if q.Get("fetch-owner") == "true" {
+		if q.Get("list-type") == "" || q.Get("fetch-owner") == "true" {
 			// All private objects belong to the authorized branch catalogue.
 			// Never expose Console/application user identities as S3 owners.
 			o.Owner = &s3ObjectOwner{ID: p.BranchID, Name: p.BranchID}
@@ -528,30 +638,61 @@ func (s *server) s3ListObjects(w http.ResponseWriter, r *http.Request, conn *pgx
 		items = []s3ListedObject{}
 		truncated = false
 	}
+	type commonPrefix struct {
+		Prefix string `xml:"Prefix"`
+	}
+	contents := []s3ListedObject{}
+	prefixes := []commonPrefix{}
+	for _, item := range items {
+		if item.Grouped {
+			prefixes = append(prefixes, commonPrefix{Prefix: item.Key})
+		} else {
+			contents = append(contents, item)
+		}
+	}
 	out := struct {
-		XMLName    xml.Name         `xml:"ListBucketResult"`
-		XMLNS      string           `xml:"xmlns,attr"`
-		Name       string           `xml:"Name"`
-		Prefix     string           `xml:"Prefix"`
-		Encoding   string           `xml:"EncodingType,omitempty"`
-		MaxKeys    int              `xml:"MaxKeys"`
-		KeyCount   int              `xml:"KeyCount"`
-		Truncated  bool             `xml:"IsTruncated"`
-		NextToken  string           `xml:"NextContinuationToken,omitempty"`
-		NextMarker string           `xml:"NextMarker,omitempty"`
-		Contents   []s3ListedObject `xml:"Contents"`
-	}{XMLNS: s3XMLNamespace, Name: bucket, Prefix: prefix, MaxKeys: limit, KeyCount: len(items), Truncated: truncated, Contents: items}
+		Delimiter      string           `xml:"Delimiter,omitempty"`
+		CommonPrefixes []commonPrefix   `xml:"CommonPrefixes"`
+		Continuation   string           `xml:"ContinuationToken,omitempty"`
+		StartAfter     string           `xml:"StartAfter,omitempty"`
+		Marker         string           `xml:"Marker,omitempty"`
+		XMLName        xml.Name         `xml:"ListBucketResult"`
+		XMLNS          string           `xml:"xmlns,attr"`
+		Name           string           `xml:"Name"`
+		Prefix         string           `xml:"Prefix"`
+		Encoding       string           `xml:"EncodingType,omitempty"`
+		MaxKeys        int              `xml:"MaxKeys"`
+		KeyCount       int              `xml:"KeyCount"`
+		Truncated      bool             `xml:"IsTruncated"`
+		NextToken      string           `xml:"NextContinuationToken,omitempty"`
+		NextMarker     string           `xml:"NextMarker,omitempty"`
+		Contents       []s3ListedObject `xml:"Contents"`
+	}{XMLNS: s3XMLNamespace, Name: bucket, Prefix: prefix, MaxKeys: limit, KeyCount: len(items), Truncated: truncated, Contents: contents, Delimiter: delimiter, CommonPrefixes: prefixes}
 	if q.Get("encoding-type") == "url" {
 		out.Encoding = "url"
 		out.Prefix = s3protocol.Encode(prefix, false)
+		out.Delimiter = s3protocol.Encode(delimiter, false)
+		for i := range out.CommonPrefixes {
+			out.CommonPrefixes[i].Prefix = s3protocol.Encode(out.CommonPrefixes[i].Prefix, false)
+		}
 		for i := range out.Contents {
 			out.Contents[i].Key = s3protocol.Encode(out.Contents[i].Key, false)
 		}
 	}
 	if q.Get("list-type") == "2" {
 		out.NextToken = base64.RawURLEncoding.EncodeToString([]byte(next))
+		out.Continuation = q.Get("continuation-token")
+		out.StartAfter = q.Get("start-after")
+		if out.Encoding == "url" {
+			out.StartAfter = s3protocol.Encode(out.StartAfter, false)
+		}
 	} else {
 		out.NextMarker = next
+		out.Marker = q.Get("marker")
+		if out.Encoding == "url" {
+			out.NextMarker = s3protocol.Encode(out.NextMarker, false)
+			out.Marker = s3protocol.Encode(out.Marker, false)
+		}
 	}
 	s3XML(w, 200, out)
 }

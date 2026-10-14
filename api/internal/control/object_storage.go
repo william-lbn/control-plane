@@ -64,8 +64,8 @@ func (s *server) objectStorageRead(w http.ResponseWriter, r *http.Request) {
 		item["s3_endpoint"] = s3Origin() + "/s3/" + r.PathValue("branch")
 	}
 	item["s3_region"] = s3Region()
-	item["s3_supported"] = []string{"ListBuckets", "CreateBucket", "DeleteBucket", "HeadBucket", "GetBucketLocation", "ListObjects", "ListObjectsV2", "PutObject", "GetObject", "HeadObject", "DeleteObject", "PresignedGet", "SignedChunksWithoutTrailers"}
-	item["s3_missing"] = []string{"multipart", "copy", "bulk_delete", "anonymous_public_read", "custom_metadata", "CORS", "streaming_trailers", "presigned_put", "large_objects", "physical_gc"}
+	item["s3_supported"] = []string{"ListBuckets", "CreateBucket", "DeleteBucket", "HeadBucket", "GetBucketLocation", "ListObjects", "ListObjectsV2", "Delimiter", "CopyObjectBasic", "PutObject", "GetObject", "HeadObject", "DeleteObject", "DeleteObjects", "PresignedGet", "PresignedPut", "BucketCORS", "UserMetadata", "CopyObjectMetadataReplace", "SignedChunksWithoutTrailers"}
+	item["s3_missing"] = []string{"multipart", "copy_source_time_and_none_match_conditions", "anonymous_public_read", "streaming_trailers", "large_objects", "physical_gc"}
 	item["limits"] = record{"object_bytes": storageObjectLimit, "branch_bytes": storageBranchLimit, "buckets": 32, "objects": 1000}
 	w.Header().Set("ETag", fmt.Sprintf(`"%d"`, item["generation"].(int64)))
 	jsonResponse(w, 200, item)
@@ -375,8 +375,8 @@ func (s *server) storageObjects(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == http.MethodGet && key == "" {
-		prefix, after := r.URL.Query().Get("prefix"), r.URL.Query().Get("after")
-		if len(prefix) > 1024 || len(after) > 1024 {
+		prefix, after, delimiter := r.URL.Query().Get("prefix"), r.URL.Query().Get("after"), r.URL.Query().Get("delimiter")
+		if len(prefix) > 1024 || len(after) > 1024 || len(delimiter) > 1024 || (delimiter != "" && delimiter != "/") {
 			fail(w, r, 422, "invalid_cursor", "Prefix and cursor must be at most 1024 bytes")
 			return
 		}
@@ -385,7 +385,7 @@ func (s *server) storageObjects(w http.ResponseWriter, r *http.Request) {
 			s.storageFailure(w, r, pgx.ErrNoRows)
 			return
 		}
-		rows, err := conn.Query(r.Context(), `SELECT key,sha256,size,content_type,updated_at FROM neon_storage.objects WHERE bucket=$1 AND starts_with(key,$2) AND key>$3 COLLATE "C" ORDER BY key COLLATE "C" LIMIT 101`, bucket, prefix, after)
+		rows, err := conn.Query(r.Context(), storageListingSQL, bucket, prefix, after, delimiter, 101)
 		if err != nil {
 			s.storageFailure(w, r, err)
 			return
@@ -403,7 +403,21 @@ func (s *server) storageObjects(w http.ResponseWriter, r *http.Request) {
 		if items == nil {
 			items = []map[string]any{}
 		}
-		jsonResponse(w, 200, record{"items": items, "next_after": next, "branch_id": p.BranchID})
+		objects := []map[string]any{}
+		prefixes := []string{}
+		for _, item := range items {
+			if item["grouped"] == true {
+				prefixes = append(prefixes, stringVal(item["key"]))
+			} else {
+				delete(item, "grouped")
+				objects = append(objects, item)
+			}
+		}
+		response := record{"items": objects, "next_after": next, "branch_id": p.BranchID}
+		if delimiter != "" {
+			response["common_prefixes"] = prefixes
+		}
+		jsonResponse(w, 200, response)
 		return
 	}
 	if !validStorageKey(key) {
@@ -483,6 +497,11 @@ func (s *server) storageObjects(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 409, "object_quota_exhausted", "Branch object quota exhausted")
 		return
 	}
+	metadata, metadataErr := metadataFromHeaders(r, false)
+	if metadataErr != nil {
+		fail(w, r, 422, "invalid_object_metadata", "Metadata requires unique ASCII keys/values and at most 2 KiB")
+		return
+	}
 	digest := fmt.Sprintf("%x", sha256.Sum256(data))
 	blob := p.ProjectID + "/" + newID("blob_")
 	// Publish only after the immutable blob is durable. Interruption can leak
@@ -492,7 +511,7 @@ func (s *server) storageObjects(w http.ResponseWriter, r *http.Request) {
 		s.storageFailure(w, r, err)
 		return
 	}
-	_, err = tx.Exec(r.Context(), `INSERT INTO neon_storage.objects(bucket,key,blob_key,sha256,size,content_type) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(bucket,key) DO UPDATE SET blob_key=$3,sha256=$4,size=$5,content_type=$6,updated_at=now()`, bucket, key, blob, digest, len(data), contentType)
+	_, err = tx.Exec(r.Context(), `INSERT INTO neon_storage.objects(bucket,key,blob_key,sha256,size,content_type,metadata) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(bucket,key) DO UPDATE SET blob_key=$3,sha256=$4,size=$5,content_type=$6,metadata=$7,updated_at=now()`, bucket, key, blob, digest, len(data), contentType, metadata)
 	if err == nil {
 		err = tx.Commit(r.Context())
 	}
@@ -525,9 +544,10 @@ func storageWriteCondition(w http.ResponseWriter, r *http.Request, previous stri
 }
 func (s *server) serveStorageObject(w http.ResponseWriter, r *http.Request, conn *pgx.Conn, p objectStoragePayload, bucket, key string, anonymous bool) {
 	var blob, digest, contentType, access string
+	var metadata map[string]string
 	var size int64
 	var modified time.Time
-	err := conn.QueryRow(r.Context(), `SELECT o.blob_key,o.sha256,o.size,o.content_type,o.updated_at,b.access FROM neon_storage.objects o JOIN neon_storage.buckets b ON b.name=o.bucket WHERE o.bucket=$1 AND o.key=$2`, bucket, key).Scan(&blob, &digest, &size, &contentType, &modified, &access)
+	err := conn.QueryRow(r.Context(), `SELECT o.blob_key,o.sha256,o.size,o.content_type,o.updated_at,b.access,o.metadata FROM neon_storage.objects o JOIN neon_storage.buckets b ON b.name=o.bucket WHERE o.bucket=$1 AND o.key=$2`, bucket, key).Scan(&blob, &digest, &size, &contentType, &modified, &access, &metadata)
 	if err != nil {
 		s.storageFailure(w, r, err)
 		return
@@ -545,6 +565,8 @@ func (s *server) serveStorageObject(w http.ResponseWriter, r *http.Request, conn
 		s.storageFailure(w, r, err)
 		return
 	}
+	w.Header().Set("X-Neon-Metadata-ETag", storageMetadataState(p.BranchID, bucket, key, blob, digest, contentType, metadata))
+	writeStorageMetadata(w, metadata)
 	w.Header().Set("ETag", `"`+digest+`"`)
 	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": key[strings.LastIndex(key, "/")+1:]}))

@@ -5,7 +5,9 @@ package s3protocol
 
 import (
 	"crypto/hmac"
+	"crypto/md5"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"net/http"
@@ -167,7 +169,9 @@ func mac(key []byte, value string) []byte {
 }
 
 // Verify binds the original method/path/query/authority and signed headers.
-// UNSIGNED-PAYLOAD is accepted only for bodyless reads, never a write.
+// UNSIGNED-PAYLOAD is accepted for bodyless reads and a bodyless COPY whose
+// source header is signed, plus query-presigned PUT (standard S3 capability).
+// Normal header-signed uploads/deletes still require payload hashes.
 // Signed chunk payloads must use VerifyAndDecode, before any object mutation.
 func (s Signature) Verify(r *http.Request, body []byte, secret, region string) error {
 	if len(s.Date) != 16 || len(secret) < 32 || len(secret) > 256 || !keyID.MatchString(s.KeyID) || !digestPattern.MatchString(s.Value) {
@@ -178,7 +182,16 @@ func (s Signature) Verify(r *http.Request, body []byte, secret, region string) e
 		payload = "UNSIGNED-PAYLOAD"
 	}
 	if payload == "UNSIGNED-PAYLOAD" {
-		if (r.Method != http.MethodGet && r.Method != http.MethodHead) || len(body) != 0 {
+		read := r.Method == http.MethodGet || r.Method == http.MethodHead
+		copy := r.Method == http.MethodPut && r.Header.Get("X-Amz-Copy-Source") != "" && strings.Contains(";"+s.Headers+";", ";x-amz-copy-source;")
+		// Query signatures authorize a bounded PUT capability. Ordinary header
+		// signatures still require a payload hash; DELETE/POST remain excluded.
+		upload := s.Presigned && r.Method == http.MethodPut && r.Header.Get("X-Amz-Copy-Source") == ""
+		// MinIO SetBucketCors signs Content-MD5 and uses UNSIGNED-PAYLOAD.
+		// Limit this exception to bounded XML configuration, never object PUT.
+		checksum := md5.Sum(body)
+		cors := r.Method == http.MethodPut && r.URL.Query().Has("cors") && len(body) > 0 && len(body) <= 65536 && r.Header.Get("X-Amz-Copy-Source") == "" && strings.Contains(";"+s.Headers+";", ";content-md5;") && r.Header.Get("Content-MD5") == base64.StdEncoding.EncodeToString(checksum[:])
+		if !upload && !cors && ((!read && !copy) || len(body) != 0) {
 			return ErrSignature
 		}
 	} else if !digestPattern.MatchString(payload) || !hmac.Equal([]byte(payload), []byte(Hash(body))) {

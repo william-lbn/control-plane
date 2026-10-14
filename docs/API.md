@@ -1,7 +1,7 @@
 # 实际 API 合同
 
 OpenAPI 3 合同的权威源是 [openapi-v1.json](../contracts/openapi-v1.json)。
-版本 0.23.0，76 个路径、112 个操作，全部拥有稳定且唯一的 operationId。
+版本 0.31.0，82 个路径、121 个操作，全部拥有稳定且唯一的 operationId。
 运行 Swagger 位于 `/api/docs`，JSON 位于 `/api/openapi.json`。
 本合同是自托管 `/api/v1`，不声称兼容 Neon SaaS `/api/v2`。
 
@@ -112,6 +112,7 @@ request_id/operation_id/error_code，再由显式 retry 接口恢复可重试操
 | POST | `/api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/presign` | `presignStorageDownload` | 200 |
 | GET | `/storage/v1/{storageBranch}/{bucket}` | `getPublicStorageObject` | 200 |
 | HEAD | `/storage/v1/{storageBranch}/{bucket}` | `headPublicStorageObject` | 200 |
+| PUT | `/storage/v1/{storageBranch}/{bucket}` | `uploadWithStorageCapability` | 200 |
 | GET | `/api/v1/projects/{project}/branches/{branch}/functions` | `listFunctions` | 200 |
 | POST | `/api/v1/projects/{project}/branches/{branch}/functions` | `createFunction` | 202 |
 | GET | `/api/v1/projects/{project}/branches/{branch}/functions/{slug}` | `getFunction` | 200 |
@@ -136,6 +137,14 @@ request_id/operation_id/error_code，再由显式 retry 接口恢复可重试操
 | DELETE | `/api/v1/projects/{project}/saved-queries/{query}` | `deleteSavedQuery` | 200 |
 | PATCH | `/api/v1/projects/{project}/branches/{branch}/functions/{slug}/http-policy` | `setFunctionHTTPPolicy` | 200 |
 | GET | `/api/application-auth-openapi.json` | `getApplicationAuthOpenAPI` | 200 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/copy` | `copyStorageObject` | 201 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/delete-batch` | `deleteStorageObjectBatch` | 200 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/presign-upload` | `presignStorageUpload` | 200 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/cors` | `getStorageBucketCORS` | 200 |
+| PUT | `/api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/cors` | `putStorageBucketCORS` | 200 |
+| DELETE | `/api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/cors` | `deleteStorageBucketCORS` | 200 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/functions/{slug}/request-logs` | `listFunctionRequestLogs` | 200 |
+| PATCH | `/api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/objects/metadata` | `updateStorageObjectMetadata` | 200 |
 
 ## 3. 实现映射与演进
 

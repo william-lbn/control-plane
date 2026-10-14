@@ -1,5 +1,7 @@
 # Object Storage S3 基础兼容预览
 
+> 最新本地增量：目录/COPY/bulk、预签名 PUT、CORS、用户 metadata 已通过各自 UI 闭环，见 [当前交付](DELIVERY-2026-10-15-STORAGE-BROWSER.md)。下文历史基础兼容范围不代替当前版本。
+
 ## 1. 目标、当前范围和官网差异
 
 官网 [Object Storage](https://neon.com/docs/storage/overview) 以随数据库分支演进的
@@ -9,9 +11,11 @@ S3 服务为目标，[认证](https://neon.com/docs/storage/authentication) 使�
 部署的专用不可变 blob bucket；不会把 MinIO root/Pageserver 凭据交给应用。
 
 **这是基础协议预览，不是官网完整 S3 准入。** 支持 List/Create/Delete/HeadBucket、
-GetBucketLocation、ListObjects/V2（平铺列表、fetch-owner、分页）、Put/Get/Head/DeleteObject、单 Range、
-条件写、SigV4 Header 和预签名 GET。尚缺 multipart、server COPY、bulk delete、
-层级 delimiter/CORS、完整 user metadata/checksum、anonymous public_read、STS、
+GetBucketLocation、ListObjects/V2（flat/grouped delimiter、fetch-owner、分页）、Put/Get/Head/DeleteObject、单 Range、
+条件写、basic CopyObject、SigV4 Header 和预签名 GET。目录与复制的实际 UI/SDK 验收见
+[目录](OBJECT-STORAGE-DIRECTORIES.md)和[复制](DELIVERY-2026-10-15-OBJECT-COPY.md)。
+批量删除已实现，正在[本地独立验收](OBJECT-STORAGE-BULK-DELETE.md)。尚缺 multipart、完整 COPY 条件/metadata REPLACE、
+CORS、完整 user metadata/checksum、anonymous public_read、STS、
 SigV4 checksum trailers 与预签名 PUT；单对象仍 8 MiB，分支 100 MiB/1000 objects。
 官网最大单对象 5 GiB，不能用当前实验室配额声称等价。物理 GC/HA/DR/TLS 另行准入。
 

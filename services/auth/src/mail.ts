@@ -110,7 +110,7 @@ export function createMailer(c: MailConfig, branch: string, baseURL: string) {
     disableUrlAccess: true,
   });
   async function send(
-    kind: "password-reset" | "email-verification",
+    kind: "password-reset" | "email-verification" | "magic-link",
     user: { email: string },
     url: string,
   ) {
@@ -133,11 +133,15 @@ export function createMailer(c: MailConfig, branch: string, baseURL: string) {
         subject:
           kind === "password-reset"
             ? "Reset your application password"
-            : "Verify your application email",
+            : kind === "magic-link"
+              ? "Sign in to your application"
+              : "Verify your application email",
         text:
           (kind === "password-reset"
             ? "Use this one-time link to reset your application password."
-            : "Use this link to verify your application email.") +
+            : kind === "magic-link"
+              ? "Use this one-time link to sign in to your application."
+              : "Use this link to verify your application email.") +
           "\n\n" +
           url +
           "\n\nIf you did not request this, ignore this message.",

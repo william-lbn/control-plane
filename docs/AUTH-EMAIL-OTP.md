@@ -2,7 +2,7 @@
 
 ## Status and scope
 
-This is the next candidate after accepted local email links/password recovery (runtime 374a38b / Helm 0.1.30). It implements native passwordless signup/login, email verification codes and password recovery codes using pinned Better Auth 1.7.7, PostgreSQL verification records and the actual configured SMTP sender. Real library/PG/SMTP checks pass; deployment and actual Linux UI acceptance remain required. Do not treat this candidate as available in the previously deployed 0.22 runtime.
+Native OTP and the application Auth OpenAPI are accepted on runtime 5449a11 / local unified Helm 0.1.31. Linux UI Job publication-ui-20261014145221 passed eight actual SMTP/browser groups: verified signup, wrong-code and replay denial, existing password account verification, password recovery, captured old session/token rejection and final Compute zero. See [exact delivery](DELIVERY-2026-10-14-AUTH-OTP.md). This does not qualify the full Auth product or public SMTP/TLS.
 
 ## Configuration and data model
 

@@ -13,6 +13,9 @@ export interface AuthConfig {
   mail?: MailConfig;
   requireEmailVerification?: boolean;
   emailOTPEnabled?: boolean;
+  magicLinkEnabled?: boolean;
+  magicLinkExpiresIn?: number;
+  magicLinkAllowRegistration?: boolean;
 }
 
 // Both the URL and SQL credential come from an immutable, owned Secret file.
@@ -21,6 +24,23 @@ export function parseConfig(value: unknown): AuthConfig {
   if (!value || typeof value !== "object")
     throw new Error("Invalid Auth configuration");
   const c = value as AuthConfig;
+  if (
+    (c.magicLinkEnabled !== undefined &&
+      typeof c.magicLinkEnabled !== "boolean") ||
+    (c.magicLinkAllowRegistration !== undefined &&
+      typeof c.magicLinkAllowRegistration !== "boolean") ||
+    (c.magicLinkExpiresIn !== undefined &&
+      c.magicLinkExpiresIn !== 0 &&
+      (!Number.isInteger(c.magicLinkExpiresIn) ||
+        c.magicLinkExpiresIn < 300 ||
+        c.magicLinkExpiresIn > 86400))
+  )
+    throw new Error("Invalid magic link policy");
+  if (
+    !c.magicLinkEnabled &&
+    (c.magicLinkAllowRegistration || c.magicLinkExpiresIn)
+  )
+    throw new Error("Magic link policy disabled");
   if (c.emailOTPEnabled !== undefined && typeof c.emailOTPEnabled !== "boolean")
     throw new Error("Invalid email OTP policy");
   if (
@@ -93,7 +113,9 @@ export function loadConfig(): AuthConfig {
   const config = parseConfig(JSON.parse(readFileSync(file, "utf8")));
   config.mail = loadMailConfig();
   if (
-    (config.requireEmailVerification || config.emailOTPEnabled) &&
+    (config.requireEmailVerification ||
+      config.emailOTPEnabled ||
+      config.magicLinkEnabled) &&
     !config.mail
   )
     throw new Error("Email verification requires a mail transport");

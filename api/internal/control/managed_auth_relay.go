@@ -24,6 +24,12 @@ func managedAuthAllowedAction(action, method string) bool {
 	if !managedAuthMailConfigured() {
 		return false
 	}
+	if action == "sign-in/magic-link" {
+		return method == "POST" || method == "OPTIONS"
+	}
+	if action == "magic-link/verify" {
+		return method == "GET" || method == "OPTIONS"
+	}
 	if managedAuthOTPActions[action] {
 		return method == "POST" || method == "OPTIONS"
 	}
@@ -133,17 +139,26 @@ func (s *server) managedAuthRelay(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
+	if (r.PathValue("rest") == "sign-in/magic-link" || r.PathValue("rest") == "magic-link/verify") && !spec.MagicLinkEnabled {
+		http.NotFound(w, r)
+		return
+	}
 	if managedAuthCORS(w, r, spec, os.Getenv("NEON_AUTH_PUBLIC_ORIGIN")) {
 		return
 	}
 	// Email links require browser redirects. Only the exact public/trusted
 	// origins are permitted, before SQL admission or any Compute wake.
-	if callbacks, exists := r.URL.Query()["callbackURL"]; exists {
-		if len(callbacks) != 1 || (r.PathValue("rest") != "verify-email" && !managedAuthResetCallback.MatchString(r.PathValue("rest"))) || !managedAuthCallbackTrusted(callbacks[0], spec, os.Getenv("NEON_AUTH_PUBLIC_ORIGIN")) {
-			fail(w, r, 422, "invalid_request", "Auth callback origin is not trusted")
-			return
+	for _, key := range []string{"callbackURL", "newUserCallbackURL", "errorCallbackURL"} {
+		if callbacks, exists := r.URL.Query()[key]; exists {
+			action := r.PathValue("rest")
+			allowed := action == "magic-link/verify" || (key == "callbackURL" && (action == "verify-email" || managedAuthResetCallback.MatchString(action)))
+			if len(callbacks) != 1 || !allowed || !managedAuthCallbackTrusted(callbacks[0], spec, os.Getenv("NEON_AUTH_PUBLIC_ORIGIN")) {
+				fail(w, r, 422, "invalid_request", "Auth callback origin is not trusted")
+				return
+			}
 		}
 	}
+
 	r.Body = http.MaxBytesReader(w, r.Body, 16384)
 	target, _ := url.Parse("http://" + managedAuthName(branch) + "." + s.kube.namespace + ".svc.cluster.local:9082")
 	base, _ := url.Parse(managedAuthBase(branch))

@@ -1,15 +1,16 @@
 # 生产门槛与官网对齐
 
-状态截至 2026-10-14；当前部署 `374a38b` / 统一 Helm 0.1.30。
+状态截至 2026-10-15；运行 API 0.31 / metadata migration 030 / Chart 0.9.15 / Helm revision 81，元数据编辑/S3 REPLACE 新 UI 8 项通过，见 [精确交付](DELIVERY-2026-10-15-METADATA-EDIT.md)。API 源 5087aa2、Web 源 dda8b19、Auth 源 3aa8efc。预签名、CORS/metadata、Functions 请求日志的独立回执沿用。公开统一 Helm 发行仍为 0.1.30；父 Git 5449a11 不代表运行源码。
 前一版本 `be04cb4` 的真实 Linux/React 闭环见 [Auth/S3 交付](DELIVERY-2026-10-14-AUTH-S3.md)：
 788 Go/真实 PostgreSQL 检查、八个同源公开镜像、三节点 24 次串行 digest 导入；
 应用密码/会话十组 UI，以及实际 S3 SDK 签名/字节/权限/轮换/撤销/正常缩零均通过。
 [Functions HTTP/SSE 与自动零/一次冷醒](DELIVERY-2026-10-14-FUNCTIONS-HTTP.md)
 在 0.1.28 有自己的十组 UI 回执。当前仍是预览产品；这些切片不关闭下列生产门槛。
 历史失败、版本和原 fixture 保留，未重复不相关的旧全量 UI 套件。
+本地 OTP/Magic Link/S3 目录三个新 UI 闭环已通过；本批综合 Go/PG 回归 793 pass / 0 fail / 0 skip。
 需运营方输入见 [OPERATOR-INPUTS.md](OPERATOR-INPUTS.md)，不阻塞其他本地工程。
 
-本地邮件链接验证/密码找回已通过十组 UI、真实 SMTP、790 Go/PG 与最终八发布审计，见 [精确回执](DELIVERY-2026-10-14-AUTH-MAIL.md)。公网邮件、OTP/Magic Link、OAuth/MFA 等仍按各自门槛推进。
+本地邮件链接验证/密码找回已通过十组 UI、真实 SMTP、790 Go/PG 与最终八发布审计，见 [精确回执](DELIVERY-2026-10-14-AUTH-MAIL.md)。本地 OTP 和应用 Auth OpenAPI 已通过八组真实 UI，见 [OTP 回执](DELIVERY-2026-10-14-AUTH-OTP.md)。Magic Link 已通过八组真实 UI，见 [本地交付](DELIVERY-2026-10-14-LOCAL-MAGIC-LINK.md)；公网邮件、OAuth/MFA 等仍按各自门槛推进。
 
 ## 1. 已实现路径
 
@@ -28,7 +29,7 @@ Functions 历史恢复在 0.1.25 通过原 fixture 的九组实际 UI 检查；S
 | 门槛 | 当前缺口 | 完成判据 |
 | --- | --- | --- |
 | Proxy/Storage adapter | 原生 Go/Helm 迁移和真实 Proxy/UI 冷醒/通知已验收；仍单实例，通知重配置和分布式连接账本未完成 | 全新隔离环境安装、完整 placement/Safekeeper 重配置、跨实例长短连接与删除竞争另验 |
-| 多租户生产安全 | 受邀注册/已有账号接受、一次凭据、撤销/过期、组织锁、事务审计已有代码；OIDC/SSO/MFA、邮件验证与完整攻击矩阵仍缺 | 新版本 Linux UI 与实际 PG 验收、跨组织/项目负例、撤销竞争、外部安全评审 |
+| 多租户生产安全 | 受邀注册/已有账号接受、一次凭据、撤销/过期、组织锁、事务审计已有代码；OIDC/SSO/MFA、公网邮件投递与完整攻击矩阵仍缺 | 新版本 Linux UI 与实际 PG 验收、跨组织/项目负例、撤销竞争、外部安全评审 |
 | 跨实例缩零栅栏 | DB 租约无法 fence 所有外部动作；缺短连接 ledger | 多 API/Proxy 并发、过期 worker、新连接/删除竞争负例与无误删 |
 | HA | 独立 API/Worker 的领导租约已有代码；两者仍单副本；Metadata/数据面单故障域实验部署 | 独立故障域、主从切换/脑裂矩阵、指标和业务连续性 |
 | DR | 元数据/Secrets/对象/WAL 恢复未形成全栈演练 | 固定镜像与密钥、隔离 restore、真实 PG 数据校验、实测 RPO/RTO |
@@ -52,9 +53,9 @@ Functions 已开始实际 Go/Node 基础层实现，合同和内部接口见
 验收；代码包/环境存储和持久身份回执见 [FUNCTIONS-BACKING](FUNCTIONS-BACKING.md)。
 原生 Driver/UI 已在 `bf0dd9e` / Helm 0.1.19 通过实际 Linux UI→microVM→Proxy→SQL 与手动停止/重部署/删除，运行监控在 `be557e0` / Helm 0.1.20 通过独立实际 UI；显式保留版本唤醒在 `0198f7c` / Helm 0.1.21 通过自己的现场回执，合同见 [FUNCTIONS-WAKE](FUNCTIONS-WAKE.md)。公开 HTTP/SSE、自动零/冷醒已在 0.1.28 独立验收；分支复制、WS、触发器和全部 Functions 产品能力仍未完成。
 
-Managed Auth 已有 Go Driver、Better Auth 1.7.7 运行时、React UI、注册/会话/JWT/分支隔离与 PostgreSQL CI，详细见 [Auth 合同](MANAGED-AUTH.md)。真实 Neon UI 结果按版本交付报告记录；应用密码/会话安全已完成本地验收；SMTP/OAuth/MFA、完整恢复/删除一致性、生产隔离与 HA 仍须独立实现/验收。
+Managed Auth 已有 Go Driver、Better Auth 1.7.7 运行时、React UI、注册/会话/JWT/分支隔离与 PostgreSQL CI，详细见 [Auth 合同](MANAGED-AUTH.md)。真实 Neon UI 结果按版本交付报告记录；应用密码/会话安全已完成本地验收；公网 SMTP/OAuth/MFA、完整恢复/删除一致性、生产隔离与 HA 仍须独立实现/验收。
 
-产品 Object Storage 已实现分支目录、独立受限对象凭据、Go REST Driver、React UI、条件写入、签名下载和分支继承，详见 [Object Storage 合同](OBJECT-STORAGE.md)。REST 是 `neon-object-rest-v1`；f0b63f5 Linux 现场 UI 19 项已通过，实际版本与其余回归见 [当前交付](DELIVERY-2026-10-12-SQL-IDENTITY.md)。基础 S3/SigV4/signed chunks/统一存储凭据已在 0.1.29 实际验收，见 [S3 合同](OBJECT-STORAGE-S3-CORE.md)。完整 multipart/COPY/bulk/CORS/大文件、物理 GC、分布式网关隔离及 HA/DR 仍未完成。
+产品 Object Storage 已实现分支目录、独立受限对象凭据、Go REST Driver、React UI、条件写入、签名下载和分支继承，详见 [Object Storage 合同](OBJECT-STORAGE.md)。REST 是 `neon-object-rest-v1`；f0b63f5 Linux 现场 UI 19 项已通过，实际版本与其余回归见 [当前交付](DELIVERY-2026-10-12-SQL-IDENTITY.md)。基础 S3/SigV4/signed chunks/统一存储凭据已在 0.1.29 实际验收，见 [S3 合同](OBJECT-STORAGE-S3-CORE.md)。基础 COPY、条件批量删除、预签名 PUT、CORS 和用户 metadata 已通过本地 UI；完整 multipart/COPY 条件/metadata REPLACE/大文件、物理 GC、分布式网关隔离及 HA/DR 仍未完成。
 
 Functions 已有 guest、不可变存储、持久候选/引导/SQL 身份及新增原生执行
 Driver/API/UI，默认禁用，实际发布验收见 [执行合同](FUNCTIONS-NATIVE-PREVIEW.md)；AI Gateway 文本 Chat/SSE、目录、Playground、应用授权和用量已通过本地真实 Ollama UI；商业上游/其他协议/预算和生产门槛仍缺。Data API 已有原生 Driver、

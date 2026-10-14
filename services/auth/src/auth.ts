@@ -1,11 +1,14 @@
 import { betterAuth } from "better-auth";
-import { jwt, emailOTP } from "better-auth/plugins";
+import { jwt, emailOTP, magicLink } from "better-auth/plugins";
 import type { Pool } from "pg";
 import type { AuthConfig } from "./config.ts";
 import { createMailer } from "./mail.ts";
 
 export function authOptions(c: AuthConfig, database: Pool) {
-  if ((c.requireEmailVerification || c.emailOTPEnabled) && !c.mail)
+  if (
+    (c.requireEmailVerification || c.emailOTPEnabled || c.magicLinkEnabled) &&
+    !c.mail
+  )
     throw new Error("Email verification requires a mail transport");
   const mail = c.mail ? createMailer(c.mail, c.branchID, c.baseURL) : undefined;
   return {
@@ -85,6 +88,18 @@ export function authOptions(c: AuthConfig, database: Pool) {
       storage: "database" as const,
     },
     plugins: [
+      ...(mail && c.magicLinkEnabled
+        ? [
+            magicLink({
+              expiresIn: c.magicLinkExpiresIn || 300,
+              disableSignUp: !c.magicLinkAllowRegistration,
+              storeToken: "hashed",
+              sendMagicLink: async ({ email, url }) => {
+                await mail.send("magic-link", { email }, url);
+              },
+            }),
+          ]
+        : []),
       ...(mail && c.emailOTPEnabled
         ? [
             emailOTP({

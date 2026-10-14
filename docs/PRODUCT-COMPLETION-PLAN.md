@@ -2,11 +2,11 @@
 
 ## 1. 本轮约束
 
-当前基线 `374a38b` / Helm 0.1.30。本地 Functions 独立 HTTP/SSE 与自动零/冷醒、
+当前为 [Linux 本地批次](DELIVERY-2026-10-15-LOCAL-BATCH.md)，源码按各镜像快照记录，父提交为 `5449a11`；公开发行与本地候选分别记录。本地 Functions 独立 HTTP/SSE 与自动零/冷醒、
 Auth 应用密码/会话安全、S3 基础真实 SDK 均已有现场 UI 结果；分别见
 [Functions](DELIVERY-2026-10-14-FUNCTIONS-HTTP.md)与[Auth/S3](DELIVERY-2026-10-14-AUTH-S3.md)。
 历史 SQL、Owner、Functions、REST 存储和推理回执保留各自版本，不重复宣称全量生产准入。
-本地邮件验证/密码找回已在 [当前切片](DELIVERY-2026-10-14-AUTH-MAIL.md)通过十组实际 UI。下一阶段优先 Email OTP/Magic Link 等 Auth 路径；
+本地邮件验证/密码找回已在 [当前切片](DELIVERY-2026-10-14-AUTH-MAIL.md)通过十组实际 UI。OTP/Magic Link 的本地闭环已验收；下一阶段优先完整对象目录与 S3 兼容；
 随后继续完整对象协议与 Functions 未完成部分。当前工程门槛由 PRODUCTION-GATES 约束。
 下方带日期段落是历史增量，不覆盖本节当前状态。
 

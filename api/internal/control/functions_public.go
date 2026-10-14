@@ -220,6 +220,19 @@ func (s *server) functionPublicInvoke(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 503, "function_unavailable", "Runtime not accepting requests")
 		return
 	}
+	event, err := s.beginFunctionEvent(ctx, r, runtime.target, runtime.instance.Scope.InstanceID, "public_http", invocation.Method)
+	if err != nil {
+		fail(w, r, 503, "function_journal_unavailable", "Request not dispatched; admission journal unavailable")
+		return
+	}
+	finalized := false
+	finish := func(status int, bytes int64, outcome string) {
+		if !finalized {
+			finalized = true
+			s.finishFunctionEvent(event, status, bytes, outcome)
+		}
+	}
+	defer finish(0, 0, "outcome_unknown")
 	response, e := client.Invoke(ctx, invocation)
 	if e != nil {
 		fail(w, r, 502, "function_invocation_outcome_unknown", "Invocation outcome unknown; no automatic replay")
@@ -230,20 +243,30 @@ func (s *server) functionPublicInvoke(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(response.StatusCode)
 	controller := http.NewResponseController(w)
 	buffer := make([]byte, 16<<10)
+	var forwarded int64
+	outcome := "completed"
 	for {
 		n, err := response.Body.Read(buffer)
 		if n > 0 {
-			if _, e = w.Write(buffer[:n]); e != nil {
+			written, writeErr := w.Write(buffer[:n])
+			forwarded += int64(written)
+			if writeErr != nil {
+				outcome = "client_disconnected"
 				break
 			}
 			if controller.Flush() != nil {
+				outcome = "client_disconnected"
 				break
 			}
 		}
 		if err != nil {
+			if err != io.EOF {
+				outcome = "response_incomplete"
+			}
 			break
 		}
 	}
+	finish(response.StatusCode, forwarded, outcome)
 	// The supervisor owns authoritative end-of-stream activity. Metadata is an
 	// additional conservative timestamp, never a replacement for that observation.
 	updateCtx, done := context.WithTimeout(context.Background(), 3*time.Second)

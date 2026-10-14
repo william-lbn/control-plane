@@ -8,7 +8,9 @@ import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
 const workflow = fs.readFileSync(path.join(root, '.github/workflows/live-e2e.yml'), 'utf8');
-const advertised = workflow.match(/options: \[([^\]]+)\]/)?.[1].split(',').map((v) => v.trim());
+const groups=[...workflow.matchAll(/options: \[([^\]]+)\]/g)].map(match=>match[1].split(',').map(v=>v.trim()));
+assert(groups.every(group=>group.length<=25),'GitHub choice inputs permit at most 25 options');
+const advertised=groups.flat().filter(value=>value!=='none');
 assert(advertised?.length, 'Live UI workflow must advertise explicit suites');
 assert.equal(new Set(advertised).size, advertised.length, 'Duplicate advertised suite');
 const admission = workflow.match(/case "\$NEON_E2E_SUITE" in([\s\S]*?)esac/)?.[1];

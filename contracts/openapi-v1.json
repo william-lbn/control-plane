@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.23.0",
+    "version": "0.31.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -2360,6 +2360,22 @@
             "type": "boolean",
             "default": false,
             "description": "Opt-in branch email OTP login/signup, verification and password recovery using the configured operator transport; requires immutable runtime regeneration."
+          },
+          "magic_link_enabled": {
+            "type": "boolean",
+            "default": false,
+            "description": "Opt-in maintained Better Auth Magic Link; requires operator SMTP."
+          },
+          "magic_link_expires_in": {
+            "type": "integer",
+            "minimum": 300,
+            "maximum": 86400,
+            "description": "Seconds, omitted defaults to 300."
+          },
+          "magic_link_allow_registration": {
+            "type": "boolean",
+            "default": false,
+            "description": "Explicitly permits verified email link signup."
           }
         }
       },
@@ -3501,6 +3517,78 @@
           "sql": {
             "type": "string",
             "description": "Included only in an authorized detail read, never in mutation/replay/list."
+          }
+        }
+      },
+      "FunctionRequestLogEvent": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "request_id",
+          "channel",
+          "method",
+          "outcome",
+          "application_status",
+          "response_bytes",
+          "duration_ms",
+          "started_at",
+          "finished_at",
+          "completion_unconfirmed"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "channel": {
+            "type": "string",
+            "enum": [
+              "console",
+              "public_http"
+            ]
+          },
+          "method": {
+            "type": "string"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "in_progress",
+              "completed",
+              "outcome_unknown",
+              "response_incomplete",
+              "client_disconnected"
+            ]
+          },
+          "application_status": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 100,
+            "maximum": 599
+          },
+          "response_bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "duration_ms": {
+            "type": "integer",
+            "nullable": true,
+            "minimum": 0
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finished_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          },
+          "completion_unconfirmed": {
+            "type": "boolean"
           }
         }
       }
@@ -10631,6 +10719,18 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "delimiter",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "",
+                "/"
+              ]
+            },
+            "description": "Group directory entries; common prefixes each count once within page and cursor order."
           }
         ],
         "responses": {
@@ -10652,6 +10752,13 @@
                     },
                     "branch_id": {
                       "type": "string"
+                    },
+                    "common_prefixes": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      },
+                      "description": "Only returned when delimiter is set."
                     }
                   }
                 }
@@ -11818,6 +11925,79 @@
                 }
               }
             }
+          }
+        }
+      },
+      "put": {
+        "operationId": "uploadWithStorageCapability",
+        "summary": "Create exact authorized bytes without Console cookie; recheck live editor permission and generation",
+        "tags": [
+          "Object Storage"
+        ],
+        "security": [],
+        "parameters": [
+          {
+            "name": "storageBranch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bucket",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "in": "query",
+            "required": false,
+            "description": "Omit key only for GET listing; otherwise required. Relative UTF-8 object key.",
+            "schema": {
+              "type": "string",
+              "maxLength": 1024
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Short-lived signed download token. Never log its query string."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary",
+                "maxLength": 8388608
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Object committed with quoted SHA-256 ETag"
+          },
+          "400": {
+            "description": "File digest or size mismatch"
+          },
+          "403": {
+            "description": "Invalid, expired, tampered, revoked or generation-stale capability"
+          },
+          "412": {
+            "description": "Create-only target already exists"
+          },
+          "413": {
+            "description": "Object too large"
           }
         }
       }
@@ -14052,6 +14232,1038 @@
             "$ref": "#/components/responses/Error"
           }
         }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/copy": {
+      "post": {
+        "operationId": "copyStorageObject",
+        "summary": "Copy immutable object content within the authorized branch",
+        "tags": [
+          "Object Storage"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bucket",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-None-Match",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "*"
+              ]
+            },
+            "description": "Create target only when absent."
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Current quoted target ETag for explicit overwrite."
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Copy committed; source preserved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string"
+                    },
+                    "bucket": {
+                      "type": "string"
+                    },
+                    "sha256": {
+                      "type": "string"
+                    },
+                    "size": {
+                      "type": "integer"
+                    },
+                    "content_type": {
+                      "type": "string"
+                    },
+                    "updated_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid source/target or same-object copy"
+          },
+          "403": {
+            "description": "Authorization denied"
+          },
+          "404": {
+            "description": "Source object/target bucket missing"
+          },
+          "409": {
+            "description": "Source blob identity invalid"
+          },
+          "412": {
+            "description": "Source or target changed"
+          },
+          "422": {
+            "description": "Invalid copy request"
+          },
+          "428": {
+            "description": "Target precondition missing"
+          },
+          "429": {
+            "description": "Quota exceeded"
+          },
+          "503": {
+            "description": "Unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "source_bucket",
+                  "source_key",
+                  "destination_key",
+                  "source_sha256"
+                ],
+                "properties": {
+                  "source_bucket": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 63
+                  },
+                  "source_key": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  },
+                  "destination_key": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  },
+                  "source_sha256": {
+                    "type": "string",
+                    "pattern": "^[a-f0-9]{64}$"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "description": "Requires editor authorization, CSRF, current source SHA-256 and conditional target creation/overwrite. Retains shared blob references for branch/PITR."
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/delete-batch": {
+      "post": {
+        "operationId": "deleteStorageObjectBatch",
+        "summary": "Atomically delete observed object directory entries",
+        "tags": [
+          "Object Storage"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bucket",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "All current directory entries deleted; physical content held",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "deleted_keys": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "physical_gc": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid or duplicate keys"
+          },
+          "403": {
+            "description": "Authorization denied"
+          },
+          "404": {
+            "description": "Missing bucket"
+          },
+          "412": {
+            "description": "Any source version changed; zero mutations"
+          },
+          "422": {
+            "description": "Invalid payload"
+          },
+          "503": {
+            "description": "Unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "objects"
+                ],
+                "properties": {
+                  "objects": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 1000,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "key",
+                        "sha256"
+                      ],
+                      "properties": {
+                        "key": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 1024
+                        },
+                        "sha256": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "description": "Editor and CSRF required. All supplied SHA-256 versions must match; any conflict denies the entire batch. Physical blobs remain held for branching/PITR."
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/presign-upload": {
+      "post": {
+        "operationId": "presignStorageUpload",
+        "summary": "Create a 1-900 second create-only upload capability bound to actor, generation, SHA-256, size and media type",
+        "tags": [
+          "Object Storage"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bucket",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Secret bearer URL with required Content-Type and If-None-Match: * headers, expiry and expected digest/size; no-store"
+          },
+          "401": {
+            "description": "Authorization, lifecycle, quota, version or storage error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Authorization, lifecycle, quota, version or storage error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Authorization, lifecycle, quota, version or storage error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Authorization, lifecycle, quota, version or storage error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Target already exists"
+          },
+          "413": {
+            "description": "Authorization, lifecycle, quota, version or storage error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Authorization, lifecycle, quota, version or storage error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "Authorization, lifecycle, quota, version or storage error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Authorization, lifecycle, quota, version or storage error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authorization, lifecycle, quota, version or storage error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "key",
+                  "expires_seconds",
+                  "sha256",
+                  "size",
+                  "content_type"
+                ],
+                "properties": {
+                  "key": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  },
+                  "expires_seconds": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 900
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "size": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 8388608
+                  },
+                  "content_type": {
+                    "type": "string",
+                    "maxLength": 256
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/cors": {
+      "get": {
+        "operationId": "getStorageBucketCORS",
+        "summary": "Read or conditionally update branch-owned browser CORS policy; signing still required",
+        "tags": [
+          "Object Storage"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bucket",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Rules and current quoted SHA-256 ETag"
+          },
+          "404": {
+            "description": "Bucket not found"
+          },
+          "412": {
+            "description": "Policy version conflict"
+          }
+        }
+      },
+      "put": {
+        "operationId": "putStorageBucketCORS",
+        "summary": "Read or conditionally update branch-owned browser CORS policy; signing still required",
+        "tags": [
+          "Object Storage"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bucket",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Rules and current quoted SHA-256 ETag"
+          },
+          "404": {
+            "description": "Bucket not found"
+          },
+          "412": {
+            "description": "Policy version conflict"
+          },
+          "428": {
+            "description": "Current version required"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "rules"
+                ],
+                "properties": {
+                  "rules": {
+                    "type": "array",
+                    "maxItems": 100,
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "allowed_origins",
+                        "allowed_methods"
+                      ],
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "maxLength": 255
+                        },
+                        "allowed_origins": {
+                          "type": "array",
+                          "minItems": 1,
+                          "maxItems": 16,
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "allowed_methods": {
+                          "type": "array",
+                          "minItems": 1,
+                          "maxItems": 5,
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "GET",
+                              "HEAD",
+                              "PUT",
+                              "POST",
+                              "DELETE"
+                            ]
+                          }
+                        },
+                        "allowed_headers": {
+                          "type": "array",
+                          "maxItems": 32,
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "expose_headers": {
+                          "type": "array",
+                          "maxItems": 32,
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "max_age_seconds": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 86400
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteStorageBucketCORS",
+        "summary": "Read or conditionally update branch-owned browser CORS policy; signing still required",
+        "tags": [
+          "Object Storage"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bucket",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Rules and current quoted SHA-256 ETag"
+          },
+          "404": {
+            "description": "Bucket not found"
+          },
+          "412": {
+            "description": "Policy version conflict"
+          },
+          "428": {
+            "description": "Current version required"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/functions/{slug}/request-logs": {
+      "get": {
+        "operationId": "listFunctionRequestLogs",
+        "summary": "Read tenant-scoped durable admitted request outcomes without waking a guest; excludes headers, paths, query, bodies and stdout",
+        "description": "Authorized metadata only; does not wake SQL or probe guests. Native execution preview requires explicit operator configuration and defaults to disabled. Retained completed source does not establish current VM readiness.",
+        "tags": [
+          "Functions"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Last returned slug or deployment ID, exclusive stable cursor."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "items, next_after, function_id; keyset pagination ordered started_at/id descending; in_progress deadline expiry is completion_unconfirmed, never synthetic success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "items",
+                    "next_after",
+                    "function_id",
+                    "capture",
+                    "retention"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "maxItems": 100,
+                      "items": {
+                        "$ref": "#/components/schemas/FunctionRequestLogEvent"
+                      }
+                    },
+                    "next_after": {
+                      "type": "string",
+                      "maxLength": 512
+                    },
+                    "function_id": {
+                      "type": "string"
+                    },
+                    "capture": {
+                      "type": "string"
+                    },
+                    "retention": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient project permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project, branch or Function not accessible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid bounded pagination",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Metadata unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/objects/metadata": {
+      "patch": {
+        "operationId": "updateStorageObjectMetadata",
+        "summary": "Replace user metadata and optional Content-Type using current branch/object-bound metadata representation ETag; immutable bytes held",
+        "tags": [
+          "Object Storage"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bucket",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Current X-Neon-Metadata-ETag from HEAD, distinct from content SHA-256 ETag"
+          },
+          {
+            "name": "key",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "400": {
+            "description": "Invalid source/target or same-object copy"
+          },
+          "403": {
+            "description": "Authorization denied"
+          },
+          "404": {
+            "description": "Source object/target bucket missing"
+          },
+          "409": {
+            "description": "Source blob identity invalid"
+          },
+          "412": {
+            "description": "Observed metadata representation changed; no update"
+          },
+          "422": {
+            "description": "Invalid copy request"
+          },
+          "428": {
+            "description": "Current metadata ETag required"
+          },
+          "429": {
+            "description": "Quota exceeded"
+          },
+          "503": {
+            "description": "Unavailable"
+          },
+          "200": {
+            "description": "metadata, content_type, metadata_etag, key, unchanged sha256",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "metadata",
+                    "content_type",
+                    "metadata_etag",
+                    "sha256",
+                    "key"
+                  ],
+                  "properties": {
+                    "metadata": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "string"
+                      }
+                    },
+                    "content_type": {
+                      "type": "string"
+                    },
+                    "metadata_etag": {
+                      "type": "string",
+                      "pattern": "^\"[0-9a-f]{64}\"$"
+                    },
+                    "sha256": {
+                      "type": "string",
+                      "pattern": "^[0-9a-f]{64}$"
+                    },
+                    "key": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "metadata"
+                ],
+                "properties": {
+                  "metadata": {
+                    "type": "object",
+                    "maxProperties": 64,
+                    "additionalProperties": {
+                      "type": "string"
+                    }
+                  },
+                  "content_type": {
+                    "type": "string",
+                    "maxLength": 256
+                  }
+                }
+              }
+            }
+          }
+        },
+        "description": "Requires editor authorization, CSRF, current source SHA-256 and conditional target creation/overwrite. Retains shared blob references for branch/PITR."
       }
     }
   }

@@ -31,6 +31,9 @@ const allowed = new Set([
   "revoke-other-sessions",
   "change-password",
   "update-user",
+  ...(config.mail && config.magicLinkEnabled
+    ? ["sign-in/magic-link", "magic-link/verify"]
+    : []),
   ...(config.mail && config.emailOTPEnabled
     ? [
         "email-otp/send-verification-otp",

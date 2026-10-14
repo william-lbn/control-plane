@@ -54,6 +54,10 @@ func applyObjectStorageSQLTx(ctx context.Context, tx pgx.Tx, p objectStoragePayl
 			return err
 		}
 	}
+	// Additive branch schema evolution preserves all objects and clone references.
+	if _, err = tx.Exec(ctx, `ALTER TABLE neon_storage.buckets ADD COLUMN IF NOT EXISTS cors jsonb NOT NULL DEFAULT '[]'::jsonb; ALTER TABLE neon_storage.objects ADD COLUMN IF NOT EXISTS metadata jsonb NOT NULL DEFAULT '{}'::jsonb`, pgx.QueryExecModeSimpleProtocol); err != nil {
+		return err
+	}
 	// The marker and immutable database identity preserve inherited manifests.
 	// Re-enabling and companion replay never truncate objects or clone bytes.
 	var generation int64
@@ -241,12 +245,27 @@ func (s *server) openObjectStorage(r *http.Request, project, branch string) (*pg
 		cleanup()
 		return nil, p, nil, err
 	}
-	var safe bool
-	err = conn.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM pg_namespace n JOIN neon_storage.installations i ON i.branch_id=$1 AND i.generation=$2 WHERE n.nspname='neon_storage' AND obj_description(n.oid,'pg_namespace')=$3)`, p.BranchID, p.Generation, "neon-control:object-storage:"+p.ProjectID).Scan(&safe)
+	var safe, evolved bool
+	err = conn.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM pg_namespace n JOIN neon_storage.installations i ON i.branch_id=$1 AND i.generation=$2 WHERE n.nspname='neon_storage' AND obj_description(n.oid,'pg_namespace')=$3),(SELECT count(*)=2 FROM information_schema.columns WHERE table_schema='neon_storage' AND ((table_name='objects' AND column_name='metadata') OR (table_name='buckets' AND column_name='cors')))`, p.BranchID, p.Generation, "neon-control:object-storage:"+p.ProjectID).Scan(&safe, &evolved)
 	if err != nil || !safe {
 		_ = conn.Close(context.Background())
 		cleanup()
 		return nil, p, nil, errors.New("Object Storage directory identity or generation mismatch")
+	}
+	if !evolved {
+		upgrade, e := conn.Begin(r.Context())
+		if e == nil {
+			e = applyObjectStorageSQLTx(r.Context(), upgrade, p)
+			if e == nil {
+				e = upgrade.Commit(r.Context())
+			}
+			_ = upgrade.Rollback(context.Background())
+		}
+		if e != nil {
+			_ = conn.Close(context.Background())
+			cleanup()
+			return nil, p, nil, e
+		}
 	}
 	p.metadata = tx
 	return conn, p, func() { _ = conn.Close(context.Background()); cleanup() }, nil

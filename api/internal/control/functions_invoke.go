@@ -67,6 +67,19 @@ func (s *server) functionConsoleInvoke(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 503, "function_runtime_unavailable", "Original boot is not ready")
 		return
 	}
+	event, e := s.beginFunctionEvent(ctx, r, p, instance.Scope.InstanceID, "console", invocation.Method)
+	if e != nil {
+		fail(w, r, 503, "function_journal_unavailable", "Request not dispatched; admission journal unavailable")
+		return
+	}
+	finalized := false
+	finish := func(status int, bytes int64, outcome string) {
+		if !finalized {
+			finalized = true
+			s.finishFunctionEvent(event, status, bytes, outcome)
+		}
+	}
+	defer finish(0, 0, "outcome_unknown")
 	response, err := client.Invoke(ctx, invocation)
 	if err != nil {
 		fail(w, r, 502, "function_invocation_outcome_unknown", "Invocation outcome may be unknown; inspect before retrying")
@@ -75,9 +88,11 @@ func (s *server) functionConsoleInvoke(w http.ResponseWriter, r *http.Request) {
 	defer response.Body.Close()
 	body, err := io.ReadAll(io.LimitReader(response.Body, functions.MaxInvokeBytes+1))
 	if err != nil || len(body) > functions.MaxInvokeBytes {
+		finish(response.StatusCode, int64(len(body)), "response_incomplete")
 		fail(w, r, 502, "function_invocation_outcome_unknown", "Invocation response failed or exceeded limits; do not replay automatically")
 		return
 	}
 	_, _ = s.db.Exec(ctx, `UPDATE function_instances SET last_invoked_at=now(),updated_at=now() WHERE id=$1 AND boot_id=$2`, instance.Scope.InstanceID, bootID)
+	finish(response.StatusCode, int64(len(body)), "completed")
 	jsonResponse(w, 200, record{"function_id": p.FunctionID, "deployment_id": p.DeploymentID, "status_code": response.StatusCode, "headers": response.Header, "body": base64.StdEncoding.EncodeToString(body), "body_encoding": "base64", "request_id": requestID(r)})
 }

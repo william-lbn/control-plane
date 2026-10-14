@@ -709,3 +709,179 @@ test("email OTP uses actual SMTP, hashed PostgreSQL records and one-time account
     await smtp.close();
   }
 });
+
+test("Magic Link uses real SMTP, hashed PostgreSQL tokens, one redemption and trusted callbacks", async () => {
+  const dsn = process.env.AUTH_TEST_DATABASE_URL;
+  if (!dsn) throw new Error("Dedicated auth_ci required");
+  const input = new URL(dsn);
+  if (
+    input.pathname !== "/auth_ci" ||
+    input.username !== "auth_ci" ||
+    !["127.0.0.1", "localhost", "[::1]"].includes(input.hostname)
+  )
+    throw new Error("Disposable auth_ci only");
+  const smtp = await mailbox(),
+    schema = "auth_magic_" + randomBytes(8).toString("hex");
+  const admin = new pg.Pool({ connectionString: dsn, max: 1 }),
+    db = new pg.Pool({
+      connectionString: dsn,
+      options: `-c search_path=${schema},pg_catalog`,
+      max: 3,
+    });
+  const branch = "br_0123456789abcdef";
+  const config: AuthConfig = {
+    version: 1,
+    branchID: branch,
+    baseURL: `https://auth.example.test/auth/v1/${branch}`,
+    secret: randomBytes(48).toString("base64url"),
+    trustedOrigins: [],
+    allowLabHTTP: false,
+    databaseURL:
+      "postgresql://synthetic:synthetic@proxy.example.test/postgres?sslmode=verify-full&options=endpoint%3Dep-0123456789abcdef",
+    databaseTLS: {
+      caFile: "/run/auth-ca/ca.crt",
+      serverName: "proxy.example.test",
+    },
+    mail: {
+      version: 1,
+      host: "127.0.0.1",
+      port: smtp.port,
+      from: "noreply@example.test",
+      secure: false,
+      labCleartext: true,
+    },
+    magicLinkEnabled: true,
+    magicLinkAllowRegistration: true,
+    magicLinkExpiresIn: 300,
+  };
+  try {
+    const ddl = readFileSync(
+      new URL(
+        "../../../api/internal/control/assets/auth-schema.sql",
+        import.meta.url,
+      ),
+      "utf8",
+    );
+    await admin.query(
+      `CREATE SCHEMA ${schema}; SET search_path=${schema},pg_catalog; ${ddl}`,
+    );
+    const auth = createAuth(config, db);
+    let calls = 0;
+    const call = (action: string, body?: unknown) =>
+      auth.handler(
+        new Request(config.baseURL + "/" + action, {
+          method: body ? "POST" : "GET",
+          headers: {
+            Origin: new URL(config.baseURL).origin,
+            "X-Neon-Client-IP": "192.0.2." + ++calls,
+            ...(body ? { "Content-Type": "application/json" } : {}),
+          },
+          body: body ? JSON.stringify(body) : undefined,
+        }),
+      );
+    const email = "magic-new@example.test";
+    assert.equal(
+      (
+        await call("sign-in/magic-link", {
+          email,
+          callbackURL: "https://attacker.example/",
+        })
+      ).status,
+      403,
+    );
+    assert.equal(smtp.messages.length, 0);
+    assert.equal((await call("sign-in/magic-link", { email })).status, 200);
+    const url = mailURL(smtp.messages.pop()!);
+    assert.equal(url.pathname, `/auth/v1/${branch}/magic-link/verify`);
+    const token = url.searchParams.get("token")!;
+    const rows = await db.query(
+      'SELECT identifier,value,EXTRACT(EPOCH FROM ("expiresAt"-now()))::int AS seconds FROM verification',
+    );
+    assert.equal(rows.rows.length, 1);
+    assert.equal(rows.rows[0].identifier.includes(token), false);
+    assert.equal(rows.rows[0].value.includes(token), false);
+    assert.ok(rows.rows[0].seconds >= 290 && rows.rows[0].seconds <= 300);
+    for (const key of ["callbackURL", "newUserCallbackURL", "errorCallbackURL"])
+      url.searchParams.delete(key);
+    const redeemed = await Promise.all([
+      auth.handler(new Request(url)),
+      auth.handler(new Request(url)),
+    ]);
+    assert.equal(redeemed.filter((r) => r.status === 200).length, 1);
+    const winner = redeemed.find((r) => r.status === 200)!;
+    const cookie = winner.headers
+      .getSetCookie()
+      .map((v) => v.split(";")[0])
+      .join("; ");
+    const session = await auth.handler(
+      new Request(config.baseURL + "/get-session", {
+        headers: { Cookie: cookie },
+      }),
+    );
+    const identity = (await session.json()).user;
+    assert.equal(identity.email, email);
+    assert.equal(identity.emailVerified, true);
+    assert.equal(
+      (
+        await db.query('SELECT count(*)::int AS n FROM "user" WHERE email=$1', [
+          email,
+        ])
+      ).rows[0].n,
+      1,
+    );
+    assert.equal((await call("sign-in/magic-link", { email })).status, 200);
+    const expired = mailURL(smtp.messages.pop()!);
+    await db.query(
+      "UPDATE verification SET \"expiresAt\"=now()-interval '1 second'",
+    );
+    for (const key of ["callbackURL", "newUserCallbackURL", "errorCallbackURL"])
+      expired.searchParams.delete(key);
+    assert.notEqual((await auth.handler(new Request(expired))).status, 200);
+    const restricted = createAuth(
+      {
+        ...config,
+        secret: randomBytes(48).toString("base64url"),
+        magicLinkAllowRegistration: false,
+      },
+      db,
+    );
+    assert.equal(
+      (
+        await restricted.handler(
+          new Request(config.baseURL + "/sign-in/magic-link", {
+            method: "POST",
+            headers: {
+              Origin: new URL(config.baseURL).origin,
+              "Content-Type": "application/json",
+              "X-Neon-Client-IP": "192.0.2.120",
+            },
+            body: JSON.stringify({
+              email: "magic-registration-denied@example.test",
+            }),
+          }),
+        )
+      ).status,
+      200,
+    );
+    const denied = mailURL(smtp.messages.pop()!);
+    for (const key of ["callbackURL", "newUserCallbackURL", "errorCallbackURL"])
+      denied.searchParams.delete(key);
+    assert.notEqual(
+      (await restricted.handler(new Request(denied))).status,
+      200,
+    );
+    assert.equal(
+      (
+        await db.query('SELECT count(*)::int AS n FROM "user" WHERE email=$1', [
+          "magic-registration-denied@example.test",
+        ])
+      ).rows[0].n,
+      0,
+    );
+  } finally {
+    await db.end();
+    await admin.query(`DROP SCHEMA ${schema} CASCADE`);
+    await admin.end();
+    await smtp.close();
+  }
+});

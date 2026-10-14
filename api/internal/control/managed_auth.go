@@ -16,8 +16,11 @@ type ManagedAuthSpec struct {
 	Database       string   `json:"database"`
 	AllowedOrigins []string `json:"allowed_origins"`
 	// Omit false to preserve existing durable request hashes and old specs.
-	RequireEmailVerification bool `json:"require_email_verification,omitempty"`
-	EmailOTPEnabled          bool `json:"email_otp_enabled,omitempty"`
+	RequireEmailVerification   bool `json:"require_email_verification,omitempty"`
+	EmailOTPEnabled            bool `json:"email_otp_enabled,omitempty"`
+	MagicLinkEnabled           bool `json:"magic_link_enabled,omitempty"`
+	MagicLinkExpiresIn         int  `json:"magic_link_expires_in,omitempty"`
+	MagicLinkAllowRegistration bool `json:"magic_link_allow_registration,omitempty"`
 }
 type managedAuthPayload struct {
 	ProjectID  string          `json:"project_id"`
@@ -55,8 +58,14 @@ func validAuthOrigin(origin string) bool {
 	return e == nil && u.Host != "" && !strings.Contains(u.Host, "*") && u.User == nil && u.Path == "" && u.RawQuery == "" && u.Fragment == "" && (u.Scheme == "https" || (os.Getenv("NEON_AUTH_LAB_HTTP") == "true" && u.Scheme == "http"))
 }
 func validateManagedAuth(p managedAuthPayload) error {
-	if (p.Spec.RequireEmailVerification || p.Spec.EmailOTPEnabled) && !managedAuthMailConfigured() {
+	if (p.Spec.RequireEmailVerification || p.Spec.EmailOTPEnabled || p.Spec.MagicLinkEnabled) && !managedAuthMailConfigured() {
 		return errors.New("email authentication requires the operator mail transport")
+	}
+	if p.Spec.MagicLinkExpiresIn != 0 && (p.Spec.MagicLinkExpiresIn < 300 || p.Spec.MagicLinkExpiresIn > 86400) {
+		return errors.New("magic link lifetime must be 300 through 86400 seconds")
+	}
+	if !p.Spec.MagicLinkEnabled && (p.Spec.MagicLinkExpiresIn != 0 || p.Spec.MagicLinkAllowRegistration) {
+		return errors.New("magic link options require the plugin to be enabled")
 	}
 	if !dataBranchID.MatchString(p.BranchID) || !validPGIdentifier(p.Spec.Database) || p.Spec.AllowedOrigins == nil || len(p.Spec.AllowedOrigins) > 8 {
 		return errors.New("invalid Managed Auth configuration; database and allowed_origins array are required")

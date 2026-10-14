@@ -1,5 +1,7 @@
 # Functions: explicit retained-version wake
 
+> 历史增量合同：公开 HTTP/SSE、自动休眠/冷醒已在后续 0.1.28 独立验收；本文旧增量的排除范围不代表最新运行状态。最新范围以 [PRODUCTION-GATES](PRODUCTION-GATES.md) 与对应版本交付为准。
+
 ## 1. Product contract and official direction
 
 The current Neon documentation describes branch-scoped Node.js Functions next

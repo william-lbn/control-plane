@@ -84,3 +84,34 @@ func TestManagedAuthOTPPolicyIsOptInAndDoesNotExposeCodeRetrieval(t *testing.T) 
 		t.Fatal("Default policy changes legacy request hashes")
 	}
 }
+
+func TestManagedAuthMagicLinkPolicyAndMethods(t *testing.T) {
+	t.Setenv("NEON_AUTH_MAIL_ENABLED", "")
+	t.Setenv("NEON_AUTH_MAIL_SECRET", "")
+	p := managedAuthPayload{BranchID: "br_0123456789abcdef", Spec: ManagedAuthSpec{Database: "postgres", AllowedOrigins: []string{}, MagicLinkEnabled: true}}
+	if validateManagedAuth(p) == nil || managedAuthAllowedAction("sign-in/magic-link", "POST") {
+		t.Fatal("Magic Link requires operator mail")
+	}
+	t.Setenv("NEON_AUTH_MAIL_ENABLED", "true")
+	t.Setenv("NEON_AUTH_MAIL_SECRET", "auth-mail-ci")
+	if validateManagedAuth(p) != nil {
+		t.Fatal("Default lifetime rejected")
+	}
+	p.Spec.MagicLinkExpiresIn = 86400
+	if validateManagedAuth(p) != nil {
+		t.Fatal("Documented maximum lifetime rejected")
+	}
+	for _, seconds := range []int{-1, 299, 86401} {
+		p.Spec.MagicLinkExpiresIn = seconds
+		if validateManagedAuth(p) == nil {
+			t.Fatal("Invalid link lifetime accepted")
+		}
+	}
+	if !managedAuthAllowedAction("sign-in/magic-link", "POST") || managedAuthAllowedAction("sign-in/magic-link", "GET") || !managedAuthAllowedAction("magic-link/verify", "GET") || managedAuthAllowedAction("magic-link/verify", "POST") {
+		t.Fatal("Magic Link method boundary violated")
+	}
+	data, e := json.Marshal(ManagedAuthSpec{Database: "postgres", AllowedOrigins: []string{}})
+	if e != nil || strings.Contains(string(data), "magic_link") {
+		t.Fatal("Legacy request hash changed")
+	}
+}

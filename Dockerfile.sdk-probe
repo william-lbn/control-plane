@@ -1,0 +1,10 @@
+ARG GO_BUILDER_IMAGE
+FROM ${GO_BUILDER_IMAGE} AS build
+ARG GOPROXY=https://proxy.golang.org,direct
+WORKDIR /src/api
+COPY api/go.mod api/go.sum ./
+RUN --mount=type=cache,id=neon-control-gomod-1-27,target=/go/pkg/mod go mod download
+COPY api/cmd/storage-sdk-probe ./cmd/storage-sdk-probe
+RUN --mount=type=cache,id=neon-control-gomod-1-27,target=/go/pkg/mod --mount=type=cache,id=neon-control-gobuild-1-27,target=/root/.cache/go-build CGO_ENABLED=0 GOMAXPROCS=2 go build -p=2 -trimpath -buildvcs=false -o /storage-sdk-probe ./cmd/storage-sdk-probe
+FROM scratch AS export
+COPY --from=build /storage-sdk-probe /storage-sdk-probe

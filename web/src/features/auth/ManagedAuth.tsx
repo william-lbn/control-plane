@@ -7,6 +7,7 @@ import { followOperation } from '../../shared/followOperation';
 import { AuthSecurityPanel } from './AuthSecurityPanel';
 import { AuthRecoveryPanel } from './AuthRecoveryPanel';
 import { AuthOTPPanel } from './AuthOTPPanel';
+import { AuthMagicLinkPanel } from './AuthMagicLinkPanel';
 
 type Instance = {
   branch_id: string;
@@ -21,6 +22,9 @@ type Instance = {
     allowed_origins: string[];
     require_email_verification?: boolean;
     email_otp_enabled?: boolean;
+    magic_link_enabled?: boolean;
+    magic_link_expires_in?: number;
+    magic_link_allow_registration?: boolean;
   } | null;
   mail_operator_enabled?: boolean;
   mail_runtime_enabled?: boolean;
@@ -58,6 +62,9 @@ export function ManagedAuth({
   const [origins, setOrigins] = useState('');
   const [requireEmailVerification, setRequireEmailVerification] = useState(false);
   const [emailOTPEnabled, setEmailOTPEnabled] = useState(false);
+  const [magicLinkEnabled, setMagicLinkEnabled] = useState(false);
+  const [magicLinkExpiresIn, setMagicLinkExpiresIn] = useState(300);
+  const [magicLinkAllowRegistration, setMagicLinkAllowRegistration] = useState(false);
   const [busy, setBusy] = useState(false);
   const [operation, setOperation] = useState<Operation | null>(null);
   const [notice, setNotice] = useState('');
@@ -83,6 +90,9 @@ export function ManagedAuth({
       setOrigins(value.spec.allowed_origins.join('\n'));
       setRequireEmailVerification(value.spec.require_email_verification ?? false);
       setEmailOTPEnabled(value.spec.email_otp_enabled ?? false);
+      setMagicLinkEnabled(value.spec.magic_link_enabled ?? false);
+      setMagicLinkExpiresIn(value.spec.magic_link_expires_in || 300);
+      setMagicLinkAllowRegistration(value.spec.magic_link_allow_registration ?? false);
     }
   }
   useEffect(() => {
@@ -101,6 +111,9 @@ export function ManagedAuth({
     setOrigins('');
     setRequireEmailVerification(false);
     setEmailOTPEnabled(false);
+    setMagicLinkEnabled(false);
+    setMagicLinkExpiresIn(300);
+    setMagicLinkAllowRegistration(false);
     setNotice('');
     setAppNotice('');
     if (branch && canAdmin) void load(current).catch(showError);
@@ -119,6 +132,13 @@ export function ManagedAuth({
             .filter(Boolean),
           ...(requireEmailVerification ? { require_email_verification: true } : {}),
           ...(emailOTPEnabled ? { email_otp_enabled: true } : {}),
+          ...(magicLinkEnabled
+            ? {
+                magic_link_enabled: true,
+                magic_link_expires_in: magicLinkExpiresIn,
+                ...(magicLinkAllowRegistration ? { magic_link_allow_registration: true } : {}),
+              }
+            : {}),
         };
     const fingerprint = JSON.stringify([path, instance.generation, disable, body]);
     if (uncertainKey.current?.fingerprint !== fingerprint)
@@ -340,6 +360,43 @@ export function ManagedAuth({
             />
             允许通过邮件验证码登录、注册、验证邮箱和找回密码
           </label>
+          <label className="auth-mail-policy backend-wide">
+            <input
+              aria-label="启用应用 Magic Link"
+              type="checkbox"
+              checked={magicLinkEnabled}
+              disabled={busy || active || !instance?.mail_operator_enabled}
+              onChange={(e) => setMagicLinkEnabled(e.target.checked)}
+            />
+            邮箱免密码登录（Magic Link）
+          </label>
+          {magicLinkEnabled && (
+            <>
+              <label>
+                登录链接有效分钟数
+                <input
+                  aria-label="登录链接有效分钟数"
+                  type="number"
+                  min={5}
+                  max={1440}
+                  step={1}
+                  value={magicLinkExpiresIn / 60}
+                  disabled={busy || active}
+                  onChange={(e) => setMagicLinkExpiresIn(Number(e.target.value) * 60)}
+                />
+              </label>
+              <label className="auth-mail-policy backend-wide">
+                <input
+                  aria-label="Magic Link 允许新用户注册"
+                  type="checkbox"
+                  checked={magicLinkAllowRegistration}
+                  disabled={busy || active}
+                  onChange={(e) => setMagicLinkAllowRegistration(e.target.checked)}
+                />
+                允许链接注册新用户
+              </label>
+            </>
+          )}
           <div className="backend-wide button-row">
             <button
               className="button primary"
@@ -522,6 +579,20 @@ export function ManagedAuth({
             setAppNotice(
               user ? '已通过邮箱验证码登录' : '应用身份状态已更新，请检查会话或重新登录',
             );
+          }}
+        />
+      )}
+      {active && instance?.mail_runtime_enabled && instance.spec?.magic_link_enabled && (
+        <AuthMagicLinkPanel
+          key={branch}
+          branch={branch}
+          projectId={projectId}
+          emailHint={session?.email}
+          onUser={(user) => {
+            setSession(user);
+            token.current = '';
+            setTokenReady(false);
+            setAppNotice(user ? '已通过邮箱链接登录' : '应用会话未建立，请检查邮件链接结果');
           }}
         />
       )}
