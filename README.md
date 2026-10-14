@@ -4,6 +4,7 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 许可证：Apache-2.0。项目由自托管维护者开发，与 Neon 托管服务独立。
 
 **发行状态：预览版本。已经验证的实验环境功能不等于生产认证，也不等于 Neon 官网全部 Backend 服务。**
+[本地 Auth 邮箱验证/密码恢复](docs/AUTH-EMAIL-RECOVERY.md)已有代码和真实 PG/SMTP 单元验收，部署/UI 仍需本阶段独立验收。[环境修复回执](docs/DELIVERY-2026-10-14-ENVIRONMENT-RECOVERY.md)说明 CNI 文件故障、精确修复和 63 次主机检查。
 当前运行基线 `be04cb4` / 统一 Helm 0.1.29，控制面八镜像由同次 Linux CI 发布。
 [Auth/S3 当前交付](docs/DELIVERY-2026-10-14-AUTH-S3.md)记录 788 项公开 Go/真实 PG 检查、
 应用密码/会话安全十组实际 UI，以及原对象/凭据保留的实际 S3 SDK 验收。

@@ -45,6 +45,23 @@ functions:
   proxyCAKey: ca.crt
 managedAuth:
   enabled: false
+  # SMTP operator identity is external and immutable. It is mounted only into
+  # branch Auth runtimes; never into Web or metadata responses.
+  mail:
+    enabled: false
+    existingSecret: ''
+  # Local acceptance receiver, never a substitute for external mail delivery.
+  # Its credentials and retained message store are independent of Auth SMTP.
+  labMailbox:
+    # Optional test receiver placement; does not move production API/Worker.
+    nodeSelector: {}
+    enabled: false
+    acknowledged: false
+    image: docker.io/axllent/mailpit@sha256:eee7db19e7518ffe47d9b38e46fab655a4edf7e6cb5e664d1b5fde6c9dc49010
+    existingAuthSecret: ''
+    existingClaim: ''
+    storageClass: ''
+    storageSize: 512Mi
   # Version 1 requires the explicit lab HTTP profile. It is not a trusted TLS gate.
   labHTTP: false
   runtimeImage: ''

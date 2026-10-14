@@ -1475,3 +1475,12 @@ textarea:focus {
     grid-template-columns: 1fr;
   }
 }
+.auth-mail-policy {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.auth-mail-policy input[type='checkbox'] {
+  width: 18px;
+  flex: 0 0 18px;
+}

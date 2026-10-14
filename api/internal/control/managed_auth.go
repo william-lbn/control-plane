@@ -15,6 +15,8 @@ import (
 type ManagedAuthSpec struct {
 	Database       string   `json:"database"`
 	AllowedOrigins []string `json:"allowed_origins"`
+	// Omit false to preserve existing durable request hashes and old specs.
+	RequireEmailVerification bool `json:"require_email_verification,omitempty"`
 }
 type managedAuthPayload struct {
 	ProjectID  string          `json:"project_id"`
@@ -52,6 +54,9 @@ func validAuthOrigin(origin string) bool {
 	return e == nil && u.Host != "" && !strings.Contains(u.Host, "*") && u.User == nil && u.Path == "" && u.RawQuery == "" && u.Fragment == "" && (u.Scheme == "https" || (os.Getenv("NEON_AUTH_LAB_HTTP") == "true" && u.Scheme == "http"))
 }
 func validateManagedAuth(p managedAuthPayload) error {
+	if p.Spec.RequireEmailVerification && !managedAuthMailConfigured() {
+		return errors.New("email verification requires the operator mail transport")
+	}
 	if !dataBranchID.MatchString(p.BranchID) || !validPGIdentifier(p.Spec.Database) || p.Spec.AllowedOrigins == nil || len(p.Spec.AllowedOrigins) > 8 {
 		return errors.New("invalid Managed Auth configuration; database and allowed_origins array are required")
 	}
@@ -85,6 +90,8 @@ func (s *server) managedAuthRead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	item["driver_enabled"] = managedAuthEnabled()
+	item["mail_operator_enabled"] = managedAuthMailConfigured()
+	item["mail_runtime_enabled"] = false
 	item["issuer"] = managedAuthBase(stringVal(branch["id"]))
 	item["audience"] = branch["id"]
 	item["public_endpoint"] = managedAuthBase(stringVal(branch["id"]))
@@ -92,6 +99,11 @@ func (s *server) managedAuthRead(w http.ResponseWriter, r *http.Request) {
 	// cold-wake a Compute. Active metadata alone is not a runtime health claim.
 	if item["state"] == "active" {
 		item["runtime"] = s.kube.runtime(r.Context(), "deployment", managedAuthName(stringVal(branch["id"])))
+		if managedAuthMailConfigured() {
+			if deployment, e := s.kube.request(r.Context(), http.MethodGet, s.kube.path("deployment", managedAuthName(stringVal(branch["id"]))), nil); e == nil && ownedManagedAuth(deployment, managedAuthPayload{ProjectID: r.PathValue("project"), EndpointID: stringVal(item["endpoint_id"]), BranchID: stringVal(branch["id"])}) {
+				item["mail_runtime_enabled"] = managedAuthMailMounted(deployment)
+			}
+		}
 	}
 	w.Header().Set("ETag", fmt.Sprintf(`"%d"`, item["generation"].(int64)))
 	jsonResponse(w, 200, item)

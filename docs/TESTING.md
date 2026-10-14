@@ -526,3 +526,7 @@ UI 新建。两个 Reader 串行验证只读 SQL、拒写和独立缩零，再�
 Endpoint 和 HTTP 状态；正常首次验收仍只有一次。白名单只包括此测试的具体
 catalog/原表读取，不接受任意 SELECT、调用任意 function 或重放任何 DML。
 所有失败和恢复 Job 分别保留，该恢复结果不能证明超时窗口内业务连续可用。
+
+## Auth SMTP verification and recovery
+
+See [the branch email/recovery contract](AUTH-EMAIL-RECOVERY.md). The protected Linux workflow advertises `auth-mail.spec.ts`, requires both `NEON_E2E_SQL_SCRIPT_FIXTURE` and `NEON_E2E_MAILBOX_FIXTURE`, and never uploads private mailbox bodies. Deploy the exact runtime images and operator mail configuration before this suite. The fixture receiver is optional, acknowledged, authenticated, internal and persistent. A mail submission response does not prove delivery or verified identity; acceptance reads the actual message and uses the actual UI account.

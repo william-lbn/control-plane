@@ -84,12 +84,23 @@ func TestManagedAuthSQLPrivilegeAndGeneration(t *testing.T) {
 		t.Fatal(err)
 	}
 	apply() // A retry never resets issued signing material in the same generation.
+	if _, err = conn.Exec(ctx, `INSERT INTO neon_auth.verification(id,identifier,value,"expiresAt","createdAt","updatedAt") VALUES('mail-probe','reset-password:synthetic','synthetic-user',now()+interval '15 minutes',now(),now())`); err != nil {
+		t.Fatal(err)
+	}
+	apply()
+	var links int
+	if err = conn.QueryRow(ctx, `SELECT count(*) FROM neon_auth.verification`).Scan(&links); err != nil || links != 1 {
+		t.Fatal("Same-generation replay erased pending reset link")
+	}
 	var count int
 	if err = conn.QueryRow(ctx, `SELECT count(*) FROM neon_auth.jwks`).Scan(&count); err != nil || count != 1 {
 		t.Fatal("same-generation retry erased signing material", err)
 	}
 	p.Generation = 2
 	apply()
+	if err = conn.QueryRow(ctx, `SELECT count(*) FROM neon_auth.verification`).Scan(&links); err != nil || links != 0 {
+		t.Fatal("New issuer generation retained opaque reset links")
+	}
 	if err = conn.QueryRow(ctx, `SELECT count(*) FROM neon_auth.jwks`).Scan(&count); err != nil || count != 0 {
 		t.Fatal("new generation retained old signing material", err)
 	}

@@ -318,6 +318,107 @@
           "type": "string",
           "maxLength": 253,
           "pattern": "^$|^[a-zA-Z0-9.-]+$"
+        },
+        "mail": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "existingSecret"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "existingSecret": {
+              "type": "string",
+              "pattern": "^$|^[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?$"
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "enabled": {
+                    "const": true
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "existingSecret": {
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "labMailbox": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "acknowledged",
+            "image",
+            "existingAuthSecret",
+            "existingClaim",
+            "storageClass",
+            "storageSize"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "acknowledged": {
+              "type": "boolean"
+            },
+            "image": {
+              "type": "string",
+              "pattern": "^docker\\.io/axllent/mailpit@sha256:[a-f0-9]{64}$"
+            },
+            "existingAuthSecret": {
+              "type": "string",
+              "pattern": "^$|^[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?$"
+            },
+            "existingClaim": {
+              "type": "string"
+            },
+            "storageClass": {
+              "type": "string"
+            },
+            "storageSize": {
+              "type": "string",
+              "pattern": "^[1-9][0-9]*(Mi|Gi)$"
+            },
+            "nodeSelector": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "enabled": {
+                    "const": true
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "existingAuthSecret": {
+                    "minLength": 1
+                  },
+                  "acknowledged": {
+                    "const": true
+                  }
+                }
+              }
+            }
+          ]
         }
       },
       "allOf": [

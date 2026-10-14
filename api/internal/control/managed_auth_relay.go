@@ -7,12 +7,56 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 )
 
 var managedAuthRelaySlots = make(chan struct{}, 32)
 var managedAuthActions = map[string]bool{"sign-up/email": true, "sign-in/email": true, "sign-out": true, "get-session": true, "token": true, "jwks": true, "list-sessions": true, "revoke-session": true, "revoke-sessions": true, "revoke-other-sessions": true, "change-password": true, "update-user": true}
+var managedAuthResetCallback = regexp.MustCompile(`^reset-password/[a-zA-Z0-9_-]{20,128}$`)
+
+func managedAuthAllowedAction(action, method string) bool {
+	if managedAuthActions[action] {
+		return true
+	}
+	if !managedAuthMailConfigured() {
+		return false
+	}
+	if managedAuthResetCallback.MatchString(action) {
+		return method == "GET"
+	}
+	switch action {
+	case "request-password-reset", "reset-password", "send-verification-email":
+		return method == "POST" || method == "OPTIONS"
+	case "verify-email":
+		return method == "GET" || method == "OPTIONS"
+	}
+	return false
+}
+
+func managedAuthCallbackTrusted(value string, spec ManagedAuthSpec, publicOrigin string) bool {
+	if len(value) > 2048 {
+		return false
+	}
+	target, err := url.Parse(value)
+	if err != nil || target.User != nil || target.Opaque != "" || target.Host == "" || (target.Scheme != "https" && target.Scheme != "http") {
+		return false
+	}
+	origin := target.Scheme + "://" + target.Host
+	if !validAuthOrigin(origin) {
+		return false
+	}
+	if origin == publicOrigin {
+		return true
+	}
+	for _, trusted := range spec.AllowedOrigins {
+		if origin == trusted {
+			return true
+		}
+	}
+	return false
+}
 
 // Preflight does not contact the branch database or acquire a SQL admission.
 // Credentials require an exact configured origin; reflection and wildcards
@@ -59,7 +103,7 @@ func managedAuthCORS(w http.ResponseWriter, r *http.Request, spec ManagedAuthSpe
 // in metadata before the worker terminates any workload.
 func (s *server) managedAuthRelay(w http.ResponseWriter, r *http.Request) {
 	branch := r.PathValue("authBranch")
-	if !managedAuthEnabled() || !dataBranchID.MatchString(branch) || !managedAuthActions[r.PathValue("rest")] || (r.Method != "GET" && r.Method != "POST" && r.Method != "OPTIONS") {
+	if !managedAuthEnabled() || !dataBranchID.MatchString(branch) || !managedAuthAllowedAction(r.PathValue("rest"), r.Method) || (r.Method != "GET" && r.Method != "POST" && r.Method != "OPTIONS") {
 		http.NotFound(w, r)
 		return
 	}
@@ -83,6 +127,14 @@ func (s *server) managedAuthRelay(w http.ResponseWriter, r *http.Request) {
 	}
 	if managedAuthCORS(w, r, spec, os.Getenv("NEON_AUTH_PUBLIC_ORIGIN")) {
 		return
+	}
+	// Email links require browser redirects. Only the exact public/trusted
+	// origins are permitted, before SQL admission or any Compute wake.
+	if callbacks, exists := r.URL.Query()["callbackURL"]; exists {
+		if len(callbacks) != 1 || (r.PathValue("rest") != "verify-email" && !managedAuthResetCallback.MatchString(r.PathValue("rest"))) || !managedAuthCallbackTrusted(callbacks[0], spec, os.Getenv("NEON_AUTH_PUBLIC_ORIGIN")) {
+			fail(w, r, 422, "invalid_request", "Auth callback origin is not trusted")
+			return
+		}
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 16384)
 	target, _ := url.Parse("http://" + managedAuthName(branch) + "." + s.kube.namespace + ".svc.cluster.local:9082")
@@ -131,10 +183,5 @@ func (s *server) managedAuthRelay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer release()
-	// Queries belong to the bounded library API, never to an arbitrary target URL.
-	if strings.Contains(r.URL.RawQuery, "callbackURL=") {
-		fail(w, r, 422, "invalid_request", "Use an exact trusted origin in the Auth body")
-		return
-	}
 	proxy.ServeHTTP(w, r)
 }

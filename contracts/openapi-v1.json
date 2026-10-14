@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.21.0",
+    "version": "0.22.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -2350,6 +2350,11 @@
               "format": "uri",
               "description": "Exact trusted browser origin; no wildcard, credentials, path, query or fragment."
             }
+          },
+          "require_email_verification": {
+            "type": "boolean",
+            "default": false,
+            "description": "Optional policy. Requires operator SMTP. False is omitted from the canonical spec to retain old idempotency hashes. Changing policy requires normal disable/re-enable and a new identity generation."
           }
         }
       },
@@ -2412,6 +2417,14 @@
           "runtime": {
             "type": "object",
             "additionalProperties": true
+          },
+          "mail_operator_enabled": {
+            "type": "boolean",
+            "description": "Operator configuration / observed owned runtime mount respectively; does not certify SMTP delivery or production TLS."
+          },
+          "mail_runtime_enabled": {
+            "type": "boolean",
+            "description": "Operator configuration / observed owned runtime mount respectively; does not certify SMTP delivery or production TLS."
           }
         }
       },

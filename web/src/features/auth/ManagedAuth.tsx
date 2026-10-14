@@ -5,6 +5,7 @@ import { PageHeading, status } from '../../shared/ui';
 import { newRequestKey } from '../../shared/requestKey';
 import { followOperation } from '../../shared/followOperation';
 import { AuthSecurityPanel } from './AuthSecurityPanel';
+import { AuthRecoveryPanel } from './AuthRecoveryPanel';
 
 type Instance = {
   branch_id: string;
@@ -14,7 +15,13 @@ type Instance = {
   public_endpoint: string;
   issuer: string;
   audience: string;
-  spec: { database: string; allowed_origins: string[] } | null;
+  spec: {
+    database: string;
+    allowed_origins: string[];
+    require_email_verification?: boolean;
+  } | null;
+  mail_operator_enabled?: boolean;
+  mail_runtime_enabled?: boolean;
   runtime?: Runtime;
 };
 type AppUser = {
@@ -22,6 +29,7 @@ type AppUser = {
   name: string;
   email: string;
   email_verified?: boolean;
+  emailVerified?: boolean;
   created_at?: string;
 };
 
@@ -37,11 +45,16 @@ export function ManagedAuth({
   showError: (e: unknown) => void;
 }) {
   const [branch, setBranch] = useState(
-    branches.find((b) => b.is_default)?.id || branches[0]?.id || '',
+    branches.find((b) => b.id === new URL(window.location.href).searchParams.get('auth_branch'))
+      ?.id ||
+      branches.find((b) => b.is_default)?.id ||
+      branches[0]?.id ||
+      '',
   );
   const [instance, setInstance] = useState<Instance | null>(null);
   const [database, setDatabase] = useState('postgres');
   const [origins, setOrigins] = useState('');
+  const [requireEmailVerification, setRequireEmailVerification] = useState(false);
   const [busy, setBusy] = useState(false);
   const [operation, setOperation] = useState<Operation | null>(null);
   const [notice, setNotice] = useState('');
@@ -65,6 +78,7 @@ export function ManagedAuth({
     if (value.spec) {
       setDatabase(value.spec.database);
       setOrigins(value.spec.allowed_origins.join('\n'));
+      setRequireEmailVerification(value.spec.require_email_verification ?? false);
     }
   }
   useEffect(() => {
@@ -81,6 +95,7 @@ export function ManagedAuth({
     setBusy(false);
     setDatabase('postgres');
     setOrigins('');
+    setRequireEmailVerification(false);
     setNotice('');
     setAppNotice('');
     if (branch && canAdmin) void load(current).catch(showError);
@@ -97,6 +112,7 @@ export function ManagedAuth({
             .split('\n')
             .map((v) => v.trim())
             .filter(Boolean),
+          ...(requireEmailVerification ? { require_email_verification: true } : {}),
         };
     const fingerprint = JSON.stringify([path, instance.generation, disable, body]);
     if (uncertainKey.current?.fingerprint !== fingerprint)
@@ -178,8 +194,16 @@ export function ManagedAuth({
         setTokenReady(false);
         setAppNotice('应用会话已撤销');
       } else {
-        setSession(result.user || null);
-        setAppNotice(action === 'sign-up/email' ? '应用用户注册成功' : '应用用户登录成功');
+        const verificationPending =
+          action === 'sign-up/email' && instance?.spec?.require_email_verification && !result.token;
+        setSession(verificationPending ? null : result.user || null);
+        setAppNotice(
+          verificationPending
+            ? '应用用户注册成功；请验证邮箱后登录。'
+            : action === 'sign-up/email'
+              ? '应用用户注册成功'
+              : '应用用户登录成功',
+        );
       }
     } catch (e) {
       if (epoch.current === current) setAppNotice(e instanceof Error ? e.message : '应用请求失败');
@@ -280,6 +304,16 @@ export function ManagedAuth({
               onChange={(e) => setOrigins(e.target.value)}
               disabled={busy || active}
             />
+          </label>
+          <label className="auth-mail-policy backend-wide">
+            <input
+              aria-label="要求应用邮箱验证"
+              type="checkbox"
+              checked={requireEmailVerification}
+              disabled={busy || active || !instance?.mail_operator_enabled}
+              onChange={(e) => setRequireEmailVerification(e.target.checked)}
+            />
+            要求邮箱验证后才能登录（需要已配置的邮件服务）
           </label>
           <div className="backend-wide button-row">
             <button
@@ -414,6 +448,7 @@ export function ManagedAuth({
         {session && (
           <p data-testid="auth-app-session">
             {session.name} · {session.email}
+            {session.emailVerified && <span> · 邮箱已验证</span>}
           </p>
         )}
         {tokenReady && (
@@ -437,6 +472,19 @@ export function ManagedAuth({
           {appNotice}
         </div>
       </section>
+      {active && instance?.mail_runtime_enabled && (
+        <AuthRecoveryPanel
+          key={branch}
+          branch={branch}
+          projectId={projectId}
+          emailHint={session?.email}
+          onChanged={() => {
+            setSession(null);
+            token.current = '';
+            setTokenReady(false);
+          }}
+        />
+      )}
       <section className="table-card backend-panel" style={{ padding: 24 }}>
         <div className="section-header">
           <h3>应用用户</h3>

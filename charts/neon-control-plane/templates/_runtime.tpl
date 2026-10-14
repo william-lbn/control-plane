@@ -45,6 +45,10 @@
 {{- end }}
 {{- end }}
 {{- if .Values.managedAuth.enabled }}
+{{- if .Values.managedAuth.mail.enabled }}
+- {name: NEON_AUTH_MAIL_ENABLED, value: 'true'}
+- {name: NEON_AUTH_MAIL_SECRET, value: {{ required "Auth mail requires managedAuth.mail.existingSecret" .Values.managedAuth.mail.existingSecret | quote }}}
+{{- end }}
 {{- if or (not .Values.managedAuth.labHTTP) (not .Values.managedAuth.publicOrigin) }}
 {{- fail "Managed Auth v1 requires explicit managedAuth.labHTTP and publicOrigin; trusted TLS has not passed" }}
 {{- end }}

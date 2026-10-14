@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"net/http"
 	"net/url"
+	"os"
 	"time"
 )
 
@@ -16,6 +17,9 @@ import (
 var managedAuthSchema string
 
 func (s *server) reserveManagedAuth(ctx context.Context, p managedAuthPayload) error {
+	if err := s.validateManagedAuthMailSecret(ctx); err != nil {
+		return err
+	}
 	password := randomToken(32)
 	verifier, err := scramVerifier(password)
 	if err != nil {
@@ -26,7 +30,7 @@ func (s *server) reserveManagedAuth(ctx context.Context, p managedAuthPayload) e
 	q.Set("sslmode", "verify-full")
 	q.Set("options", "endpoint="+selector(p.EndpointID))
 	dsn.RawQuery = q.Encode()
-	config, _ := json.Marshal(record{"version": 1, "branchID": p.BranchID, "baseURL": managedAuthBase(p.BranchID), "databaseURL": dsn.String(), "databaseTLS": record{"caFile": "/run/auth-ca/ca.crt", "serverName": env("NEON_AUTH_PG_SERVER_NAME", "")}, "secret": randomToken(48), "trustedOrigins": p.Spec.AllowedOrigins, "allowLabHTTP": true})
+	config, _ := json.Marshal(record{"version": 1, "branchID": p.BranchID, "baseURL": managedAuthBase(p.BranchID), "databaseURL": dsn.String(), "databaseTLS": record{"caFile": "/run/auth-ca/ca.crt", "serverName": env("NEON_AUTH_PG_SERVER_NAME", "")}, "secret": randomToken(48), "trustedOrigins": p.Spec.AllowedOrigins, "allowLabHTTP": true, "requireEmailVerification": p.Spec.RequireEmailVerification})
 	_, err = s.kube.createOwned(ctx, "secret", record{"apiVersion": "v1", "kind": "Secret", "type": "Opaque", "immutable": true, "metadata": record{"name": p.SecretRef, "labels": managedAuthLabels(p)}, "stringData": map[string]string{"config.json": string(config), "password": password, "verifier": verifier}}, p.ProjectID, p.EndpointID)
 	return err
 }
@@ -80,7 +84,10 @@ func applyManagedAuthSQLTx(ctx context.Context, tx pgx.Tx, p managedAuthPayload,
 		return errors.New("Managed Auth SQL generation advanced")
 	}
 	if generation < p.Generation {
-		if _, err = tx.Exec(ctx, `DELETE FROM neon_auth.session; DELETE FROM neon_auth.jwks; DELETE FROM neon_auth."rateLimit";`, pgx.QueryExecModeSimpleProtocol); err != nil {
+		// Copied opaque reset tokens must not remain valid in a child branch.
+		// Re-enable also rotates the issuer generation; clear outstanding links
+		// with sessions/JWKS, without touching application users/passwords.
+		if _, err = tx.Exec(ctx, `DELETE FROM neon_auth.session; DELETE FROM neon_auth.jwks; DELETE FROM neon_auth."rateLimit"; DELETE FROM neon_auth.verification;`, pgx.QueryExecModeSimpleProtocol); err != nil {
 			return err
 		}
 		if _, err = tx.Exec(ctx, `INSERT INTO neon_auth.control_installations(branch_id,generation) VALUES($1,$2) ON CONFLICT(branch_id) DO UPDATE SET generation=$2,installed_at=now()`, p.BranchID, p.Generation); err != nil {
@@ -167,12 +174,20 @@ func managedAuthDeployment(p managedAuthPayload, namespace string, enable bool) 
 		replicas = 0
 	}
 	labels := managedAuthLabels(p)
-	return record{"apiVersion": "apps/v1", "kind": "Deployment", "metadata": record{"name": managedAuthName(p.BranchID), "namespace": namespace, "labels": labels}, "spec": record{
+	deployment := record{"apiVersion": "apps/v1", "kind": "Deployment", "metadata": record{"name": managedAuthName(p.BranchID), "namespace": namespace, "labels": labels}, "spec": record{
 		"replicas": replicas, "strategy": record{"type": "Recreate"}, "selector": record{"matchLabels": map[string]string{"neon-control/managed-auth": p.BranchID}}, "template": record{"metadata": record{"labels": labels, "annotations": map[string]string{"neon-control/generation": fmt.Sprint(p.Generation)}}, "spec": record{
 			"automountServiceAccountToken": false, "terminationGracePeriodSeconds": 20, "securityContext": record{"runAsNonRoot": true, "runAsUser": 65532, "runAsGroup": 65532, "fsGroup": 65532, "seccompProfile": record{"type": "RuntimeDefault"}},
 			"containers": []any{record{"name": "managed-auth", "image": env("NEON_AUTH_RUNTIME_IMAGE", ""), "imagePullPolicy": "IfNotPresent", "ports": []any{record{"name": "auth", "containerPort": 9082}}, "env": []any{record{"name": "NEON_AUTH_CONFIG_FILE", "value": "/run/auth/config.json"}}, "securityContext": record{"allowPrivilegeEscalation": false, "readOnlyRootFilesystem": true, "capabilities": record{"drop": []string{"ALL"}}}, "resources": record{"requests": map[string]string{"cpu": "50m", "memory": "64Mi"}, "limits": map[string]string{"cpu": "500m", "memory": "256Mi"}}, "volumeMounts": []any{record{"name": "config", "mountPath": "/run/auth", "readOnly": true}, record{"name": "ca", "mountPath": "/run/auth-ca", "readOnly": true}, record{"name": "tmp", "mountPath": "/tmp"}}, "readinessProbe": record{"httpGet": record{"path": "/readyz", "port": "auth"}, "periodSeconds": 5}, "livenessProbe": record{"httpGet": record{"path": "/livez", "port": "auth"}, "periodSeconds": 10}}},
 			"volumes":    []any{record{"name": "config", "secret": record{"secretName": p.SecretRef, "defaultMode": 0440, "items": []any{record{"key": "config.json", "path": "config.json"}}}}, record{"name": "ca", "secret": record{"secretName": env("NEON_AUTH_PG_CA_SECRET", ""), "defaultMode": 0440, "items": []any{record{"key": env("NEON_AUTH_PG_CA_KEY", "ca.crt"), "path": "ca.crt"}}}}, record{"name": "tmp", "emptyDir": record{"sizeLimit": "16Mi"}}},
 		}}}}
+	if managedAuthMailConfigured() {
+		pod := nested(deployment, "spec", "template", "spec").(map[string]any)
+		container := pod["containers"].([]any)[0].(map[string]any)
+		container["env"] = append(container["env"].([]any), record{"name": "NEON_AUTH_MAIL_CONFIG_FILE", "value": "/run/auth-mail/config.json"})
+		container["volumeMounts"] = append(container["volumeMounts"].([]any), record{"name": "auth-mail", "mountPath": "/run/auth-mail", "readOnly": true})
+		pod["volumes"] = append(pod["volumes"].([]any), record{"name": "auth-mail", "secret": record{"secretName": os.Getenv("NEON_AUTH_MAIL_SECRET"), "defaultMode": 0440}})
+	}
+	return deployment
 }
 func (s *server) reconcileManagedAuthWorkload(ctx context.Context, p managedAuthPayload, enable bool) error {
 	name := managedAuthName(p.BranchID)
