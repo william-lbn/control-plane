@@ -205,7 +205,10 @@ test('Auth local account security starts in UI and isolates passwords and owned 
       headers: { Origin: new URL(baseURL).origin },
       data: { token: otherSession.session.token },
     });
-    expect(denied.status()).toBeGreaterThanOrEqual(400);
+    // Locked Better Auth deliberately returns an indistinguishable no-op 200
+    // for an unowned/unknown token. Verify isolation by the actual session,
+    // never by inventing a 403 contract or weakening the owner check.
+    expect(denied.status()).toBe(200);
     expect((await (await outsider.get(app + '/get-session')).json()).user.email).toBe(otherEmail);
     await save('authenticated_application_user_cannot_revoke_another_users_session');
     expect(
