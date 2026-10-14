@@ -123,12 +123,21 @@ test('Auth local account security starts in UI and isolates passwords and owned 
     expect((await grant).status()).toBe(200);
     await save('database_owner_explicit_sql_grant_from_workbench');
     await page.goto(`/#/projects/${project}/auth`);
-    await page.getByLabel('Auth 数据库', { exact: true }).fill(fixture.database);
-    const enabling = page.waitForResponse(
-      (r) => new URL(r.url()).pathname === control && r.request().method() === 'POST',
-    );
-    await page.getByRole('button', { name: '启用 Auth', exact: true }).click();
-    await wait(await enabling);
+    const prior = await context.request.get(control);
+    expect(prior.status()).toBe(200);
+    const observed = await prior.json();
+    if (observed.state === 'active') {
+      expect(observed.spec.database).toBe(fixture.database);
+      await save('owned_active_auth_setup_verified_and_reused_after_origin_rejection');
+    } else {
+      expect(observed.state).toBe('disabled');
+      await page.getByLabel('Auth 数据库', { exact: true }).fill(fixture.database);
+      const enabling = page.waitForResponse(
+        (r) => new URL(r.url()).pathname === control && r.request().method() === 'POST',
+      );
+      await page.getByRole('button', { name: '启用 Auth', exact: true }).click();
+      await wait(await enabling);
+    }
     await page.getByLabel('应用姓名', { exact: true }).fill('Local security user');
     await page.getByLabel('应用邮箱', { exact: true }).fill(email);
     await page.getByLabel('应用密码', { exact: true }).fill(password);
