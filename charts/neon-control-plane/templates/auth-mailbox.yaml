@@ -53,6 +53,8 @@ spec:
             - {name: MP_MAX_MESSAGES, value: '0'}
             - {name: MP_DISABLE_HTML_CHECK, value: 'true'}
             - {name: MP_DISABLE_TLS_CHECK, value: 'true'}
+            # No egress is allowed. Default reverse DNS stalls SMTP greeting.
+            - {name: MP_SMTP_DISABLE_RDNS, value: 'true'}
             - {name: MP_DISABLE_VERSION_CHECK, value: 'true'}
             - {name: MP_BLOCK_REMOTE_CSS_AND_FONTS, value: 'true'}
             - {name: MP_MAX_MESSAGE_SIZE, value: '1'}

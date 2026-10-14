@@ -4,7 +4,7 @@
 
 The branch Auth service uses pinned Better Auth and Nodemailer with the actual branch PostgreSQL database. This phase implements email delivery, optional mandatory verification before password login, password recovery, and invalidation of server sessions after reset. It extends application identity; it does not register Console administrators.
 
-Implementation and disposable PostgreSQL/SMTP tests are present. Real Linux UI acceptance and immutable-image deployment remain required before marking this phase accepted. The local mailbox is an operator test receiver, not a production email provider. SMTP TLS, deliverability, abuse prevention, mailbox privacy, and HA have separate production gates.
+Runtime 374a38b / Helm 0.1.30 has actual Linux UI acceptance: ten recorded checks, 790 public Go/PG checks and protected SMTP delivery. See [the exact delivery receipt](DELIVERY-2026-10-14-AUTH-MAIL.md). The local mailbox is an operator test receiver, not a production email provider. SMTP TLS, deliverability, abuse prevention, mailbox privacy, and HA have separate production gates.
 
 ## Architecture and trust boundaries
 
@@ -62,7 +62,7 @@ Cleartext is only permitted with `labCleartext: true`, no SMTP credentials or CA
 
 For local acceptance, opt in to `managedAuth.labMailbox.enabled` and `acknowledged`, supply an independent immutable `existingAuthSecret`, and configure SMTP port 1025 to the fixed internal service name. The reader Secret contains `authfile` in the format supported by pinned Mailpit; a separate `password` key may be used by a protected test fixture. Generate the random credential on Linux and never expose it as Helm values.
 
-The receiver uses an immutable vendor digest and a retained PVC. Its ClusterIP inbox on 8025 requires Basic authentication. SMTP ingress is restricted to branch Auth Pods, and inbox ingress to Pods labelled `neon-control/test-fixture=auth-mail`. Egress is denied, remote checks and version checks are disabled, and message auto-deletion is disabled so failure evidence remains available. No NodePort or public Ingress is created. This receiver's SQLite file is a third-party mail fixture; the control-plane metadata and Auth accounts remain PostgreSQL.
+The receiver uses an immutable vendor digest and a retained PVC. Its ClusterIP inbox on 8025 requires Basic authentication. SMTP ingress is restricted to branch Auth Pods, and inbox ingress to Pods labelled `neon-control/test-fixture=auth-mail`. Egress is denied, reverse DNS, remote checks and version checks are disabled, and message auto-deletion is disabled so failure evidence remains available. No NodePort or public Ingress is created. This receiver's SQLite file is a third-party mail fixture; the control-plane metadata and Auth accounts remain PostgreSQL.
 
 The PVC is retained on uninstall. Operators must inspect it and make an explicit retention decision; neither test cleanup nor Helm removes mailbox evidence. Restrict operator Secret access and protect retained mail because it contains bearer verification/recovery links.
 

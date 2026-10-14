@@ -1,13 +1,15 @@
 # 生产门槛与官网对齐
 
-状态截至 2026-10-14；当前部署 `be04cb4` / 统一 Helm 0.1.29。
-本次真实 Linux/React 闭环见 [Auth/S3 交付](DELIVERY-2026-10-14-AUTH-S3.md)：
+状态截至 2026-10-14；当前部署 `374a38b` / 统一 Helm 0.1.30。
+前一版本 `be04cb4` 的真实 Linux/React 闭环见 [Auth/S3 交付](DELIVERY-2026-10-14-AUTH-S3.md)：
 788 Go/真实 PostgreSQL 检查、八个同源公开镜像、三节点 24 次串行 digest 导入；
 应用密码/会话十组 UI，以及实际 S3 SDK 签名/字节/权限/轮换/撤销/正常缩零均通过。
 [Functions HTTP/SSE 与自动零/一次冷醒](DELIVERY-2026-10-14-FUNCTIONS-HTTP.md)
 在 0.1.28 有自己的十组 UI 回执。当前仍是预览产品；这些切片不关闭下列生产门槛。
 历史失败、版本和原 fixture 保留，未重复不相关的旧全量 UI 套件。
 需运营方输入见 [OPERATOR-INPUTS.md](OPERATOR-INPUTS.md)，不阻塞其他本地工程。
+
+本地邮件链接验证/密码找回已通过十组 UI、真实 SMTP、790 Go/PG 与最终八发布审计，见 [精确回执](DELIVERY-2026-10-14-AUTH-MAIL.md)。公网邮件、OTP/Magic Link、OAuth/MFA 等仍按各自门槛推进。
 
 ## 1. 已实现路径
 

@@ -57,6 +57,11 @@ test("mail fixture retains data, restricts access and separates reader credentia
     receiver.containers[0].env.find((e) => e.name === "MP_MAX_MESSAGES").value,
     "0",
   );
+  assert.equal(
+    receiver.containers[0].env.find((e) => e.name === "MP_SMTP_DISABLE_RDNS")
+      .value,
+    "true",
+  );
   const service = objects.find(
     (o) => o.kind === "Service" && o.metadata.name === "neon-auth-mailbox",
   );
