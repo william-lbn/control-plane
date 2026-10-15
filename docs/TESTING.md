@@ -11,7 +11,7 @@ API.md 由 `node tools/generate-api-docs.mjs` 生成，Linux CI 使用 `--check`
 合同见 [ENDPOINT-DELETION.md](ENDPOINT-DELETION.md)。从登录/点击验证丢失 202 后
 的原请求重放、服务依赖、Writer/Reader 连续性、完全无 Compute 后重建和项目恢复。
 
-新增局部验收：应用 TOTP `auth-totp.spec.ts`、项目共享 `shared-queries.spec.ts`。完整运行边界和原检查点续测见对应交付报告；不重复已验收旧套件。
+新增局部验收：应用 TOTP `auth-totp.spec.ts`、项目共享 `shared-queries.spec.ts`、个人执行历史 `query-history.spec.ts`。完整运行边界和原检查点续测见对应交付报告；不重复已验收旧套件。
 
 ## 1. Linux CI
 

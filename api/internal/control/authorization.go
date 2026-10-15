@@ -112,7 +112,7 @@ func (s *server) authorizeRoute(w http.ResponseWriter, r *http.Request, u user) 
 		if strings.Contains(r.URL.Path, "/roles") || strings.Contains(r.URL.Path, "/databases") {
 			required = 2 // Live catalog reads may cold wake a compute.
 		}
-		if strings.Contains(r.URL.Path, "/saved-queries") {
+		if strings.Contains(r.URL.Path, "/saved-queries") || strings.Contains(r.URL.Path, "/query-history") {
 			required = 2
 		}
 	} else if org != "" {

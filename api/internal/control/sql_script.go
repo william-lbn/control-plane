@@ -183,10 +183,17 @@ func (s *server) querySQLScript(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 422, "invalid_connection_target", "Choose a valid public database role and database")
 		return
 	}
+	history, historyErr := s.beginSQLHistory(r, item, "script", role, database, body.SQL)
+	if historyErr != nil {
+		fail(w, r, 503, "history_unavailable", "SQL was not submitted because its history admission could not be recorded")
+		return
+	}
 	ctx, cancel := context.WithTimeout(r.Context(), sqlTotalTimeout)
 	defer cancel()
 	conn, err := connectSQL(ctx, s.proxyHost, s.proxyPort, role, body.Password, database, stringVal(item["selector"]))
 	if err != nil {
+		outcome, state := sqlHistoryFailure(err)
+		history.finish(w, outcome, state)
 		s.sqlFailureResponse(w, r, err)
 		return
 	}
@@ -195,10 +202,16 @@ func (s *server) querySQLScript(w http.ResponseWriter, r *http.Request) {
 	// already be durable; neither failures nor transport loss authorize replay.
 	_ = conn.Close(context.Background())
 	if err != nil {
+		history.finish(w, "outcome_unknown", "")
 		s.audit(r.Context(), userFrom(r).ID, "execute_sql_script", "endpoint", r.PathValue("endpoint"), "unknown", requestID(r))
 		jsonResponse(w, 503, apiError{"sql_script_outcome_unknown", "Script was submitted; inspect original data before retrying. No automatic replay is safe.", requestID(r), false})
 		return
 	}
+	state := ""
+	if result.Error != nil {
+		state = result.Error.SQLState
+	}
+	history.finish(w, result.Outcome, state)
 	s.audit(r.Context(), userFrom(r).ID, "execute_sql_script", "endpoint", r.PathValue("endpoint"), result.Outcome, requestID(r))
 	jsonResponse(w, 200, result)
 }

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.33.0",
+    "version": "0.34.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -3706,6 +3706,246 @@
             "const": false
           }
         }
+      },
+      "SQLHistoryEntry": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "project_id",
+          "owner_id",
+          "endpoint_id",
+          "branch_id",
+          "mode",
+          "database_name",
+          "role_name",
+          "original_bytes",
+          "truncated",
+          "outcome",
+          "sqlstate",
+          "started_at",
+          "deadline_at",
+          "finished_at",
+          "duration_ms",
+          "completion_unconfirmed"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^qh_[a-f0-9]{24}$"
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "owner_id": {
+            "type": "string"
+          },
+          "endpoint_id": {
+            "type": "string"
+          },
+          "branch_id": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "single",
+              "script"
+            ]
+          },
+          "database_name": {
+            "type": "string"
+          },
+          "role_name": {
+            "type": "string"
+          },
+          "original_bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 32000
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "admitted",
+              "completed",
+              "failed",
+              "not_submitted",
+              "outcome_unknown"
+            ]
+          },
+          "sqlstate": {
+            "type": "string",
+            "pattern": "^([A-Z0-9]{5})?$"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deadline_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "duration_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "completion_unconfirmed": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SQLHistoryDetail": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "project_id",
+          "owner_id",
+          "endpoint_id",
+          "branch_id",
+          "mode",
+          "database_name",
+          "role_name",
+          "original_bytes",
+          "truncated",
+          "outcome",
+          "sqlstate",
+          "started_at",
+          "deadline_at",
+          "finished_at",
+          "duration_ms",
+          "completion_unconfirmed",
+          "sql"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^qh_[a-f0-9]{24}$"
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "owner_id": {
+            "type": "string"
+          },
+          "endpoint_id": {
+            "type": "string"
+          },
+          "branch_id": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "single",
+              "script"
+            ]
+          },
+          "database_name": {
+            "type": "string"
+          },
+          "role_name": {
+            "type": "string"
+          },
+          "original_bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 32000
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "admitted",
+              "completed",
+              "failed",
+              "not_submitted",
+              "outcome_unknown"
+            ]
+          },
+          "sqlstate": {
+            "type": "string",
+            "pattern": "^([A-Z0-9]{5})?$"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deadline_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "duration_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "completion_unconfirmed": {
+            "type": "boolean"
+          },
+          "sql": {
+            "type": "string",
+            "maxLength": 9216,
+            "description": "UTF-8 bytes <=9 KiB including truncation marker. Owner detail only, no passwords/results."
+          }
+        }
+      },
+      "SQLHistoryList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "enabled",
+          "items",
+          "limit",
+          "next_cursor"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 25,
+            "items": {
+              "$ref": "#/components/schemas/SQLHistoryEntry"
+            }
+          },
+          "limit": {
+            "type": "integer",
+            "const": 25
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
       }
     },
     "responses": {
@@ -5093,6 +5333,28 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/SQLResult"
+                }
+              }
+            },
+            "headers": {
+              "X-Neon-SQL-History-ID": {
+                "description": "Present when optional history admission was durably recorded; identifies this request record, never a replay token.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^qh_[a-f0-9]{24}$"
+                }
+              },
+              "X-Neon-SQL-History-State": {
+                "description": "Completion-record state; unconfirmed means SQL may have completed while metadata finish could not be confirmed. Do not replay SQL based on this header.",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "completed",
+                    "failed",
+                    "not_submitted",
+                    "outcome_unknown",
+                    "unconfirmed"
+                  ]
                 }
               }
             }
@@ -13224,6 +13486,28 @@
                   "$ref": "#/components/schemas/SQLScriptResult"
                 }
               }
+            },
+            "headers": {
+              "X-Neon-SQL-History-ID": {
+                "description": "Present when optional history admission was durably recorded; identifies this request record, never a replay token.",
+                "schema": {
+                  "type": "string",
+                  "pattern": "^qh_[a-f0-9]{24}$"
+                }
+              },
+              "X-Neon-SQL-History-State": {
+                "description": "Completion-record state; unconfirmed means SQL may have completed while metadata finish could not be confirmed. Do not replay SQL based on this header.",
+                "schema": {
+                  "type": "string",
+                  "enum": [
+                    "completed",
+                    "failed",
+                    "not_submitted",
+                    "outcome_unknown",
+                    "unconfirmed"
+                  ]
+                }
+              }
             }
           },
           "422": {
@@ -15511,6 +15795,151 @@
           }
         },
         "summary": "Author explicitly shares or revokes a SQL draft within its project"
+      }
+    },
+    "/api/v1/projects/{project}/query-history": {
+      "get": {
+        "operationId": "listPersonalSQLHistory",
+        "tags": [
+          "SQL"
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 1024
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Personal query metadata; detail reads include decrypted SQL. No Compute startup or execution.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SQLHistoryList"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "description": "Operator sqlHistory.enabled opt-in; current project Editor+ and owner only. Fixed 25-row owner/project-bound keyset pages. No SQL text, credentials or results in list. An expired admitted row is explicitly unconfirmed, not failed or safe to replay. Disabled feature returns enabled=false and an empty list.",
+        "summary": "List personal encrypted SQL execution history metadata without waking Compute"
+      }
+    },
+    "/api/v1/projects/{project}/query-history/{history}": {
+      "get": {
+        "operationId": "getPersonalSQLHistory",
+        "tags": [
+          "SQL"
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "history",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^qh_[a-f0-9]{24}$"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Personal query metadata; detail reads include decrypted SQL. No Compute startup or execution.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SQLHistoryDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "description": "Owner-only within authorized project. Text is authenticated with the original project/owner/history ID AAD; old encryption key versions must remain available. no-store. Truncated history is not the complete executable query.",
+        "summary": "Owner reads bounded historical SQL without executing it"
       }
     }
   }

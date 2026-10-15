@@ -6,6 +6,7 @@ import { useEndpointSelection } from '../../shared/useEndpointSelection';
 import { ScriptResults, type ScriptResult } from './ScriptResults';
 import { ResultExports } from './ResultExports';
 import { SavedQueries } from './SavedQueries';
+import { QueryHistory } from './QueryHistory';
 
 export function Workbench({
   projectId,
@@ -28,7 +29,13 @@ export function Workbench({
   const [mode, setMode] = useState<'single' | 'script'>('single');
   const [queryAction, setQueryAction] = useState<'query' | 'explain' | 'analyze'>('query');
   const scopeEpoch = useRef(0);
+  const historyTarget = useRef<{
+    endpoint_id: string;
+    role_name: string;
+    database_name: string;
+  } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [historyRevision, setHistoryRevision] = useState(0);
   const endpoint = endpoints.find((e) => e.id === selected) || endpoints[0];
   useEffect(() => {
     scopeEpoch.current++;
@@ -36,8 +43,11 @@ export function Workbench({
     setScriptResult(null);
     setPassword('');
     setQueryAction('query');
-    setRole(endpoint?.role_name || '');
-    setDatabase(endpoint?.database_name || '');
+    const target =
+      historyTarget.current?.endpoint_id === endpoint?.id ? historyTarget.current : null;
+    setRole(target?.role_name || endpoint?.role_name || '');
+    setDatabase(target?.database_name || endpoint?.database_name || '');
+    historyTarget.current = null;
     setBusy(false);
     return () => {
       scopeEpoch.current++;
@@ -77,6 +87,7 @@ export function Workbench({
       if (epoch === scopeEpoch.current) {
         setPassword((current) => (current === submittedPassword ? '' : current));
         setBusy(false);
+        setHistoryRevision((value) => value + 1);
       }
     }
   }
@@ -264,6 +275,24 @@ export function Workbench({
         </div>
       )}
       {scriptResult && <ScriptResults result={scriptResult} />}
+      <QueryHistory
+        projectId={projectId}
+        revision={historyRevision}
+        onLoad={(text, entry) => {
+          if (!endpoints.some((value) => value.id === entry.endpoint_id))
+            throw new Error('原 Endpoint 已删除，不能自动恢复原连接目标。');
+          setSQL(text);
+          setMode(entry.mode);
+          setQueryAction('query');
+          setPassword('');
+          setResult(null);
+          setScriptResult(null);
+          if (endpoint?.id !== entry.endpoint_id) historyTarget.current = entry;
+          setSelected(entry.endpoint_id);
+          setRole(entry.role_name);
+          setDatabase(entry.database_name);
+        }}
+      />
       <div className="subtle-note">
         脚本按 PostgreSQL 原生语义执行，最多显示 16 组结果及 200 行，单元格 JSON 预算 1
         MiB。显示截断不会跳过后续命令。提交后连接中断时结果可能未知，请核验原数据，不要盲目重发。生产并发准入与独立

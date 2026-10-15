@@ -129,3 +129,8 @@ ingress:
   host: ''
   annotations: {}
   tls: []
+
+# SQL text may contain sensitive literals. Explicit operator opt-in; encrypted
+# personal history never records connection passwords or result rows.
+sqlHistory:
+  enabled: false

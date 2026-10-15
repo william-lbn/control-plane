@@ -54,6 +54,8 @@ func (s *server) routes() *http.ServeMux {
 	mux.Handle("PATCH /api/v1/projects/{project}/saved-queries/{query}", s.auth(http.HandlerFunc(s.savedQueries), true))
 	mux.Handle("DELETE /api/v1/projects/{project}/saved-queries/{query}", s.auth(http.HandlerFunc(s.savedQueries), true))
 	mux.Handle("POST /api/v1/projects/{project}/saved-queries/{query}/sharing", s.auth(http.HandlerFunc(s.savedQueries), true))
+	mux.Handle("GET /api/v1/projects/{project}/query-history", s.auth(http.HandlerFunc(s.sqlHistory), false))
+	mux.Handle("GET /api/v1/projects/{project}/query-history/{history}", s.auth(http.HandlerFunc(s.sqlHistory), false))
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/ai-gateway", s.auth(http.HandlerFunc(s.aiRead), false))
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/ai-gateway/usage", s.auth(http.HandlerFunc(s.aiRead), false))
 	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/ai-gateway/request", s.auth(http.HandlerFunc(s.aiConsoleRequest), true))
@@ -648,12 +650,20 @@ func (s *server) querySQL(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 422, "invalid_connection_target", "Choose a valid public database role and database")
 		return
 	}
+	history, historyErr := s.beginSQLHistory(r, item, "single", role, database, body.SQL)
+	if historyErr != nil {
+		fail(w, r, 503, "history_unavailable", "SQL was not submitted because its history admission could not be recorded")
+		return
+	}
 	result, err := runSQL(r.Context(), s.proxyHost, s.proxyPort, role, body.Password,
 		database, stringVal(item["selector"]), body.SQL)
 	if err != nil {
+		outcome, state := sqlHistoryFailure(err)
+		history.finish(w, outcome, state)
 		s.sqlFailureResponse(w, r, err)
 		return
 	}
+	history.finish(w, "completed", "")
 	s.audit(r.Context(), userFrom(r).ID, "execute_sql", "endpoint", r.PathValue("endpoint"), "succeeded", requestID(r))
 	jsonResponse(w, 200, result)
 }

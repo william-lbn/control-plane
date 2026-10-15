@@ -1,6 +1,6 @@
 # 生产门槛与官网对齐
 
-状态截至 2026-10-15；运行 API 0.33 / metadata migration 031 / Chart 0.9.17 / Helm revision 84。新增 [应用 TOTP 八项 UI](DELIVERY-2026-10-15-AUTH-TOTP.md) 与 [项目共享查询六项 UI](DELIVERY-2026-10-15-SHARED-QUERIES.md) 已通过。API/Web 源 5fb08c5，Auth 源 967e1b3；旧功能沿用各自回执。公开统一 Helm 发行仍为 0.1.30；父提交与源码快照分别留证。
+状态截至 2026-10-15；运行 API 0.34 / migration 032 / Chart 0.9.18 / Helm revision 85。新增 [应用 TOTP](DELIVERY-2026-10-15-AUTH-TOTP.md)八项、[共享查询](DELIVERY-2026-10-15-SHARED-QUERIES.md)六项、[个人执行历史](DELIVERY-2026-10-15-SQL-HISTORY.md)四项实际 UI 均通过。API/Web 源 640e384，Auth 源 967e1b3；旧功能沿用各自回执。公开统一 Helm 发行仍为 0.1.30，本批尚未远程发布。
 前一版本 `be04cb4` 的真实 Linux/React 闭环见 [Auth/S3 交付](DELIVERY-2026-10-14-AUTH-S3.md)：
 788 Go/真实 PostgreSQL 检查、八个同源公开镜像、三节点 24 次串行 digest 导入；
 应用密码/会话十组 UI，以及实际 S3 SDK 签名/字节/权限/轮换/撤销/正常缩零均通过。
@@ -79,4 +79,4 @@ Linux 真实场景正反例 + 恢复证据共同验收。
 
 ## 2026-10-13：本地真实推理已解除外部凭据阻塞
 
-独立 Go AI 网关、限定列权限元数据库身份、AI UI 和持久用量已完成代码/Helm/实际 UI 闭环。769 个公开 Linux Go/PG 测试与九组真实 UI 检查通过，见 [交付](DELIVERY-2026-10-13-AI-GATEWAY.md)。只验收文本 Chat Completions；动态供应商管理、完整协议/计费、HA 和全链路 TLS 仍未完成。个人保存查询已在 0.1.27 通过实际 UI 六组检查；完整交付见 [当前报告](DELIVERY-2026-10-13-SAVED-QUERIES.md)。显式项目共享查询已通过新 Linux UI/真实 PG 多用户隔离验收；查询历史仍未实现。
+独立 Go AI 网关、限定列权限元数据库身份、AI UI 和持久用量已完成代码/Helm/实际 UI 闭环。769 个公开 Linux Go/PG 测试与九组真实 UI 检查通过，见 [交付](DELIVERY-2026-10-13-AI-GATEWAY.md)。只验收文本 Chat Completions；动态供应商管理、完整协议/计费、HA 和全链路 TLS 仍未完成。个人保存查询已在 0.1.27 通过实际 UI 六组检查；完整交付见 [当前报告](DELIVERY-2026-10-13-SAVED-QUERIES.md)。显式项目共享查询已通过新 Linux UI/真实 PG 多用户隔离验收；个人加密执行历史已通过新真实 SQL/UI 验收；项目级共享历史、AI 命名和保留策略尚未完成。
