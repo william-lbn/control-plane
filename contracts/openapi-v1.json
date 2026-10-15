@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.32.0",
+    "version": "0.33.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -3490,8 +3490,14 @@
         "type": "object",
         "required": [
           "id",
+          "project_id",
+          "owner_id",
           "name",
-          "generation"
+          "generation",
+          "is_shared",
+          "created_at",
+          "updated_at",
+          "sql"
         ],
         "properties": {
           "id": {
@@ -3522,8 +3528,17 @@
           "sql": {
             "type": "string",
             "description": "Included only in an authorized detail read, never in mutation/replay/list."
+          },
+          "is_shared": {
+            "type": "boolean",
+            "description": "Explicit project SQL-editor sharing, false for existing and new personal drafts."
+          },
+          "can_edit": {
+            "type": "boolean",
+            "description": "Present on list/detail. Only the author may update, delete, share or unshare."
           }
-        }
+        },
+        "additionalProperties": false
       },
       "FunctionRequestLogEvent": {
         "type": "object",
@@ -3594,6 +3609,101 @@
           },
           "completion_unconfirmed": {
             "type": "boolean"
+          }
+        }
+      },
+      "SavedQueryMetadata": {
+        "type": "object",
+        "required": [
+          "id",
+          "project_id",
+          "owner_id",
+          "name",
+          "generation",
+          "is_shared",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^sq_[a-f0-9]{24}$"
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "owner_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "generation": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "is_shared": {
+            "type": "boolean",
+            "description": "Explicit project SQL-editor sharing, false for existing and new personal drafts."
+          },
+          "can_edit": {
+            "type": "boolean",
+            "description": "Present on list/detail. Only the author may update, delete, share or unshare."
+          }
+        },
+        "additionalProperties": false
+      },
+      "SavedQueryList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "limit",
+          "visibility"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "$ref": "#/components/schemas/SavedQueryMetadata"
+            }
+          },
+          "limit": {
+            "type": "integer",
+            "const": 50
+          },
+          "visibility": {
+            "type": "string",
+            "enum": [
+              "personal",
+              "shared"
+            ]
+          }
+        }
+      },
+      "SavedQueryMutation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "query",
+          "sql_included"
+        ],
+        "properties": {
+          "query": {
+            "$ref": "#/components/schemas/SavedQueryMetadata"
+          },
+          "sql_included": {
+            "type": "boolean",
+            "const": false
           }
         }
       }
@@ -13634,6 +13744,18 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "view",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "personal",
+                "shared"
+              ],
+              "default": "personal"
+            }
           }
         ],
         "security": [
@@ -13650,7 +13772,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/SavedQueryList"
                 }
               }
             }
@@ -13730,7 +13852,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/SavedQueryMutation"
                 }
               }
             }
@@ -13764,7 +13886,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/SavedQueryMutation"
                 }
               }
             }
@@ -13822,7 +13944,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/SavedQuery"
                 }
               }
             }
@@ -13920,7 +14042,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/SavedQueryMutation"
                 }
               }
             }
@@ -14028,7 +14150,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object"
+                  "$ref": "#/components/schemas/SavedQueryMutation"
                 }
               }
             }
@@ -15269,6 +15391,126 @@
           }
         },
         "description": "Requires editor authorization, CSRF, current source SHA-256 and conditional target creation/overwrite. Retains shared blob references for branch/PITR."
+      }
+    },
+    "/api/v1/projects/{project}/saved-queries/{query}/sharing": {
+      "post": {
+        "operationId": "setSavedQuerySharing",
+        "tags": [
+          "SQL"
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "query",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^sq_[a-f0-9]{24}$"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Required for Console sessions."
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"[0-9]+\"$"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Personal query metadata; detail reads include decrypted SQL. No Compute startup or execution.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedQueryMutation"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "description": "Project Editor+ and author required; CSRF, If-Match and durable Idempotency-Key. Other owners receive 404. Sharing changes only metadata generation, never SQL ciphertext or content_generation. Existing users retain private drafts. Shared peers cannot mutate the original. Revocation blocks subsequent reads; previously read copies cannot be recalled.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "shared"
+                ],
+                "properties": {
+                  "shared": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Author explicitly shares or revokes a SQL draft within its project"
       }
     }
   }

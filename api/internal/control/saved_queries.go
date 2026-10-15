@@ -64,7 +64,7 @@ func (s *server) openSavedSQL(version string, sealed, aad []byte) (string, error
 	return string(plain), nil
 }
 
-const savedQueryPublicColumns = `id,project_id,owner_id,name,generation,created_at,updated_at`
+const savedQueryPublicColumns = `id,project_id,owner_id,name,generation,is_shared,created_at,updated_at`
 
 func (s *server) savedQueries(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
@@ -75,15 +75,20 @@ func (s *server) savedQueries(w http.ResponseWriter, r *http.Request) {
 	project, owner, id := r.PathValue("project"), userFrom(r).ID, r.PathValue("query")
 	if r.Method == http.MethodGet {
 		if id == "" {
-			items, e := s.many(r.Context(), `SELECT `+savedQueryPublicColumns+` FROM saved_queries WHERE project_id=$1 AND owner_id=$2 AND deleted_at IS NULL ORDER BY updated_at DESC,id LIMIT 50`, project, owner)
+			view := r.URL.Query().Get("view")
+			if view != "" && view != "personal" && view != "shared" {
+				fail(w, r, 422, "invalid_request", "View must be personal or shared")
+				return
+			}
+			items, e := s.many(r.Context(), `SELECT `+savedQueryPublicColumns+`,(owner_id=$2) AS can_edit FROM saved_queries WHERE project_id=$1 AND (($3='shared' AND is_shared) OR ($3<>'shared' AND owner_id=$2)) AND deleted_at IS NULL ORDER BY updated_at DESC,id LIMIT 50`, project, owner, view)
 			if e != nil {
 				fail(w, r, 503, "metadata_unavailable", "Could not list saved queries")
 				return
 			}
-			jsonResponse(w, 200, record{"items": items, "limit": 50, "visibility": "personal"})
+			jsonResponse(w, 200, record{"items": items, "limit": 50, "visibility": map[bool]string{true: "shared", false: "personal"}[view == "shared"]})
 			return
 		}
-		item, e := s.one(r.Context(), `SELECT `+savedQueryPublicColumns+`,key_version,sealed_sql,content_generation FROM saved_queries WHERE project_id=$1 AND owner_id=$2 AND id=$3 AND deleted_at IS NULL`, project, owner, id)
+		item, e := s.one(r.Context(), `SELECT `+savedQueryPublicColumns+`,key_version,sealed_sql,content_generation,(owner_id=$2) AS can_edit FROM saved_queries WHERE project_id=$1 AND (owner_id=$2 OR is_shared) AND id=$3 AND deleted_at IS NULL`, project, owner, id)
 		if e != nil {
 			if isNoRows(e) {
 				fail(w, r, 404, "not_found", "Saved query not found")
@@ -92,7 +97,7 @@ func (s *server) savedQueries(w http.ResponseWriter, r *http.Request) {
 			}
 			return
 		}
-		sql, e := s.openSavedSQL(stringVal(item["key_version"]), item["sealed_sql"].([]byte), savedQueryAAD(project, owner, id, item["content_generation"].(int64)))
+		sql, e := s.openSavedSQL(stringVal(item["key_version"]), item["sealed_sql"].([]byte), savedQueryAAD(project, stringVal(item["owner_id"]), id, item["content_generation"].(int64)))
 		if e != nil {
 			fail(w, r, 503, "saved_query_key_unavailable", "Could not decrypt saved query")
 			return
@@ -110,8 +115,18 @@ func (s *server) savedQueries(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 422, "invalid_idempotency_key", "Idempotency-Key must contain 8 to 128 bytes")
 		return
 	}
+	sharing := strings.HasSuffix(r.URL.Path, "/sharing")
+	var share struct {
+		Shared *bool `json:"shared"`
+	}
 	spec := savedQuerySpec{}
-	if r.Method != http.MethodDelete {
+	if sharing {
+		if id == "" || readJSON(r, &share) != nil || share.Shared == nil {
+			fail(w, r, 422, "invalid_request", "Explicit shared boolean required")
+			return
+		}
+	}
+	if r.Method != http.MethodDelete && !sharing {
 		if readJSON(r, &spec) != nil || !validSavedQuery(&spec) {
 			fail(w, r, 422, "invalid_request", "Name and UTF-8 SQL are required; maximum SQL size is 64 KiB")
 			return
@@ -136,7 +151,11 @@ func (s *server) savedQueries(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	keyHash := s.createRequestHash("saved-query-idempotency", idem)
-	requestHash := s.createRequestHash("saved-query-request", record{"method": r.Method, "path": r.URL.Path, "expected": expected, "spec": spec})
+	description := record{"method": r.Method, "path": r.URL.Path, "expected": expected, "spec": spec}
+	if sharing {
+		description["sharing"] = share
+	}
+	requestHash := s.createRequestHash("saved-query-request", description)
 	tx, e := s.db.Begin(r.Context())
 	if e != nil {
 		fail(w, r, 503, "metadata_unavailable", "Could not begin saved query change")
@@ -205,7 +224,18 @@ func (s *server) savedQueries(w http.ResponseWriter, r *http.Request) {
 	}
 	version := s.backendKeys.Active
 	var item record
-	if r.Method == http.MethodDelete {
+	if sharing {
+		action = "share_saved_query"
+		if !*share.Shared {
+			action = "unshare_saved_query"
+		}
+		rows, err := tx.Query(r.Context(), `UPDATE saved_queries SET is_shared=$4,generation=$5,updated_at=now() WHERE project_id=$1 AND owner_id=$2 AND id=$3 RETURNING `+savedQueryPublicColumns, project, owner, id, *share.Shared, generation)
+		if err == nil {
+			item, e = pgx.CollectOneRow(rows, pgx.RowToMap)
+		} else {
+			e = err
+		}
+	} else if r.Method == http.MethodDelete {
 		action = "delete_saved_query"
 		rows, err := tx.Query(r.Context(), `UPDATE saved_queries SET deleted_at=now(),updated_at=now(),generation=$4 WHERE project_id=$1 AND owner_id=$2 AND id=$3 RETURNING `+savedQueryPublicColumns, project, owner, id, generation)
 		if err == nil {

@@ -53,6 +53,7 @@ func (s *server) routes() *http.ServeMux {
 	mux.Handle("GET /api/v1/projects/{project}/saved-queries/{query}", s.auth(http.HandlerFunc(s.savedQueries), false))
 	mux.Handle("PATCH /api/v1/projects/{project}/saved-queries/{query}", s.auth(http.HandlerFunc(s.savedQueries), true))
 	mux.Handle("DELETE /api/v1/projects/{project}/saved-queries/{query}", s.auth(http.HandlerFunc(s.savedQueries), true))
+	mux.Handle("POST /api/v1/projects/{project}/saved-queries/{query}/sharing", s.auth(http.HandlerFunc(s.savedQueries), true))
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/ai-gateway", s.auth(http.HandlerFunc(s.aiRead), false))
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/ai-gateway/usage", s.auth(http.HandlerFunc(s.aiRead), false))
 	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/ai-gateway/request", s.auth(http.HandlerFunc(s.aiConsoleRequest), true))

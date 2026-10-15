@@ -3,7 +3,7 @@
 The Console can save, load, rename/update and delete personal SQL drafts. Loading
 only changes editor text, clears the connection password/results and selects
 script mode; it never executes SQL or wakes Compute. This slice does not implement
-automatic query history, shared queries, SQL result storage or AI-assisted SQL.
+automatic query history, SQL result storage or AI-assisted SQL. Explicit author-controlled project sharing is now specified and accepted separately in [SHARED-QUERIES](SHARED-QUERIES.md).
 
 ## Model and interfaces
 

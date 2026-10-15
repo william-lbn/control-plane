@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon self-hosted application Auth protocol",
-    "version": "0.25.0",
+    "version": "0.25.1",
     "description": "Curated allowlisted Better Auth 1.7.7 branch protocol. Separate from Console identity/control API. Conditional routes require operator mail and branch policy. The schema documents protocols; it does not assert a runtime is enabled or healthy. Optional self-hosted TOTP extension requires two_factor_enabled. Passwordless login paths retain their own policies; trusted-device cookies are not relayed."
   },
   "servers": [
@@ -3057,7 +3057,11 @@
       "post": {
         "operationId": "enableApplicationTOTP",
         "summary": "Branch-enabled application TOTP: signed temporary challenge, password/session guards, factor confirmation and recovery",
-        "security": [],
+        "security": [
+          {
+            "applicationSession": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Maintained provider result; enrollment returns private totpURI/backupCodes, verification completes application session. Mask and store private material safely.",
@@ -3183,7 +3187,11 @@
       "post": {
         "operationId": "disableApplicationTOTP",
         "summary": "Branch-enabled application TOTP: signed temporary challenge, password/session guards, factor confirmation and recovery",
-        "security": [],
+        "security": [
+          {
+            "applicationSession": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Maintained provider result; enrollment returns private totpURI/backupCodes, verification completes application session. Mask and store private material safely.",
@@ -3302,7 +3310,11 @@
       "post": {
         "operationId": "getApplicationTOTPURI",
         "summary": "Branch-enabled application TOTP: signed temporary challenge, password/session guards, factor confirmation and recovery",
-        "security": [],
+        "security": [
+          {
+            "applicationSession": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Maintained provider result; enrollment returns private totpURI/backupCodes, verification completes application session. Mask and store private material safely.",
@@ -3421,7 +3433,14 @@
       "post": {
         "operationId": "verifyApplicationTOTP",
         "summary": "Branch-enabled application TOTP: signed temporary challenge, password/session guards, factor confirmation and recovery",
-        "security": [],
+        "security": [
+          {
+            "applicationSession": []
+          },
+          {
+            "applicationFactorChallenge": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Maintained provider result; enrollment returns private totpURI/backupCodes, verification completes application session. Mask and store private material safely.",
@@ -3546,7 +3565,14 @@
       "post": {
         "operationId": "verifyApplicationBackupCode",
         "summary": "Branch-enabled application TOTP: signed temporary challenge, password/session guards, factor confirmation and recovery",
-        "security": [],
+        "security": [
+          {
+            "applicationSession": []
+          },
+          {
+            "applicationFactorChallenge": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Maintained provider result; enrollment returns private totpURI/backupCodes, verification completes application session. Mask and store private material safely.",
@@ -3672,7 +3698,11 @@
       "post": {
         "operationId": "regenerateApplicationBackupCodes",
         "summary": "Branch-enabled application TOTP: signed temporary challenge, password/session guards, factor confirmation and recovery",
-        "security": [],
+        "security": [
+          {
+            "applicationSession": []
+          }
+        ],
         "responses": {
           "200": {
             "description": "Maintained provider result; enrollment returns private totpURI/backupCodes, verification completes application session. Mask and store private material safely.",
@@ -3876,6 +3906,12 @@
         "in": "cookie",
         "name": "neon_app_br_0123456789abcdef.session_token",
         "description": "HttpOnly branch cookie, established by native login. Schema query branch_id customizes this literal name; browser sends cookies, do not paste them into public evidence."
+      },
+      "applicationFactorChallenge": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "neon_app_br_0123456789abcdef.two_factor",
+        "description": "HttpOnly 300-second pending branch MFA challenge; not an authenticated session. branch_id customizes the literal cookie name."
       }
     }
   },

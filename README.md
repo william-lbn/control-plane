@@ -5,10 +5,12 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 
 **发行状态：预览版本。已经验证的实验环境功能不等于生产认证，也不等于 Neon 官网全部 Backend 服务。**
 
-最新本地已验收：[预签名上传](docs/DELIVERY-2026-10-15-PRESIGNED-UPLOAD.md)、[CORS 与用户元数据](docs/DELIVERY-2026-10-15-STORAGE-BROWSER.md)、[Functions 请求日志](docs/DELIVERY-2026-10-15-FUNCTIONS-JOURNAL.md)。[元数据条件编辑与 S3 REPLACE](docs/DELIVERY-2026-10-15-METADATA-EDIT.md)也已通过 8 项新的独立 UI 验收。当前状态以 [生产门槛](docs/PRODUCTION-GATES.md) 和各版本回执为准；复用既有功能记录，不重复旧 UI 套件。
+最新新增：[应用 TOTP 双重认证](docs/DELIVERY-2026-10-15-AUTH-TOTP.md)八项 UI 与[项目共享查询](docs/DELIVERY-2026-10-15-SHARED-QUERIES.md)六项 UI 均通过；API 0.33 / Chart 0.9.17 / migration 031。
+
+此前本地已验收：[预签名上传](docs/DELIVERY-2026-10-15-PRESIGNED-UPLOAD.md)、[CORS 与用户元数据](docs/DELIVERY-2026-10-15-STORAGE-BROWSER.md)、[Functions 请求日志](docs/DELIVERY-2026-10-15-FUNCTIONS-JOURNAL.md)。[元数据条件编辑与 S3 REPLACE](docs/DELIVERY-2026-10-15-METADATA-EDIT.md)也已通过 8 项新的独立 UI 验收。当前状态以 [生产门槛](docs/PRODUCTION-GATES.md) 和各版本回执为准；复用既有功能记录，不重复旧 UI 套件。
 
 [本地 Auth 邮箱验证/密码恢复](docs/DELIVERY-2026-10-14-AUTH-MAIL.md)已通过十组实际 Linux UI、真实 SMTP 和 790 Go/PG 检查；邮箱 OTP 和独立应用 Auth OpenAPI 已通过[八组真实 Linux UI](docs/DELIVERY-2026-10-14-AUTH-OTP.md)；Magic Link 也已通过[八组真实 Linux UI](docs/DELIVERY-2026-10-14-LOCAL-MAGIC-LINK.md)。[环境修复回执](docs/DELIVERY-2026-10-14-ENVIRONMENT-RECOVERY.md)说明 CNI 文件故障、精确修复和 63 次主机检查。
-当前为 [Linux 本地镜像/逐项验收批次](docs/DELIVERY-2026-10-15-LOCAL-BATCH.md)，镜像按源码快照留证，父提交 `5449a11`；后续采用[Linux 本地构建与验收](docs/LOCAL-LINUX-DEVELOPMENT.md)，整批回归后统一提交与远程发布。本地源码快照和各组件镜像来源独立留证。
+当前为 [Linux 本地镜像/逐项验收批次](docs/DELIVERY-2026-10-15-LOCAL-BATCH.md)，镜像按组件源码快照留证，历次父提交在各交付报告单独记录；后续采用[Linux 本地构建与验收](docs/LOCAL-LINUX-DEVELOPMENT.md)，整批回归后统一提交与远程发布。本地源码快照和各组件镜像来源独立留证。
 [Auth/S3 历史切片](docs/DELIVERY-2026-10-14-AUTH-S3.md)在 `be04cb4` 记录 788 项公开 Go/真实 PG 检查、
 应用密码/会话安全十组实际 UI，以及原对象/凭据保留的实际 S3 SDK 验收。
 S3 的 test-only `875e48b` 只修正选择器和原 checkpoint 续测，不改变运行时代码。
