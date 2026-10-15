@@ -1,7 +1,9 @@
 package control
 
 import (
+	"bytes"
 	"encoding/json"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httputil"
@@ -15,11 +17,21 @@ import (
 var managedAuthRelaySlots = make(chan struct{}, 32)
 var managedAuthActions = map[string]bool{"sign-up/email": true, "sign-in/email": true, "sign-out": true, "get-session": true, "token": true, "jwks": true, "list-sessions": true, "revoke-session": true, "revoke-sessions": true, "revoke-other-sessions": true, "change-password": true, "update-user": true}
 var managedAuthOTPActions = map[string]bool{"email-otp/send-verification-otp": true, "email-otp/check-verification-otp": true, "email-otp/verify-email": true, "email-otp/request-password-reset": true, "email-otp/reset-password": true, "sign-in/email-otp": true}
+var managedAuthTwoFactorActions = map[string]bool{"two-factor/enable": true, "two-factor/disable": true, "two-factor/get-totp-uri": true, "two-factor/verify-totp": true, "two-factor/verify-backup-code": true, "two-factor/generate-backup-codes": true}
 var managedAuthResetCallback = regexp.MustCompile(`^reset-password/[a-zA-Z0-9_-]{20,128}$`)
+
+func managedAuthRelayCookieAllowed(name, branch string, twoFactor bool) bool {
+	base := strings.TrimPrefix(name, "__Secure-")
+	prefix := "neon_app_" + branch + "."
+	return base == prefix+"session_token" || (twoFactor && base == prefix+"two_factor")
+}
 
 func managedAuthAllowedAction(action, method string) bool {
 	if managedAuthActions[action] {
 		return true
+	}
+	if managedAuthTwoFactorActions[action] {
+		return method == "POST" || method == "OPTIONS"
 	}
 	if !managedAuthMailConfigured() {
 		return false
@@ -135,6 +147,10 @@ func (s *server) managedAuthRelay(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 503, "auth_unavailable", "Branch Auth configuration unavailable")
 		return
 	}
+	if managedAuthTwoFactorActions[r.PathValue("rest")] && !spec.TwoFactorEnabled {
+		http.NotFound(w, r)
+		return
+	}
 	if managedAuthOTPActions[r.PathValue("rest")] && !spec.EmailOTPEnabled {
 		http.NotFound(w, r)
 		return
@@ -159,10 +175,29 @@ func (s *server) managedAuthRelay(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	if managedAuthTwoFactorActions[r.PathValue("rest")] && r.Method == http.MethodPost {
+		body, e := io.ReadAll(http.MaxBytesReader(w, r.Body, 16384))
+		var input map[string]any
+		if e != nil || json.Unmarshal(body, &input) != nil || input == nil {
+			fail(w, r, 422, "invalid_factor_request", "Bounded factor JSON required")
+			return
+		}
+		if value, exists := input["trustDevice"]; exists && value != false {
+			fail(w, r, 422, "trusted_device_unavailable", "Trusted device memory is not enabled by this branch relay")
+			return
+		}
+		if r.PathValue("rest") == "two-factor/enable" {
+			if method, exists := input["method"]; exists && method != "totp" {
+				fail(w, r, 422, "factor_method_unavailable", "This branch extension provides TOTP enrollment")
+				return
+			}
+		}
+		r.Body = io.NopCloser(bytes.NewReader(body))
+	}
 	r.Body = http.MaxBytesReader(w, r.Body, 16384)
 	target, _ := url.Parse("http://" + managedAuthName(branch) + "." + s.kube.namespace + ".svc.cluster.local:9082")
 	base, _ := url.Parse(managedAuthBase(branch))
-	cookieName := "neon_app_" + branch + ".session_token"
+	cookieAllowed := func(name string) bool { return managedAuthRelayCookieAllowed(name, branch, spec.TwoFactorEnabled) }
 	proxy := &httputil.ReverseProxy{Rewrite: func(pr *httputil.ProxyRequest) {
 		pr.SetURL(target)
 		pr.Out.Host = base.Host
@@ -170,7 +205,7 @@ func (s *server) managedAuthRelay(w http.ResponseWriter, r *http.Request) {
 			pr.Out.Header.Del(h)
 		}
 		for _, cookie := range pr.In.Cookies() {
-			if cookie.Name == cookieName || cookie.Name == "__Secure-"+cookieName {
+			if cookieAllowed(cookie.Name) {
 				pr.Out.AddCookie(cookie)
 			}
 		}
@@ -190,7 +225,7 @@ func (s *server) managedAuthRelay(w http.ResponseWriter, r *http.Request) {
 			cookies := response.Cookies()
 			response.Header.Del("Set-Cookie")
 			for _, c := range cookies {
-				if (c.Name == cookieName || c.Name == "__Secure-"+cookieName) && c.Domain == "" && c.Path == "/auth/v1/"+branch && c.HttpOnly {
+				if cookieAllowed(c.Name) && c.Domain == "" && c.Path == "/auth/v1/"+branch && c.HttpOnly {
 					response.Header.Add("Set-Cookie", c.String())
 				}
 			}

@@ -10,7 +10,7 @@ on:
       additional_suite:
         description: Additional real UI suites (overrides suite when selected)
         type: choice
-        options: [none, storage-directory.spec.ts, storage-copy.spec.ts, storage-bulk-delete.spec.ts, storage-presigned-upload.spec.ts, storage-browser-metadata.spec.ts, functions-request-logs.spec.ts, storage-metadata-edit.spec.ts]
+        options: [none, auth-totp.spec.ts, storage-directory.spec.ts, storage-copy.spec.ts, storage-bulk-delete.spec.ts, storage-presigned-upload.spec.ts, storage-browser-metadata.spec.ts, functions-request-logs.spec.ts, storage-metadata-edit.spec.ts]
         default: none
       poll_fault:
         description: Inject transient read failures for native/Data API observation recovery
@@ -63,6 +63,7 @@ jobs:
             functions-request-logs.spec.ts|functions-http.spec.ts|functions-observation.spec.ts|functions-wake.spec.ts|functions-rollback.spec.ts) test -f "$NEON_E2E_FUNCTIONS_MONITOR_FIXTURE" ;;
             database-owner.spec.ts) test -f "$NEON_E2E_CATALOG_OWNER_FIXTURE" ;;
             auth-security.spec.ts|s3-storage.spec.ts|storage-directory.spec.ts|storage-copy.spec.ts|storage-metadata-edit.spec.ts|storage-browser-metadata.spec.ts|storage-presigned-upload.spec.ts|storage-bulk-delete.spec.ts|sql-script.spec.ts|sql-tools.spec.ts) test -f "$NEON_E2E_SQL_SCRIPT_FIXTURE" ;;
+            auth-totp.spec.ts) test -f "$NEON_E2E_SQL_SCRIPT_FIXTURE" ;;
             auth-magic-link.spec.ts|auth-otp.spec.ts|auth-mail.spec.ts) test -f "$NEON_E2E_SQL_SCRIPT_FIXTURE"; test -f "$NEON_E2E_MAILBOX_FIXTURE" ;;
             backend-credentials.spec.ts|functions-metadata.spec.ts|ai-gateway.spec.ts|saved-queries.spec.ts) [[ "$NEON_E2E_CREDENTIAL_PROJECT" =~ ^prj_[a-f0-9]{16}$ ]] ;;
             *) exit 1 ;;

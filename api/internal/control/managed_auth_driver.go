@@ -2,7 +2,10 @@ package control
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
 	_ "embed"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,6 +18,20 @@ import (
 
 //go:embed assets/auth-schema.sql
 var managedAuthSchema string
+
+//go:embed assets/auth-totp-schema.sql
+var managedAuthTOTPSchema string
+
+// TOTP ciphertext must survive service generations. This branch-scoped key
+// keeps cookie isolation; branch-clone re-encryption is a separate gate.
+func (s *server) managedAuthTOTPSecret(p managedAuthPayload) (string, error) {
+	if len(s.idempotencyKey) < 32 || !dataBranchID.MatchString(p.BranchID) || p.ProjectID == "" {
+		return "", errors.New("TOTP branch key identity unavailable")
+	}
+	mac := hmac.New(sha256.New, s.idempotencyKey)
+	mac.Write([]byte("neon.auth.totp.secret.v1\x00" + p.ProjectID + "\x00" + p.BranchID))
+	return base64.RawURLEncoding.EncodeToString(mac.Sum(nil)), nil
+}
 
 func (s *server) reserveManagedAuth(ctx context.Context, p managedAuthPayload) error {
 	if err := s.validateManagedAuthMailSecret(ctx); err != nil {
@@ -30,7 +47,15 @@ func (s *server) reserveManagedAuth(ctx context.Context, p managedAuthPayload) e
 	q.Set("sslmode", "verify-full")
 	q.Set("options", "endpoint="+selector(p.EndpointID))
 	dsn.RawQuery = q.Encode()
-	config, _ := json.Marshal(record{"version": 1, "branchID": p.BranchID, "baseURL": managedAuthBase(p.BranchID), "databaseURL": dsn.String(), "databaseTLS": record{"caFile": "/run/auth-ca/ca.crt", "serverName": env("NEON_AUTH_PG_SERVER_NAME", "")}, "secret": randomToken(48), "trustedOrigins": p.Spec.AllowedOrigins, "allowLabHTTP": true, "requireEmailVerification": p.Spec.RequireEmailVerification, "emailOTPEnabled": p.Spec.EmailOTPEnabled, "magicLinkEnabled": p.Spec.MagicLinkEnabled, "magicLinkExpiresIn": p.Spec.MagicLinkExpiresIn, "magicLinkAllowRegistration": p.Spec.MagicLinkAllowRegistration})
+	authSecret := randomToken(48)
+	if p.Spec.TwoFactorEnabled {
+		var err error
+		authSecret, err = s.managedAuthTOTPSecret(p)
+		if err != nil {
+			return err
+		}
+	}
+	config, _ := json.Marshal(record{"version": 1, "branchID": p.BranchID, "baseURL": managedAuthBase(p.BranchID), "databaseURL": dsn.String(), "databaseTLS": record{"caFile": "/run/auth-ca/ca.crt", "serverName": env("NEON_AUTH_PG_SERVER_NAME", "")}, "secret": authSecret, "trustedOrigins": p.Spec.AllowedOrigins, "allowLabHTTP": true, "requireEmailVerification": p.Spec.RequireEmailVerification, "emailOTPEnabled": p.Spec.EmailOTPEnabled, "magicLinkEnabled": p.Spec.MagicLinkEnabled, "magicLinkExpiresIn": p.Spec.MagicLinkExpiresIn, "magicLinkAllowRegistration": p.Spec.MagicLinkAllowRegistration, "twoFactorEnabled": p.Spec.TwoFactorEnabled})
 	_, err = s.kube.createOwned(ctx, "secret", record{"apiVersion": "v1", "kind": "Secret", "type": "Opaque", "immutable": true, "metadata": record{"name": p.SecretRef, "labels": managedAuthLabels(p)}, "stringData": map[string]string{"config.json": string(config), "password": password, "verifier": verifier}}, p.ProjectID, p.EndpointID)
 	return err
 }
@@ -80,6 +105,26 @@ func applyManagedAuthSQLTx(ctx context.Context, tx pgx.Tx, p managedAuthPayload,
 	if err != nil && !isNoRows(err) {
 		return err
 	}
+	// Optional plugin schemas are upgraded additively under the existing owner
+	// marker. Disabling a plugin must never bypass an enrolled user's factor.
+	var hasFactorColumn bool
+	if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='neon_auth' AND table_name='user' AND column_name='twoFactorEnabled')`).Scan(&hasFactorColumn); err != nil {
+		return err
+	}
+	if hasFactorColumn {
+		var enrolled bool
+		if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM neon_auth."user" WHERE "twoFactorEnabled" IS TRUE)`).Scan(&enrolled); err != nil {
+			return err
+		}
+		if enrolled && (!p.Spec.TwoFactorEnabled || generation == 0) {
+			return dataAPIPrerequisiteError{"auth_factor_migration_required", "Enrolled factors require the original branch TOTP policy and key; clone re-encryption or user removal of factors is required"}
+		}
+	}
+	if p.Spec.TwoFactorEnabled {
+		if _, err = tx.Exec(ctx, managedAuthTOTPSchema, pgx.QueryExecModeSimpleProtocol); err != nil {
+			return err
+		}
+	}
 	if generation > p.Generation {
 		return errors.New("Managed Auth SQL generation advanced")
 	}
@@ -123,7 +168,11 @@ func applyManagedAuthSQLTx(ctx context.Context, tx pgx.Tx, p managedAuthPayload,
 			return err
 		}
 	}
-	for _, table := range []string{"user", "session", "account", "verification", "jwks", "rateLimit"} {
+	tables := []string{"user", "session", "account", "verification", "jwks", "rateLimit"}
+	if p.Spec.TwoFactorEnabled {
+		tables = append(tables, "twoFactor")
+	}
+	for _, table := range tables {
 		if _, err = tx.Exec(ctx, "GRANT SELECT,INSERT,UPDATE,DELETE ON TABLE neon_auth."+pgQuote(table)+" TO "+pgQuote(login)); err != nil {
 			return err
 		}
@@ -327,7 +376,7 @@ func (s *server) managedAuthUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer conn.Close(context.Background())
-	rows, err := conn.Query(r.Context(), `SELECT id,name,email,"emailVerified" AS email_verified,"createdAt" AS created_at FROM neon_auth."user" ORDER BY "createdAt" DESC,id LIMIT 100`)
+	rows, err := conn.Query(r.Context(), `SELECT id,name,email,"emailVerified" AS email_verified,"createdAt" AS created_at,COALESCE((to_jsonb(u)->>'twoFactorEnabled')::boolean,false) AS two_factor_enabled FROM neon_auth."user" u ORDER BY "createdAt" DESC,id LIMIT 100`)
 	if err != nil {
 		s.sqlFailureResponse(w, r, sqlExecutionError{"query", err})
 		return

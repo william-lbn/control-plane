@@ -16,6 +16,7 @@ export interface AuthConfig {
   magicLinkEnabled?: boolean;
   magicLinkExpiresIn?: number;
   magicLinkAllowRegistration?: boolean;
+  twoFactorEnabled?: boolean;
 }
 
 // Both the URL and SQL credential come from an immutable, owned Secret file.
@@ -24,6 +25,7 @@ export function parseConfig(value: unknown): AuthConfig {
   if (!value || typeof value !== "object")
     throw new Error("Invalid Auth configuration");
   const c = value as AuthConfig;
+  if(c.twoFactorEnabled!==undefined && typeof c.twoFactorEnabled!=="boolean")throw new Error("Invalid two-factor policy");
   if (
     (c.magicLinkEnabled !== undefined &&
       typeof c.magicLinkEnabled !== "boolean") ||

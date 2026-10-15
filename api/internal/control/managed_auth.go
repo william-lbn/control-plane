@@ -21,6 +21,7 @@ type ManagedAuthSpec struct {
 	MagicLinkEnabled           bool `json:"magic_link_enabled,omitempty"`
 	MagicLinkExpiresIn         int  `json:"magic_link_expires_in,omitempty"`
 	MagicLinkAllowRegistration bool `json:"magic_link_allow_registration,omitempty"`
+	TwoFactorEnabled           bool `json:"two_factor_enabled,omitempty"`
 }
 type managedAuthPayload struct {
 	ProjectID  string          `json:"project_id"`

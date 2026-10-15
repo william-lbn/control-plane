@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon self-hosted application Auth protocol",
-    "version": "0.24.0",
-    "description": "Curated allowlisted Better Auth 1.7.7 branch protocol. Separate from Console identity/control API. Conditional routes require operator mail and branch policy. The schema documents protocols; it does not assert a runtime is enabled or healthy."
+    "version": "0.25.0",
+    "description": "Curated allowlisted Better Auth 1.7.7 branch protocol. Separate from Console identity/control API. Conditional routes require operator mail and branch policy. The schema documents protocols; it does not assert a runtime is enabled or healthy. Optional self-hosted TOTP extension requires two_factor_enabled. Passwordless login paths retain their own policies; trusted-device cookies are not relayed."
   },
   "servers": [
     {
@@ -3052,6 +3052,740 @@
           }
         }
       }
+    },
+    "/two-factor/enable": {
+      "post": {
+        "operationId": "enableApplicationTOTP",
+        "summary": "Branch-enabled application TOTP: signed temporary challenge, password/session guards, factor confirmation and recovery",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Maintained provider result; enrollment returns private totpURI/backupCodes, verification completes application session. Mask and store private material safely.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": [
+                    "object",
+                    "array",
+                    "null"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Provider per-client rate limit or per-account verification lockout"
+          },
+          "500": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "password"
+                ],
+                "properties": {
+                  "password": {
+                    "type": "string",
+                    "minLength": 12,
+                    "maxLength": 128
+                  },
+                  "method": {
+                    "type": "string",
+                    "enum": [
+                      "totp"
+                    ],
+                    "default": "totp"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-neon-branch-policy": "two_factor_enabled"
+      }
+    },
+    "/two-factor/disable": {
+      "post": {
+        "operationId": "disableApplicationTOTP",
+        "summary": "Branch-enabled application TOTP: signed temporary challenge, password/session guards, factor confirmation and recovery",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Maintained provider result; enrollment returns private totpURI/backupCodes, verification completes application session. Mask and store private material safely.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": [
+                    "object",
+                    "array",
+                    "null"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Provider per-client rate limit or per-account verification lockout"
+          },
+          "500": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "password"
+                ],
+                "properties": {
+                  "password": {
+                    "type": "string",
+                    "minLength": 12,
+                    "maxLength": 128
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-neon-branch-policy": "two_factor_enabled"
+      }
+    },
+    "/two-factor/get-totp-uri": {
+      "post": {
+        "operationId": "getApplicationTOTPURI",
+        "summary": "Branch-enabled application TOTP: signed temporary challenge, password/session guards, factor confirmation and recovery",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Maintained provider result; enrollment returns private totpURI/backupCodes, verification completes application session. Mask and store private material safely.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": [
+                    "object",
+                    "array",
+                    "null"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Provider per-client rate limit or per-account verification lockout"
+          },
+          "500": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "password"
+                ],
+                "properties": {
+                  "password": {
+                    "type": "string",
+                    "minLength": 12,
+                    "maxLength": 128
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-neon-branch-policy": "two_factor_enabled"
+      }
+    },
+    "/two-factor/verify-totp": {
+      "post": {
+        "operationId": "verifyApplicationTOTP",
+        "summary": "Branch-enabled application TOTP: signed temporary challenge, password/session guards, factor confirmation and recovery",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Maintained provider result; enrollment returns private totpURI/backupCodes, verification completes application session. Mask and store private material safely.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": [
+                    "object",
+                    "array",
+                    "null"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Provider per-client rate limit or per-account verification lockout"
+          },
+          "500": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "code"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "pattern": "^[0-9]{6}$"
+                  },
+                  "trustDevice": {
+                    "type": "boolean",
+                    "enum": [
+                      false
+                    ],
+                    "default": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-neon-branch-policy": "two_factor_enabled"
+      }
+    },
+    "/two-factor/verify-backup-code": {
+      "post": {
+        "operationId": "verifyApplicationBackupCode",
+        "summary": "Branch-enabled application TOTP: signed temporary challenge, password/session guards, factor confirmation and recovery",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Maintained provider result; enrollment returns private totpURI/backupCodes, verification completes application session. Mask and store private material safely.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": [
+                    "object",
+                    "array",
+                    "null"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Provider per-client rate limit or per-account verification lockout"
+          },
+          "500": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "code"
+                ],
+                "properties": {
+                  "code": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
+                  },
+                  "trustDevice": {
+                    "type": "boolean",
+                    "enum": [
+                      false
+                    ],
+                    "default": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-neon-branch-policy": "two_factor_enabled"
+      }
+    },
+    "/two-factor/generate-backup-codes": {
+      "post": {
+        "operationId": "regenerateApplicationBackupCodes",
+        "summary": "Branch-enabled application TOTP: signed temporary challenge, password/session guards, factor confirmation and recovery",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Maintained provider result; enrollment returns private totpURI/backupCodes, verification completes application session. Mask and store private material safely.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": [
+                    "object",
+                    "array",
+                    "null"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Provider per-client rate limit or per-account verification lockout"
+          },
+          "500": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Bounded library or relay rejection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "password"
+                ],
+                "properties": {
+                  "password": {
+                    "type": "string",
+                    "minLength": 12,
+                    "maxLength": 128
+                  }
+                }
+              }
+            }
+          }
+        },
+        "x-neon-branch-policy": "two_factor_enabled"
+      }
     }
   },
   "components": {
@@ -3081,6 +3815,9 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "twoFactorEnabled": {
+            "type": "boolean"
           }
         },
         "additionalProperties": true

@@ -1,5 +1,5 @@
 import { betterAuth } from "better-auth";
-import { jwt, emailOTP, magicLink } from "better-auth/plugins";
+import { jwt, emailOTP, magicLink, twoFactor } from "better-auth/plugins";
 import type { Pool } from "pg";
 import type { AuthConfig } from "./config.ts";
 import { createMailer } from "./mail.ts";
@@ -88,6 +88,7 @@ export function authOptions(c: AuthConfig, database: Pool) {
       storage: "database" as const,
     },
     plugins: [
+      ...(c.twoFactorEnabled ? [twoFactor({issuer:"Neon Self Hosted",skipVerificationOnEnable:false,twoFactorCookieMaxAge:300,backupCodeOptions:{storeBackupCodes:"encrypted"}})] : []),
       ...(mail && c.magicLinkEnabled
         ? [
             magicLink({

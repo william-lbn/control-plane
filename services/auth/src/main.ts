@@ -31,6 +31,7 @@ const allowed = new Set([
   "revoke-other-sessions",
   "change-password",
   "update-user",
+  ...(config.twoFactorEnabled ? ["two-factor/enable","two-factor/disable","two-factor/get-totp-uri","two-factor/verify-totp","two-factor/verify-backup-code","two-factor/generate-backup-codes"] : []),
   ...(config.mail && config.magicLinkEnabled
     ? ["sign-in/magic-link", "magic-link/verify"]
     : []),

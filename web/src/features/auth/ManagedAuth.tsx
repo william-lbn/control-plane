@@ -8,6 +8,7 @@ import { AuthSecurityPanel } from './AuthSecurityPanel';
 import { AuthRecoveryPanel } from './AuthRecoveryPanel';
 import { AuthOTPPanel } from './AuthOTPPanel';
 import { AuthMagicLinkPanel } from './AuthMagicLinkPanel';
+import { AuthTOTPPanel } from './AuthTOTPPanel';
 
 type Instance = {
   branch_id: string;
@@ -25,6 +26,7 @@ type Instance = {
     magic_link_enabled?: boolean;
     magic_link_expires_in?: number;
     magic_link_allow_registration?: boolean;
+    two_factor_enabled?: boolean;
   } | null;
   mail_operator_enabled?: boolean;
   mail_runtime_enabled?: boolean;
@@ -36,6 +38,7 @@ type AppUser = {
   email: string;
   email_verified?: boolean;
   emailVerified?: boolean;
+  twoFactorEnabled?: boolean;
   created_at?: string;
 };
 
@@ -62,6 +65,7 @@ export function ManagedAuth({
   const [origins, setOrigins] = useState('');
   const [requireEmailVerification, setRequireEmailVerification] = useState(false);
   const [emailOTPEnabled, setEmailOTPEnabled] = useState(false);
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [magicLinkEnabled, setMagicLinkEnabled] = useState(false);
   const [magicLinkExpiresIn, setMagicLinkExpiresIn] = useState(300);
   const [magicLinkAllowRegistration, setMagicLinkAllowRegistration] = useState(false);
@@ -90,6 +94,7 @@ export function ManagedAuth({
       setOrigins(value.spec.allowed_origins.join('\n'));
       setRequireEmailVerification(value.spec.require_email_verification ?? false);
       setEmailOTPEnabled(value.spec.email_otp_enabled ?? false);
+      setTwoFactorEnabled(value.spec.two_factor_enabled ?? false);
       setMagicLinkEnabled(value.spec.magic_link_enabled ?? false);
       setMagicLinkExpiresIn(value.spec.magic_link_expires_in || 300);
       setMagicLinkAllowRegistration(value.spec.magic_link_allow_registration ?? false);
@@ -111,6 +116,7 @@ export function ManagedAuth({
     setOrigins('');
     setRequireEmailVerification(false);
     setEmailOTPEnabled(false);
+    setTwoFactorEnabled(false);
     setMagicLinkEnabled(false);
     setMagicLinkExpiresIn(300);
     setMagicLinkAllowRegistration(false);
@@ -132,6 +138,7 @@ export function ManagedAuth({
             .filter(Boolean),
           ...(requireEmailVerification ? { require_email_verification: true } : {}),
           ...(emailOTPEnabled ? { email_otp_enabled: true } : {}),
+          ...(twoFactorEnabled ? { two_factor_enabled: true } : {}),
           ...(magicLinkEnabled
             ? {
                 magic_link_enabled: true,
@@ -210,6 +217,11 @@ export function ManagedAuth({
       if (action === 'get-session') {
         setSession(result?.user || null);
         setAppNotice(result?.user ? '应用会话有效' : '没有应用会话');
+      } else if (result?.twoFactorRedirect) {
+        setSession(null);
+        token.current = '';
+        setTokenReady(false);
+        setAppNotice('密码已验证；请在下方完成 TOTP 或使用恢复码登录。');
       } else if (action === 'token') {
         token.current = result.token;
         setTokenReady(true);
@@ -304,8 +316,8 @@ export function ManagedAuth({
         </a>
         <p>
           注册、登录、会话撤销与短期 JWT/JWKS 已提供。本版本需要显式启用实验室
-          HTTP；邮箱链接验证与密码找回已有本地验收；OTP 需本阶段独立验收，OAuth、MFA 和全链路可信
-          TLS 仍有门槛。
+          HTTP；邮箱链接验证与密码找回已有本地验收；OTP/Magic Link 已有本地验收；TOTP
+          本阶段独立验证，OAuth 和全链路可信 TLS 仍有门槛。
         </p>
         <p className="subtle-note">
           首次启用前，由数据库所有者通过 SQL 工作台执行权限委托。已有同名业务 schema 不会被接管。
@@ -359,6 +371,16 @@ export function ManagedAuth({
               onChange={(e) => setEmailOTPEnabled(e.target.checked)}
             />
             允许通过邮件验证码登录、注册、验证邮箱和找回密码
+          </label>
+          <label className="auth-mail-policy backend-wide">
+            <input
+              aria-label="启用应用 TOTP 双重认证"
+              type="checkbox"
+              checked={twoFactorEnabled}
+              disabled={busy || active}
+              onChange={(e) => setTwoFactorEnabled(e.target.checked)}
+            />
+            允许密码账户绑定 TOTP 验证器与一次性恢复码
           </label>
           <label className="auth-mail-policy backend-wide">
             <input
@@ -556,7 +578,7 @@ export function ManagedAuth({
       </section>
       {active && instance?.mail_runtime_enabled && (
         <AuthRecoveryPanel
-          key={branch}
+          key={`${branch}/recovery`}
           branch={branch}
           projectId={projectId}
           emailHint={session?.email}
@@ -569,7 +591,7 @@ export function ManagedAuth({
       )}
       {active && instance?.mail_runtime_enabled && instance.spec?.email_otp_enabled && (
         <AuthOTPPanel
-          key={branch}
+          key={`${branch}/otp`}
           branch={branch}
           emailHint={session?.email}
           onUser={(user) => {
@@ -582,9 +604,23 @@ export function ManagedAuth({
           }}
         />
       )}
+      {active && instance?.spec?.two_factor_enabled && (
+        <AuthTOTPPanel
+          key={`${branch}/totp`}
+          branch={branch}
+          onUser={(user) => {
+            setSession(user);
+            token.current = '';
+            setTokenReady(false);
+            setAppNotice(
+              user?.twoFactorEnabled ? '应用用户 TOTP 已启用，会话有效。' : '应用身份状态已更新。',
+            );
+          }}
+        />
+      )}
       {active && instance?.mail_runtime_enabled && instance.spec?.magic_link_enabled && (
         <AuthMagicLinkPanel
-          key={branch}
+          key={`${branch}/magic-link`}
           branch={branch}
           projectId={projectId}
           emailHint={session?.email}
