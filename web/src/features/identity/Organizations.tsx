@@ -102,7 +102,7 @@ export function Organizations({
         title="组织与访问控制"
         description="组织权限与项目授权按较高权限生效，Collaborator 默认无项目访问。"
       />
-      <ConsoleSessions showError={showError} />
+      <ConsoleSessions />
       <section className="panel identity-panel">
         <h2>创建组织</h2>
         <form className="identity-form" onSubmit={create}>

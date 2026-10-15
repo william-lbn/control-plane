@@ -5,7 +5,7 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 
 **发行状态：预览版本。已经验证的实验环境功能不等于生产认证，也不等于 Neon 官网全部 Backend 服务。**
 
-最新新增：[控制台账号会话管理](docs/DELIVERY-2026-10-15-CONSOLE-SESSIONS.md)五项真实 UI 检查通过；API 0.37.0 / Chart 0.9.23 / migration 033。前一阶段 [XLSX 与计划树](docs/DELIVERY-2026-10-15-SQL-EXPORT-PLAN.md)8 项、[S3 COPY 条件](docs/DELIVERY-2026-10-15-COPY-CONDITIONS.md)16 项、[小数 CPU/准入](docs/DELIVERY-2026-10-15-FRACTIONAL-CPU.md)9 项均通过。
+最新状态：[本批最终交付](docs/DELIVERY-2026-10-15-BATCH-CURRENT.md)汇总 40 项新 UI/SDK 检查；API 0.37.0 / Chart 0.9.24 / migration 033 / revision 91。涵盖实际小数配额、S3 COPY 条件、XLSX、计划树和 Console 会话管理。
 
 上一批新增：[应用 TOTP 双重认证](docs/DELIVERY-2026-10-15-AUTH-TOTP.md)八项 UI 与[项目共享查询](docs/DELIVERY-2026-10-15-SHARED-QUERIES.md)六项 UI 均通过；API 0.33 / Chart 0.9.17 / migration 031。
 

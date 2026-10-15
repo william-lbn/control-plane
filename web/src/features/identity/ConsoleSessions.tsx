@@ -2,12 +2,13 @@ import { useState } from 'react';
 import { api } from '../../api';
 
 type Session = { id: string; created_at: string; expires_at: string; current: boolean };
-export function ConsoleSessions({ showError }: { showError: (e: unknown) => void }) {
+export function ConsoleSessions() {
   const [items, setItems] = useState<Session[]>([]),
     [password, setPassword] = useState(''),
     [busy, setBusy] = useState(false),
     [loaded, setLoaded] = useState(false),
-    [more, setMore] = useState(false);
+    [more, setMore] = useState(false),
+    [notice, setNotice] = useState<{ message: string; error: boolean } | null>(null);
   async function load() {
     const result = await api<{ items: Session[]; has_more: boolean }>('/api/v1/account/sessions');
     setItems(result.items);
@@ -16,14 +17,22 @@ export function ConsoleSessions({ showError }: { showError: (e: unknown) => void
   }
   async function revoke(id?: string) {
     setBusy(true);
+    setNotice(null);
     try {
-      await api(
+      const result = await api<{ revoked_count: number }>(
         '/api/v1/account/sessions/' + (id ? encodeURIComponent(id) + '/revoke' : 'revoke-others'),
         { method: 'POST', body: JSON.stringify({ password }) },
       );
       await load();
+      setNotice({
+        message: `已撤销 ${result.revoked_count} 个会话；当前登录保持有效。`,
+        error: false,
+      });
     } catch (e) {
-      showError(e);
+      setNotice({
+        message: e instanceof Error ? e.message : '无法撤销会话，请刷新检查。',
+        error: true,
+      });
     } finally {
       setPassword('');
       setBusy(false);
@@ -36,30 +45,45 @@ export function ConsoleSessions({ showError }: { showError: (e: unknown) => void
         管理当前账号的控制台登录。撤销后会话的后续请求立即被拒绝；已开始的请求不会被强制中断。应用
         Auth 会话独立管理。
       </p>
-      <button className="button" disabled={busy} onClick={() => void load().catch(showError)}>
-        加载我的会话
-      </button>
-      <label>
-        当前账号密码
-        <input
-          aria-label="会话管理密码"
-          type="password"
-          autoComplete="current-password"
-          value={password}
-          maxLength={1024}
+      <div className="selector-row">
+        <button
+          className="button"
           disabled={busy}
-          onChange={(e) => setPassword(e.target.value)}
-        />
-      </label>
-      <button
-        className="button"
-        disabled={busy || !password || !items.some((s) => !s.current)}
-        onClick={() => {
-          if (window.confirm('撤销这个账号除当前页面以外的所有登录会话？')) void revoke();
-        }}
-      >
-        撤销其他全部会话
-      </button>
+          onClick={() => {
+            setNotice(null);
+            void load().catch((e) =>
+              setNotice({
+                message: e instanceof Error ? e.message : '无法读取会话。',
+                error: true,
+              }),
+            );
+          }}
+        >
+          加载我的会话
+        </button>
+        <label>
+          当前账号密码
+          <input
+            aria-label="会话管理密码"
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            maxLength={1024}
+            disabled={busy}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+        </label>
+        <button
+          className="button"
+          disabled={busy || !password || !items.some((s) => !s.current)}
+          onClick={() => {
+            if (window.confirm('撤销这个账号除当前页面以外的所有登录会话？')) void revoke();
+          }}
+        >
+          撤销其他全部会话
+        </button>
+      </div>
+      {notice && <p role={notice.error ? 'alert' : 'status'}>{notice.message}</p>}
       {loaded && (
         <p role="status">
           当前显示 {items.length} 个有效会话

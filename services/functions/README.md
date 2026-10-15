@@ -1,3 +1,5 @@
+> Current product status: the native Go Driver/API, React Console, immutable microVM, real SQL, observation, HTTP/SSE, idle suspension/cold wake and request journal have independent Linux/UI acceptance. See [production gates](../../docs/PRODUCTION-GATES.md). Installation remains opt-in. The first-increment description below is historical; WebSockets, triggers and full logs/metering remain incomplete.
+
 # Isolated Functions runtime foundations
 
 The first source increment contains the Node.js 24 Fetch runtime and Go bundle,

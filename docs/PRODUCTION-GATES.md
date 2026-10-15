@@ -1,6 +1,6 @@
 # 生产门槛与官网对齐
 
-状态截至 2026-10-15；API 0.37.0 / migration 033 / Chart 0.9.23 / Helm revision 90；NeonVM revision 53。[控制台会话管理](DELIVERY-2026-10-15-CONSOLE-SESSIONS.md)五项真实 UI 已通过，API 源 b72793b、Web 源 96a84e9；Auth 源 967e1b3 保留。此前各切片沿用独立回执。公开统一 Helm 发行仍为 0.1.30，本批尚未远程发布。
+状态截至 2026-10-15；API 0.37.0 / migration 033 / Chart 0.9.24 / Helm revision 91；NeonVM revision 53。[本批交付](DELIVERY-2026-10-15-BATCH-CURRENT.md)汇总 40 项新 UI/SDK 检查。API 源 b72793b、Web 源 af85f1e、Auth 源 967e1b3；每个切片保留独立精确回执。公开统一 Helm 发行仍为 0.1.30，本批尚未远程发布。
 前一版本 `be04cb4` 的真实 Linux/React 闭环见 [Auth/S3 交付](DELIVERY-2026-10-14-AUTH-S3.md)：
 788 Go/真实 PostgreSQL 检查、八个同源公开镜像、三节点 24 次串行 digest 导入；
 应用密码/会话十组 UI，以及实际 S3 SDK 签名/字节/权限/轮换/撤销/正常缩零均通过。

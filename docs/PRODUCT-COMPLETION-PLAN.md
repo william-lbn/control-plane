@@ -2,7 +2,7 @@
 
 ## 1. 本轮约束
 
-当前 Linux 本地批次已推进到 API 0.37.0、Chart 0.9.23、Helm revision 90。当前准入状态以 [PRODUCTION-GATES](PRODUCTION-GATES.md)为准。新增应用 TOTP、项目共享草稿、个人加密 SQL 历史、小数 CPU 实际配额/新建准入、S3 COPY 源条件、XLSX、基础执行计划树和 Console 个人会话管理均有独立真实 UI 回执。每个镜像保留各自快照，父 Git 不冒充运行源码；旧验收不重复跑，公共发行与本地候选分开记录。
+当前 Linux 本地批次已推进到 API 0.37.0、Chart 0.9.24、Helm revision 91。当前准入状态以 [PRODUCTION-GATES](PRODUCTION-GATES.md)为准。新增应用 TOTP、项目共享草稿、个人加密 SQL 历史、小数 CPU 实际配额/新建准入、S3 COPY 源条件、XLSX、基础执行计划树和 Console 个人会话管理均有独立真实 UI 回执。每个镜像保留各自快照，父 Git 不冒充运行源码；旧验收不重复跑，公共发行与本地候选分开记录。
 
 后续继续未完成的 Functions WS/触发器/完整日志、Object Storage multipart/大对象、Auth Console MFA/分支 factor 迁移、跨实例栅栏、本地可信 TLS、软件恢复与 HA。外部配置和硬件隔离门槛不阻塞本地工程，不能将其当作未开发功能的原因。
 下方带日期段落是历史增量，不覆盖本节当前状态。

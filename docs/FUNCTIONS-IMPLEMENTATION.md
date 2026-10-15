@@ -1,6 +1,8 @@
+> 当前实现：原生 Driver/API/UI、实际 microVM SQL、运行监控、HTTP/SSE、自动休眠/冷醒和请求日志已完成各自 Linux UI 验收，见 [HTTP 交付](DELIVERY-2026-10-14-FUNCTIONS-HTTP.md)、[请求日志](DELIVERY-2026-10-15-FUNCTIONS-JOURNAL.md)和[生产门槛](PRODUCTION-GATES.md)。默认禁用是安装策略，不代表代码尚未集成。下文“本增量/尚未集成”是最初基础层的历史设计状态；WS、触发器、完整日志/计量和 Backend 一致性仍未完成。
+
 # Functions：执行基础层与后续产品闭环
 
-## 1. 目标、官网依据和当前结论
+## 1. 最初基础层的目标、官网依据和历史结论
 
 目标是与 Neon 分支一起演进的实际 Node.js 24 服务：在独立 NeonVM 内运行客户
 bundle，通过 branch-specific DATABASE_URL 访问受限 SQL，支持请求/响应、流式、

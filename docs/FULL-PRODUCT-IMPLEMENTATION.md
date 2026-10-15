@@ -1,8 +1,8 @@
-> 当前 2026-10-10/11 Compute 生命周期增量：[独立 Endpoint 删除与重建](ENDPOINT-DELETION.md) 提供迁移 018、OpenAPI 0.10.1（58 paths / 87 operations）、Go/React 实现；[本版交付](DELIVERY-2026-10-10-COMPUTE-LIFECYCLE.md)记录九套 UI 146 项和原失败恢复 23 项。生产门槛仍逐项保留。
+> 历史 2026-10-10/11 Compute 生命周期增量：[独立 Endpoint 删除与重建](ENDPOINT-DELETION.md) 提供迁移 018、OpenAPI 0.10.1（58 paths / 87 operations）、Go/React 实现；[本版交付](DELIVERY-2026-10-10-COMPUTE-LIFECYCLE.md)记录九套 UI 146 项和原失败恢复 23 项。生产门槛仍逐项保留。
 
 > Historical broad design contract; current implementation/version/acceptance are authoritative in [API.md](API.md), [PRODUCTION-GATES](PRODUCTION-GATES.md) and [local batch](DELIVERY-2026-10-15-LOCAL-BATCH.md). This design is not a claim of full Neon feature completion.
 
-> 历史代码增量说明（2026-10-08）：[Managed Auth v1](MANAGED-AUTH.md) 已有 Go/TS/React/Helm 实现；当时 API 版本为 0.9.0，当前合同见上面的 0.10.1。后面的未来 API 与完整 Backend 设计仍是规划。Better Auth 1.4.18 是原网站快照起点，实际锁定并测试为 1.7.7。
+> 历史代码增量说明（2026-10-08）：[Managed Auth v1](MANAGED-AUTH.md) 已有 Go/TS/React/Helm 实现；当时 API 版本为 0.9.0，当时后续合同为 0.10.1；实际当前版本见 API.md。后面的未来 API 与完整 Backend 设计仍是规划。Better Auth 1.4.18 是原网站快照起点，实际锁定并测试为 1.7.7。
 
 # 完整产品实施合同与验收顺序
 
