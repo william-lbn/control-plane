@@ -11,6 +11,7 @@ type Entry = {
   outcome: string;
   sqlstate: string;
   started_at: string;
+  finished_at: string | null;
   duration_ms: number | null;
   truncated: boolean;
   original_bytes: number;
@@ -31,6 +32,7 @@ export function QueryHistory({
     [cursor, setCursor] = useState<string | null>(null),
     [enabled, setEnabled] = useState(false),
     [busy, setBusy] = useState(false),
+    [deleting, setDeleting] = useState<string | null>(null),
     [notice, setNotice] = useState('');
   useEffect(() => {
     epoch.current++;
@@ -38,6 +40,7 @@ export function QueryHistory({
     setItems([]);
     setCursor(null);
     setNotice('');
+    setDeleting(null);
     setBusy(true);
     api<{ enabled: boolean; items: Entry[]; next_cursor: string | null }>(base)
       .then((v) => {
@@ -104,6 +107,27 @@ export function QueryHistory({
           not_submitted: '未提交数据库',
           outcome_unknown: '结果未知',
         }[entry.outcome] || entry.outcome;
+  const canDelete = (entry: Entry) =>
+    !!entry.finished_at && ['completed', 'failed', 'not_submitted'].includes(entry.outcome);
+  async function remove(id: string) {
+    const current = epoch.current;
+    setBusy(true);
+    setNotice('');
+    try {
+      await api(base + '/' + encodeURIComponent(id) + '?acknowledge_history_deletion=true', {
+        method: 'DELETE',
+      });
+      if (current !== epoch.current) return;
+      setItems((old) => old.filter((item) => item.id !== id));
+      setDeleting(null);
+      setNotice('已删除本人的历史记录；数据库执行结果和当前编辑器内容没有改变。');
+    } catch (e) {
+      if (current === epoch.current)
+        setNotice(e instanceof Error ? e.message : '删除结果未确认；请重载历史核对原记录。');
+    } finally {
+      if (current === epoch.current) setBusy(false);
+    }
+  }
   return (
     <section
       className="table-card backend-panel"
@@ -125,6 +149,20 @@ export function QueryHistory({
             <summary>管理本账号的历史采集与保留</summary>
             <HistoryPolicy />
           </details>
+          {deleting && (
+            <div className="notice" role="group" aria-label="确认删除历史记录">
+              <p>
+                确认删除本人记录 <code>{deleting}</code>？这仅移除元数据库中的历史文本和详情，
+                不撤销已执行 SQL，不清空编辑器。备份与 WAL 遵循各自保留策略。
+              </p>
+              <button className="button" disabled={busy} onClick={() => void remove(deleting)}>
+                确认删除此历史
+              </button>
+              <button className="button" disabled={busy} onClick={() => setDeleting(null)}>
+                取消删除历史
+              </button>
+            </div>
+          )}
           <div className="table-scroll">
             <table>
               <thead>
@@ -167,6 +205,17 @@ export function QueryHistory({
                         onClick={() => void load(entry)}
                       >
                         加载到编辑器
+                      </button>
+                      <button
+                        className="button"
+                        disabled={busy || !canDelete(entry)}
+                        aria-label={'删除历史 ' + entry.id}
+                        title={
+                          canDelete(entry) ? '删除本人历史记录' : '保留进行中或结果未确认的记录'
+                        }
+                        onClick={() => setDeleting(entry.id)}
+                      >
+                        删除记录
                       </button>
                     </td>
                   </tr>

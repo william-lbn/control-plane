@@ -25,7 +25,7 @@
 - Auth 组织强制 MFA、OAuth/SSO、分支 factor 迁移和完整管理流程（Console MFA 自助已验收）；应用密码和会话安全已验收。
 - 完整目录/删除/恢复：rename、系统身份迁移、TTL/物理 GC、原分支恢复和 Backend 一致性。
 - 严格小数 CPU Guest 隔离/计量、完整内存归还、跨实例外部栅栏、软件 HA/DR 流程和本地全链路 TLS。
-- Console 项目共享查询历史、单条历史删除、计划比较/AI SQL 等缺失交互；个人保留/采集策略已验收；脚本、计划、CSV/JSON 和个人保存查询已验收。
+- Console 项目共享查询历史、计划比较/AI SQL 等缺失交互；个人保留/采集策略和单条历史删除已验收；脚本、计划、CSV/JSON 和个人保存查询已验收。
 
 这些项目的现有代码、版本现场结果和生产门槛分别查看
 [PRODUCTION-GATES.md](PRODUCTION-GATES.md)、[PRODUCT-COMPLETION-PLAN.md](PRODUCT-COMPLETION-PLAN.md)

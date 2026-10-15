@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.39.0",
+    "version": "0.40.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -3601,7 +3601,7 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 100,
-            "description": "1–100 UTF-8 bytes after trim; no CR/LF/NUL."
+            "description": "1\u2013100 UTF-8 bytes after trim; no CR/LF/NUL."
           },
           "sql": {
             "type": "string",
@@ -16379,6 +16379,81 @@
         },
         "description": "Owner-only within authorized project. Text is authenticated with the original project/owner/history ID AAD; old encryption key versions must remain available. no-store. Truncated history is not the complete executable query.",
         "summary": "Owner reads bounded historical SQL without executing it"
+      },
+      "delete": {
+        "operationId": "deletePersonalSQLHistory",
+        "tags": [
+          "SQL"
+        ],
+        "summary": "Delete one owned confirmed terminal history entry without executing SQL",
+        "description": "Console session and project Editor+ required. No keyring or enabled capture required. Only completed/failed/not_submitted with finished_at are eligible. Missing or foreign-owner IDs both return 204. Repeat DELETE is safe. Row lock, physical metadata deletion and audit commit atomically. In-flight/unknown/missing completion returns 409. A 503 is unconfirmed: reload history or retry this exact DELETE; never replay SQL. WAL/backups retain their own policies.",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "history",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^qh_[a-f0-9]{24}$"
+            }
+          },
+          {
+            "name": "acknowledge_history_deletion",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "boolean",
+              "enum": [
+                true
+              ]
+            },
+            "description": "Exactly one true value acknowledges personal metadata deletion."
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Owned record deleted, or no owned record exists. No response body."
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
       }
     },
     "/api/v1/account/sessions": {

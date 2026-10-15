@@ -1,6 +1,6 @@
 # 生产门槛与官网对齐
 
-状态截至 2026-10-16；API 0.39.0 / migration 035 / Chart 0.9.27 / Helm revision 94。Console MFA 和个人 SQL 历史采集/保留策略已有 Linux Go/PG 与真实 UI 回执，见[当前交付](DELIVERY-2026-10-16-CURRENT.md)。[剩余需求账本](REMAINING-REQUIREMENTS-2026-10-16.md)区分未开发、部分实现和独立验收门槛。运行镜像按本地快照留证；公开统一 Helm 0.1.31 源码候选仍锁 0.23.0 公共控制镜像，不能冒充本地 0.39.0 发行。
+状态截至 2026-10-16；API 0.40.0 / migration 035 / Chart 0.9.28 / Helm revision 95。Console MFA、个人 SQL 历史采集/保留策略和单条删除已有 Linux Go/PG 与真实 UI 回执，见[当前交付](DELIVERY-2026-10-16-CURRENT.md)。[剩余需求账本](REMAINING-REQUIREMENTS-2026-10-16.md)区分未开发、部分实现和独立验收门槛。运行镜像按本地快照留证；公开统一 Helm 0.1.31 源码候选仍锁 0.23.0 公共控制镜像，不能冒充本地 0.40.0 发行。
 前一版本 `be04cb4` 的真实 Linux/React 闭环见 [Auth/S3 交付](DELIVERY-2026-10-14-AUTH-S3.md)：
 788 Go/真实 PostgreSQL 检查、八个同源公开镜像、三节点 24 次串行 digest 导入；
 应用密码/会话十组 UI，以及实际 S3 SDK 签名/字节/权限/轮换/撤销/正常缩零均通过。
@@ -79,8 +79,8 @@ Linux 真实场景正反例 + 恢复证据共同验收。
 
 ## 2026-10-13：本地真实推理已解除外部凭据阻塞
 
-独立 Go AI 网关、限定列权限元数据库身份、AI UI 和持久用量已完成代码/Helm/实际 UI 闭环。769 个公开 Linux Go/PG 测试与九组真实 UI 检查通过，见 [交付](DELIVERY-2026-10-13-AI-GATEWAY.md)。只验收文本 Chat Completions；动态供应商管理、完整协议/计费、HA 和全链路 TLS 仍未完成。个人保存查询已在 0.1.27 通过实际 UI 六组检查；完整交付见 [当前报告](DELIVERY-2026-10-13-SAVED-QUERIES.md)。显式项目共享查询已通过新 Linux UI/真实 PG 多用户隔离验收；个人加密执行历史已通过新真实 SQL/UI 验收。个人采集/保留策略与到期清理已在 0.39.0 验收；项目级共享历史、AI 命名和单条手工删除尚未完成。
+独立 Go AI 网关、限定列权限元数据库身份、AI UI 和持久用量已完成代码/Helm/实际 UI 闭环。769 个公开 Linux Go/PG 测试与九组真实 UI 检查通过，见 [交付](DELIVERY-2026-10-13-AI-GATEWAY.md)。只验收文本 Chat Completions；动态供应商管理、完整协议/计费、HA 和全链路 TLS 仍未完成。个人保存查询已在 0.1.27 通过实际 UI 六组检查；完整交付见 [当前报告](DELIVERY-2026-10-13-SAVED-QUERIES.md)。显式项目共享查询已通过新 Linux UI/真实 PG 多用户隔离验收；个人加密执行历史已通过新真实 SQL/UI 验收。个人采集/保留策略与到期清理已在 0.39.0 验收；单条手工删除已在 0.40.0 验收；项目级共享历史和 AI 命名尚未完成。
 
 ## 2026-10-15：SQL 工作台新增闭环
 
-XLSX 与 Explain/Analyze 基础树形计划各四项真实 Linux UI 通过，版本和源码见 [交付](DELIVERY-2026-10-15-SQL-EXPORT-PLAN.md)。个人保留/到期记录删除已有独立本地验收；项目共享历史、单条删除、AI SQL、计划比较/自动建议仍未完成；个人加密历史和已保存共享草稿不能代替这些能力。
+XLSX 与 Explain/Analyze 基础树形计划各四项真实 Linux UI 通过，版本和源码见 [交付](DELIVERY-2026-10-15-SQL-EXPORT-PLAN.md)。个人保留/到期记录删除已有独立本地验收；单条手工删除已在 0.40.0 验收；项目共享历史、AI SQL、计划比较/自动建议仍未完成；个人加密历史和已保存共享草稿不能代替这些能力。

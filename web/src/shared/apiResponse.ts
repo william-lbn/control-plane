@@ -25,6 +25,9 @@ export class ApiError extends Error {
 // Only the accepted-Operation observer retries reads; this parser does not
 // repeat a request, and callers must retain mutation idempotency on uncertainty.
 export async function decodeAPIResponse<T>(response: Response): Promise<T> {
+  // HTTP 204 has no representation. Keep rejecting missing/truncated JSON for
+  // ordinary 2xx responses; an explicitly empty DELETE receipt is valid.
+  if (response.status === 204) return undefined as T;
   let value: unknown;
   try {
     value = await response.json();

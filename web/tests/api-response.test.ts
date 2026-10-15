@@ -3,6 +3,10 @@ import { test } from 'node:test';
 import { ApiError, decodeAPIResponse } from '../src/shared/apiResponse.ts';
 import { followOperation } from '../src/shared/followOperation.ts';
 
+test('204 deletion receipts have no JSON representation', async () => {
+  assert.equal(await decodeAPIResponse<void>(new Response(null, { status: 204 })), undefined);
+});
+
 test('truncated JSON and HTML cannot become successful empty API objects', async () => {
   for (const body of ['{"id":', '<html>upstream error</html>', 'null', '[]', 'true']) {
     await assert.rejects(

@@ -1,111 +1,74 @@
-# 2026-10-16：Console MFA 与个人 SQL 历史策略
+# 2026-10-16 当前交付：MFA、历史策略与单条删除
 
-## 1. 交付结论
+## 1. 结论
 
-| 能力 | 已实现与实际验证 | 保留的边界 |
+本地运行 API **0.40.0**、migration **035**、Chart **0.9.28**、控制面 Helm revision **95**。
+本次实现并按阶段验收 Console MFA、个人 SQL 历史采集/保留策略和单条手工删除。
+后端 Go、前端 React/TypeScript、元数据库 PostgreSQL；未修改 Neon Rust 源码。
+Python 只在维护者私有 SSH/证据传输中使用，不进入公共仓库或产品运行路径。
+
+| 能力 | 实现 / 验收 | 边界 |
 |---|---|---|
-| Console MFA | TOTP、加密待确认、一次性恢复码、密码确认、防重放、其他会话撤销、旧版 session INSERT 保护、React UI、OpenAPI | 组织强制、WebAuthn/SSO、正式运营恢复和完整攻击矩阵未完成 |
-| 个人 SQL 历史策略 | 采集开关、0/7/30/90 天期限、明确清理确认、版本/幂等、owner 隔离、有界清理、审计事务和 UI | 单条手动删除、共享历史和未知结果人工处置未完成 |
+| Console MFA | TOTP、一次性恢复码、加密绑定、密码确认、防重放、会话撤销、旧版 INSERT 保护和真实 UI/PG | 组织强制、WebAuthn/SSO、完整恢复/攻击矩阵仍缺 |
+| 个人历史策略 | 采集开关、0/7/30/90 天保留、显式确认、版本/幂等、owner 隔离、到期清理与事务审计 | 默认保留全部；不清理进行中/未知结果；共享历史与人工定性仍缺 |
+| 单条历史删除 | 本人终态、UI 二次确认、Cookie/CSRF、并发重试、审计原子性，Compute 0 下真实 UI 验收 | 元数据 DELETE 非安全擦盘；不撤销 SQL、不删除备份/测试证据 |
 
-这是两个经过本地验收的功能切片。官网全部功能及生产准入仍未完成；准确待办见
-[35 项源码核对账本](REMAINING-REQUIREMENTS-2026-10-16.md)和[生产门槛](PRODUCTION-GATES.md)。
-产品后端为 Go、前端 React/TypeScript、元数据库 PostgreSQL；Python 只作维护者私有
-SSH/证据传输，不进入公开源、产品服务或新功能运行路径。未修改 Neon Rust 源码。
+**官网全部功能和生产准入仍未完成**。未开发与部分实现/待验收分列于
+[35 项需求账本](REMAINING-REQUIREMENTS-2026-10-16.md)和[生产门槛](PRODUCTION-GATES.md)。
+本账本不是官网全部 SaaS 子功能的穷尽计数。详细合同见 [MFA](CONSOLE-MFA.md)、
+[历史策略](SQL-HISTORY-POLICY.md)、[单条删除](SQL-HISTORY-DELETION.md)。
 
-## 2. 最终运行版本及来源
+## 2. 当前部署与镜像来源
 
-API **0.39.0**，94 paths / 134 operations，migration **035**，独立 Chart **0.9.27**，
-控制面 Helm revision **94**。保留同一元数据库、keyring 和既有业务配置。
+当前合同 **94 paths / 135 operations**。API/Worker 与 Web 均来自不可变 Linux 本地快照
+`a715af6db9c2bd58c327798e2b9dafe562254c991d8366dc2f28480b53f240f5`，父 Git 为 `19558ec`；父提交不冒充运行源码。
 
-| 组件 | 本地源快照 SHA-256 | 实际 image digest |
-|---|---|---|
-| API / Worker | `062513a9bac8cd9b52bdac97f44e711df449cd662fc867f9b4b07351a8c526c7` | `sha256:e58c82edf9de5aab5c98a1c0e629ce120dca418bc44c76c47a76d245bf04209b` |
-| Web | `e341c431340eae5112c8261f4b699ad533c4e347f44199692789b5c7ad4b2717` | `sha256:12c2f5739b6ad035d1e399393c1b0fc4b2b7f0fed869d6da712913f4ac7185d2` |
+| 组件 | 实际本地 digest |
+|---|---|
+| API / Worker | `sha256:3eeedafc1dec74bc1fa9c38de1893b6f10d6ada89a0ebcbe662af6979970be65` |
+| Web | `sha256:72815df15d0d3e3033315d585ebcd2cdd6da032a7add7c759ff75362f94ddbf0` |
 
-均为 Linux 本地 BuildKit 构建、逐节点 checksum/digest 核对与 containerd 导入；没有
-通过 Windows 构建/CI。各组件保留自己的快照，不把父 Git 提交冒充运行源码。
-最后一次 Web 修复只替换 Web image，API/Worker 保持其已验收 Go digest。
-API 镜像补齐本项目和引入依赖的 license/NOTICE 文件。
+Linux BuildKit 串行构建，逐节点 checksum/digest 核对并导入 containerd。其余组件沿用各自
+已接受镜像。升级前元数据库备份 SHA-256 为
+`76795b4ff50ce29aef7183a33f7f58bda0f95ec8828351a5220d6019f3bce136`；9 个 PVC、779 个既有非 Helm Secret UID 和
+其他六个 neon release manifest 保持。没有在 Windows 构建或执行 CI。
 
-三次部署都先备份元数据、原 values/manifest 和资源身份，再执行标准 Helm 升级。
-最终升级前备份摘要 `a4e95473d7508e69c1b23551a5e435b770051fec3dccfc1c8d133eea23884ac1`。
-9 个 PVC、779 个既有非 Helm Secret UID、其他六个 neon release manifest 保持。
-公开统一 Helm 0.1.31 源码候选仍锁旧 0.23.0 公共控制镜像；新本地 0.39.0 镜像的
-公开发布、匿名验证及统一版本锁更新属于独立发行步骤。
+公开统一 Helm 0.1.31 源码候选仍锁 0.23.0 公共控制镜像；当前 0.40.0 是带本地精确
+image overrides 的独立 Chart 部署。完整公开镜像发行、匿名验证和统一版本锁更新
+仍是 O02，不声称默认下载旧锁即可复现最新功能。
 
-## 3. 测试与修复
+## 3. 实际测试与失败记录
 
-### Go / PostgreSQL
+- 前一阶段：两个 MFA Go race 测试、一个个人历史策略 Go race/PG 测试；MFA 累计
+  12 条与历史策略/补充因素验证 11 条 UI 账本通过。准确旧快照、原账号续测和 HTTP
+  UUID 修复见[0.39 阶段回执](DELIVERY-2026-10-16-MFA-HISTORY-POLICY.md)。
+- 新增删除：`TestSQLHistoryDeleteIsolationProtectionReplayAndAtomicAudit` 真实一次性
+  control_ci PostgreSQL/race 通过，覆盖项目/owner/API Key/CSRF、显式确认、未结束/
+  未知结果/缺回执保护、审计失败回滚、并发和重复 DELETE。vet 与三项 OpenAPI 合同
+  检查通过。首轮审计字段不符合已有模型，事务回滚后修正；失败证据保留。
+- TypeScript、Prettier、Vite 通过。对修改过的 API response decoder 单独执行五项测试，
+  含新 204 空响应与旧的损坏 JSON/权限/请求身份保护。新增 UI suite 分页变量补全显式
+  类型后通过；原类型失败保留。45 个受保护 suite 的声明/准入/文件存在检查通过。
+- 实际 Linux UI Job **publication-ui-20261015195624** 五项检查通过：记录原历史集合；通过页面一次无写入
+  SELECT 创建新记录；缩零后取消；确认只删除新记录且保留编辑器；重复 DELETE、
+  重载及 Compute 0。新记录原始详情先保存证据，原 **10** 条历史全部保留。
+  本次仅 **1** 次 SQL 请求，没有重跑旧功能全量套件。
 
-两个 MFA race 测试（含真实 PG）和一个个人历史策略 race/PG 测试通过；vet 通过。
-OpenAPI 三项路径、引用/会话合同与 operationId 检查通过。没有重跑旧业务全量套件。
-TypeScript、Prettier、Vite 构建通过，Linux 文档生成确认 94/134；44 个受保护 UI
-suite 的声明、准入和文件存在性校验通过。
+三个阶段 UI 账本为 12 + 11 + 5，不冒充一次官网全量回归。新版本只重新验收新增路径
+和修改过的共享 decoder；旧功能按其已有版本回执保留，不能声称全产品已准入。
 
-历史策略的真实 PG 负例覆盖：默认不删、停止采集、显式期限确认、幂等冲突/版本冲突、
-其他账号、进行中/结果未知/缺完成回执保护、审计失败回滚，以及并发批次不重删。
-DELETE 是元数据库记录删除，WAL/备份/死元组遵循其自身保留策略，不声称安全擦盘。
+## 4. 数据、资源与复测
 
-### 实际 UI
+本批三个终态 UI/quality Job 均先归档描述/容器日志，再按 UID/resourceVersion 退休；
+一次性 PG 测试 Pod 也在各自回执中保留 UID/日志后退休。失败、源码、OCI、密码保护
+输入、原测试文件和所有原业务历史保持。SQL 新记录只通过被验收的产品功能删除，
+其原始内容仍在证据中。MFA/策略测试账号最终恢复 MFA 关闭、采集开启、保留全部。
 
-MFA 原账号累计 **12 项**检查见[独立回执](DELIVERY-2026-10-16-CONSOLE-MFA.md)。
-历史策略最终 Job **publication-ui-20261015192603** 又通过 **11 项**：八项个人策略/
-版本/幂等/重载/空目录清理/恢复默认/运营方隔离，以及三项原账号正常再次绑定、
-实际恢复码显示、启用使此前有效的其他浏览器登录后续 401，最后正常关闭因素并恢复
-密码登录。后三项关闭了原 MFA 流程在首次 textarea 定位失败前未观察到的浏览器断言。
-累计 **23 项**是各自检查账本之和，不冒充一次完整官网全量测试。
+最终检查 3 节点 Ready、无压力条件，87 个 Deployment/StatefulSet 达到各自期望副本，
+错误 Pod 0、托管 Compute VM 0。瞬时健康不等于 HA、物理独立或长期 SLO。
+私有 evidence 为 `control-plane/production/evidence/20261016-history-delete` 与前一阶段
+各根目录；不进入 Git。各阶段只清理已确认归属的运行资源，不删除原始测试证据。
 
-两类原失败都保留：测试的嵌套 textarea/select label 定位和续测页面导航已修正；
-实际产品的 HTTP 浏览器 `crypto.randomUUID()` 不可用导致保存没有发出，改复用现有
-Web Crypto CSPRNG `newRequestKey()`，并将生成失败纳入 UI 错误处理。只重建 Web，
-沿用原账号继续验证，没有创建新账号掩盖失败。明文因素/恢复码只保留于私有输入；
-涉及因素 DOM 的两个 suite 不上传公开 GitHub artifact。
-
-## 4. 数据、资源与证据
-
-既有历史、数据、业务目录和原始证据未删除；实际 UI 的清理只针对没有 SQL 的新测试
-账号，返回 deleted_count=0。合成数据物理删除和失败回滚只发生在独立 control_ci。
-测试账号最后为采集开启、保留全部、MFA 关闭；运营方 admin 未变更因素或策略。
-
-归档 Job/Pod 描述及所有容器日志后，用 UID/resourceVersion 条件退休 **11 个**终态
-运行资源（10 Job / 1 失败 Go Pod）；另两个成功 Go 测试 Pod 在各自回执中已按 UID
-退休。中断过的浏览器 Pod 已由 deadline 清除时，核对其预先归档的精确 Job UID 后
-才退休 Job。源码快照、OCI、私有 checkpoint、业务数据/PVC/Secrets 与失败记录保留。
-
-最终只读检查：3 节点 Ready、无压力条件；neon/neonvm-system 的 **87 个** Deployment/
-StatefulSet 达到各自期望副本数；错误 Pod 0，托管 Compute VM 0，Node100 可用约
-369 GiB。该瞬时检查不代表 HA、物理故障域或长期 SLO 验收。
-
-维护者私有 evidence：`control-plane/production/evidence/20261016-mfa`、
-`20261016-history-policy`、`20261016-delivery`；全部保留，不随源码推送。
-
-## 5. 开发者手工复测
-
-详细接口/模型与步骤见 [MFA 合同](CONSOLE-MFA.md)、[历史策略合同](SQL-HISTORY-POLICY.md)
-及 [Linux 开发流程](LOCAL-LINUX-DEVELOPMENT.md)。先在 Linux 按锁定 builder 构建并
-部署本批 API/Worker/Web 和迁移，保留既有 keyring。Go 测试只允许一次性 control_ci：
-
-```bash
-cd api
-# 由操作者在受保护环境配置 NEON_V2_TEST_DATABASE_URL；禁止指向业务元数据库。
-go test -race ./internal/control -run '^TestConsoleMFA|^TestSQLHistoryPolicy' -count=1
-go test ./internal/control -run '^TestOpenAPI' -count=1
-```
-
-浏览器依赖及真实 Chromium 使用锁定 Linux 镜像；安装依赖按项目现有 Linux 流程。
-每次新建受保护 evidence/private 目录，不覆盖旧 attempt。密码由文件输入：
-
-```bash
-export NEON_E2E_BASE_URL=http://192.168.146.100:30788
-export NEON_E2E_ADMIN_PASSWORD_FILE=/secure/operator/admin-password
-export NEON_E2E_PRIVATE_DIR=/secure/attempt-new/private
-export NEON_E2E_ARTIFACTS=/secure/attempt-new/evidence
-install -d -m 0700 "$NEON_E2E_PRIVATE_DIR" "$NEON_E2E_ARTIFACTS"
-npm --prefix web run test:e2e -- console-mfa.spec.ts
-# 复用上一步最终关闭 MFA 的同一账号，不接触既有 SQL 历史。
-export NEON_E2E_CONSOLE_ACCOUNT_FIXTURE="$NEON_E2E_PRIVATE_DIR/console-mfa-account.private.json"
-npm --prefix web run test:e2e -- history-policy.spec.ts
-```
-
-保持一 worker、零自动重试。失败先看原状态/checkpoint，不能重新建账号/分支绕过。
-这些自助测试不会为 admin 配置 MFA，不创建 Compute；同一账号原始输入继续保留。
+完整手工步骤和 API/模型见三个功能合同及 [Linux 开发流程](LOCAL-LINUX-DEVELOPMENT.md)。
+只允许一次性 control_ci 做合成破坏性 Go 测试；真实浏览器使用受保护 owner fixture。
+失败核对同一原请求/历史 ID，不重新建 fixture 或盲目重发 SQL。
