@@ -6,6 +6,7 @@ COPY web/package.json web/package-lock.json ./
 RUN npm ci --no-audit --fund=false
 COPY web/index.html web/tsconfig.json web/vite.config.ts ./
 COPY web/src ./src
+COPY web/public ./public
 COPY web/scripts ./scripts
 RUN npm run build
 FROM ${WEB_RUNTIME_IMAGE}

@@ -22,3 +22,6 @@ third_party/licenses/PostgREST-16.4-MIT.txt and copied into that image at
 own source, not to the upstream PostgREST executable or its dependencies.
 
 Product blob access uses github.com/minio/minio-go/v7 v7.2.0 (Apache-2.0), checksum-pinned in api/go.sum. Its S3 signing client is an internal transport; this release does not claim an external S3 gateway.
+
+SQL XLSX export uses fflate 0.8.3 (MIT), https://github.com/101arrowz/fflate.
+The unmodified upstream notice is retained in third_party/licenses/fflate-0.8.3-MIT.txt.

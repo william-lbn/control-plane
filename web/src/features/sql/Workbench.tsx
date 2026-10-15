@@ -7,6 +7,7 @@ import { ScriptResults, type ScriptResult } from './ScriptResults';
 import { ResultExports } from './ResultExports';
 import { SavedQueries } from './SavedQueries';
 import { QueryHistory } from './QueryHistory';
+import { QueryPlan } from './QueryPlan';
 
 export function Workbench({
   projectId,
@@ -25,6 +26,12 @@ export function Workbench({
   const [database, setDatabase] = useState('');
   const [sql, setSQL] = useState('SELECT current_database(), current_user, now();');
   const [result, setResult] = useState<QueryResult | null>(null);
+  const [planResult, setPlanResult] = useState<{
+    result: QueryResult;
+    analyzed: boolean;
+    sequence: number;
+  } | null>(null);
+  const planSequence = useRef(0);
   const [scriptResult, setScriptResult] = useState<ScriptResult | null>(null);
   const [mode, setMode] = useState<'single' | 'script'>('single');
   const [queryAction, setQueryAction] = useState<'query' | 'explain' | 'analyze'>('query');
@@ -78,7 +85,19 @@ export function Workbench({
       );
       if (epoch !== scopeEpoch.current) return;
       if (mode === 'script') setScriptResult(data as ScriptResult);
-      else setResult(data as QueryResult);
+      else {
+        const received = data as QueryResult;
+        setResult(received);
+        setPlanResult(
+          queryAction === 'query'
+            ? null
+            : {
+                result: received,
+                analyzed: queryAction === 'analyze',
+                sequence: ++planSequence.current,
+              },
+        );
+      }
     } catch (e) {
       if (epoch === scopeEpoch.current) showError(e);
     } finally {
@@ -243,6 +262,13 @@ export function Workbench({
               {result.command} · {result.rows.length} 行{result.truncated ? ' · 已截断' : ''}
             </span>
           </div>
+          {planResult?.result === result && (
+            <QueryPlan
+              key={planResult.sequence}
+              rows={result.rows}
+              analyzed={planResult.analyzed}
+            />
+          )}
           <div className="table-scroll">
             <table>
               <thead>

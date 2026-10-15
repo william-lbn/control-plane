@@ -2,12 +2,9 @@
 
 ## 1. 本轮约束
 
-当前为 [Linux 本地批次](DELIVERY-2026-10-15-LOCAL-BATCH.md)，源码按各镜像快照记录，父提交为 `5449a11`；公开发行与本地候选分别记录。本地 Functions 独立 HTTP/SSE 与自动零/冷醒、
-Auth 应用密码/会话安全、S3 基础真实 SDK 均已有现场 UI 结果；分别见
-[Functions](DELIVERY-2026-10-14-FUNCTIONS-HTTP.md)与[Auth/S3](DELIVERY-2026-10-14-AUTH-S3.md)。
-历史 SQL、Owner、Functions、REST 存储和推理回执保留各自版本，不重复宣称全量生产准入。
-本地邮件验证/密码找回已在 [当前切片](DELIVERY-2026-10-14-AUTH-MAIL.md)通过十组实际 UI。OTP/Magic Link 的本地闭环已验收；下一阶段优先完整对象目录与 S3 兼容；
-随后继续完整对象协议与 Functions 未完成部分。当前工程门槛由 PRODUCTION-GATES 约束。
+当前 Linux 本地批次已推进到 API 0.36.0、Chart 0.9.22、Helm revision 89。当前准入状态以 [PRODUCTION-GATES](PRODUCTION-GATES.md)为准。新增应用 TOTP、项目共享草稿、个人加密 SQL 历史、小数 CPU 实际配额/新建准入、S3 COPY 源条件、XLSX 和基础执行计划树均有独立真实 UI 回执。每个镜像保留各自快照，父 Git 不冒充运行源码；旧验收不重复跑，公共发行与本地候选分开记录。
+
+后续继续未完成的 Functions WS/触发器/完整日志、Object Storage multipart/大对象、Auth Console MFA/分支 factor 迁移、跨实例栅栏、本地可信 TLS、软件恢复与 HA。外部配置和硬件隔离门槛不阻塞本地工程，不能将其当作未开发功能的原因。
 下方带日期段落是历史增量，不覆盖本节当前状态。
 
 继续执行完整官网 Backend 目标。需要外部账号、模型调用凭据、SMTP 或 OAuth
