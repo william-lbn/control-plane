@@ -230,7 +230,7 @@ func (s *server) s3Invoke(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		if len(data) != 0 || r.Header.Get("X-Amz-Server-Side-Encryption") != "" || (r.Header.Get("X-Amz-Metadata-Directive") != "" && r.Header.Get("X-Amz-Metadata-Directive") != "COPY" && r.Header.Get("X-Amz-Metadata-Directive") != "REPLACE") || r.Header.Get("X-Amz-Copy-Source-If-None-Match") != "" || r.Header.Get("X-Amz-Copy-Source-If-Modified-Since") != "" || r.Header.Get("X-Amz-Copy-Source-If-Unmodified-Since") != "" {
+		if len(data) != 0 || r.Header.Get("X-Amz-Server-Side-Encryption") != "" || (r.Header.Get("X-Amz-Metadata-Directive") != "" && r.Header.Get("X-Amz-Metadata-Directive") != "COPY" && r.Header.Get("X-Amz-Metadata-Directive") != "REPLACE") {
 			s3Error(w, r, 501, "NotImplemented")
 			return
 		}
@@ -239,7 +239,12 @@ func (s *server) s3Invoke(w http.ResponseWriter, r *http.Request) {
 			s3Error(w, r, 400, "InvalidArgument")
 			return
 		}
-		item, err := copyStorageObject(r.Context(), conn, p.ProjectID, srcBucket, srcKey, bucket, key, r.Header.Get("X-Amz-Copy-Source-If-Match"), r.Header.Get("If-Match"), r.Header.Get("If-None-Match"), replacement...)
+		conditions, err := parseStorageCopyConditions(r.Header)
+		if err != nil {
+			s3Error(w, r, 400, "InvalidArgument")
+			return
+		}
+		item, err := copyStorageObjectWithConditions(r.Context(), conn, p.ProjectID, srcBucket, srcKey, bucket, key, conditions, r.Header.Get("If-Match"), r.Header.Get("If-None-Match"), replacement...)
 		if err != nil {
 			var fault *storageMutationFault
 			if errors.As(err, &fault) {

@@ -36,6 +36,10 @@ type storageCopyMetadata struct {
 // blob. It never fetches an external URL or deletes a shared blob. The branch
 // directory lock serializes copy with put/delete/quota checks and PITR metadata.
 func copyStorageObject(ctx context.Context, conn *pgx.Conn, project, srcBucket, srcKey, dstBucket, dstKey, srcMatch, dstMatch, dstNone string, replacements ...storageCopyMetadata) (record, error) {
+	return copyStorageObjectWithConditions(ctx, conn, project, srcBucket, srcKey, dstBucket, dstKey, storageCopyConditions{Match: srcMatch}, dstMatch, dstNone, replacements...)
+}
+
+func copyStorageObjectWithConditions(ctx context.Context, conn *pgx.Conn, project, srcBucket, srcKey, dstBucket, dstKey string, source storageCopyConditions, dstMatch, dstNone string, replacements ...storageCopyMetadata) (record, error) {
 	if len(replacements) > 1 {
 		return nil, &storageMutationFault{400, "InvalidArgument"}
 	}
@@ -75,7 +79,8 @@ func copyStorageObject(ctx context.Context, conn *pgx.Conn, project, srcBucket, 
 	var blob, digest, contentType string
 	var metadata map[string]string
 	var size int64
-	if e = tx.QueryRow(ctx, `SELECT blob_key,sha256,size,content_type,metadata FROM neon_storage.objects WHERE bucket=$1 AND key=$2`, srcBucket, srcKey).Scan(&blob, &digest, &size, &contentType, &metadata); e != nil {
+	var sourceModified time.Time
+	if e = tx.QueryRow(ctx, `SELECT blob_key,sha256,size,content_type,metadata,updated_at FROM neon_storage.objects WHERE bucket=$1 AND key=$2`, srcBucket, srcKey).Scan(&blob, &digest, &size, &contentType, &metadata, &sourceModified); e != nil {
 		if errors.Is(e, pgx.ErrNoRows) {
 			return nil, &storageMutationFault{404, "NoSuchKey"}
 		}
@@ -84,7 +89,7 @@ func copyStorageObject(ctx context.Context, conn *pgx.Conn, project, srcBucket, 
 	if !strings.HasPrefix(blob, project+"/") {
 		return nil, &storageMutationFault{409, "ObjectIdentityMismatch"}
 	}
-	if srcMatch != "" && srcMatch != "*" && srcMatch != digest && srcMatch != "\""+digest+"\"" {
+	if !source.accepts(digest, sourceModified) {
 		return nil, &storageMutationFault{412, "PreconditionFailed"}
 	}
 	if replacement != nil {

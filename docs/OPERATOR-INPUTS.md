@@ -1,6 +1,6 @@
 # 人工输入清单与可直接推进的工作
 
-状态日期：2026-10-14。此清单用于后续统一配置，不要求每个功能开发前再次选择。
+状态日期：2026-10-15。此清单用于后续统一配置，不要求每个功能开发前再次选择。
 凭据只能在受保护配置入口或 Secret 管理工具中输入，不进入聊天、Git、日志或公开证据。
 
 ## 1. 后置：确实需要运营方提供的输入
@@ -8,7 +8,7 @@
 | 项目 | 需要的输入 | 在输入前可完成的工作 | 尚不能证明的结果 |
 | --- | --- | --- | --- |
 | 外部商业模型服务 | 将来接入的供应商、API 地址、模型及调用凭据；本地 Ollama 已真实验收，无须额外模型账号 | 文本 Chat/SSE、目录、分支凭据与用量已完成本地闭环；动态配置 UI、其他协议、预算继续开发 | 特定商业服务、额度和真实计费；Codex/ChatGPT 登录不是平台模型凭据 |
-| Auth 邮件投递 | SMTP/API 服务、发信地址、投递凭据及收信测试地址 | 真实本地 SMTP 验证链接/密码恢复与十组 UI 已通过；OTP/Magic Link 继续开发 | 真实送信、反垃圾策略、送达率 |
+| Auth 邮件投递 | SMTP/API 服务、发信地址、投递凭据及收信测试地址 | 真实本地 SMTP 验证链接/密码恢复与十组 UI 已通过；OTP/Magic Link 与应用 TOTP 已本地验收；Console MFA 等继续开发 | 真实送信、反垃圾策略、送达率 |
 | OAuth/OIDC/企业 SSO | IdP 类型、issuer、client ID/凭据、允许的回调与组织策略 | 标准协议、状态/nonce/PKCE、账号绑定和隔离测试 | 特定 IdP 的真实登录、组织策略与外部安全审核 |
 | 公网生产入口 | 将来使用的域名、DNS 控制及证书/入口策略 | 当前 IP/内部 CA/SAN 的可信传输代码、轮换和拒绝负例 | 公网 DNS/证书、浏览器最终信任链和正式回调 |
 | 独立故障域/异地 DR | 可用节点/存储/异地位置、备份目的地及业务 RPO/RTO | 有限环境的隔离恢复、故障注入、校验和实测记录 | 物理故障域独立、真实异地恢复、长期容量/SLO |
@@ -21,11 +21,11 @@
 下列工作属于工程任务，不应转交给用户选择或误记为“等待凭据”：
 
 - Functions WS、分支复制、触发器、完整日志/计量；HTTP/SSE 和自动零/一次冷醒已在 0.1.28 验收。
-- Object Storage multipart/COPY/bulk/CORS/metadata/大文件、引用安全 GC 和独立网关；基础 S3/SigV4/signed chunks 已在 0.1.29 实际验收。
-- Auth 本地邮件验证/找回、Email OTP/Magic Link/管理流程与既定 MFA 扩展；应用密码和会话安全已验收。
+- Object Storage multipart/大文件、引用安全 GC 和独立网关；基础 S3/SigV4/signed chunks 已在 0.1.29 实际验收。
+- Auth Console MFA、OAuth/SSO、分支 factor 迁移和完整管理流程；应用密码和会话安全已验收。
 - 完整目录/删除/恢复：rename、系统身份迁移、TTL/物理 GC、原分支恢复和 Backend 一致性。
-- 小数 CPU 实际配额、完整内存归还、跨实例外部栅栏、软件 HA/DR 流程和本地全链路 TLS。
-- Console 查询历史、XLSX/图形计划等缺失交互；脚本、计划、CSV/JSON 和个人保存查询已验收。
+- 严格小数 CPU Guest 隔离/计量、完整内存归还、跨实例外部栅栏、软件 HA/DR 流程和本地全链路 TLS。
+- Console 项目共享查询历史/保留、XLSX/图形计划等缺失交互；脚本、计划、CSV/JSON 和个人保存查询已验收。
 
 这些项目的现有代码、版本现场结果和生产门槛分别查看
 [PRODUCTION-GATES.md](PRODUCTION-GATES.md)、[PRODUCT-COMPLETION-PLAN.md](PRODUCT-COMPLETION-PLAN.md)

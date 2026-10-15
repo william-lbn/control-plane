@@ -1,6 +1,6 @@
 # 生产门槛与官网对齐
 
-状态截至 2026-10-15；运行 API 0.35.1 / migration 032 / Chart 0.9.20 / Helm revision 87；NeonVM revision 53。[小数 CPU](DELIVERY-2026-10-15-FRACTIONAL-CPU.md)完成实际配额六项和新建准入三项 UI。API 源 ca49814、Web 源 f910c17、Auth 源 967e1b3；匹配 autoscaling fork 1720924 修复已本地构建部署。此前应用 TOTP、共享查询、个人历史沿用独立回执。公开统一 Helm 发行仍为 0.1.30，本批尚未远程发布。
+状态截至 2026-10-15；运行 API 0.36.0 / migration 032 / Chart 0.9.21 / Helm revision 88；NeonVM revision 53。[COPY 源条件](DELIVERY-2026-10-15-COPY-CONDITIONS.md)16 项新 UI/SDK 已通过，API 源 15bc5b7；Web 源 f910c17、Auth 源 967e1b3 保留。此前小数 CPU、应用 TOTP、共享查询、个人历史沿用各自独立回执。公开统一 Helm 发行仍为 0.1.30，本批尚未远程发布。
 前一版本 `be04cb4` 的真实 Linux/React 闭环见 [Auth/S3 交付](DELIVERY-2026-10-14-AUTH-S3.md)：
 788 Go/真实 PostgreSQL 检查、八个同源公开镜像、三节点 24 次串行 digest 导入；
 应用密码/会话十组 UI，以及实际 S3 SDK 签名/字节/权限/轮换/撤销/正常缩零均通过。
@@ -55,7 +55,7 @@ Functions 已开始实际 Go/Node 基础层实现，合同和内部接口见
 
 Managed Auth 已有 Go Driver、Better Auth 1.7.7 运行时、React UI、注册/会话/JWT/分支隔离与 PostgreSQL CI，详细见 [Auth 合同](MANAGED-AUTH.md)。真实 Neon UI 结果按版本交付报告记录；应用密码/会话安全已完成本地验收；公网 SMTP/OAuth、Console MFA、分支 factor 迁移、完整恢复/删除一致性、生产隔离与 HA 仍须独立实现/验收。
 
-产品 Object Storage 已实现分支目录、独立受限对象凭据、Go REST Driver、React UI、条件写入、签名下载和分支继承，详见 [Object Storage 合同](OBJECT-STORAGE.md)。REST 是 `neon-object-rest-v1`；f0b63f5 Linux 现场 UI 19 项已通过，实际版本与其余回归见 [当前交付](DELIVERY-2026-10-12-SQL-IDENTITY.md)。基础 S3/SigV4/signed chunks/统一存储凭据已在 0.1.29 实际验收，见 [S3 合同](OBJECT-STORAGE-S3-CORE.md)。基础 COPY、条件批量删除、预签名 PUT、CORS 和用户 metadata 已通过本地 UI；完整 multipart/COPY 源条件/大文件、物理 GC、分布式网关隔离及 HA/DR 仍未完成。
+产品 Object Storage 已实现分支目录、独立受限对象凭据、Go REST Driver、React UI、条件写入、签名下载和分支继承，详见 [Object Storage 合同](OBJECT-STORAGE.md)。REST 是 `neon-object-rest-v1`；f0b63f5 Linux 现场 UI 19 项已通过，实际版本与其余回归见 [当前交付](DELIVERY-2026-10-12-SQL-IDENTITY.md)。基础 S3/SigV4/signed chunks/统一存储凭据已在 0.1.29 实际验收，见 [S3 合同](OBJECT-STORAGE-S3-CORE.md)。基础 COPY、条件批量删除、预签名 PUT、CORS 和用户 metadata 已通过本地 UI；完整 multipart/大文件、物理 GC、分布式网关隔离及 HA/DR 仍未完成。
 
 Functions 已有 guest、不可变存储、持久候选/引导/SQL 身份及新增原生执行
 Driver/API/UI，默认禁用，实际发布验收见 [执行合同](FUNCTIONS-NATIVE-PREVIEW.md)；AI Gateway 文本 Chat/SSE、目录、Playground、应用授权和用量已通过本地真实 Ollama UI；商业上游/其他协议/预算和生产门槛仍缺。Data API 已有原生 Driver、

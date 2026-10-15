@@ -64,8 +64,8 @@ func (s *server) objectStorageRead(w http.ResponseWriter, r *http.Request) {
 		item["s3_endpoint"] = s3Origin() + "/s3/" + r.PathValue("branch")
 	}
 	item["s3_region"] = s3Region()
-	item["s3_supported"] = []string{"ListBuckets", "CreateBucket", "DeleteBucket", "HeadBucket", "GetBucketLocation", "ListObjects", "ListObjectsV2", "Delimiter", "CopyObjectBasic", "PutObject", "GetObject", "HeadObject", "DeleteObject", "DeleteObjects", "PresignedGet", "PresignedPut", "BucketCORS", "UserMetadata", "CopyObjectMetadataReplace", "SignedChunksWithoutTrailers"}
-	item["s3_missing"] = []string{"multipart", "copy_source_time_and_none_match_conditions", "anonymous_public_read", "streaming_trailers", "large_objects", "physical_gc"}
+	item["s3_supported"] = []string{"ListBuckets", "CreateBucket", "DeleteBucket", "HeadBucket", "GetBucketLocation", "ListObjects", "ListObjectsV2", "Delimiter", "CopyObjectBasic", "PutObject", "GetObject", "HeadObject", "DeleteObject", "DeleteObjects", "PresignedGet", "PresignedPut", "BucketCORS", "UserMetadata", "CopyObjectMetadataReplace", "CopyObjectSourceConditions", "SignedChunksWithoutTrailers"}
+	item["s3_missing"] = []string{"multipart", "anonymous_public_read", "streaming_trailers", "large_objects", "physical_gc"}
 	item["limits"] = record{"object_bytes": storageObjectLimit, "branch_bytes": storageBranchLimit, "buckets": 32, "objects": 1000}
 	w.Header().Set("ETag", fmt.Sprintf(`"%d"`, item["generation"].(int64)))
 	jsonResponse(w, 200, item)
