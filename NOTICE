@@ -10,6 +10,8 @@ licenses and notices. They are external deployment dependencies, not relicensed
 by this repository. No ownership of Neon names or marks is asserted.
 
 Go module dependencies are declared in api/go.mod and api/go.sum.
+Console TOTP uses github.com/pquerna/otp v1.5.0 (Apache-2.0), with its
+checksum-pinned dependencies; https://github.com/pquerna/otp/tree/v1.5.0.
 Web dependencies are declared in web/package.json and web/package-lock.json.
 Container CI emits per-image SBOM and build provenance. Operators must review
 dependency licenses and security advisories for their own distribution.

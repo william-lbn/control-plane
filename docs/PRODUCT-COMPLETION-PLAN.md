@@ -2,9 +2,9 @@
 
 ## 1. 本轮约束
 
-当前 Linux 本地批次已推进到 API 0.37.0、Chart 0.9.24、Helm revision 91。当前准入状态以 [PRODUCTION-GATES](PRODUCTION-GATES.md)为准。新增应用 TOTP、项目共享草稿、个人加密 SQL 历史、小数 CPU 实际配额/新建准入、S3 COPY 源条件、XLSX、基础执行计划树和 Console 个人会话管理均有独立真实 UI 回执。每个镜像保留各自快照，父 Git 不冒充运行源码；旧验收不重复跑，公共发行与本地候选分开记录。
+当前 Linux 本地批次已推进到 API 0.39.0、migration 035、Chart 0.9.27、Helm revision 94。最新已完成 Console MFA 与个人 SQL 历史采集/保留策略，真实 Linux UI/PG、失败续测、镜像来源和资源退休见[当前交付](DELIVERY-2026-10-16-CURRENT.md)。完整的待开发/待验收内容按 35 项列于[剩余需求账本](REMAINING-REQUIREMENTS-2026-10-16.md)。
 
-后续继续未完成的 Functions WS/触发器/完整日志、Object Storage multipart/大对象、Auth Console MFA/分支 factor 迁移、跨实例栅栏、本地可信 TLS、软件恢复与 HA。外部配置和硬件隔离门槛不阻塞本地工程，不能将其当作未开发功能的原因。
+后续优先未完成的 Functions WS/触发器/客户日志、S3 multipart/大对象/安全 GC、Auth 高级服务与组织安全、目录/生命周期、跨实例外部栅栏、HA/DR 和可信 TLS。个人 MFA 与保留策略的通过不关闭这些独立门槛。继续使用 Linux 本地构建、串行 UI、原 fixture 与精确源码快照，只重跑具体受影响的路径。
 下方带日期段落是历史增量，不覆盖本节当前状态。
 
 继续执行完整官网 Backend 目标。需要外部账号、模型调用凭据、SMTP 或 OAuth

@@ -1,4 +1,6 @@
 import { ConsoleSessions } from './ConsoleSessions';
+import { ConsoleMFA } from './ConsoleMFA';
+import { HistoryPolicy } from './HistoryPolicy';
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { api, projectPath } from '../../api';
@@ -103,6 +105,8 @@ export function Organizations({
         description="组织权限与项目授权按较高权限生效，Collaborator 默认无项目访问。"
       />
       <ConsoleSessions />
+      <ConsoleMFA />
+      <HistoryPolicy />
       <section className="panel identity-panel">
         <h2>创建组织</h2>
         <form className="identity-form" onSubmit={create}>

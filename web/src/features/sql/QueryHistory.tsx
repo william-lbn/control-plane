@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, projectPath } from '../../api';
+import { HistoryPolicy } from '../identity/HistoryPolicy';
 type Entry = {
   id: string;
   endpoint_id: string;
@@ -120,6 +121,10 @@ export function QueryHistory({
       </p>
       {enabled && (
         <>
+          <details>
+            <summary>管理本账号的历史采集与保留</summary>
+            <HistoryPolicy />
+          </details>
           <div className="table-scroll">
             <table>
               <thead>

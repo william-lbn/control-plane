@@ -5,9 +5,9 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 
 **发行状态：预览版本。已经验证的实验环境功能不等于生产认证，也不等于 Neon 官网全部 Backend 服务。**
 
-最新状态：[本批最终交付](docs/DELIVERY-2026-10-15-BATCH-CURRENT.md)汇总 40 项新 UI/SDK 检查；API 0.37.0 / Chart 0.9.24 / migration 033 / revision 91。涵盖实际小数配额、S3 COPY 条件、XLSX、计划树和 Console 会话管理。
+最新状态：[2026-10-16 交付](docs/DELIVERY-2026-10-16-CURRENT.md)：Console MFA 与个人 SQL 历史策略已实现并通过 Linux 本地真实 UI/PG 验收。API 0.39.0 / migration 035 / Chart 0.9.27 / Helm revision 94。剩余功能已按 35 项逐一记录在[需求账本](docs/REMAINING-REQUIREMENTS-2026-10-16.md)，其中仍有明确的待开发功能，不能理解为只剩验收。
 
-上一批新增：[应用 TOTP 双重认证](docs/DELIVERY-2026-10-15-AUTH-TOTP.md)八项 UI 与[项目共享查询](docs/DELIVERY-2026-10-15-SHARED-QUERIES.md)六项 UI 均通过；API 0.33 / Chart 0.9.17 / migration 031。
+此前增量：[应用 TOTP 双重认证](docs/DELIVERY-2026-10-15-AUTH-TOTP.md)八项 UI 与[项目共享查询](docs/DELIVERY-2026-10-15-SHARED-QUERIES.md)六项 UI 均通过；该批基线为 API 0.33 / Chart 0.9.17 / migration 031。
 
 此前本地已验收：[预签名上传](docs/DELIVERY-2026-10-15-PRESIGNED-UPLOAD.md)、[CORS 与用户元数据](docs/DELIVERY-2026-10-15-STORAGE-BROWSER.md)、[Functions 请求日志](docs/DELIVERY-2026-10-15-FUNCTIONS-JOURNAL.md)。[元数据条件编辑与 S3 REPLACE](docs/DELIVERY-2026-10-15-METADATA-EDIT.md)也已通过 8 项新的独立 UI 验收。当前状态以 [生产门槛](docs/PRODUCTION-GATES.md) 和各版本回执为准；复用既有功能记录，不重复旧 UI 套件。
 
@@ -27,7 +27,7 @@ S3 的 test-only `875e48b` 只修正选择器和原 checkpoint 续测，不改�
 旧合并版本升级前必须执行 [停止/排空流程](docs/WORKER-SPLIT.md)。
 运行代码与实际合同见 [OpenAPI](contracts/openapi-v1.json)；本项目使用 `/api/v1`，未声称兼容托管 Neon `/api/v2`。
 
-[Object Storage REST v1](docs/OBJECT-STORAGE.md) 已增加真实分支文件服务；源码合同为 OpenAPI 0.21.0。现场验收按版本记录，现有基础 S3 独立入口、signed chunks 与统一凭据；完整兼容仍有独立门槛。[SQL 脚本](docs/SQL-SCRIPTS.md)新增原生解析、逐条结果、事务结果和输出预算，已在 0.1.23 通过首次实际 UI 六组检查；原单条请求保持兼容。[Explain/Analyze 与 CSV/JSON 导出](docs/SQL-TOOLS.md)已在 0.1.24 通过首次实际 UI 五组检查；[Functions 历史部署恢复](docs/FUNCTIONS-ROLLBACK.md)已在 0.1.25 通过原 fixture 实际 UI 九组检查；[SDK 空闲断开处理](docs/FUNCTIONS-SDK-RELIABILITY.md)已验证进程存活、明确重连和保留写入。需人工提供的外部依赖统一见 [人工输入清单](docs/OPERATOR-INPUTS.md)，其余工程任务继续推进。
+[Object Storage REST v1](docs/OBJECT-STORAGE.md) 已增加真实分支文件服务，该基础路径自 OpenAPI 0.21.0 引入。现场验收按版本记录，现有基础 S3 独立入口、signed chunks 与统一凭据；完整兼容仍有独立门槛。[SQL 脚本](docs/SQL-SCRIPTS.md)新增原生解析、逐条结果、事务结果和输出预算，已在 0.1.23 通过首次实际 UI 六组检查；原单条请求保持兼容。[Explain/Analyze 与 CSV/JSON 导出](docs/SQL-TOOLS.md)已在 0.1.24 通过首次实际 UI 五组检查；[Functions 历史部署恢复](docs/FUNCTIONS-ROLLBACK.md)已在 0.1.25 通过原 fixture 实际 UI 九组检查；[SDK 空闲断开处理](docs/FUNCTIONS-SDK-RELIABILITY.md)已验证进程存活、明确重连和保留写入。需人工提供的外部依赖统一见 [人工输入清单](docs/OPERATOR-INPUTS.md)，其余工程任务继续推进。
 
 ## 1. 功能范围
 

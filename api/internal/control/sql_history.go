@@ -42,6 +42,13 @@ func (s *server) beginSQLHistory(r *http.Request, item record, mode, role, datab
 	if !sqlHistoryEnabled() {
 		return nil, nil
 	}
+	preference, policyErr := s.readSQLHistoryPreference(r.Context(), userFrom(r).ID)
+	if policyErr != nil {
+		return nil, policyErr
+	}
+	if !preference.Capture {
+		return nil, nil
+	}
 	if s.backendKeys == nil || s.backendKeys.decoded[s.backendKeys.Active] == nil {
 		return nil, errors.New("SQL history encryption unavailable")
 	}

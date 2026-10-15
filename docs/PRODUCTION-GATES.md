@@ -1,6 +1,6 @@
 # 生产门槛与官网对齐
 
-状态截至 2026-10-15；API 0.37.0 / migration 033 / Chart 0.9.24 / Helm revision 91；NeonVM revision 53。[本批交付](DELIVERY-2026-10-15-BATCH-CURRENT.md)汇总 40 项新 UI/SDK 检查。API 源 b72793b、Web 源 af85f1e、Auth 源 967e1b3；每个切片保留独立精确回执。公开统一 Helm 发行仍为 0.1.30，本批尚未远程发布。
+状态截至 2026-10-16；API 0.39.0 / migration 035 / Chart 0.9.27 / Helm revision 94。Console MFA 和个人 SQL 历史采集/保留策略已有 Linux Go/PG 与真实 UI 回执，见[当前交付](DELIVERY-2026-10-16-CURRENT.md)。[剩余需求账本](REMAINING-REQUIREMENTS-2026-10-16.md)区分未开发、部分实现和独立验收门槛。运行镜像按本地快照留证；公开统一 Helm 0.1.31 源码候选仍锁 0.23.0 公共控制镜像，不能冒充本地 0.39.0 发行。
 前一版本 `be04cb4` 的真实 Linux/React 闭环见 [Auth/S3 交付](DELIVERY-2026-10-14-AUTH-S3.md)：
 788 Go/真实 PostgreSQL 检查、八个同源公开镜像、三节点 24 次串行 digest 导入；
 应用密码/会话十组 UI，以及实际 S3 SDK 签名/字节/权限/轮换/撤销/正常缩零均通过。
@@ -10,7 +10,7 @@
 本地 OTP/Magic Link/S3 目录三个新 UI 闭环已通过；本批综合 Go/PG 回归 793 pass / 0 fail / 0 skip。
 需运营方输入见 [OPERATOR-INPUTS.md](OPERATOR-INPUTS.md)，不阻塞其他本地工程。
 
-本地邮件链接验证/密码找回已通过十组 UI、真实 SMTP、790 Go/PG 与最终八发布审计，见 [精确回执](DELIVERY-2026-10-14-AUTH-MAIL.md)。本地 OTP 和应用 Auth OpenAPI 已通过八组真实 UI，见 [OTP 回执](DELIVERY-2026-10-14-AUTH-OTP.md)。Magic Link 已通过八组真实 UI，见 [本地交付](DELIVERY-2026-10-14-LOCAL-MAGIC-LINK.md)；应用 TOTP 本地八项 UI 已通过；公网邮件、Console MFA、OAuth 等仍按各自门槛推进。
+本地邮件链接验证/密码找回已通过十组 UI、真实 SMTP、790 Go/PG 与最终八发布审计，见 [精确回执](DELIVERY-2026-10-14-AUTH-MAIL.md)。本地 OTP 和应用 Auth OpenAPI 已通过八组真实 UI，见 [OTP 回执](DELIVERY-2026-10-14-AUTH-OTP.md)。Magic Link 已通过八组真实 UI，见 [本地交付](DELIVERY-2026-10-14-LOCAL-MAGIC-LINK.md)；应用 TOTP 本地八项 UI 已通过；公网邮件、组织强制 MFA、OAuth 等仍按各自门槛推进；Console MFA 自助见当前交付。
 
 ## 1. 已实现路径
 
@@ -29,7 +29,7 @@ Functions 历史恢复在 0.1.25 通过原 fixture 的九组实际 UI 检查；S
 | 门槛 | 当前缺口 | 完成判据 |
 | --- | --- | --- |
 | Proxy/Storage adapter | 原生 Go/Helm 迁移和真实 Proxy/UI 冷醒/通知已验收；仍单实例，通知重配置和分布式连接账本未完成 | 全新隔离环境安装、完整 placement/Safekeeper 重配置、跨实例长短连接与删除竞争另验 |
-| 多租户生产安全 | 受邀注册/已有账号接受、一次凭据、撤销/过期、组织锁、事务审计及个人 Console 会话管理已有代码/真实 UI；OIDC/SSO/Console MFA、公网邮件投递与完整攻击矩阵仍缺 | 新版本 Linux UI 与实际 PG 验收、跨组织/项目负例、撤销竞争、外部安全评审 |
+| 多租户生产安全 | 受邀注册/已有账号接受、一次凭据、撤销/过期、组织锁、事务审计及个人 Console 会话管理已有代码/真实 UI；Console MFA 自助已验收；OIDC/SSO、组织强制 MFA、公网邮件投递与完整攻击矩阵仍缺 | 新版本 Linux UI 与实际 PG 验收、跨组织/项目负例、撤销竞争、外部安全评审 |
 | 跨实例缩零栅栏 | DB 租约无法 fence 所有外部动作；缺短连接 ledger | 多 API/Proxy 并发、过期 worker、新连接/删除竞争负例与无误删 |
 | HA | 独立 API/Worker 的领导租约已有代码；两者仍单副本；Metadata/数据面单故障域实验部署 | 独立故障域、主从切换/脑裂矩阵、指标和业务连续性 |
 | DR | 元数据/Secrets/对象/WAL 恢复未形成全栈演练 | 固定镜像与密钥、隔离 restore、真实 PG 数据校验、实测 RPO/RTO |
@@ -53,7 +53,7 @@ Functions 已开始实际 Go/Node 基础层实现，合同和内部接口见
 验收；代码包/环境存储和持久身份回执见 [FUNCTIONS-BACKING](FUNCTIONS-BACKING.md)。
 原生 Driver/UI 已在 `bf0dd9e` / Helm 0.1.19 通过实际 Linux UI→microVM→Proxy→SQL 与手动停止/重部署/删除，运行监控在 `be557e0` / Helm 0.1.20 通过独立实际 UI；显式保留版本唤醒在 `0198f7c` / Helm 0.1.21 通过自己的现场回执，合同见 [FUNCTIONS-WAKE](FUNCTIONS-WAKE.md)。公开 HTTP/SSE、自动零/冷醒已在 0.1.28 独立验收；分支复制、WS、触发器和全部 Functions 产品能力仍未完成。
 
-Managed Auth 已有 Go Driver、Better Auth 1.7.7 运行时、React UI、注册/会话/JWT/分支隔离与 PostgreSQL CI，详细见 [Auth 合同](MANAGED-AUTH.md)。真实 Neon UI 结果按版本交付报告记录；应用密码/会话安全已完成本地验收；公网 SMTP/OAuth、Console MFA、分支 factor 迁移、完整恢复/删除一致性、生产隔离与 HA 仍须独立实现/验收。
+Managed Auth 已有 Go Driver、Better Auth 1.7.7 运行时、React UI、注册/会话/JWT/分支隔离与 PostgreSQL CI，详细见 [Auth 合同](MANAGED-AUTH.md)。真实 Neon UI 结果按版本交付报告记录；应用密码/会话安全已完成本地验收；公网 SMTP/OAuth、Console 组织强制 MFA、分支 factor 迁移、完整恢复/删除一致性、生产隔离与 HA 仍须独立实现/验收。
 
 产品 Object Storage 已实现分支目录、独立受限对象凭据、Go REST Driver、React UI、条件写入、签名下载和分支继承，详见 [Object Storage 合同](OBJECT-STORAGE.md)。REST 是 `neon-object-rest-v1`；f0b63f5 Linux 现场 UI 19 项已通过，实际版本与其余回归见 [当前交付](DELIVERY-2026-10-12-SQL-IDENTITY.md)。基础 S3/SigV4/signed chunks/统一存储凭据已在 0.1.29 实际验收，见 [S3 合同](OBJECT-STORAGE-S3-CORE.md)。基础 COPY、条件批量删除、预签名 PUT、CORS 和用户 metadata 已通过本地 UI；完整 multipart/大文件、物理 GC、分布式网关隔离及 HA/DR 仍未完成。
 
@@ -79,8 +79,8 @@ Linux 真实场景正反例 + 恢复证据共同验收。
 
 ## 2026-10-13：本地真实推理已解除外部凭据阻塞
 
-独立 Go AI 网关、限定列权限元数据库身份、AI UI 和持久用量已完成代码/Helm/实际 UI 闭环。769 个公开 Linux Go/PG 测试与九组真实 UI 检查通过，见 [交付](DELIVERY-2026-10-13-AI-GATEWAY.md)。只验收文本 Chat Completions；动态供应商管理、完整协议/计费、HA 和全链路 TLS 仍未完成。个人保存查询已在 0.1.27 通过实际 UI 六组检查；完整交付见 [当前报告](DELIVERY-2026-10-13-SAVED-QUERIES.md)。显式项目共享查询已通过新 Linux UI/真实 PG 多用户隔离验收；个人加密执行历史已通过新真实 SQL/UI 验收；项目级共享历史、AI 命名和保留策略尚未完成。
+独立 Go AI 网关、限定列权限元数据库身份、AI UI 和持久用量已完成代码/Helm/实际 UI 闭环。769 个公开 Linux Go/PG 测试与九组真实 UI 检查通过，见 [交付](DELIVERY-2026-10-13-AI-GATEWAY.md)。只验收文本 Chat Completions；动态供应商管理、完整协议/计费、HA 和全链路 TLS 仍未完成。个人保存查询已在 0.1.27 通过实际 UI 六组检查；完整交付见 [当前报告](DELIVERY-2026-10-13-SAVED-QUERIES.md)。显式项目共享查询已通过新 Linux UI/真实 PG 多用户隔离验收；个人加密执行历史已通过新真实 SQL/UI 验收。个人采集/保留策略与到期清理已在 0.39.0 验收；项目级共享历史、AI 命名和单条手工删除尚未完成。
 
 ## 2026-10-15：SQL 工作台新增闭环
 
-XLSX 与 Explain/Analyze 基础树形计划各四项真实 Linux UI 通过，版本和源码见 [交付](DELIVERY-2026-10-15-SQL-EXPORT-PLAN.md)。项目共享历史、保留/物理清除、AI SQL、计划比较/自动建议仍未完成；个人加密历史和已保存共享草稿不能代替这些能力。
+XLSX 与 Explain/Analyze 基础树形计划各四项真实 Linux UI 通过，版本和源码见 [交付](DELIVERY-2026-10-15-SQL-EXPORT-PLAN.md)。个人保留/到期记录删除已有独立本地验收；项目共享历史、单条删除、AI SQL、计划比较/自动建议仍未完成；个人加密历史和已保存共享草稿不能代替这些能力。

@@ -10,7 +10,7 @@ on:
       additional_suite:
         description: Additional real UI suites (overrides suite when selected)
         type: choice
-        options: [none, console-session-feedback.spec.ts, console-sessions.spec.ts, sql-plan-tree.spec.ts, sql-xlsx.spec.ts, storage-copy-conditions.spec.ts, fractional-admission.spec.ts, fractional-cpu.spec.ts, query-history.spec.ts, shared-queries.spec.ts, auth-totp.spec.ts, storage-directory.spec.ts, storage-copy.spec.ts, storage-bulk-delete.spec.ts, storage-presigned-upload.spec.ts, storage-browser-metadata.spec.ts, functions-request-logs.spec.ts, storage-metadata-edit.spec.ts]
+        options: [none, history-policy.spec.ts, console-mfa.spec.ts, console-session-feedback.spec.ts, console-sessions.spec.ts, sql-plan-tree.spec.ts, sql-xlsx.spec.ts, storage-copy-conditions.spec.ts, fractional-admission.spec.ts, fractional-cpu.spec.ts, query-history.spec.ts, shared-queries.spec.ts, auth-totp.spec.ts, storage-directory.spec.ts, storage-copy.spec.ts, storage-bulk-delete.spec.ts, storage-presigned-upload.spec.ts, storage-browser-metadata.spec.ts, functions-request-logs.spec.ts, storage-metadata-edit.spec.ts]
         default: none
       poll_fault:
         description: Inject transient read failures for native/Data API observation recovery
@@ -60,8 +60,8 @@ jobs:
           test -n "$NEON_E2E_BASE_URL"
           test -n "$ADMIN_PASSWORD"
           case "$NEON_E2E_SUITE" in
-            console-session-feedback.spec.ts) test -f "$NEON_E2E_CONSOLE_ACCOUNT_FIXTURE" ;;
-            native-product.spec.ts|restore.spec.ts|lifecycle.spec.ts|endpoint-deletion.spec.ts|data-api.spec.ts|console-invitations.spec.ts|console-sessions.spec.ts|managed-auth.spec.ts|object-storage.spec.ts|functions-native.spec.ts) ;;
+            console-session-feedback.spec.ts|history-policy.spec.ts) test -f "$NEON_E2E_CONSOLE_ACCOUNT_FIXTURE" ;;
+            native-product.spec.ts|restore.spec.ts|lifecycle.spec.ts|endpoint-deletion.spec.ts|data-api.spec.ts|console-invitations.spec.ts|console-mfa.spec.ts|console-sessions.spec.ts|managed-auth.spec.ts|object-storage.spec.ts|functions-native.spec.ts) ;;
             functions-request-logs.spec.ts|functions-http.spec.ts|functions-observation.spec.ts|functions-wake.spec.ts|functions-rollback.spec.ts) test -f "$NEON_E2E_FUNCTIONS_MONITOR_FIXTURE" ;;
             database-owner.spec.ts) test -f "$NEON_E2E_CATALOG_OWNER_FIXTURE" ;;
             auth-security.spec.ts|s3-storage.spec.ts|storage-directory.spec.ts|sql-plan-tree.spec.ts|sql-xlsx.spec.ts|storage-copy-conditions.spec.ts|storage-copy.spec.ts|storage-metadata-edit.spec.ts|storage-browser-metadata.spec.ts|storage-presigned-upload.spec.ts|storage-bulk-delete.spec.ts|sql-script.spec.ts|sql-tools.spec.ts) test -f "$NEON_E2E_SQL_SCRIPT_FIXTURE" ;;
@@ -111,5 +111,7 @@ jobs:
           install -d "$NEON_E2E_ARTIFACTS"
           cp "$NEON_E2E_PRIVATE_DIR/fractional-proof.json" "$NEON_E2E_ARTIFACTS/fractional-resource-proof.json"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
-        if: always()
+        # MFA DOM/trace failures may contain one-time setup/recovery material.
+        # Retain that evidence only on the protected Linux runner.
+        if: always() && env.NEON_E2E_SUITE != 'console-mfa.spec.ts' && env.NEON_E2E_SUITE != 'history-policy.spec.ts'
         with: {name: live-ui-evidence, path: '${{ env.NEON_E2E_ARTIFACTS }}', retention-days: 30}

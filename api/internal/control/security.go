@@ -6,9 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
-	"io"
 	"net"
 	"net/http"
 	"os"
@@ -136,7 +134,9 @@ func (s *server) currentUser(r *http.Request) (user, error) {
 	var u user
 	err = s.db.QueryRow(r.Context(), `SELECT u.id,u.username,u.role,s.csrf_hash
         FROM sessions s JOIN users u ON u.id=s.user_id
-        WHERE s.token_hash=$1 AND s.expires_at > now() AND s.revoked_at IS NULL AND NOT u.disabled`, digest(cookie.Value)).
+        WHERE s.token_hash=$1 AND s.expires_at > now() AND s.revoked_at IS NULL AND NOT u.disabled
+        AND NOT EXISTS(SELECT 1 FROM console_mfa f WHERE f.user_id=u.id AND f.enabled_at IS NOT NULL
+            AND (s.mfa_verified_at IS NULL OR s.mfa_verified_at<f.enabled_at))`, digest(cookie.Value)).
 		Scan(&u.ID, &u.Username, &u.Role, &u.CSRFHash)
 	return u, err
 }
@@ -166,11 +166,15 @@ func (s *server) auth(next http.Handler, write bool) http.Handler {
 func userFrom(r *http.Request) user { u, _ := r.Context().Value(userKey).(user); return u }
 
 func (s *server) login(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	r.Body = http.MaxBytesReader(w, r.Body, 4096)
 	var body struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
+		Code     string `json:"mfa_code"`
+		Recovery bool   `json:"recovery"`
 	}
-	if err := json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&body); err != nil || body.Username == "" || body.Password == "" {
+	if err := readJSON(r, &body); err != nil || body.Username == "" || len(body.Username) > 128 || body.Password == "" || len(body.Password) > 1024 || len(body.Code) > 64 {
 		fail(w, r, 422, "invalid_request", "Username and password are required")
 		return
 	}
@@ -194,18 +198,70 @@ func (s *server) login(w http.ResponseWriter, r *http.Request) {
 	}
 	var u user
 	var stored string
-	err := s.db.QueryRow(r.Context(), "SELECT id,username,role,password_hash FROM users WHERE username=$1 AND NOT disabled", body.Username).
+	tx, err := s.db.Begin(r.Context())
+	if err != nil {
+		fail(w, r, 503, "metadata_unavailable", "Could not create session")
+		return
+	}
+	defer tx.Rollback(r.Context())
+	err = tx.QueryRow(r.Context(), "SELECT id,username,role,password_hash FROM users WHERE username=$1 AND NOT disabled FOR UPDATE", body.Username).
 		Scan(&u.ID, &u.Username, &u.Role, &stored)
 	if err != nil || !verifyPassword(body.Password, stored) {
+		_ = tx.Rollback(r.Context())
 		_, _ = s.db.Exec(r.Context(), "INSERT INTO login_failures(scope_key) VALUES($1),($2)", ipScope, userScope)
 		fail(w, r, 401, "invalid_credentials", "Username or password is incorrect")
 		return
 	}
+	var mfa bool
+	if err = tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM console_mfa WHERE user_id=$1 AND enabled_at IS NOT NULL)`, u.ID).Scan(&mfa); err != nil {
+		fail(w, r, 503, "metadata_unavailable", "Could not check MFA policy")
+		return
+	}
+	var verifiedAt any
+	if mfa {
+		if body.Code == "" {
+			fail(w, r, 401, "mfa_required", "Enter an authenticator code or a recovery code")
+			return
+		}
+		// Recheck under the user lock so concurrent API instances share one budget.
+		if err = tx.QueryRow(r.Context(), `SELECT count(*) FROM login_failures WHERE scope_key=$1 AND occurred_at>now()-interval '15 minutes'`, userScope).Scan(&userFailures); err != nil {
+			fail(w, r, 503, "metadata_unavailable", "Could not check login policy")
+			return
+		}
+		if userFailures >= 20 {
+			w.Header().Set("Retry-After", "900")
+			fail(w, r, 429, "login_rate_limited", "Retry later")
+			return
+		}
+		valid, e := s.consoleMFAProof(r, tx, u.ID, body.Code, body.Recovery)
+		if e != nil {
+			fail(w, r, 503, "mfa_key_unavailable", "Could not verify MFA")
+			return
+		}
+		if !valid {
+			if _, err = tx.Exec(r.Context(), `INSERT INTO login_failures(scope_key) VALUES($1),($2)`, ipScope, userScope); err == nil {
+				err = tx.Commit(r.Context())
+			}
+			if err != nil {
+				fail(w, r, 503, "metadata_unavailable", "Could not record login policy")
+				return
+			}
+			fail(w, r, 401, "invalid_mfa_proof", "MFA code is incorrect, expired or already used")
+			return
+		}
+		verifiedAt = time.Now().UTC()
+		if _, err = tx.Exec(r.Context(), `INSERT INTO audit_events(actor_id,action,resource_type,resource_id,outcome,request_id) VALUES($1,'console_mfa_login','account_mfa',$1,'succeeded',$2)`, u.ID, requestID(r)); err != nil {
+			fail(w, r, 503, "audit_unavailable", "Could not commit login audit")
+			return
+		}
+	}
 	token, csrf := randomToken(48), randomToken(32)
-	_, err = s.db.Exec(r.Context(), "INSERT INTO sessions(token_hash,user_id,csrf_hash,expires_at) VALUES($1,$2,$3,now()+interval '8 hours')",
-		digest(token), u.ID, digest(csrf))
+	_, err = tx.Exec(r.Context(), "INSERT INTO sessions(token_hash,user_id,csrf_hash,expires_at,mfa_verified_at) VALUES($1,$2,$3,now()+interval '8 hours',$4)",
+		digest(token), u.ID, digest(csrf), verifiedAt)
+	if err == nil {
+		err = tx.Commit(r.Context())
+	}
 	if err != nil {
-		s.logger.Error("session insert", "error", err)
 		fail(w, r, 503, "metadata_unavailable", "Could not create session")
 		return
 	}
@@ -249,6 +305,7 @@ func (s *server) cleanSessions(ctx context.Context) {
 			_, _ = s.db.Exec(ctx, "DELETE FROM sessions WHERE expires_at < now() AND (revoked_at IS NULL OR revoked_at < now()-interval '8 hours')")
 			_, _ = s.db.Exec(ctx, "DELETE FROM login_failures WHERE occurred_at < now()-interval '1 day'")
 			s.cleanRegistrationLimits(ctx)
+			s.maintainSQLHistory(ctx)
 		}
 	}
 }

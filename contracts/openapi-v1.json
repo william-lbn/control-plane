@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.37.0",
+    "version": "0.39.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -4168,6 +4168,219 @@
             "const": true
           }
         }
+      },
+      "ConsoleMFAPolicy": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "pending_until": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "recovery_codes_remaining": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10
+          },
+          "enrollment_available": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled",
+          "pending_until",
+          "recovery_codes_remaining",
+          "enrollment_available"
+        ]
+      },
+      "ConsoleMFAProof": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "format": "password",
+            "writeOnly": true
+          },
+          "code": {
+            "type": "string",
+            "maxLength": 64,
+            "writeOnly": true
+          },
+          "recovery": {
+            "type": "boolean",
+            "default": false
+          }
+        },
+        "required": [
+          "password"
+        ]
+      },
+      "ConsoleMFAEnrollment": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "secret": {
+            "type": "string",
+            "readOnly": true
+          },
+          "otpauth_uri": {
+            "type": "string",
+            "format": "uri",
+            "readOnly": true
+          },
+          "pending_until": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "secret",
+          "otpauth_uri",
+          "pending_until"
+        ]
+      },
+      "ConsoleMFAActivated": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "const": true
+          },
+          "recovery_codes": {
+            "type": "array",
+            "minItems": 10,
+            "maxItems": 10,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{32}$"
+            },
+            "description": "Returned only once on successful activation; absent from status and replay."
+          },
+          "recovery_codes_remaining": {
+            "const": 10
+          },
+          "other_sessions_revoked": {
+            "const": true
+          }
+        },
+        "required": [
+          "enabled",
+          "recovery_codes",
+          "recovery_codes_remaining",
+          "other_sessions_revoked"
+        ]
+      },
+      "ConsoleMFADisabled": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "const": false
+          },
+          "other_sessions_revoked": {
+            "const": true
+          }
+        },
+        "required": [
+          "enabled",
+          "other_sessions_revoked"
+        ]
+      },
+      "SQLHistoryPolicy": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "capture_enabled": {
+            "type": "boolean"
+          },
+          "retain_days": {
+            "type": "integer",
+            "enum": [
+              0,
+              7,
+              30,
+              90
+            ]
+          },
+          "version_token": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)$"
+          }
+        },
+        "required": [
+          "capture_enabled",
+          "retain_days",
+          "version_token"
+        ]
+      },
+      "SQLHistoryPolicyInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "capture_enabled": {
+            "type": "boolean"
+          },
+          "retain_days": {
+            "type": "integer",
+            "enum": [
+              0,
+              7,
+              30,
+              90
+            ]
+          },
+          "acknowledge_expired_history_deletion": {
+            "type": "boolean",
+            "description": "Must be true for nonzero retention, which affects existing completed personal history."
+          }
+        },
+        "required": [
+          "capture_enabled",
+          "retain_days"
+        ]
+      },
+      "SQLHistoryCleanupInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "acknowledge_expired_history_deletion": {
+            "const": true
+          }
+        },
+        "required": [
+          "acknowledge_expired_history_deletion"
+        ]
+      },
+      "SQLHistoryCleanup": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "deleted_count": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000
+          },
+          "batch_limit": {
+            "const": 1000
+          },
+          "more_possible": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "deleted_count",
+          "batch_limit",
+          "more_possible"
+        ]
       }
     },
     "responses": {
@@ -4227,13 +4440,28 @@
                 ],
                 "properties": {
                   "username": {
-                    "type": "string"
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128
                   },
                   "password": {
                     "type": "string",
-                    "format": "password"
+                    "format": "password",
+                    "minLength": 1,
+                    "maxLength": 1024
+                  },
+                  "mfa_code": {
+                    "type": "string",
+                    "maxLength": 64,
+                    "writeOnly": true,
+                    "description": "Authenticator code, or a single-use recovery code when recovery=true. MFA-enabled accounts never receive a password-only session."
+                  },
+                  "recovery": {
+                    "type": "boolean",
+                    "default": false
                   }
-                }
+                },
+                "additionalProperties": false
               }
             }
           }
@@ -4255,6 +4483,15 @@
             }
           },
           "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
             "$ref": "#/components/responses/Error"
           }
         },
@@ -16316,6 +16553,394 @@
           }
         },
         "description": "Cookie + CSRF + current password required. Only own non-current sessions. Revocation and durable audit commit atomically. Effect-idempotent; no automatic replay after an unknown commit. Does not cancel already admitted requests or API/application credentials."
+      }
+    },
+    "/api/v1/account/mfa": {
+      "get": {
+        "operationId": "getOwnConsoleMFA",
+        "tags": [
+          "Identity"
+        ],
+        "summary": "Read own Console factor state without secrets",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current account MFA result; no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleMFAPolicy"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/account/mfa/enroll": {
+      "post": {
+        "operationId": "enrollOwnConsoleMFA",
+        "tags": [
+          "Identity"
+        ],
+        "summary": "Password-confirmed ten-minute TOTP enrollment",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current account MFA result; no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleMFAEnrollment"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsoleMFAProof"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/account/mfa/confirm": {
+      "post": {
+        "operationId": "confirmOwnConsoleMFA",
+        "tags": [
+          "Identity"
+        ],
+        "summary": "Activate own factor and reveal recovery codes once",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current account MFA result; no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleMFAActivated"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsoleMFAProof"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/account/mfa/disable": {
+      "post": {
+        "operationId": "disableOwnConsoleMFA",
+        "tags": [
+          "Identity"
+        ],
+        "summary": "Password and unused factor proof disable own MFA",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current account MFA result; no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleMFADisabled"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsoleMFAProof"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/account/query-history-policy": {
+      "get": {
+        "operationId": "getOwnSQLHistoryPolicy",
+        "tags": [
+          "Identity"
+        ],
+        "summary": "Read own SQL capture and retention default/current policy",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Personal metadata policy or bounded cleanup result; no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SQLHistoryPolicy"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateOwnSQLHistoryPolicy",
+        "tags": [
+          "Identity"
+        ],
+        "summary": "Explicitly change own SQL capture and retention",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Personal metadata policy or bounded cleanup result; no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SQLHistoryPolicy"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SQLHistoryPolicyInput"
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/idempotency"
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"(0|[1-9][0-9]*)\"$"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/account/query-history-cleanup": {
+      "post": {
+        "operationId": "cleanupOwnExpiredSQLHistory",
+        "tags": [
+          "Identity"
+        ],
+        "summary": "Explicit bounded cleanup of own confirmed expired history",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Personal metadata policy or bounded cleanup result; no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SQLHistoryCleanup"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SQLHistoryCleanupInput"
+              }
+            }
+          }
+        }
       }
     }
   }

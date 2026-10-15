@@ -318,6 +318,8 @@ function Login({ onLogin }: { onLogin: (user: User) => void }) {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [mfaCode, setMfaCode] = useState(''),
+    [recovery, setRecovery] = useState(false);
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setBusy(true);
@@ -325,9 +327,10 @@ function Login({ onLogin }: { onLogin: (user: User) => void }) {
     try {
       const result = await api<{ user: User }>('/auth/login', {
         method: 'POST',
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username, password, mfa_code: mfaCode, recovery }),
       });
       setPassword('');
+      setMfaCode('');
       onLogin(result.user);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -382,6 +385,30 @@ function Login({ onLogin }: { onLogin: (user: User) => void }) {
               required
             />
           </label>
+          <details>
+            <summary>已启用双重验证？</summary>
+            <label>
+              登录验证码
+              <input
+                type="password"
+                autoComplete="one-time-code"
+                maxLength={64}
+                value={mfaCode}
+                onChange={(e) => setMfaCode(e.target.value)}
+              />
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={recovery}
+                onChange={(e) => {
+                  setRecovery(e.target.checked);
+                  setMfaCode('');
+                }}
+              />
+              使用恢复码登录
+            </label>
+          </details>
           {error && (
             <div role="alert" className="form-error">
               {error}
