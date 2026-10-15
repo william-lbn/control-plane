@@ -431,12 +431,44 @@ export function CreateResource({
           {(kind !== 'branch' || withEndpoint) && (
             <div className="form-grid create-bounds">
               <label>
+                资源预设
+                <select
+                  aria-label="计算资源预设"
+                  value=""
+                  onChange={(e) => {
+                    if (e.target.value === 'fractional') {
+                      setBounds({
+                        min_cpu_milli: 250,
+                        max_cpu_milli: 500,
+                        min_memory_mib: 1024,
+                        max_memory_mib: 2048,
+                      });
+                      resetKey();
+                    } else if (e.target.value === 'integer') {
+                      setBounds(initialBounds);
+                      resetKey();
+                    }
+                  }}
+                >
+                  <option value="">选择配置</option>
+                  <option value="fractional">0.25–0.5 vCPU / 1–2 GiB</option>
+                  <option value="integer">整数 CPU 兼容配置</option>
+                </select>
+              </label>
+              <p className="subtle-note">
+                小数 CPU 使用 agent 的 250m / 1Gi 比例；新 Endpoint 可设 250m。已有 VM
+                不可越过创建时的硬件下限。逻辑 CPU 预算与 QEMU overcommit 硬配额不同。
+              </p>
+              <label>
                 最小 CPU
                 <select
                   aria-label="最小 CPU"
                   value={bounds.min_cpu_milli}
                   onChange={(e) => setBound('min_cpu_milli', Number(e.target.value))}
                 >
+                  <option value={250}>250m · 0.25 vCPU</option>
+                  <option value={500}>500m · 0.5 vCPU</option>
+                  <option value={750}>750m · 0.75 vCPU</option>
                   <option value={1000}>1000m</option>
                   <option value={2000}>2000m</option>
                 </select>
@@ -448,6 +480,9 @@ export function CreateResource({
                   value={bounds.max_cpu_milli}
                   onChange={(e) => setBound('max_cpu_milli', Number(e.target.value))}
                 >
+                  <option value={250}>250m · 0.25 vCPU</option>
+                  <option value={500}>500m · 0.5 vCPU</option>
+                  <option value={750}>750m · 0.75 vCPU</option>
                   <option value={1000}>1000m</option>
                   <option value={2000}>2000m</option>
                 </select>

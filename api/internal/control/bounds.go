@@ -20,14 +20,12 @@ func boundsAnnotation(p boundsPayload) (string, error) {
 	if p.ProjectID == "" || p.EndpointID == "" || p.WorkloadName != kubeName(p.EndpointID) {
 		return "", errors.New("bounds workload identity mismatch")
 	}
-	if p.MinCPU > p.MaxCPU || p.MinMem > p.MaxMem || p.MinCPU < 1000 || p.MaxCPU > 2000 ||
-		p.MinMem < 1024 || p.MaxMem > 3072 || p.MinCPU%1000 != 0 || p.MaxCPU%1000 != 0 ||
-		p.MinMem%1024 != 0 || p.MaxMem%1024 != 0 {
+	if !(createBounds{p.MinCPU, p.MaxCPU, p.MinMem, p.MaxMem}).valid() {
 		return "", errors.New("unsupported bounds")
 	}
 	b, err := json.Marshal(map[string]any{
-		"min": map[string]string{"cpu": strconv.Itoa(p.MinCPU / 1000), "mem": strconv.Itoa(p.MinMem/1024) + "Gi"},
-		"max": map[string]string{"cpu": strconv.Itoa(p.MaxCPU / 1000), "mem": strconv.Itoa(p.MaxMem/1024) + "Gi"}})
+		"min": map[string]string{"cpu": cpuQuantityText(p.MinCPU), "mem": strconv.Itoa(p.MinMem/1024) + "Gi"},
+		"max": map[string]string{"cpu": cpuQuantityText(p.MaxCPU), "mem": strconv.Itoa(p.MaxMem/1024) + "Gi"}})
 	return string(b), err
 }
 
@@ -43,7 +41,7 @@ func validateBoundsVM(vm map[string]any, p boundsPayload, live bool) error {
 	minCPU, maxCPU := cpuMilli(nested(guest, "cpus", "min")), cpuMilli(nested(guest, "cpus", "max"))
 	minMem := int(number(nested(guest, "memorySlots", "min"))) * 1024
 	maxMem := int(number(nested(guest, "memorySlots", "max"))) * 1024
-	if minCPU < 1000 || maxCPU < minCPU || minMem < 1024 || maxMem < minMem ||
+	if minCPU < 250 || maxCPU < minCPU || minMem < 1024 || maxMem < minMem ||
 		p.MinCPU < minCPU || p.MaxCPU > maxCPU || p.MinMem < minMem || p.MaxMem > maxMem {
 		return errors.New("requested bounds exceed immutable VM capacity")
 	}

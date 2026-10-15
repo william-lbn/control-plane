@@ -493,7 +493,7 @@ func (s *server) updateEndpoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a := body.Autoscaling
-	if a.MinCPU < 1000 || a.MaxCPU > 2000 || a.MinCPU > a.MaxCPU || a.MinMem < 1024 || a.MaxMem > 3072 || a.MinMem > a.MaxMem || a.MinCPU%1000 != 0 || a.MaxCPU%1000 != 0 || a.MinMem%1024 != 0 || a.MaxMem%1024 != 0 {
+	if !(createBounds{a.MinCPU, a.MaxCPU, a.MinMem, a.MaxMem}).valid() {
 		fail(w, r, 422, "invalid_scaling_bounds", "Bounds must fit VM capacity and memory slots")
 		return
 	}

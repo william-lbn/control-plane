@@ -10,7 +10,7 @@ on:
       additional_suite:
         description: Additional real UI suites (overrides suite when selected)
         type: choice
-        options: [none, query-history.spec.ts, shared-queries.spec.ts, auth-totp.spec.ts, storage-directory.spec.ts, storage-copy.spec.ts, storage-bulk-delete.spec.ts, storage-presigned-upload.spec.ts, storage-browser-metadata.spec.ts, functions-request-logs.spec.ts, storage-metadata-edit.spec.ts]
+        options: [none, fractional-admission.spec.ts, fractional-cpu.spec.ts, query-history.spec.ts, shared-queries.spec.ts, auth-totp.spec.ts, storage-directory.spec.ts, storage-copy.spec.ts, storage-bulk-delete.spec.ts, storage-presigned-upload.spec.ts, storage-browser-metadata.spec.ts, functions-request-logs.spec.ts, storage-metadata-edit.spec.ts]
         default: none
       poll_fault:
         description: Inject transient read failures for native/Data API observation recovery
@@ -63,7 +63,7 @@ jobs:
             functions-request-logs.spec.ts|functions-http.spec.ts|functions-observation.spec.ts|functions-wake.spec.ts|functions-rollback.spec.ts) test -f "$NEON_E2E_FUNCTIONS_MONITOR_FIXTURE" ;;
             database-owner.spec.ts) test -f "$NEON_E2E_CATALOG_OWNER_FIXTURE" ;;
             auth-security.spec.ts|s3-storage.spec.ts|storage-directory.spec.ts|storage-copy.spec.ts|storage-metadata-edit.spec.ts|storage-browser-metadata.spec.ts|storage-presigned-upload.spec.ts|storage-bulk-delete.spec.ts|sql-script.spec.ts|sql-tools.spec.ts) test -f "$NEON_E2E_SQL_SCRIPT_FIXTURE" ;;
-            query-history.spec.ts|shared-queries.spec.ts|auth-totp.spec.ts) test -f "$NEON_E2E_SQL_SCRIPT_FIXTURE" ;;
+            fractional-admission.spec.ts|fractional-cpu.spec.ts|query-history.spec.ts|shared-queries.spec.ts|auth-totp.spec.ts) test -f "$NEON_E2E_SQL_SCRIPT_FIXTURE" ;;
             auth-magic-link.spec.ts|auth-otp.spec.ts|auth-mail.spec.ts) test -f "$NEON_E2E_SQL_SCRIPT_FIXTURE"; test -f "$NEON_E2E_MAILBOX_FIXTURE" ;;
             backend-credentials.spec.ts|functions-metadata.spec.ts|ai-gateway.spec.ts|saved-queries.spec.ts) [[ "$NEON_E2E_CREDENTIAL_PROJECT" =~ ^prj_[a-f0-9]{16}$ ]] ;;
             *) exit 1 ;;
@@ -88,8 +88,26 @@ jobs:
             node tools/package-function-example.mjs examples/functions/replacement "$NEON_E2E_PRIVATE_DIR/function-replacement.zip"
             echo "NEON_E2E_FUNCTION_ROLLBACK_ZIP=$NEON_E2E_PRIVATE_DIR/function-replacement.zip" >> "$GITHUB_ENV"
           fi
-      - run: npm run test:e2e -- "$NEON_E2E_SUITE"
-        working-directory: web
+      - name: Run one serial UI slice with optional read-only resource observer
+        shell: bash
+        run: |
+          if [ "$NEON_E2E_SUITE" != fractional-cpu.spec.ts ]; then
+            npm --prefix web run test:e2e -- "$NEON_E2E_SUITE"
+            exit 0
+          fi
+          command -v kubectl >/dev/null
+          task_project=$(node -e 'const fs=require("node:fs");const v=JSON.parse(fs.readFileSync(process.env.NEON_E2E_SQL_SCRIPT_FIXTURE,"utf8"));if(!/^prj_[a-f0-9]{16}$/.test(v.project_id))process.exit(1);process.stdout.write(v.project_id)')
+          node tools/observe-fractional-cpu.mjs --marker "$NEON_E2E_PRIVATE_DIR/fractional-marker.json" --result "$NEON_E2E_PRIVATE_DIR/fractional-proof.json" --project "$task_project" > "$NEON_E2E_PRIVATE_DIR/fractional-observer.log" 2>&1 &
+          task_observer_pid=$!
+          task_observer_cleanup() {
+            node -e 'require("node:fs").writeFileSync(process.env.NEON_E2E_PRIVATE_DIR+"/fractional-marker.json",JSON.stringify({abort:true}))'
+            wait "$task_observer_pid" || true
+          }
+          trap task_observer_cleanup EXIT
+          npm --prefix web run test:e2e -- "$NEON_E2E_SUITE"
+          wait "$task_observer_pid"
+          install -d "$NEON_E2E_ARTIFACTS"
+          cp "$NEON_E2E_PRIVATE_DIR/fractional-proof.json" "$NEON_E2E_ARTIFACTS/fractional-resource-proof.json"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         if: always()
         with: {name: live-ui-evidence, path: '${{ env.NEON_E2E_ARTIFACTS }}', retention-days: 30}

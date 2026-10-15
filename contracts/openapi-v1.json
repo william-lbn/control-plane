@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.34.0",
+    "version": "0.35.1",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -569,16 +569,26 @@
           "min_cpu_milli": {
             "type": "integer",
             "enum": [
+              250,
+              500,
+              750,
               1000,
               2000
-            ]
+            ],
+            "minimum": 250,
+            "multipleOf": 250
           },
           "max_cpu_milli": {
             "type": "integer",
             "enum": [
+              250,
+              500,
+              750,
               1000,
               2000
-            ]
+            ],
+            "minimum": 250,
+            "multipleOf": 250
           },
           "min_memory_mib": {
             "type": "integer",
@@ -596,7 +606,122 @@
               3072
             ]
           }
-        }
+        },
+        "description": "Historical integer profiles remain supported. Fractional preview uses verified 250m/1Gi compute units, only 250/500/750m within the laboratory 3Gi ceiling. New VM immutable capacity must include requested range. Logical CPU budget differs from QEMU overcommit cgroup quota; not strict guest CPU isolation. Fractional creation rejects dummy/skip-cgroup runners before publishing the Endpoint; an owned writable cgroup host mount is required.",
+        "oneOf": [
+          {
+            "properties": {
+              "min_cpu_milli": {
+                "enum": [
+                  1000,
+                  2000
+                ]
+              },
+              "max_cpu_milli": {
+                "enum": [
+                  1000,
+                  2000
+                ]
+              }
+            }
+          },
+          {
+            "properties": {
+              "min_cpu_milli": {
+                "const": 250
+              },
+              "max_cpu_milli": {
+                "const": 250
+              },
+              "min_memory_mib": {
+                "const": 1024
+              },
+              "max_memory_mib": {
+                "const": 1024
+              }
+            }
+          },
+          {
+            "properties": {
+              "min_cpu_milli": {
+                "const": 250
+              },
+              "max_cpu_milli": {
+                "const": 500
+              },
+              "min_memory_mib": {
+                "const": 1024
+              },
+              "max_memory_mib": {
+                "const": 2048
+              }
+            }
+          },
+          {
+            "properties": {
+              "min_cpu_milli": {
+                "const": 250
+              },
+              "max_cpu_milli": {
+                "const": 750
+              },
+              "min_memory_mib": {
+                "const": 1024
+              },
+              "max_memory_mib": {
+                "const": 3072
+              }
+            }
+          },
+          {
+            "properties": {
+              "min_cpu_milli": {
+                "const": 500
+              },
+              "max_cpu_milli": {
+                "const": 500
+              },
+              "min_memory_mib": {
+                "const": 2048
+              },
+              "max_memory_mib": {
+                "const": 2048
+              }
+            }
+          },
+          {
+            "properties": {
+              "min_cpu_milli": {
+                "const": 500
+              },
+              "max_cpu_milli": {
+                "const": 750
+              },
+              "min_memory_mib": {
+                "const": 2048
+              },
+              "max_memory_mib": {
+                "const": 3072
+              }
+            }
+          },
+          {
+            "properties": {
+              "min_cpu_milli": {
+                "const": 750
+              },
+              "max_cpu_milli": {
+                "const": 750
+              },
+              "min_memory_mib": {
+                "const": 3072
+              },
+              "max_memory_mib": {
+                "const": 3072
+              }
+            }
+          }
+        ]
       },
       "CreateProject": {
         "type": "object",
@@ -4947,27 +5072,7 @@
                 ],
                 "properties": {
                   "autoscaling": {
-                    "type": "object",
-                    "required": [
-                      "min_cpu_milli",
-                      "max_cpu_milli",
-                      "min_memory_mib",
-                      "max_memory_mib"
-                    ],
-                    "properties": {
-                      "min_cpu_milli": {
-                        "type": "integer"
-                      },
-                      "max_cpu_milli": {
-                        "type": "integer"
-                      },
-                      "min_memory_mib": {
-                        "type": "integer"
-                      },
-                      "max_memory_mib": {
-                        "type": "integer"
-                      }
-                    }
+                    "$ref": "#/components/schemas/AutoscalingBounds"
                   }
                 }
               }

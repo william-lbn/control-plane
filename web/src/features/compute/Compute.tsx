@@ -179,7 +179,9 @@ export function Compute({
                 {status(endpoint.observed_state)}
               </div>
               <p className="muted">
-                agent 与 scheduler 决定实际 CPU/RAM；控制面只修改允许的有效范围。
+                agent 与 scheduler 决定实际 CPU/RAM；控制面修改允许范围。250/500/750m
+                的内存须分别匹配 1/2/3Gi。逻辑 CPU 与 QEMU overcommit 硬配额不同；旧 VM
+                创建时的下限不可原地降低。
               </p>
               <div className="form-grid">
                 <label>
@@ -189,6 +191,9 @@ export function Compute({
                     value={minCPU}
                     onChange={(e) => setMinCPU(Number(e.target.value))}
                   >
+                    <option value={250}>250m · 0.25 vCPU</option>
+                    <option value={500}>500m · 0.5 vCPU</option>
+                    <option value={750}>750m · 0.75 vCPU</option>
                     <option value={1000}>1000m · 1 vCPU</option>
                     <option value={2000}>2000m · 2 vCPU</option>
                   </select>
@@ -200,6 +205,9 @@ export function Compute({
                     value={maxCPU}
                     onChange={(e) => setMaxCPU(Number(e.target.value))}
                   >
+                    <option value={250}>250m · 0.25 vCPU</option>
+                    <option value={500}>500m · 0.5 vCPU</option>
+                    <option value={750}>750m · 0.75 vCPU</option>
                     <option value={1000}>1000m · 1 vCPU</option>
                     <option value={2000}>2000m · 2 vCPU</option>
                   </select>

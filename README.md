@@ -5,7 +5,7 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 
 **发行状态：预览版本。已经验证的实验环境功能不等于生产认证，也不等于 Neon 官网全部 Backend 服务。**
 
-最新新增：[个人加密 SQL 执行历史](docs/DELIVERY-2026-10-15-SQL-HISTORY.md)四项实际 UI 已通过；API 0.34 / Chart 0.9.18 / migration 032。
+最新新增：[小数 CPU 与实际 QEMU 配额](docs/DELIVERY-2026-10-15-FRACTIONAL-CPU.md)六项 UI 及新建 Reader 准入三项通过；API 0.35.1 / Chart 0.9.20 / migration 032。个人加密 SQL 执行历史、共享查询和应用 TOTP 均有独立交付记录。
 
 上一批新增：[应用 TOTP 双重认证](docs/DELIVERY-2026-10-15-AUTH-TOTP.md)八项 UI 与[项目共享查询](docs/DELIVERY-2026-10-15-SHARED-QUERIES.md)六项 UI 均通过；API 0.33 / Chart 0.9.17 / migration 031。
 

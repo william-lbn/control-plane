@@ -492,13 +492,13 @@ func (k *kubeClient) createCompute(ctx context.Context, p createPayload) (map[st
 	}
 	vmLabels := credentialLabels(p.ProjectID, p.EndpointID)
 	vmLabels["autoscaling.neon.tech/enabled"] = "true"
-	bounds, _ := json.Marshal(map[string]any{"min": map[string]string{"cpu": fmt.Sprint(p.MinCPU / 1000), "mem": fmt.Sprintf("%dGi", p.MinMem/1024)},
-		"max": map[string]string{"cpu": fmt.Sprint(p.MaxCPU / 1000), "mem": fmt.Sprintf("%dGi", p.MaxMem/1024)}})
+	bounds, _ := json.Marshal(map[string]any{"min": map[string]string{"cpu": cpuQuantityText(p.MinCPU), "mem": fmt.Sprintf("%dGi", p.MinMem/1024)},
+		"max": map[string]string{"cpu": cpuQuantityText(p.MaxCPU), "mem": fmt.Sprintf("%dGi", p.MaxMem/1024)}})
 	vm := map[string]any{"apiVersion": "vm.neon.tech/v1", "kind": "VirtualMachine",
 		"metadata": map[string]any{"name": name, "labels": vmLabels,
 			"annotations": map[string]string{"autoscaling.neon.tech/bounds": string(bounds)}},
 		"spec": map[string]any{"schedulerName": "autoscale-scheduler", "enableSSH": true,
-			"guest": map[string]any{"cpus": map[string]int{"min": p.MinCPU / 1000, "use": p.MinCPU / 1000, "max": p.MaxCPU / 1000},
+			"guest": map[string]any{"cpus": map[string]any{"min": vmCPUValue(p.MinCPU), "use": vmCPUValue(p.MinCPU), "max": vmCPUValue(p.MaxCPU)},
 				"memorySlotSize": "1Gi", "memorySlots": map[string]int{"min": p.MinMem / 1024, "use": p.MinMem / 1024, "max": p.MaxMem / 1024},
 				"rootDisk": map[string]string{"image": vmComputeImage(), "size": "8Gi"},
 				"args": []string{"--pgdata", "/var/db/postgres/compute", "-C", "postgresql://cloud_admin@localhost:55433/postgres",
@@ -531,6 +531,15 @@ func (k *kubeClient) waitCompute(ctx context.Context, projectID, endpointID stri
 			}
 			lastPhase = stringVal(nested(vm, "status", "phase"))
 			if lastPhase == "Running" {
+				if needsFractionalRunner(vm) {
+					pod, e := k.request(ctx, http.MethodGet, k.path("pod", stringVal(nested(vm, "status", "podName"))), nil)
+					if e != nil {
+						return nil, e
+					}
+					if e = validateFractionalRunnerPod(vm, pod); e != nil {
+						return nil, e
+					}
+				}
 				return vm, nil
 			}
 		}

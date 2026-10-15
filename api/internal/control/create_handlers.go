@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"os"
 	"regexp"
@@ -31,10 +32,28 @@ func defaults(bounds *createBounds) createBounds {
 	return *bounds
 }
 
+// Preserve historical integer profiles. Fractional preview profiles follow the
+// verified agent compute unit (250m / 1Gi) and this cluster's 3Gi ceiling.
 func (b createBounds) valid() bool {
-	return b.MinCPU >= 1000 && b.MaxCPU <= 2000 && b.MinCPU <= b.MaxCPU &&
-		b.MinMem >= 1024 && b.MaxMem <= 3072 && b.MinMem <= b.MaxMem &&
-		b.MinCPU%1000 == 0 && b.MaxCPU%1000 == 0 && b.MinMem%1024 == 0 && b.MaxMem%1024 == 0
+	if b.MinCPU < 250 || b.MaxCPU > 2000 || b.MinCPU > b.MaxCPU || b.MinMem < 1024 || b.MaxMem > 3072 || b.MinMem > b.MaxMem || b.MinCPU%250 != 0 || b.MaxCPU%250 != 0 || b.MinMem%1024 != 0 || b.MaxMem%1024 != 0 {
+		return false
+	}
+	if b.MinCPU%1000 == 0 && b.MaxCPU%1000 == 0 {
+		return true
+	}
+	return b.MaxCPU <= 750 && b.MinMem == b.MinCPU/250*1024 && b.MaxMem == b.MaxCPU/250*1024
+}
+func cpuQuantityText(milli int) string {
+	if milli%1000 == 0 {
+		return fmt.Sprint(milli / 1000)
+	}
+	return fmt.Sprintf("%dm", milli)
+}
+func vmCPUValue(milli int) any {
+	if milli%1000 == 0 {
+		return milli / 1000
+	}
+	return cpuQuantityText(milli)
 }
 
 var resourceName = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9 _.-]{0,63}$`)

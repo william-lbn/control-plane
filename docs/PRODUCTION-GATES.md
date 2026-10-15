@@ -1,6 +1,6 @@
 # 生产门槛与官网对齐
 
-状态截至 2026-10-15；运行 API 0.34 / migration 032 / Chart 0.9.18 / Helm revision 85。新增 [应用 TOTP](DELIVERY-2026-10-15-AUTH-TOTP.md)八项、[共享查询](DELIVERY-2026-10-15-SHARED-QUERIES.md)六项、[个人执行历史](DELIVERY-2026-10-15-SQL-HISTORY.md)四项实际 UI 均通过。API/Web 源 640e384，Auth 源 967e1b3；旧功能沿用各自回执。公开统一 Helm 发行仍为 0.1.30，本批尚未远程发布。
+状态截至 2026-10-15；运行 API 0.35.1 / migration 032 / Chart 0.9.20 / Helm revision 87；NeonVM revision 53。[小数 CPU](DELIVERY-2026-10-15-FRACTIONAL-CPU.md)完成实际配额六项和新建准入三项 UI。API 源 ca49814、Web 源 f910c17、Auth 源 967e1b3；匹配 autoscaling fork 1720924 修复已本地构建部署。此前应用 TOTP、共享查询、个人历史沿用独立回执。公开统一 Helm 发行仍为 0.1.30，本批尚未远程发布。
 前一版本 `be04cb4` 的真实 Linux/React 闭环见 [Auth/S3 交付](DELIVERY-2026-10-14-AUTH-S3.md)：
 788 Go/真实 PostgreSQL 检查、八个同源公开镜像、三节点 24 次串行 digest 导入；
 应用密码/会话十组 UI，以及实际 S3 SDK 签名/字节/权限/轮换/撤销/正常缩零均通过。
@@ -34,8 +34,8 @@ Functions 历史恢复在 0.1.25 通过原 fixture 的九组实际 UI 检查；S
 | HA | 独立 API/Worker 的领导租约已有代码；两者仍单副本；Metadata/数据面单故障域实验部署 | 独立故障域、主从切换/脑裂矩阵、指标和业务连续性 |
 | DR | 元数据/Secrets/对象/WAL 恢复未形成全栈演练 | 固定镜像与密钥、隔离 restore、真实 PG 数据校验、实测 RPO/RTO |
 | PITR | 已实现按时间戳/LSN 恢复到新分支、原生保留窗口/租约与 UI；原地恢复、Time Travel Assist、完整 Backend 一致性恢复未实现 | 新分支路径按版本做真实 Linux UI 验收；另验原地切换、GC 竞争、服务一致性、长期保留与恢复 |
-| 小数 CPU | 已支持的 bounds 只有整核 | Guest cgroup quota + SQL + 调度竞争/计量实测 |
-| 内存缩回 | 未通过完整 RAM 扩缩闭环 | Guest 状态、压力/回收、OOM 防护、SQL 持续和冷醒完整循环 |
+| 小数 CPU | 新建小数 Endpoint、实际 runner 配额 250→500→250m、SQL、冷醒及最终缩零已通过；保留四倍 QEMU 预算 | 严格 Guest 隔离、争用公平性及计量另验；正式公开镜像和统一 Helm 发行待完成 |
+| 内存缩回 | 本批 VM status 1→2→1Gi 与 SQL 已通过，物理 RAM 归还和压力/OOM 仍未通过 | Guest 状态、压力/回收、OOM 防护、SQL 持续和冷醒完整循环 |
 | 基础设施稳定性 | 同物理盘 VM 存在共同 I/O 竞争 | 分离故障域/IO、持续负载、etcd 延迟与错误预算 |
 | TLS / 网络 | Auth→Proxy 已实现显式 CA/证书名称验证及真实 TLS 正反例；浏览器、控制库、Storage 等仍有实验传输例外 | 正确域名或 IP SAN、可信证书、verify-full、管理网络隔离及 NetworkPolicy；本地 CA 路径不依赖公网域名 |
 | 目录完整性 | 自定义 API-owned 数据库 Owner 变更已通过实际 UI/SQL、Writer/Reader 冷醒、幂等与正常回收；rename、默认/系统 Owner、外部 DDL 回收、默认身份迁移未完成 | 按版本 UI/实际 PG 验证；扩展动作与完整身份迁移另设门槛 |
@@ -55,7 +55,7 @@ Functions 已开始实际 Go/Node 基础层实现，合同和内部接口见
 
 Managed Auth 已有 Go Driver、Better Auth 1.7.7 运行时、React UI、注册/会话/JWT/分支隔离与 PostgreSQL CI，详细见 [Auth 合同](MANAGED-AUTH.md)。真实 Neon UI 结果按版本交付报告记录；应用密码/会话安全已完成本地验收；公网 SMTP/OAuth、Console MFA、分支 factor 迁移、完整恢复/删除一致性、生产隔离与 HA 仍须独立实现/验收。
 
-产品 Object Storage 已实现分支目录、独立受限对象凭据、Go REST Driver、React UI、条件写入、签名下载和分支继承，详见 [Object Storage 合同](OBJECT-STORAGE.md)。REST 是 `neon-object-rest-v1`；f0b63f5 Linux 现场 UI 19 项已通过，实际版本与其余回归见 [当前交付](DELIVERY-2026-10-12-SQL-IDENTITY.md)。基础 S3/SigV4/signed chunks/统一存储凭据已在 0.1.29 实际验收，见 [S3 合同](OBJECT-STORAGE-S3-CORE.md)。基础 COPY、条件批量删除、预签名 PUT、CORS 和用户 metadata 已通过本地 UI；完整 multipart/COPY 条件/metadata REPLACE/大文件、物理 GC、分布式网关隔离及 HA/DR 仍未完成。
+产品 Object Storage 已实现分支目录、独立受限对象凭据、Go REST Driver、React UI、条件写入、签名下载和分支继承，详见 [Object Storage 合同](OBJECT-STORAGE.md)。REST 是 `neon-object-rest-v1`；f0b63f5 Linux 现场 UI 19 项已通过，实际版本与其余回归见 [当前交付](DELIVERY-2026-10-12-SQL-IDENTITY.md)。基础 S3/SigV4/signed chunks/统一存储凭据已在 0.1.29 实际验收，见 [S3 合同](OBJECT-STORAGE-S3-CORE.md)。基础 COPY、条件批量删除、预签名 PUT、CORS 和用户 metadata 已通过本地 UI；完整 multipart/COPY 源条件/大文件、物理 GC、分布式网关隔离及 HA/DR 仍未完成。
 
 Functions 已有 guest、不可变存储、持久候选/引导/SQL 身份及新增原生执行
 Driver/API/UI，默认禁用，实际发布验收见 [执行合同](FUNCTIONS-NATIVE-PREVIEW.md)；AI Gateway 文本 Chat/SSE、目录、Playground、应用授权和用量已通过本地真实 Ollama UI；商业上游/其他协议/预算和生产门槛仍缺。Data API 已有原生 Driver、
