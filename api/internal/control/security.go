@@ -136,7 +136,7 @@ func (s *server) currentUser(r *http.Request) (user, error) {
 	var u user
 	err = s.db.QueryRow(r.Context(), `SELECT u.id,u.username,u.role,s.csrf_hash
         FROM sessions s JOIN users u ON u.id=s.user_id
-        WHERE s.token_hash=$1 AND s.expires_at > now() AND NOT u.disabled`, digest(cookie.Value)).
+        WHERE s.token_hash=$1 AND s.expires_at > now() AND s.revoked_at IS NULL AND NOT u.disabled`, digest(cookie.Value)).
 		Scan(&u.ID, &u.Username, &u.Role, &u.CSRFHash)
 	return u, err
 }
@@ -246,7 +246,7 @@ func (s *server) cleanSessions(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			_, _ = s.db.Exec(ctx, "DELETE FROM sessions WHERE expires_at < now()")
+			_, _ = s.db.Exec(ctx, "DELETE FROM sessions WHERE expires_at < now() AND (revoked_at IS NULL OR revoked_at < now()-interval '8 hours')")
 			_, _ = s.db.Exec(ctx, "DELETE FROM login_failures WHERE occurred_at < now()-interval '1 day'")
 			s.cleanRegistrationLimits(ctx)
 		}

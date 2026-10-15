@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.36.0",
+    "version": "0.37.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -4069,6 +4069,103 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "ConsoleAccountSession": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "created_at",
+          "expires_at",
+          "current"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^cs_[a-f0-9]{32}$"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "current": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ConsoleAccountSessions": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "limit",
+          "has_more"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "$ref": "#/components/schemas/ConsoleAccountSession"
+            }
+          },
+          "limit": {
+            "type": "integer",
+            "const": 50
+          },
+          "has_more": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ConsoleSessionRevokeBody": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "password"
+        ],
+        "properties": {
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1024,
+            "writeOnly": true
+          }
+        }
+      },
+      "ConsoleSessionRevocation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "revoked_count",
+          "session_id",
+          "revoked_at",
+          "current_session_retained"
+        ],
+        "properties": {
+          "revoked_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "revoked_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "current_session_retained": {
+            "type": "boolean",
+            "const": true
           }
         }
       }
@@ -16045,6 +16142,180 @@
         },
         "description": "Owner-only within authorized project. Text is authenticated with the original project/owner/history ID AAD; old encryption key versions must remain available. no-store. Truncated history is not the complete executable query.",
         "summary": "Owner reads bounded historical SQL without executing it"
+      }
+    },
+    "/api/v1/account/sessions": {
+      "get": {
+        "operationId": "listOwnConsoleSessions",
+        "tags": [
+          "Identity"
+        ],
+        "summary": "listOwnConsoleSessions",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current account sessions or idempotent revocation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleAccountSessions"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated or incorrect current password"
+          },
+          "403": {
+            "description": "Console cookie required or CSRF rejected"
+          },
+          "404": {
+            "description": "Session not owned by current user"
+          },
+          "409": {
+            "description": "Use logout for current session"
+          },
+          "422": {
+            "description": "Malformed password body"
+          },
+          "429": {
+            "description": "Account password attempts limited"
+          },
+          "503": {
+            "description": "Metadata/audit unavailable or commit outcome unknown"
+          }
+        }
+      }
+    },
+    "/api/v1/account/sessions/{session}/revoke": {
+      "post": {
+        "operationId": "revokeOwnConsoleSession",
+        "tags": [
+          "Identity"
+        ],
+        "summary": "revokeOwnConsoleSession",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current account sessions or idempotent revocation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleSessionRevocation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated or incorrect current password"
+          },
+          "403": {
+            "description": "Console cookie required or CSRF rejected"
+          },
+          "404": {
+            "description": "Session not owned by current user"
+          },
+          "409": {
+            "description": "Use logout for current session"
+          },
+          "422": {
+            "description": "Malformed password body"
+          },
+          "429": {
+            "description": "Account password attempts limited"
+          },
+          "503": {
+            "description": "Metadata/audit unavailable or commit outcome unknown"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsoleSessionRevokeBody"
+              }
+            }
+          }
+        },
+        "description": "Cookie + CSRF + current password required. Only own non-current sessions. Revocation and durable audit commit atomically. Effect-idempotent; no automatic replay after an unknown commit. Does not cancel already admitted requests or API/application credentials.",
+        "parameters": [
+          {
+            "name": "session",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^cs_[a-f0-9]{32}$"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/account/sessions/revoke-others": {
+      "post": {
+        "operationId": "revokeOtherConsoleSessions",
+        "tags": [
+          "Identity"
+        ],
+        "summary": "revokeOtherConsoleSessions",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current account sessions or idempotent revocation result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleSessionRevocation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthenticated or incorrect current password"
+          },
+          "403": {
+            "description": "Console cookie required or CSRF rejected"
+          },
+          "404": {
+            "description": "Session not owned by current user"
+          },
+          "409": {
+            "description": "Use logout for current session"
+          },
+          "422": {
+            "description": "Malformed password body"
+          },
+          "429": {
+            "description": "Account password attempts limited"
+          },
+          "503": {
+            "description": "Metadata/audit unavailable or commit outcome unknown"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConsoleSessionRevokeBody"
+              }
+            }
+          }
+        },
+        "description": "Cookie + CSRF + current password required. Only own non-current sessions. Revocation and durable audit commit atomically. Effect-idempotent; no automatic replay after an unknown commit. Does not cancel already admitted requests or API/application credentials."
       }
     }
   }

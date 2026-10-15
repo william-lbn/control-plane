@@ -1,6 +1,6 @@
 # 生产门槛与官网对齐
 
-状态截至 2026-10-15；API 0.36.0 / migration 032 / Chart 0.9.22 / Helm revision 89；NeonVM revision 53。[XLSX 与计划树](DELIVERY-2026-10-15-SQL-EXPORT-PLAN.md)八项新 UI 已通过，Web 源 2d932d5；API 源 15bc5b7、Auth 源 967e1b3 保留。此前 S3 COPY 源条件、小数 CPU、应用 TOTP、共享查询、个人历史沿用各自独立回执。公开统一 Helm 发行仍为 0.1.30，本批尚未远程发布。
+状态截至 2026-10-15；API 0.37.0 / migration 033 / Chart 0.9.23 / Helm revision 90；NeonVM revision 53。[控制台会话管理](DELIVERY-2026-10-15-CONSOLE-SESSIONS.md)五项真实 UI 已通过，API 源 b72793b、Web 源 96a84e9；Auth 源 967e1b3 保留。此前各切片沿用独立回执。公开统一 Helm 发行仍为 0.1.30，本批尚未远程发布。
 前一版本 `be04cb4` 的真实 Linux/React 闭环见 [Auth/S3 交付](DELIVERY-2026-10-14-AUTH-S3.md)：
 788 Go/真实 PostgreSQL 检查、八个同源公开镜像、三节点 24 次串行 digest 导入；
 应用密码/会话十组 UI，以及实际 S3 SDK 签名/字节/权限/轮换/撤销/正常缩零均通过。
@@ -29,7 +29,7 @@ Functions 历史恢复在 0.1.25 通过原 fixture 的九组实际 UI 检查；S
 | 门槛 | 当前缺口 | 完成判据 |
 | --- | --- | --- |
 | Proxy/Storage adapter | 原生 Go/Helm 迁移和真实 Proxy/UI 冷醒/通知已验收；仍单实例，通知重配置和分布式连接账本未完成 | 全新隔离环境安装、完整 placement/Safekeeper 重配置、跨实例长短连接与删除竞争另验 |
-| 多租户生产安全 | 受邀注册/已有账号接受、一次凭据、撤销/过期、组织锁、事务审计已有代码；OIDC/SSO/MFA、公网邮件投递与完整攻击矩阵仍缺 | 新版本 Linux UI 与实际 PG 验收、跨组织/项目负例、撤销竞争、外部安全评审 |
+| 多租户生产安全 | 受邀注册/已有账号接受、一次凭据、撤销/过期、组织锁、事务审计及个人 Console 会话管理已有代码/真实 UI；OIDC/SSO/Console MFA、公网邮件投递与完整攻击矩阵仍缺 | 新版本 Linux UI 与实际 PG 验收、跨组织/项目负例、撤销竞争、外部安全评审 |
 | 跨实例缩零栅栏 | DB 租约无法 fence 所有外部动作；缺短连接 ledger | 多 API/Proxy 并发、过期 worker、新连接/删除竞争负例与无误删 |
 | HA | 独立 API/Worker 的领导租约已有代码；两者仍单副本；Metadata/数据面单故障域实验部署 | 独立故障域、主从切换/脑裂矩阵、指标和业务连续性 |
 | DR | 元数据/Secrets/对象/WAL 恢复未形成全栈演练 | 固定镜像与密钥、隔离 restore、真实 PG 数据校验、实测 RPO/RTO |

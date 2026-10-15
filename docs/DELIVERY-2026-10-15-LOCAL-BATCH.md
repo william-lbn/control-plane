@@ -1,3 +1,5 @@
+> 当前状态已推进到 API 0.37.0 / Chart 0.9.23 / migration 033 / revision 90，见 [最新账号会话交付](DELIVERY-2026-10-15-CONSOLE-SESSIONS.md)和[生产门槛](PRODUCTION-GATES.md)。下文为早期批次的历史记录。
+
 # 2026-10-14/15：Linux 本地批次验收
 
 ## 已验收切片
