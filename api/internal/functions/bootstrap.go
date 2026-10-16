@@ -9,6 +9,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/netip"
 	"net/url"
@@ -175,9 +176,35 @@ func (b Bootstrap) ManagerTLS(now time.Time) (*tls.Config, error) {
 	return &tls.Config{MinVersion: tls.VersionTLS13, Certificates: []tls.Certificate{certificate}}, nil
 }
 
+// ArtifactFetchError contains only fixed codes and HTTP status, never a URL,
+// response body, bootstrap credential or underlying network error.
+type ArtifactFetchError struct {
+	Reason           string
+	Status, Attempts int
+}
+
+func (e *ArtifactFetchError) Error() string { return "trusted artifact fetch failed: " + e.Reason }
+
+func transientArtifactNetwork(err error) bool {
+	var certificate *tls.CertificateVerificationError
+	var record tls.RecordHeaderError
+	if errors.As(err, &certificate) || errors.As(err, &record) {
+		return false
+	}
+	var dns *net.DNSError
+	if errors.As(err, &dns) {
+		return dns.IsTimeout || dns.IsTemporary
+	}
+	var operation *net.OpError
+	var network net.Error
+	return errors.As(err, &operation) || (errors.As(err, &network) && network.Timeout()) || errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF)
+}
+
 // FetchBundle permits one exact HTTPS artifact, signs the exact path, refuses
 // redirects/proxies/system CA fallbacks, bounds bytes and verifies archive hash
-// before ZIP validation or any file creation. All errors are secret-free.
+// before ZIP validation or any file creation. Only safe artifact GETs retry on
+// known transient failures (three freshly signed attempts, 95 seconds total).
+// No customer invocation, authentication rejection or integrity failure retries.
 func (b Bootstrap) FetchBundle(ctx context.Context) ([]byte, error) {
 	if err := b.Validate(); err != nil {
 		return nil, err
@@ -186,29 +213,65 @@ func (b Bootstrap) FetchBundle(ctx context.Context) ([]byte, error) {
 	key, _ := secretKey(b.ArtifactKey)
 	transport := &http.Transport{Proxy: nil, TLSClientConfig: &tls.Config{MinVersion: tls.VersionTLS13, RootCAs: roots}, ResponseHeaderTimeout: 15 * time.Second, DisableCompression: true}
 	defer transport.CloseIdleConnections()
-	client := &http.Client{Transport: transport, Timeout: 45 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, b.ArtifactURL, nil)
-	if err != nil || SignManagerRequest(request, nil, key, time.Now()) != nil {
-		return nil, errors.New("artifact request could not be signed")
+	client := &http.Client{Transport: transport, Timeout: 30 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	ctx, cancel := context.WithTimeout(ctx, 95*time.Second)
+	defer cancel()
+	for attempt := 1; attempt <= 3; attempt++ {
+		if ctx.Err() != nil {
+			return nil, &ArtifactFetchError{Reason: "cancelled", Attempts: attempt - 1}
+		}
+		request, err := http.NewRequestWithContext(ctx, http.MethodGet, b.ArtifactURL, nil)
+		if err != nil || SignManagerRequest(request, nil, key, time.Now()) != nil {
+			return nil, &ArtifactFetchError{Reason: "signing", Attempts: attempt}
+		}
+		response, err := client.Do(request)
+		failure := &ArtifactFetchError{Reason: "network", Attempts: attempt}
+		retry := false
+		if err != nil {
+			retry = transientArtifactNetwork(err)
+			if !retry {
+				failure.Reason = "transport_rejected"
+			}
+		} else {
+			failure.Status = response.StatusCode
+			if response.StatusCode != http.StatusOK {
+				failure.Reason = "http_rejected"
+				retry = response.StatusCode == 429 || response.StatusCode == 502 || response.StatusCode == 503 || response.StatusCode == 504
+				_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 4096))
+				_ = response.Body.Close()
+			} else {
+				content, readErr := io.ReadAll(io.LimitReader(response.Body, MaxArchiveBytes+1))
+				_ = response.Body.Close()
+				if readErr != nil {
+					failure.Reason, retry = "read_interrupted", transientArtifactNetwork(readErr)
+				} else {
+					if len(content) == 0 || len(content) > MaxArchiveBytes {
+						return nil, &ArtifactFetchError{Reason: "size_rejected", Status: 200, Attempts: attempt}
+					}
+					digest := sha256.Sum256(content)
+					if hex.EncodeToString(digest[:]) != b.BundleDigest {
+						return nil, &ArtifactFetchError{Reason: "digest_rejected", Status: 200, Attempts: attempt}
+					}
+					if _, err := ValidateBundle(content); err != nil {
+						return nil, &ArtifactFetchError{Reason: "archive_rejected", Status: 200, Attempts: attempt}
+					}
+					return content, nil
+				}
+			}
+		}
+		if ctx.Err() != nil {
+			failure.Reason, retry = "cancelled", false
+		}
+		if !retry || attempt == 3 {
+			return nil, failure
+		}
+		timer := time.NewTimer(time.Duration(attempt) * time.Second)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return nil, &ArtifactFetchError{Reason: "cancelled", Attempts: attempt}
+		case <-timer.C:
+		}
 	}
-	response, err := client.Do(request)
-	if err != nil {
-		return nil, errors.New("trusted artifact fetch failed")
-	}
-	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK {
-		return nil, errors.New("artifact fetch rejected")
-	}
-	content, err := io.ReadAll(io.LimitReader(response.Body, MaxArchiveBytes+1))
-	if err != nil || len(content) == 0 || len(content) > MaxArchiveBytes {
-		return nil, errors.New("artifact fetch exceeds bounds")
-	}
-	digest := sha256.Sum256(content)
-	if hex.EncodeToString(digest[:]) != b.BundleDigest {
-		return nil, errors.New("artifact digest mismatch")
-	}
-	if _, err := ValidateBundle(content); err != nil {
-		return nil, err
-	}
-	return content, nil
+	panic("bounded artifact attempts exhausted")
 }

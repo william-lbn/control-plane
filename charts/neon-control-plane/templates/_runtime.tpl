@@ -1,8 +1,15 @@
 {{- define "neonControl.runtimeEnv" -}}
+{{- if and .Values.functions.schedules.enabled (not .Values.functions.enabled) }}
+{{- fail "Functions schedules require functions.enabled" }}
+{{- end }}
 {{- if and .Values.objectStorage.s3.enabled (not .Values.objectStorage.enabled) }}
 {{- fail "S3 requires objectStorage.enabled" }}
 {{- end }}
 {{- if .Values.functions.enabled }}
+{{- if and .Values.functions.schedules.enabled (not .Values.functions.publicHTTP.enabled) }}
+{{- fail "Functions schedules require functions.publicHTTP.enabled" }}
+{{- end }}
+- {name: NEON_FUNCTION_SCHEDULES_ENABLED, value: {{ .Values.functions.schedules.enabled | quote }}}
 - {name: NEON_FUNCTIONS_PREVIEW_ENABLED, value: 'true'}
 - {name: NEON_FUNCTIONS_CONFIG_FILE, value: /run/functions-common/config.json}
 {{- if .Values.functions.publicHTTP.enabled }}

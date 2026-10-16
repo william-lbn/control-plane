@@ -3,6 +3,7 @@ package control
 import (
 	"bytes"
 	"context"
+	"github.com/jackc/pgx/v5"
 	"io"
 	"net/http"
 	"net/url"
@@ -20,19 +21,31 @@ type functionHTTPIdentity struct {
 	Timeout                                 int
 }
 type functionAutomaticStopKey struct{}
+type functionExpectedIdentityKey struct{}
 
 func (s *server) functionHTTPIdentity(ctx context.Context, branch, slug string) (functionHTTPIdentity, error) {
+	return readFunctionHTTPIdentity(ctx, s.db, branch, slug)
+}
+
+type functionIdentityReader interface {
+	QueryRow(context.Context, string, ...any) pgx.Row
+}
+
+// The same reader can be a pool or an already-held transaction. Never borrow
+// a second connection while holding branch/configuration locks: a saturated
+// pool would otherwise deadlock enabled schedule admission.
+func readFunctionHTTPIdentity(ctx context.Context, db functionIdentityReader, branch, slug string) (functionHTTPIdentity, error) {
 	var out functionHTTPIdentity
-	e := s.db.QueryRow(ctx, `SELECT f.id,f.project_id,f.branch_id,f.slug,f.state,f.version,h.actor_id,h.idle_enabled,h.idle_suspended,f.idle_timeout_seconds
+	var orgRole, projectRole string
+	e := db.QueryRow(ctx, `SELECT f.id,f.project_id,f.branch_id,f.slug,f.state,f.version,h.actor_id,h.idle_enabled,h.idle_suspended,f.idle_timeout_seconds,m.role,COALESCE(g.role,'')
  FROM function_definitions f JOIN function_http_policies h ON h.function_id=f.id
  JOIN projects p ON p.id=f.project_id JOIN branches b ON b.id=f.branch_id JOIN organizations o ON o.id=f.org_id JOIN users u ON u.id=h.actor_id
+ JOIN organization_members m ON m.org_id=f.org_id AND m.user_id=h.actor_id
+ LEFT JOIN project_grants g ON g.project_id=f.project_id AND g.user_id=h.actor_id
  WHERE f.branch_id=$1 AND f.slug=$2 AND h.public_enabled AND f.state NOT IN ('deleting','deleted')
- AND p.state='ready' AND p.deleted_at IS NULL AND b.state='ready' AND b.deleted_at IS NULL AND o.state='active' AND NOT u.disabled`, branch, slug).Scan(&out.ID, &out.Project, &out.Branch, &out.Slug, &out.State, &out.Version, &out.Actor, &out.Idle, &out.IdleSuspended, &out.Timeout)
-	if e == nil {
-		a, err := s.projectAccess(ctx, out.Project, out.Actor)
-		if err != nil || a.Level < 2 {
-			e = errBackendCredentialInvalid
-		}
+ AND p.state='ready' AND p.deleted_at IS NULL AND b.state='ready' AND b.deleted_at IS NULL AND o.state='active' AND NOT u.disabled`, branch, slug).Scan(&out.ID, &out.Project, &out.Branch, &out.Slug, &out.State, &out.Version, &out.Actor, &out.Idle, &out.IdleSuspended, &out.Timeout, &orgRole, &projectRole)
+	if e == nil && effectivePermission(orgRole, projectRole) < 2 {
+		e = errBackendCredentialInvalid
 	}
 	return out, e
 }
@@ -63,6 +76,7 @@ func (s *server) automaticFunctionIntent(ctx context.Context, p functionHTTPIden
 		action = "resume"
 		body = `{}`
 	}
+	ctx = context.WithValue(ctx, functionExpectedIdentityKey{}, p.ID)
 	r, _ := http.NewRequestWithContext(context.WithValue(context.WithValue(ctx, userKey, user{ID: p.Actor}), requestIDKey, newID("function_auto_")), http.MethodPost, "http://internal/api/v1/projects/"+p.Project+"/branches/"+p.Branch+"/functions/"+p.Slug+"/"+action, strings.NewReader(body))
 	r.SetPathValue("project", p.Project)
 	r.SetPathValue("branch", p.Branch)
@@ -83,12 +97,21 @@ func (s *server) automaticFunctionIntent(ctx context.Context, p functionHTTPIden
 }
 
 func (s *server) awaitPublicFunction(ctx context.Context, branch, slug string) (functionHTTPIdentity, error) {
+	return s.awaitFunctionIdentity(ctx, branch, slug, "")
+}
+
+// A durable trigger addresses an immutable Function ID as well as its slug.
+// A later replacement at the same URL must not be woken or adopted by it.
+func (s *server) awaitFunctionIdentity(ctx context.Context, branch, slug, expectedID string) (functionHTTPIdentity, error) {
 	deadline := time.NewTimer(180 * time.Second)
 	defer deadline.Stop()
 	for {
 		p, e := s.functionHTTPIdentity(ctx, branch, slug)
 		if e != nil {
 			return p, e
+		}
+		if expectedID != "" && p.ID != expectedID {
+			return p, errFunctionInstanceConflict
 		}
 		if p.State == "active" {
 			return p, nil
@@ -97,7 +120,7 @@ func (s *server) awaitPublicFunction(ctx context.Context, branch, slug string) (
 			release, ok := s.functionAdmissionLock(ctx, p.ID, true)
 			if ok {
 				fresh, err := s.functionHTTPIdentity(ctx, branch, slug)
-				if err == nil && fresh.State == "suspended" && fresh.Idle && fresh.IdleSuspended {
+				if err == nil && fresh.ID == p.ID && fresh.State == "suspended" && fresh.Idle && fresh.IdleSuspended {
 					s.automaticFunctionIntent(ctx, fresh, true)
 				}
 				release()

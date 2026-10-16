@@ -244,6 +244,10 @@ func (s *server) admitFunctionDeployment(w http.ResponseWriter, r *http.Request,
 		fail(w, r, 412, "version_conflict", "Function changed; refresh before retrying")
 		return
 	}
+	if expected, _ := r.Context().Value(functionExpectedIdentityKey{}).(string); expected != "" && expected != functionID {
+		fail(w, r, 409, "function_identity_changed", "Original automatic Function identity changed")
+		return
+	}
 	if state == "deleting" {
 		fail(w, r, 409, "function_deleting", "Function is being deleted")
 		return

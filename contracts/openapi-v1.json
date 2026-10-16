@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.46.0",
+    "version": "0.47.2",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -5232,6 +5232,355 @@
           "version_token",
           "updated_at"
         ]
+      },
+      "FunctionTriggerCreate": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type",
+          "name",
+          "function_slug",
+          "schedule"
+        ],
+        "properties": {
+          "type": {
+            "const": "schedule"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "function_slug": {
+            "type": "string",
+            "pattern": "^[a-z0-9]{1,20}$"
+          },
+          "function_path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048,
+            "description": "Application-relative path, no query/fragment/dot segments."
+          },
+          "schedule": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "cron"
+            ],
+            "properties": {
+              "cron": {
+                "type": "string",
+                "minLength": 9,
+                "maxLength": 128,
+                "description": "Five numeric cron fields, UTC; ranges/lists/steps; minimum one minute. No timezone/macros/seconds."
+              }
+            }
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "FunctionTriggerPatch": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "type"
+        ],
+        "properties": {
+          "type": {
+            "const": "schedule"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "function_slug": {
+            "type": "string",
+            "pattern": "^[a-z0-9]{1,20}$"
+          },
+          "function_path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048,
+            "description": "Application-relative path, no query/fragment/dot segments."
+          },
+          "schedule": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "cron"
+            ],
+            "properties": {
+              "cron": {
+                "type": "string",
+                "minLength": 9,
+                "maxLength": 128,
+                "description": "Five numeric cron fields, UTC; ranges/lists/steps; minimum one minute. No timezone/macros/seconds."
+              }
+            }
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "FunctionScheduleTrigger": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "trigger_id",
+          "type",
+          "name",
+          "function_slug",
+          "function_path",
+          "schedule",
+          "enabled",
+          "version_token",
+          "next_run_at",
+          "inherited",
+          "created_at",
+          "updated_at"
+        ],
+        "properties": {
+          "trigger_id": {
+            "type": "string",
+            "pattern": "^ftr_[a-f0-9]{24}$"
+          },
+          "type": {
+            "const": "schedule"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "function_slug": {
+            "type": "string",
+            "pattern": "^[a-z0-9]{1,20}$"
+          },
+          "function_path": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048,
+            "description": "Application-relative path, no query/fragment/dot segments."
+          },
+          "schedule": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "cron"
+            ],
+            "properties": {
+              "cron": {
+                "type": "string",
+                "minLength": 9,
+                "maxLength": 128,
+                "description": "Five numeric cron fields, UTC; ranges/lists/steps; minimum one minute. No timezone/macros/seconds."
+              }
+            }
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "version_token": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "next_run_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "inherited": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "FunctionTriggerResponse": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "trigger"
+        ],
+        "properties": {
+          "trigger": {
+            "$ref": "#/components/schemas/FunctionScheduleTrigger"
+          }
+        }
+      },
+      "FunctionTriggerList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "next_after",
+          "limit",
+          "scheduling_enabled"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FunctionScheduleTrigger"
+            },
+            "maxItems": 100
+          },
+          "next_after": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "scheduling_enabled": {
+            "type": "boolean"
+          }
+        }
+      },
+      "FunctionTriggerInvocation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "trigger_id",
+          "trigger_version_token",
+          "scheduled_at",
+          "state",
+          "attempts",
+          "request_event_id",
+          "application_status",
+          "response_bytes",
+          "error_code",
+          "admitted_at",
+          "started_at",
+          "finished_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^fti_[a-f0-9]{64}$"
+          },
+          "trigger_id": {
+            "type": "string"
+          },
+          "trigger_version_token": {
+            "type": "string"
+          },
+          "scheduled_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "state": {
+            "enum": [
+              "queued",
+              "dispatching",
+              "succeeded",
+              "failed",
+              "outcome_unknown",
+              "skipped"
+            ]
+          },
+          "attempts": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 3
+          },
+          "request_event_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "application_status": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 100,
+            "maximum": 599
+          },
+          "response_bytes": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "error_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "admitted_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "started_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "FunctionTriggerInvocationList": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "next_after",
+          "limit",
+          "capture",
+          "retention"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FunctionTriggerInvocation"
+            },
+            "maxItems": 100
+          },
+          "next_after": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "capture": {
+            "const": "occurrence_and_dispatch_metadata_only"
+          },
+          "retention": {
+            "const": "held_until_operator_policy"
+          }
+        }
       }
     },
     "responses": {
@@ -19200,6 +19549,543 @@
                 "$ref": "#/components/schemas/SQLHistoryNameInput"
               }
             }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/functions-triggers": {
+      "get": {
+        "operationId": "listFunctionTriggers",
+        "tags": [
+          "Functions"
+        ],
+        "summary": "List branch schedule plans without waking a runtime",
+        "description": "Branch-local UTC schedule preview. Editor mutations require CSRF for sessions, durable Idempotency-Key and exact quoted If-Match for PATCH/DELETE. Exact replay precedes generation/rate checks. Enabled schedules require currently exposed deployed Function and operator flag. Creator and HTTP policy authorization are rechecked before dispatch. Queued immutable occurrences survive disable/delete. At most one dispatch at a time per controller, three attempts only for known pre-dispatch unavailability. Network/expired lease uncertainty is terminal outcome_unknown, no automatic replay. Misses older than two minutes are skipped; next future minute is retained. Application must deduplicate invocation_id. No branch inheritance, HA/external fencing or exactly-once business guarantee.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 1024
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable committed receipt; no customer response payload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FunctionTriggerList"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createFunctionTrigger",
+        "tags": [
+          "Functions"
+        ],
+        "summary": "Create an idempotent UTC schedule",
+        "description": "Branch-local UTC schedule preview. Editor mutations require CSRF for sessions, durable Idempotency-Key and exact quoted If-Match for PATCH/DELETE. Exact replay precedes generation/rate checks. Enabled schedules require currently exposed deployed Function and operator flag. Creator and HTTP policy authorization are rechecked before dispatch. Queued immutable occurrences survive disable/delete. At most one dispatch at a time per controller, three attempts only for known pre-dispatch unavailability. Network/expired lease uncertainty is terminal outcome_unknown, no automatic replay. Misses older than two minutes are skipped; next future minute is retained. Application must deduplicate invocation_id. No branch inheritance, HA/external fencing or exactly-once business guarantee.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Durable committed receipt; no customer response payload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FunctionTriggerResponse"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Quoted committed generation."
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FunctionTriggerCreate"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/functions-triggers/{trigger}": {
+      "get": {
+        "operationId": "getFunctionTrigger",
+        "tags": [
+          "Functions"
+        ],
+        "summary": "Read current trigger and version",
+        "description": "Branch-local UTC schedule preview. Editor mutations require CSRF for sessions, durable Idempotency-Key and exact quoted If-Match for PATCH/DELETE. Exact replay precedes generation/rate checks. Enabled schedules require currently exposed deployed Function and operator flag. Creator and HTTP policy authorization are rechecked before dispatch. Queued immutable occurrences survive disable/delete. At most one dispatch at a time per controller, three attempts only for known pre-dispatch unavailability. Network/expired lease uncertainty is terminal outcome_unknown, no automatic replay. Misses older than two minutes are skipped; next future minute is retained. Application must deduplicate invocation_id. No branch inheritance, HA/external fencing or exactly-once business guarantee.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "name": "trigger",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^ftr_[a-f0-9]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable committed receipt; no customer response payload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FunctionTriggerResponse"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Quoted committed generation."
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "updateFunctionTrigger",
+        "tags": [
+          "Functions"
+        ],
+        "summary": "Update or pause a versioned schedule",
+        "description": "Branch-local UTC schedule preview. Editor mutations require CSRF for sessions, durable Idempotency-Key and exact quoted If-Match for PATCH/DELETE. Exact replay precedes generation/rate checks. Enabled schedules require currently exposed deployed Function and operator flag. Creator and HTTP policy authorization are rechecked before dispatch. Queued immutable occurrences survive disable/delete. At most one dispatch at a time per controller, three attempts only for known pre-dispatch unavailability. Network/expired lease uncertainty is terminal outcome_unknown, no automatic replay. Misses older than two minutes are skipped; next future minute is retained. Application must deduplicate invocation_id. No branch inheritance, HA/external fencing or exactly-once business guarantee.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "name": "trigger",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^ftr_[a-f0-9]{24}$"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"[1-9][0-9]*\"$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable committed receipt; no customer response payload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FunctionTriggerResponse"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Quoted committed generation."
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FunctionTriggerPatch"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteFunctionTrigger",
+        "tags": [
+          "Functions"
+        ],
+        "summary": "Tombstone plan, retain queued occurrences and journal",
+        "description": "Branch-local UTC schedule preview. Editor mutations require CSRF for sessions, durable Idempotency-Key and exact quoted If-Match for PATCH/DELETE. Exact replay precedes generation/rate checks. Enabled schedules require currently exposed deployed Function and operator flag. Creator and HTTP policy authorization are rechecked before dispatch. Queued immutable occurrences survive disable/delete. At most one dispatch at a time per controller, three attempts only for known pre-dispatch unavailability. Network/expired lease uncertainty is terminal outcome_unknown, no automatic replay. Misses older than two minutes are skipped; next future minute is retained. Application must deduplicate invocation_id. No branch inheritance, HA/external fencing or exactly-once business guarantee.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "name": "trigger",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^ftr_[a-f0-9]{24}$"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"[1-9][0-9]*\"$"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Durable committed receipt; no customer response payload.",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Quoted committed generation."
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/functions-triggers/{trigger}/invocations": {
+      "get": {
+        "operationId": "listFunctionTriggerInvocations",
+        "tags": [
+          "Functions"
+        ],
+        "summary": "Read retained occurrence outcomes including unknown dispatch",
+        "description": "Branch-local UTC schedule preview. Editor mutations require CSRF for sessions, durable Idempotency-Key and exact quoted If-Match for PATCH/DELETE. Exact replay precedes generation/rate checks. Enabled schedules require currently exposed deployed Function and operator flag. Creator and HTTP policy authorization are rechecked before dispatch. Queued immutable occurrences survive disable/delete. At most one dispatch at a time per controller, three attempts only for known pre-dispatch unavailability. Network/expired lease uncertainty is terminal outcome_unknown, no automatic replay. Misses older than two minutes are skipped; next future minute is retained. Application must deduplicate invocation_id. No branch inheritance, HA/external fencing or exactly-once business guarantee.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "name": "trigger",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^ftr_[a-f0-9]{24}$"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 1024
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable committed receipt; no customer response payload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FunctionTriggerInvocationList"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
         }
       }

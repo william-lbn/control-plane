@@ -49,6 +49,9 @@ type Invocation struct {
 	URL        string              `json:"url"`
 	Headers    map[string][]string `json:"headers"`
 	Body       []byte              `json:"body"`
+	// This privileged field is authenticated by the private manager HMAC. Public
+	// and Console callers can supply ordinary headers, never this field.
+	TriggerInvocationID string `json:"trigger_invocation_id,omitempty"`
 }
 
 type Manager struct {
@@ -126,6 +129,10 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch {
 	case r.Method == http.MethodGet && r.URL.Path == "/internal/v1/status" && r.URL.RawQuery == "" && len(body) == 0:
 		m.status(w, r)
+	case r.Method == http.MethodGet && r.URL.Path == "/internal/v1/capabilities" && r.URL.RawQuery == "" && len(body) == 0:
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Cache-Control", "no-store")
+		_ = json.NewEncoder(w).Encode(InstanceCapabilities{Scope: m.scope, BootID: m.bootID, TriggerInvocations: true})
 	case r.Method == http.MethodPost && r.URL.Path == "/internal/v1/invoke" && r.URL.RawQuery == "":
 		m.invoke(w, r, body)
 	case r.Method == http.MethodPost && r.URL.Path == "/internal/v1/shutdown" && r.URL.RawQuery == "":
@@ -188,6 +195,15 @@ func hopHeader(name string) bool {
 }
 
 func (m *Manager) validInvocation(v Invocation) bool {
+	if v.TriggerInvocationID != "" {
+		var envelope struct {
+			Version      int    `json:"version"`
+			InvocationID string `json:"invocation_id"`
+		}
+		if v.Method != http.MethodPost || !ValidTriggerInvocationID(v.TriggerInvocationID) || json.Unmarshal(v.Body, &envelope) != nil || envelope.Version != 1 || envelope.InvocationID != v.TriggerInvocationID {
+			return false
+		}
+	}
 	if v.BootID != m.bootID || v.Generation != m.scope.Generation || len(v.Body) > MaxInvokeBytes || v.Headers == nil || len(v.Headers) > 64 {
 		return false
 	}
@@ -255,6 +271,10 @@ func (m *Manager) invoke(w http.ResponseWriter, r *http.Request, body []byte) {
 		}
 	}
 	request.Header.Set("X-Neon-Request-URL", v.URL)
+	if v.TriggerInvocationID != "" {
+		// Set only after stripping every caller-supplied X-Neon-* header.
+		request.Header.Set("X-Neon-Trigger-Invocation-Id", v.TriggerInvocationID)
+	}
 	response, err := m.client.Do(request)
 	if err != nil {
 		managerError(w, 502, "runtime_unavailable")

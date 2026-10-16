@@ -31,6 +31,10 @@ aiGateway:
 # Existing Secrets are operator-managed and are retained across Helm upgrades.
 functions:
   enabled: false
+  # Requires an upgraded Guest supervisor with signed trigger invocation support.
+  # Off by default. Persistent UTC plans remain inspectable while disabled.
+  schedules:
+    enabled: false
   # Dedicated web origin. Never proxy customer responses through Console nginx.
   # With a shared lab host, Cookie/Set-Cookie are suppressed in both directions.
   publicHTTP:

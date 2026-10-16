@@ -5,7 +5,7 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 
 **发行状态：预览版本。已经验证的实验环境功能不等于生产认证，也不等于 Neon 官网全部 Backend 服务。**
 
-最新状态：[2026-10-16 交付](docs/DELIVERY-2026-10-16-CURRENT.md)：新增 [个人历史名称与 AI 建议](docs/SQL-HISTORY-NAMES.md)：加密/审计、真实响应丢失恢复、双 UI 版本冲突与真实模型命名；API/Web 0.46.0 / migration 038 / Chart 0.9.36 / Helm revision 108。此前有界 multipart、共享历史、计划比较和 MFA 等保留独立回执。[35 组需求账本](docs/REMAINING-REQUIREMENTS-2026-10-16.md)仍有待开发和独立验收项。
+最新状态：[2026-10-17 定时触发器交付](docs/DELIVERY-2026-10-16-CURRENT.md)：UTC Cron、持久计划/回执、幂等/版本、真实 UI 从 Function/Compute 0 冷醒到受限 SQL、伪造拒绝与正常退休通过。API/Worker 0.47.2、Web 0.47.0 / migration 039 / Chart 0.9.39 / Helm revision 111。此前[历史名称/AI 命名](docs/DELIVERY-2026-10-16-HISTORY-NAMES.md)、multipart、共享历史、计划比较和 MFA 保留独立回执。[需求账本](docs/REMAINING-REQUIREMENTS-2026-10-16.md)仍有 29 组代码或独立验收缺口；继续逐项推进。
 
 此前增量：[应用 TOTP 双重认证](docs/DELIVERY-2026-10-15-AUTH-TOTP.md)八项 UI 与[项目共享查询](docs/DELIVERY-2026-10-15-SHARED-QUERIES.md)六项 UI 均通过；该批基线为 API 0.33 / Chart 0.9.17 / migration 031。
 
@@ -34,13 +34,13 @@ S3 的 test-only `875e48b` 只修正选择器和原 checkpoint 续测，不改�
 | 功能 | 本仓库代码 | 当前边界 |
 | --- | --- | --- |
 | 组织、成员、项目授权、API Key | 已实现，真实 PostgreSQL 集成测试 | 加法式项目授权；Console 自助 MFA 已验收；完整生产安全审计、SSO/组织强制 MFA 未完成 |
-| Console 邀请与受邀注册 | 账号绑定、一次性凭据、幂等/过期/撤销、事务审计、Go/React/PG 测试 | 手动安全交付邀请；邮件验证/OIDC/MFA 未完成，独立于 Managed Auth |
+| Console 邀请与受邀注册 | 账号绑定、一次性凭据、幂等/过期/撤销、事务审计、Go/React/PG 测试 | 手动安全交付邀请；Console 自助 TOTP/恢复码与会话撤销已验收；邀请邮件自动投递、OIDC/组织强制 MFA 仍缺，独立于 Managed Auth |
 | 项目、当前时间点分支、Writer、多个 Reader | 已实现，异步 Operation + SQL 就绪探针 | 单集群、单 Region、PG16；不支持所有项目/分支删除与恢复动作 |
 | PostgreSQL 连接与 SQL 工作台 | 通过独立 Neon Proxy 和 Endpoint selector | 应用不能直接连接控制 API；生产入口必须配置可信 TLS |
 | 数据库、角色与密码轮换 | 分支目录、Compute 原生配置、Proxy spec 调谐；原 OID/版本保护的自定义库 Owner 变更已通过实际 UI 和 Writer/Reader 冷醒 | 默认/系统 Owner 变更、rename、未知外部 DDL 恢复未完成；见 [Owner 回执](docs/DATABASE-OWNER.md) |
-| CPU / 内存边界、自动休眠、连接唤醒 | 已实现实验环境控制路径 | 整数 CPU 1→2→1 已验证；小数 CPU、完整内存缩回、跨实例栅栏未验收 |
+| CPU / 内存边界、自动休眠、连接唤醒 | 已实现实验环境控制路径 | 整数 CPU 和实际 QEMU 250→500→250m、SQL/冷醒已验收；严格 Guest 隔离、完整物理内存归还、跨实例外部栅栏仍未通过 |
 | 监控、Operation 步骤、错误与重试 | 已实现 | 长期指标持久化、SLO 告警、完整审计导出未完成 |
-| 分支 Managed Auth | Go/TS/React、真实 PG 与 Neon UI 注册/会话/JWT/克隆隔离/RLS/自动缩零通过 | 密码/会话安全已独立验收；邮件/OAuth/MFA、完整身份管理、密钥轮换、全链路 TLS/HA 未完成；见本版交付 |
+| 分支 Managed Auth | Go/TS/React、真实 PG 与 Neon UI 注册/会话/JWT/克隆隔离/RLS/自动缩零通过 | 密码/会话、真实本地邮件、OTP/Magic Link 与应用 TOTP 已独立验收；OAuth/完整身份管理、factor 分支重绑、密钥轮换、全链路 TLS/HA 仍缺；见对应交付 |
 | 时间点恢复到新分支 | 原生时间戳/LSN、存储保留租约、异步调谐、历史目录隔离、React UI | 默认禁用；仅受管理分支；原地恢复、Time Travel Assist、完整 Backend 一致性恢复未实现 |
 | 项目/分支保留删除与独立 Compute 删除 | 保护/依赖图、关闭 Proxy 和服务、正常 Runner 回收、held tombstone、项目恢复、原密码重建与 React UI | 物理 GC、TTL、失败创建回收与跨实例栅栏未开放；详见 [删除手册](docs/RETAINED-DELETION.md)和本版交付 |
 | HA / DR | 部分租约与恢复工具 | 未通过独立故障域 HA/DR；历史新分支恢复不等于完整 DR |

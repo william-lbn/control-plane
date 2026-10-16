@@ -21,12 +21,15 @@ func main() {
 	if err := functions.ServeGuest(ctx); err != nil {
 		// Bootstrap may contain customer secrets: underlying errors, URLs and
 		// environment values must never flow into the guest/platform journal.
-		stage := "unknown"
+		entry := map[string]any{"component": "function-supervisor", "state": "boot_or_runtime_failed", "stage": "unknown"}
 		var boot *functions.GuestBootError
 		if errors.As(err, &boot) {
-			stage = boot.Stage
+			entry["stage"] = boot.Stage
+			if boot.Reason != "" {
+				entry["reason"], entry["http_status"], entry["attempts"] = boot.Reason, boot.HTTPStatus, boot.Attempts
+			}
 		}
-		_ = json.NewEncoder(os.Stderr).Encode(map[string]string{"component": "function-supervisor", "state": "boot_or_runtime_failed", "stage": stage})
+		_ = json.NewEncoder(os.Stderr).Encode(entry)
 		os.Exit(1)
 	}
 	fmt.Println(`{"component":"function-supervisor","state":"stopped"}`)

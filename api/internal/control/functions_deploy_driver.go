@@ -342,6 +342,7 @@ func (s *server) reconcileFunctionDeployment(ctx context.Context, op, worker str
 	return s.functionDeployStep(ctx, op, worker, 5, func() error {
 		ticker := time.NewTicker(2 * time.Second)
 		defer ticker.Stop()
+		var guestDeadline time.Time
 		for {
 			if err := s.verifyFunctionIntent(ctx, op, worker, p); err != nil {
 				return err
@@ -354,6 +355,12 @@ func (s *server) reconcileFunctionDeployment(ctx context.Context, op, worker str
 				return err
 			}
 			if stringVal(nested(vm, "status", "phase")) == "Running" {
+				if guestDeadline.IsZero() {
+					guestDeadline = time.Now().Add(150 * time.Second)
+				}
+				if time.Now().After(guestDeadline) {
+					return errFunctionGuestBootstrapUnavailable
+				}
 				service, err := s.kube.request(ctx, "GET", s.kube.path("service", instance.ServiceName), nil)
 				if err != nil {
 					return errFunctionRuntimeResource
@@ -404,3 +411,5 @@ func (s *server) reconcileFunctionDeployment(ctx context.Context, op, worker str
 }
 
 var errFunctionPreviousInstance = errors.New("Previous Function instance must be explicitly drained before replacement")
+
+var errFunctionGuestBootstrapUnavailable = errors.New("Function guest bootstrap did not become ready within its bounded boot window")

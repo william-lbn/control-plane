@@ -114,7 +114,10 @@ func stringsContainLine(text, line string) bool {
 
 // GuestBootError exposes only a fixed boot stage; bootstrap/private errors stay
 // out of the platform journal.
-type GuestBootError struct{ Stage string }
+type GuestBootError struct {
+	Stage, Reason        string
+	HTTPStatus, Attempts int
+}
 
 func (e *GuestBootError) Error() string { return "function guest stage failed: " + e.Stage }
 
@@ -131,7 +134,12 @@ func ServeGuest(ctx context.Context) (result error) {
 			if guestVerified {
 				_ = os.Remove("/neonvm/vmstart.allowed")
 			}
-			result = &GuestBootError{Stage: stage}
+			boot := &GuestBootError{Stage: stage}
+			var artifact *ArtifactFetchError
+			if errors.As(result, &artifact) {
+				boot.Reason, boot.HTTPStatus, boot.Attempts = artifact.Reason, artifact.Status, artifact.Attempts
+			}
+			result = boot
 		}
 	}()
 	if os.Geteuid() != 0 {

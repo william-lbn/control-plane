@@ -186,10 +186,12 @@ func (s *server) authorizeRoute(w http.ResponseWriter, r *http.Request, u user) 
 	return r.WithContext(context.WithValue(r.Context(), resourceAccessKey{}, a)), true
 }
 
+var errInvalidBearerCredential = errors.New("invalid bearer credential")
+
 func (s *server) bearerUser(r *http.Request) (user, error) {
 	token := strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")
 	if token == r.Header.Get("Authorization") || !strings.HasPrefix(token, "ncp_") || len(token) > 256 {
-		return user{}, errors.New("invalid bearer credential")
+		return user{}, errInvalidBearerCredential
 	}
 	u := user{APIKey: true}
 	err := s.db.QueryRow(r.Context(), `SELECT u.id,u.username,u.role,k.id,COALESCE(k.org_id,''),

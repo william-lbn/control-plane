@@ -15,6 +15,18 @@ import (
 )
 
 var bootPattern = regexp.MustCompile(`^[a-f0-9]{32}$`)
+var triggerInvocationPattern = regexp.MustCompile(`^fti_[a-f0-9]{64}$`)
+
+func ValidTriggerInvocationID(id string) bool { return triggerInvocationPattern.MatchString(id) }
+
+// An independent endpoint keeps the original status representation compatible
+// with older control clients. An old guest returns 404: triggers fail closed
+// before dispatch instead of silently losing privileged header attestation.
+type InstanceCapabilities struct {
+	Scope              Scope  `json:"scope"`
+	BootID             string `json:"boot_id"`
+	TriggerInvocations bool   `json:"trigger_invocations"`
+}
 
 // InstanceStatus contains privileged supervisor observations. NodeObservation
 // belongs to customer code and must never authorize retirement or resource use.
@@ -101,6 +113,22 @@ func (c *InstanceClient) Status(ctx context.Context) (InstanceStatus, error) {
 		return InstanceStatus{}, errors.New("Functions manager identity or status rejected")
 	}
 	return status, nil
+}
+
+func (c *InstanceClient) Capabilities(ctx context.Context) (InstanceCapabilities, error) {
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
+	defer cancel()
+	response, err := c.request(ctx, http.MethodGet, "/internal/v1/capabilities", nil)
+	if err != nil {
+		return InstanceCapabilities{}, err
+	}
+	defer response.Body.Close()
+	body, err := io.ReadAll(io.LimitReader(response.Body, (4096)+1))
+	var value InstanceCapabilities
+	if err != nil || response.StatusCode != 200 || len(body) > 4096 || strictJSON(body, &value) != nil || value.Scope != c.scope || !bootPattern.MatchString(value.BootID) {
+		return InstanceCapabilities{}, errors.New("Functions manager capabilities unavailable or rejected")
+	}
+	return value, nil
 }
 
 // Invoke returns the original status/headers/body, including application errors

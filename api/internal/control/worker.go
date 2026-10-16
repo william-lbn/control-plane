@@ -281,6 +281,9 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 	if errors.Is(stepErr, errDriverPanic) {
 		state, code, message, retryable = "failed", "driver_panic", "Worker driver failed internally; inspect operation ID and repair before retry", false
 	}
+	if errors.Is(stepErr, errFunctionGuestBootstrapUnavailable) {
+		state, code, message, retryable = "failed", "function_guest_bootstrap_unavailable", "Original Function guest failed to become ready within 150 seconds of Running; inspect its fixed boot-stage log, then explicitly stop the original instance before resuming retained source", false
+	}
 	// Commit the result and any failure cleanup under the same locked lease.
 	// A stale worker must not change resource state after a successor has claimed
 	// the operation. The service context is used because runCtx may have timed out.

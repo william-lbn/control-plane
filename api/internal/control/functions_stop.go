@@ -73,6 +73,10 @@ func (s *server) functionStop(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 412, "version_conflict", "Function changed before stop")
 		return
 	}
+	if expected, _ := r.Context().Value(functionExpectedIdentityKey{}).(string); expected != "" && expected != id {
+		fail(w, r, 409, "function_identity_changed", "Original automatic Function identity changed")
+		return
+	}
 	var pending bool
 	if tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM operations WHERE resource_type='function' AND resource_id=$1 AND state IN ('queued','running','retry_wait'))`, id).Scan(&pending) != nil || pending {
 		fail(w, r, 409, "function_operation_in_progress", "Finish or resolve the original Function Operation first")
@@ -86,6 +90,9 @@ func (s *server) functionStop(w http.ResponseWriter, r *http.Request) {
 	op := s.functionRequestID("op_", userFrom(r).ID, key, fingerprint)
 	payload, _ := json.Marshal(p)
 	_, err = tx.Exec(r.Context(), `UPDATE function_definitions SET state=$2,generation=$3,version=version+1,updated_at=now() WHERE id=$1`, id, next, p.Generation)
+	if err == nil && deleting {
+		_, err = tx.Exec(r.Context(), `UPDATE function_triggers SET state='deleted',enabled=false,next_run_at=NULL,generation=generation+1,deleted_at=clock_timestamp(),updated_at=clock_timestamp() WHERE function_id=$1 AND state='ready'`, id)
+	}
 	if err == nil {
 		// Atomic marker avoids a crash between a durable stop and reopening wake.
 		automatic, _ := r.Context().Value(functionAutomaticStopKey{}).(bool)

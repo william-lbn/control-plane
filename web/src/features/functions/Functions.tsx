@@ -1,4 +1,5 @@
 import { FunctionRequestLogs } from './FunctionRequestLogs';
+import { ScheduleTriggers } from './ScheduleTriggers';
 import { useEffect, useRef, useState } from 'react';
 import { api, projectPath } from '../../api';
 import type { Branch, Page, Operation } from '../../api';
@@ -489,6 +490,12 @@ export function Functions({
                   disabled={busy}
                 />
                 <FunctionRequestLogs path={`${path}/${current.slug}`} />
+                <ScheduleTriggers
+                  key={`${path}/${current.slug}`}
+                  path={path.replace(/\/functions$/, '/functions-triggers')}
+                  slug={current.slug}
+                  canEdit={canEdit && !busy}
+                />
                 {driver && (
                   <HTTPPolicyPanel
                     key={`${current.id}/${current.version_token}`}

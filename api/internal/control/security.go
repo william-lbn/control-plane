@@ -145,7 +145,15 @@ func (s *server) auth(next http.Handler, write bool) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		u, err := s.currentUser(r)
 		if err != nil {
-			fail(w, r, 401, "unauthenticated", "Please sign in")
+			// Missing/invalid credentials are authentication failures. A metadata
+			// connection/query failure proves no such fact: fail closed with a
+			// retryable availability error, without exposing raw storage errors.
+			if errors.Is(err, http.ErrNoCookie) || errors.Is(err, pgx.ErrNoRows) || errors.Is(err, errInvalidBearerCredential) {
+				fail(w, r, 401, "unauthenticated", "Please sign in")
+			} else {
+				w.Header().Set("Retry-After", "1")
+				fail(w, r, 503, "authentication_unavailable", "Authentication state temporarily unavailable")
+			}
 			return
 		}
 		if write && !u.APIKey {

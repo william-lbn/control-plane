@@ -47,6 +47,12 @@ func (s *server) many(ctx context.Context, query string, args ...any) ([]record,
 
 func (s *server) routes() *http.ServeMux {
 	mux := http.NewServeMux()
+	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/functions-triggers", s.auth(http.HandlerFunc(s.functionTriggers), false))
+	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/functions-triggers", s.auth(http.HandlerFunc(s.functionTriggers), true))
+	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/functions-triggers/{trigger}", s.auth(http.HandlerFunc(s.functionTriggers), false))
+	mux.Handle("PATCH /api/v1/projects/{project}/branches/{branch}/functions-triggers/{trigger}", s.auth(http.HandlerFunc(s.functionTriggers), true))
+	mux.Handle("DELETE /api/v1/projects/{project}/branches/{branch}/functions-triggers/{trigger}", s.auth(http.HandlerFunc(s.functionTriggers), true))
+	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/functions-triggers/{trigger}/invocations", s.auth(http.HandlerFunc(s.functionTriggerInvocations), false))
 	mux.Handle("PATCH /api/v1/projects/{project}/branches/{branch}/functions/{slug}/http-policy", s.auth(http.HandlerFunc(s.functionHTTPPolicy), true))
 	mux.Handle("GET /api/v1/projects/{project}/saved-queries", s.auth(http.HandlerFunc(s.savedQueries), false))
 	mux.Handle("POST /api/v1/projects/{project}/saved-queries", s.auth(http.HandlerFunc(s.savedQueries), true))

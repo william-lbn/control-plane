@@ -12,10 +12,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/william-lbn/control-plane/api/internal/functions"
 )
 
 var functionArtifactRoute = regexp.MustCompile(`^/internal/v1/function-artifacts/(fni_[a-f0-9]{16})/(fdp_[a-f0-9]{16})/([a-f0-9]{64})$`)
+
+var errFunctionArtifactMetadataUnavailable = errors.New("Function artifact metadata temporarily unavailable")
 
 type functionArtifactGateway struct {
 	server     *server
@@ -146,6 +149,9 @@ func (g *functionArtifactGateway) identities(ctx context.Context, instance, depl
 	boot.Scope.InstanceID, boot.Scope.DeploymentID, boot.BundleDigest = instance, deployment, digest
 	sql.Scope.FunctionID, sql.Scope.ProjectID, sql.Scope.BranchID = boot.FunctionID, boot.Scope.ProjectID, boot.Scope.BranchID
 	artifact.ProjectID, artifact.BranchID, artifact.Digest = boot.Scope.ProjectID, boot.Scope.BranchID, digest
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return functionBootstrapReference{}, functionSQLReference{}, functionArtifactReference{}, errFunctionArtifactMetadataUnavailable
+	}
 	if err != nil || !boot.valid() || boot.UID == "" || !sql.valid() || sql.UID == "" || sql.WriterID != boot.WriterID {
 		return functionBootstrapReference{}, functionSQLReference{}, functionArtifactReference{}, errFunctionArtifact
 	}
@@ -174,6 +180,11 @@ func (g *functionArtifactGateway) ServeHTTP(w http.ResponseWriter, r *http.Reque
 	ctx, cancel := context.WithTimeout(r.Context(), 40*time.Second)
 	defer cancel()
 	boot, sql, artifact, err := g.identities(ctx, match[1], match[2], match[3])
+	if errors.Is(err, errFunctionArtifactMetadataUnavailable) {
+		w.Header().Set("Retry-After", "1")
+		jsonResponse(w, 503, record{"code": "artifact_metadata_unavailable"})
+		return
+	}
 	if err != nil || boot.MACKeyVersion != g.server.functions.input.KeyVersion || sql.MACKeyVersion != g.server.functions.input.KeyVersion {
 		jsonResponse(w, 404, record{"code": "artifact_identity_rejected"})
 		return
