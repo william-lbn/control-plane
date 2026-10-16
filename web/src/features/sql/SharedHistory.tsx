@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError, projectPath } from '../../api';
 import { newRequestKey } from '../../shared/requestKey';
-import type { Entry } from './QueryHistory';
+import type { Entry, HistoryLoadTarget } from './QueryHistory';
 
 type Sharing = {
   history_id: string;
@@ -159,13 +159,15 @@ export function HistorySharingPanel({
   );
 }
 
-type SharedEntry = Entry & { owner_username: string };
+type SharedEntry = Omit<Entry, 'name' | 'name_version_token' | 'name_updated_at'> & {
+  owner_username: string;
+};
 export function SharedHistory({
   projectId,
   onLoad,
 }: {
   projectId: string;
-  onLoad: (sql: string, entry: Entry) => void;
+  onLoad: (sql: string, entry: HistoryLoadTarget) => void;
 }) {
   const base = projectPath(projectId) + '/shared-query-history',
     epoch = useRef(0);

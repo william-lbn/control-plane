@@ -1,75 +1,83 @@
-# 2026-10-16 当前交付：AI 修错与确定性计划提示
+# 2026-10-16 当前交付：个人历史名称与 AI 命名
 
-## 1. 结论
+## 1. 本批结果
 
-本地 **Web 功能切片 0.45.0 / Chart 0.9.35 / Helm revision 107**。
-API/Worker 仍为 **0.43.0 / migration 037 / 103 paths / 147 operations**；没有新增
-API、迁移或 Neon/Autoscaling 内核改动。此前受控 Schema、草稿及计划建议通路已在
-`121a1eecdc034f3865ede1e300f3564c252a1e56` 推送，详见
-[上一批交付](DELIVERY-2026-10-16-SQL-ASSISTANT.md)。
+本地 **API/Web 0.46.0 / migration 038 / Chart 0.9.36 / Helm revision 108**，
+**104 paths / 149 operations**。此前 AI 修错已在
+`f2c01b86b0b7ec8be6f36879be495f9c1ede5bfe` 推送，独立回执见
+[0.45 交付](DELIVERY-2026-10-16-SQL-AI-REPAIR.md)。
 
-本批实现[AI 修错](SQL-AI-REPAIR.md)：真实 PG 失败、本页源 SQL/连接匹配、明确选入
-SQL/错误、精确预览与确认、真实模型修复、独立载入并清除密码、人工执行。
-固定 Explain/Analyze 测量说明由 UI 状态产生，不依赖模型断言。它没有认证模型
-准确率；历史 AI 命名、其他未开发功能和[生产门槛](PRODUCTION-GATES.md)继续保留，
-不能把本阶段验收视作整体完成。
+本批实现并验收：
 
-## 2. 精确运行版本
+| 功能 | 实际验证 | 边界 |
+|---|---|---|
+| 个人历史名称 | 加密保存/清除、刷新可见、原记录关联 | 不改原 SQL/执行状态，个人名称不随 SQL 共享 |
+| 并发和恢复 | 真实成功响应丢失，原 key/版本/输入取回完全相同回执；第二 UI 页面旧版本被拒绝 | 元数据变更；原回执不重施旧名称，刷新丢失本页意图时需按当前状态/原 key 核对 |
+| 真实 AI 命名 | 明确读取原历史，精确发送预览/确认，本地 Qwen 1.5B 生成，人工采用后另行保存 | 不默认发送所有 SQL，不认证模型语义准确率 |
+| 权限与留存 | 当前 Editor+本人、API key 拒绝、其他 Admin 不越权、加密/审计/回执、删除级联 | 备份/WAL 仍有各自保留；未知执行结果不改名 |
+| 无数据面副作用 | 真实 UI 全程普通 SQL POST 0、Compute/VM 保持 0 | 模型调用产生自己的既有 AI 用量账本 |
 
-- 构建父提交：`121a1eecdc034f3865ede1e300f3564c252a1e56`；实际运行源码由本地不可变快照识别。
-- Web 快照：`eba21c1b295aa8d4368d63f770c1bb6d028ac21d07edfc9a2496d407e5afa75c`。
-- Web 镜像：`neon.local/control-web@sha256:b28239b8d7c90e33808dbb670a2891ac656f8c951c647a3d59ef6cbf7021c924`。
-- API/Worker 镜像保持 `neon.local/control-api@sha256:5a0bcdf294ae7b35120e76f49327002b22e625efa5405dc74c2aeb1ea950449c`。
-- API/Worker 源快照保持 `18f34cad7281b7db8137f964a12bde203e5d1b9e9080cae10912c6b95693a3c4`。
-- 最后 metadata backup SHA-256：`80cf55fb24b2b74b32e7f4ff4665bdbee16b2b24edca22dfeebf98093c78d6e2`。
-- 最终 UI Job：`publication-ui-20261016052313`；运行镜像的实际 COPY 输入与当前 API/Web 文件重新核对一致。
+[名称合同](SQL-HISTORY-NAMES.md)定义完整接口、密文模型、组件/时序、错误、人工步骤与
+官网差异。新增表 `sql_history_name_requests`，原 history 增加独立名称版本、密文、
+密钥版本和更新时间。幂等回执/审计不保存名称或 SQL 明文。
 
-Web 仅在 Linux 本地构建，三节点 digest 导入；保留 API/Worker/AI/数据面二进制镜像。
-三次窄 Helm 升级分别部署 Web、运营模型候选和可用模型；每次保留 9 个 PVC、所有
-既有 Secret UID 与其他六个 Neon 发布，先保存 metadata/values/manifest。
-新增不可变模型配置仅修改原受限本地上游的模型路由；原 0.5B 路由、供应商凭据、
-旧配置和失败记录都保留，无外部模型账号输入。
+本阶段完成 Q03 的基本交互：计划比较、受控 SQL AI 草稿/Schema、计划建议通路、
+修错及显式历史 AI 命名。默认自动命名/长期授权和模型质量等扩展仍保留。
+其余[需求账本](REMAINING-REQUIREMENTS-2026-10-16.md)与生产门槛继续推进，**整体未完成**。
 
-本地当前目录提供 `local-small → qwen2.5:0.5b` 与 `local-sql → qwen2.5:1.5b`，
-后者用于本批修错。模型选择是产品目录输入，公开代码不硬编码用户供应商密钥。
-Windows 只承载本地 Ollama 上游；控制服务、构建和 Playwright 均在 Linux。
-最新本地镜像尚未统一公开发行；公共统一 Helm 0.1.31 的 0.23.0 锁不能冒充此版本。
+## 2. 精确构建与部署
 
-## 3. 新增验收和失败
+- 构建父提交：`f2c01b86b0b7ec8be6f36879be495f9c1ede5bfe`；运行源码由不可变本地文件快照确认。
+- API/Web 源快照 SHA-256：`de9216590f99523b2fdf09594c32593dc97839aeb34c3fb1823d20a99220dea4`。
+- API/Worker 镜像：`neon.local/control-api@sha256:1a34a458c9aa25fb8bbb9c6ad3b39442c6c8e599370e64e0c84e151d23299a09`。
+- Web 镜像：`neon.local/control-web@sha256:22240817f0843239983f83f8c6ca3eaf3f0a40bb85bc2fa8cefab619333fe544`。
+- metadata backup SHA-256：`6cfe79ebbe8e2c3f952a2bd91a80c4dac900d7fa445cc13b7e56a5541468cb08`。
+- 最终 UI Job：`publication-ui-20261016055149`。
 
-3 项新增 Linux 纯函数测试覆盖双上下文选入、错误格式/UTF-8 界限、拒绝控制符、
-额外 transport/凭据字段不投影，以及普通草稿不附带错误。受影响的既有 6 项助手
-检查一起通过；类型/格式/Vite 与 51 个可信 live suite 的声明/准入检查通过。
-没有重跑其他旧全量功能套件，也没有等待 GitHub CI。
+仅在 Linux 构建 API/Web，三节点串行 digest 导入。Helm 升级前保存 metadata、
+values、manifest；迁移 038 为加法式，保留 9 个 PVC、既有 Secret UID、其他六个
+Neon 发布和运营方模型配置。最终实际 API/Web 构建输入与当前源码重新核对一致。
+未更改 Neon Rust 或 Autoscaling 内核代码，没有 Python 产品后端/公开 Python 验证器。
+最新本地镜像尚未统一公开发行；公开统一 Helm 0.1.31 的 0.23.0 镜像锁不能冒充本地版本。
 
-真实 UI 6 条 ledger（含收尾）通过：
+## 3. 本地验收与失败保留
 
-1. 原 fixture 的 `SELEC 43::integer AS ai_fix_value` 经真实 Proxy/PG 返回 422，
-   原历史 `qh_3192e3e76ef2128cbcd0fb8c` 保留；没有自动模型调用或 SQL 重试。
-2. 编辑器与原失败不匹配时隐藏修复入口；选入 SQL/错误后完整预览，取消错误选择
-   会重置确认并禁用生成。未附带连接密码、角色或库名。
-3. 真实 Qwen 1.5B 通过 Go Gateway 返回修复草稿，模型 request_id
-   `air_2284007d335d6bf23d35df4e`；此时数据库 POST 仍只有第一次失败请求。
-4. 显式载入后密码为空，旧错误清除；人工输入密码/提交原模型草稿后实际返回 43。
-5. 人工 Explain 后显示确定性的“仅估算/无实际行数与耗时”说明，切换未请求模型。
-6. 结束 Compute/VM 归零，原失败与成功历史、业务数据和模型输出证据保留。
+2 项新 Go race/真实 PostgreSQL 测试通过（其中集成测试包含多项 API/事务场景）：
+名称字符/UTF-8/Unicode 换行限制，AEAD 跨项目/账号/记录/SQL 信封隔离，当前账号与
+Admin/Viewer/外账号/API key 负例、确认终态、审计失败回滚、精确重试与内容冲突、
+并发版本冲突、旧回执不重施、密钥缺失/轮换、60 新意图限额、回执复合外键和
+删除级联。实际 HTTP 字段与闭合 OpenAPI 模型核对；Go vet 与三项 OpenAPI 检查通过。
 
-本次共 **3 次数据库请求、1 次模型请求**，不把它们算成完整官网回归。
-最初 0.5B 模型原样返回错误 SQL，前端拒绝载入且未执行；随后已有 14B 模型加载
-报文件读取错误，上游拒绝被准确呈现为 502，8B 的独立模型加载探测同样失败。
-磁盘有余量，未未经证据归因或修改原模型文件。下载约 986 MB 的 1.5B 模型并通过
-摘要验证和加载检查后，才接入同一受限路由并进行上述真实 UI 验收。
+前端新增 3 项纯函数检查、受影响的既有 9 项助手/修错检查通过；类型/格式/Vite
+通过。52 个可信 live suite 声明/准入对齐，API 操作索引生成/核对通过。没有重复
+其他旧全量套件，也没有等待 GitHub CI。
 
-原失败 history ID `qh_228351b8d62c3fa0f494391e`、`qh_87e33a4f7c3d1ba0d0cb2ade`
-和原模型响应保留。没有把错误 SQL 人工改写成模型输出、放松识别器或用假供应商
-替代真实模型。该样本通过不保证其他模型/SQL 都能正确修复。
+真实 UI 8 条 ledger（含收尾）通过：
 
-## 4. 资源与继续工作
+1. 原 history `qh_aae3c2f2e83e5e41c7c81487` 从版本 0 开始，不创建替代 SQL 记录。
+2. 第一次服务器已保存名称但浏览器丢弃响应，原 key/版本/输入/回执留存；重试完全
+   相同请求，回执相同，当前版本只到 1。
+3. 另一 UI 页面用旧版本提交返回 412；重载看到胜出名称，无静默覆盖。
+4. 主页面清除名称到版本 2，原 SQL/执行状态保持。
+5. 明确读取该 history 的原 SQL，SHA-256 与保留输入一致，不使用未保存编辑器。
+   真实模型请求 `air_11f49fbe4d39313c83195014`，生成/采用均未写入名字。
+6. 用户独立保存原模型建议到版本 3，刷新后同 ID 名称仍在。
 
-4 个本阶段自有终态 Job 先归档描述和全部日志，再按 UID/resourceVersion 退休。
-最后 3/3 节点 Ready，无 Pressure；87 个工作负载与期望一致（含有意的 0），错误
-Pod 0、托管 VM 0。所有文件、OCI、原配置、fixture 和失败材料保留。
+共 **5 次名称 PUT**（含一次响应丢失的原成功、一次同 key 重试及一次 412），
+**普通 SQL 请求 0、模型请求 1**。名称和原失败/成功历史、所有业务字节保留。
 
-完整维护者证据位于 `control-plane/production/evidence/20261016-sql-ai-repair`，
-私密模型输出、DOM、口令和 SSH 工具不进入公共源码。产品仍为 Go/PostgreSQL 与
-React/TypeScript。随后继续历史查询命名，再推进其他[未完成需求](REMAINING-REQUIREMENTS-2026-10-16.md)。
+首个前端 gate 的 12 项纯函数检查已通过，随后 TypeScript 指出测试闭包的可选私密
+目录类型，补充已校验的 string 绑定后通过。首个 live Job 在登录/写入前因私有
+执行器的 fixture 白名单漏传新增 history ID/hash 而停止；修正私有参数白名单后
+复用完全相同的原 history 验收，未对产品或数据做替代。原失败日志保留。
+
+## 4. 收尾与下一项
+
+两个临时 PG Pod 已各自保存原日志并按 UID 退休；4 个本阶段终态质量/UI Job 同样
+先归档、再按 UID/resourceVersion 退休。最后 3/3 节点 Ready，无 Pressure，87 个
+工作负载与期望一致（含有意的 0），错误 Pod 0、托管 VM 0。模型服务、原配置、
+测试历史、失败、文件、源码/OCI 均保留。
+
+维护者完整证据在 `control-plane/production/evidence/20261016-history-names`，
+口令、DOM、原模型输出及私密工具不上传公共 Git。下一项进入 **F02 Functions
+定时触发器**的代码、UI、持久调度/调用回执与串行本地验收；阶段提交后继续工作。

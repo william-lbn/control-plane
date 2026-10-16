@@ -5,7 +5,7 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 
 **发行状态：预览版本。已经验证的实验环境功能不等于生产认证，也不等于 Neon 官网全部 Backend 服务。**
 
-最新状态：[2026-10-16 交付](docs/DELIVERY-2026-10-16-CURRENT.md)：新增 [SQL AI 修错](docs/SQL-AI-REPAIR.md)：真实 PG 失败、明确上下文/确认、真实模型修复与人工 Proxy 执行；API 0.43.0 / Web 切片 0.45.0 / migration 037 / Chart 0.9.35 / Helm revision 107。此前有界 multipart、共享历史、计划比较和 MFA 等保留独立回执。[35 组需求账本](docs/REMAINING-REQUIREMENTS-2026-10-16.md)仍有待开发和独立验收项。
+最新状态：[2026-10-16 交付](docs/DELIVERY-2026-10-16-CURRENT.md)：新增 [个人历史名称与 AI 建议](docs/SQL-HISTORY-NAMES.md)：加密/审计、真实响应丢失恢复、双 UI 版本冲突与真实模型命名；API/Web 0.46.0 / migration 038 / Chart 0.9.36 / Helm revision 108。此前有界 multipart、共享历史、计划比较和 MFA 等保留独立回执。[35 组需求账本](docs/REMAINING-REQUIREMENTS-2026-10-16.md)仍有待开发和独立验收项。
 
 此前增量：[应用 TOTP 双重认证](docs/DELIVERY-2026-10-15-AUTH-TOTP.md)八项 UI 与[项目共享查询](docs/DELIVERY-2026-10-15-SHARED-QUERIES.md)六项 UI 均通过；该批基线为 API 0.33 / Chart 0.9.17 / migration 031。
 
@@ -33,7 +33,7 @@ S3 的 test-only `875e48b` 只修正选择器和原 checkpoint 续测，不改�
 
 | 功能 | 本仓库代码 | 当前边界 |
 | --- | --- | --- |
-| 组织、成员、项目授权、API Key | 已实现，真实 PostgreSQL 集成测试 | 加法式项目授权；完整生产安全审计、SSO/MFA 未完成 |
+| 组织、成员、项目授权、API Key | 已实现，真实 PostgreSQL 集成测试 | 加法式项目授权；Console 自助 MFA 已验收；完整生产安全审计、SSO/组织强制 MFA 未完成 |
 | Console 邀请与受邀注册 | 账号绑定、一次性凭据、幂等/过期/撤销、事务审计、Go/React/PG 测试 | 手动安全交付邀请；邮件验证/OIDC/MFA 未完成，独立于 Managed Auth |
 | 项目、当前时间点分支、Writer、多个 Reader | 已实现，异步 Operation + SQL 就绪探针 | 单集群、单 Region、PG16；不支持所有项目/分支删除与恢复动作 |
 | PostgreSQL 连接与 SQL 工作台 | 通过独立 Neon Proxy 和 Endpoint selector | 应用不能直接连接控制 API；生产入口必须配置可信 TLS |

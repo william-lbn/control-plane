@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.43.0",
+    "version": "0.46.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -3930,7 +3930,10 @@
           "duration_ms",
           "completion_unconfirmed",
           "shared_at",
-          "sharing_version_token"
+          "sharing_version_token",
+          "name",
+          "name_version_token",
+          "name_updated_at"
         ],
         "properties": {
           "id": {
@@ -4019,6 +4022,24 @@
           "sharing_version_token": {
             "type": "string",
             "pattern": "^[0-9]+$"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 80
+          },
+          "name_version_token": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)$"
+          },
+          "name_updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -4045,7 +4066,10 @@
           "completion_unconfirmed",
           "sql",
           "shared_at",
-          "sharing_version_token"
+          "sharing_version_token",
+          "name",
+          "name_version_token",
+          "name_updated_at"
         ],
         "properties": {
           "id": {
@@ -4139,6 +4163,24 @@
           "sharing_version_token": {
             "type": "string",
             "pattern": "^[0-9]+$"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 80
+          },
+          "name_version_token": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)$"
+          },
+          "name_updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -5116,6 +5158,79 @@
           "physical_gc",
           "intent_id",
           "request_id"
+        ]
+      },
+      "SQLHistoryName": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "history_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 80
+          },
+          "version_token": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)$"
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "history_id",
+          "name",
+          "version_token",
+          "updated_at"
+        ]
+      },
+      "SQLHistoryNameInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "description": "Empty explicitly clears. Otherwise trimmed single line, <=80 Unicode characters and <=240 UTF-8 bytes; no control characters."
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "SQLHistoryNameReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "history_id": {
+            "type": "string"
+          },
+          "has_name": {
+            "type": "boolean"
+          },
+          "version_token": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)$"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "history_id",
+          "has_name",
+          "version_token",
+          "updated_at"
         ]
       }
     },
@@ -17040,7 +17155,7 @@
             "$ref": "#/components/responses/Error"
           }
         },
-        "description": "Operator sqlHistory.enabled opt-in; current project Editor+ and owner only. Fixed 25-row owner/project-bound keyset pages. No SQL text, credentials or results in list. An expired admitted row is explicitly unconfirmed, not failed or safe to replay. Disabled feature returns enabled=false and an empty list.",
+        "description": "Operator sqlHistory.enabled opt-in; current project Editor+ and owner only. Fixed 25-row owner/project-bound keyset pages. No SQL text, credentials or results in list. An expired admitted row is explicitly unconfirmed, not failed or safe to replay. Disabled feature returns enabled=false and an empty list. Console session required; API keys rejected, including the issuer key. Personal names are decrypted only for the owner and not exposed in shared views.",
         "summary": "List personal encrypted SQL execution history metadata without waking Compute"
       }
     },
@@ -17113,7 +17228,7 @@
             "$ref": "#/components/responses/Error"
           }
         },
-        "description": "Owner-only within authorized project. Text is authenticated with the original project/owner/history ID AAD; old encryption key versions must remain available. no-store. Truncated history is not the complete executable query.",
+        "description": "Owner-only within authorized project. Text is authenticated with the original project/owner/history ID AAD; old encryption key versions must remain available. no-store. Truncated history is not the complete executable query. Console session required; API keys rejected, including the issuer key. Personal names are decrypted only for the owner and not exposed in shared views.",
         "summary": "Owner reads bounded historical SQL without executing it"
       },
       "delete": {
@@ -18890,6 +19005,203 @@
           }
         },
         "description": "Intent and admission audit commit before branch I/O. Branch abort is serialized with completion and never changes a completed object. Lost response/audit failure retains admitted intent; exact key/input retry confirms the original receipt. Confirmed replay does not reopen storage or mutate again. Physical bytes remain retained."
+      }
+    },
+    "/api/v1/projects/{project}/query-history/{history}/name": {
+      "get": {
+        "operationId": "getPersonalSQLHistoryName",
+        "tags": [
+          "SQL"
+        ],
+        "summary": "Read own encrypted personal history name without Compute access",
+        "description": "Console session and current project Editor+ required. Personal owner only, including against project Admin. no-store. Name ciphertext is bound to project/owner/history; names never enter shared SQL history or plaintext receipts/audit. No SQL execution or Compute startup. Confirmed terminal entries only for changes. 60 new updates/entry/hour, exact replays do not consume a new admission. Re-read current state after replay; replay does not reapply an older annotation.",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "history",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^qh_[a-f0-9]{24}$"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Read own encrypted personal history name without Compute access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SQLHistoryName"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Quoted current or original receipt generation"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "put": {
+        "operationId": "putPersonalSQLHistoryName",
+        "tags": [
+          "SQL"
+        ],
+        "summary": "Set or clear own encrypted name with version, durable metadata-only replay and atomic audit",
+        "description": "Console session and current project Editor+ required. Personal owner only, including against project Admin. no-store. Name ciphertext is bound to project/owner/history; names never enter shared SQL history or plaintext receipts/audit. No SQL execution or Compute startup. Confirmed terminal entries only for changes. 60 new updates/entry/hour, exact replays do not consume a new admission. Re-read current state after replay; replay does not reapply an older annotation.",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "history",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^qh_[a-f0-9]{24}$"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"(0|[1-9][0-9]*)\"$"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Set or clear own encrypted name with version, durable metadata-only replay and atomic audit",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SQLHistoryNameReceipt"
+                }
+              }
+            },
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Quoted current or original receipt generation"
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SQLHistoryNameInput"
+              }
+            }
+          }
+        }
       }
     }
   }

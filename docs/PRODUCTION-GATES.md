@@ -1,6 +1,6 @@
 # 生产门槛与官网对齐
 
-状态截至 2026-10-16；API 0.43.0 / Web 切片 0.45.0 / migration 037 / Chart 0.9.35 / Helm revision 107。Console MFA、个人 SQL 历史采集/保留策略和单条删除已有 Linux Go/PG 与真实 UI 回执，见[当前交付](DELIVERY-2026-10-16-CURRENT.md)。[剩余需求账本](REMAINING-REQUIREMENTS-2026-10-16.md)区分未开发、部分实现和独立验收门槛。运行镜像按本地快照留证；公开统一 Helm 0.1.31 源码候选仍锁 0.23.0 公共控制镜像，不能冒充本地 0.43.0 发行。
+状态截至 2026-10-16；API/Web 0.46.0 / migration 038 / Chart 0.9.36 / Helm revision 108。Console MFA、个人 SQL 历史采集/保留策略和单条删除已有 Linux Go/PG 与真实 UI 回执，见[当前交付](DELIVERY-2026-10-16-CURRENT.md)。[剩余需求账本](REMAINING-REQUIREMENTS-2026-10-16.md)区分未开发、部分实现和独立验收门槛。运行镜像按本地快照留证；公开统一 Helm 0.1.31 源码候选仍锁 0.23.0 公共控制镜像，不能冒充本地 0.46.0 发行。
 前一版本 `be04cb4` 的真实 Linux/React 闭环见 [Auth/S3 交付](DELIVERY-2026-10-14-AUTH-S3.md)：
 788 Go/真实 PostgreSQL 检查、八个同源公开镜像、三节点 24 次串行 digest 导入；
 应用密码/会话十组 UI，以及实际 S3 SDK 签名/字节/权限/轮换/撤销/正常缩零均通过。
@@ -55,7 +55,7 @@ Functions 已开始实际 Go/Node 基础层实现，合同和内部接口见
 
 Managed Auth 已有 Go Driver、Better Auth 1.7.7 运行时、React UI、注册/会话/JWT/分支隔离与 PostgreSQL CI，详细见 [Auth 合同](MANAGED-AUTH.md)。真实 Neon UI 结果按版本交付报告记录；应用密码/会话安全已完成本地验收；公网 SMTP/OAuth、Console 组织强制 MFA、分支 factor 迁移、完整恢复/删除一致性、生产隔离与 HA 仍须独立实现/验收。
 
-产品 Object Storage 已实现分支目录、独立受限对象凭据、Go REST Driver、React UI、条件写入、签名下载和分支继承，详见 [Object Storage 合同](OBJECT-STORAGE.md)。REST 是 `neon-object-rest-v1`；f0b63f5 Linux 现场 UI 19 项已通过，实际版本与其余回归见 [当前交付](DELIVERY-2026-10-12-SQL-IDENTITY.md)。基础 S3/SigV4/signed chunks/统一存储凭据已在 0.1.29 实际验收，见 [S3 合同](OBJECT-STORAGE-S3-CORE.md)。基础 COPY、条件批量删除、预签名 PUT、CORS 和用户 metadata 已通过本地 UI；完整 multipart/大文件、物理 GC、分布式网关隔离及 HA/DR 仍未完成。
+产品 Object Storage 已实现分支目录、独立受限对象凭据、Go REST Driver、React UI、条件写入、签名下载和分支继承，详见 [Object Storage 合同](OBJECT-STORAGE.md)。REST 是 `neon-object-rest-v1`；f0b63f5 Linux 现场 UI 19 项已通过，实际版本与其余回归见 [当前交付](DELIVERY-2026-10-12-SQL-IDENTITY.md)。基础 S3/SigV4/signed chunks/统一存储凭据已在 0.1.29 实际验收，见 [S3 合同](OBJECT-STORAGE-S3-CORE.md)。基础 COPY、条件批量删除、预签名 PUT、CORS 和用户 metadata 已通过本地 UI；8 MiB 有界 multipart/运维已在 0.42/0.43 验收；大文件、进阶校验、物理 GC、分布式网关隔离及 HA/DR 仍未完成。
 
 Functions 已有 guest、不可变存储、持久候选/引导/SQL 身份及新增原生执行
 Driver/API/UI，默认禁用，实际发布验收见 [执行合同](FUNCTIONS-NATIVE-PREVIEW.md)；AI Gateway 文本 Chat/SSE、目录、Playground、应用授权和用量已通过本地真实 Ollama UI；商业上游/其他协议/预算和生产门槛仍缺。Data API 已有原生 Driver、
@@ -79,12 +79,12 @@ Linux 真实场景正反例 + 恢复证据共同验收。
 
 ## 2026-10-13：本地真实推理已解除外部凭据阻塞
 
-独立 Go AI 网关、限定列权限元数据库身份、AI UI 和持久用量已完成代码/Helm/实际 UI 闭环。769 个公开 Linux Go/PG 测试与九组真实 UI 检查通过，见 [交付](DELIVERY-2026-10-13-AI-GATEWAY.md)。只验收文本 Chat Completions；动态供应商管理、完整协议/计费、HA 和全链路 TLS 仍未完成。个人保存查询已在 0.1.27 通过实际 UI 六组检查；完整交付见 [当前报告](DELIVERY-2026-10-13-SAVED-QUERIES.md)。显式项目共享查询已通过新 Linux UI/真实 PG 多用户隔离验收；个人加密执行历史已通过新真实 SQL/UI 验收。个人采集/保留策略与到期清理已在 0.39.0 验收；单条手工删除已在 0.40.0 验收；项目共享历史已在 0.41.0 完成基础多账号验收，AI 命名尚未完成。
+独立 Go AI 网关、限定列权限元数据库身份、AI UI 和持久用量已完成代码/Helm/实际 UI 闭环。769 个公开 Linux Go/PG 测试与九组真实 UI 检查通过，见 [交付](DELIVERY-2026-10-13-AI-GATEWAY.md)。只验收文本 Chat Completions；动态供应商管理、完整协议/计费、HA 和全链路 TLS 仍未完成。个人保存查询已在 0.1.27 通过实际 UI 六组检查；完整交付见 [当前报告](DELIVERY-2026-10-13-SAVED-QUERIES.md)。显式项目共享查询已通过新 Linux UI/真实 PG 多用户隔离验收；个人加密执行历史已通过新真实 SQL/UI 验收。个人采集/保留策略与到期清理已在 0.39.0 验收；单条手工删除已在 0.40.0 验收；项目共享历史已在 0.41.0 完成基础多账号验收，显式个人 AI 命名已在 0.46.0 验收，默认自动命名仍需开发。
 
 ## 2026-10-15：SQL 工作台新增闭环
 
-XLSX 与 Explain/Analyze 基础树形计划各四项真实 Linux UI 通过，版本和源码见 [交付](DELIVERY-2026-10-15-SQL-EXPORT-PLAN.md)。个人保留/到期记录删除已有独立本地验收；单条手工删除已在 0.40.0 验收；项目共享历史及基础计划比较已在 0.41.0 验收；受控 AI SQL 草稿/计划建议通路已在 Web 0.44.0 本地验收；AI 修错基础路径已在 Web 0.45.0 验收；历史命名和建议准确性仍有门槛；个人加密历史和已保存共享草稿不能代替这些能力。
+XLSX 与 Explain/Analyze 基础树形计划各四项真实 Linux UI 通过，版本和源码见 [交付](DELIVERY-2026-10-15-SQL-EXPORT-PLAN.md)。个人保留/到期记录删除已有独立本地验收；单条手工删除已在 0.40.0 验收；项目共享历史及基础计划比较已在 0.41.0 验收；受控 AI SQL 草稿/计划建议通路已在 Web 0.44.0 本地验收；AI 修错基础路径已在 Web 0.45.0 验收；个人加密名称/显式历史 AI 命名已在 0.46.0 验收；默认自动命名和建议准确性仍有门槛；个人加密历史和已保存共享草稿不能代替这些能力。
 
 有界 multipart 已通过原用例 UI 续传和七类实际 SDK 操作，见[本次交付](DELIVERY-2026-10-16-CURRENT.md)与[合同](OBJECT-STORAGE-MULTIPART.md)。8 MiB 上限、大对象、GC、分片写入权接管及独立 Storage gateway 等门槛仍保留。
 
-0.43.0 已验收原失效凭据的管理员逻辑中止/审计恢复和 multipart 分组分页，详见[合同](MULTIPART-ADMINISTRATION.md)。后台自动续跑、写入权转让、GC 等仍按各自门槛；Web 0.44.0 的受控 SQL AI 草稿与计划建议通路已验收；继续 AI 修错及其余账本项。
+0.43.0 已验收原失效凭据的管理员逻辑中止/审计恢复和 multipart 分组分页，详见[合同](MULTIPART-ADMINISTRATION.md)。后台自动续跑、写入权转让、GC 等仍按各自门槛；Web 0.44.0 的受控 SQL AI 草稿与计划建议通路已验收；0.45/0.46 的修错和显式命名也已验收；继续 F02 及其余账本项。

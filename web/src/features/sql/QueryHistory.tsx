@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api, projectPath } from '../../api';
 import { HistoryPolicy } from '../identity/HistoryPolicy';
 import { HistorySharingPanel, SharedHistory } from './SharedHistory';
+import { HistoryNamePanel } from './HistoryNames';
 export type Entry = {
   id: string;
   endpoint_id: string;
@@ -19,7 +20,11 @@ export type Entry = {
   completion_unconfirmed: boolean;
   shared_at: string | null;
   sharing_version_token: string;
+  name: string | null;
+  name_version_token: string;
+  name_updated_at: string | null;
 };
+export type HistoryLoadTarget = Pick<Entry, 'endpoint_id' | 'database_name' | 'role_name' | 'mode'>;
 export function QueryHistory({
   projectId,
   revision,
@@ -27,7 +32,7 @@ export function QueryHistory({
 }: {
   projectId: string;
   revision: number;
-  onLoad: (sql: string, entry: Entry) => void;
+  onLoad: (sql: string, entry: HistoryLoadTarget) => void;
 }) {
   const epoch = useRef(0);
   const base = projectPath(projectId) + '/query-history';
@@ -37,6 +42,7 @@ export function QueryHistory({
     [busy, setBusy] = useState(false),
     [deleting, setDeleting] = useState<string | null>(null),
     [sharing, setSharing] = useState<Entry | null>(null),
+    [naming, setNaming] = useState<Entry | null>(null),
     [notice, setNotice] = useState('');
   useEffect(() => {
     epoch.current++;
@@ -46,6 +52,7 @@ export function QueryHistory({
     setNotice('');
     setDeleting(null);
     setSharing(null);
+    setNaming(null);
     setBusy(true);
     api<{ enabled: boolean; items: Entry[]; next_cursor: string | null }>(base)
       .then((v) => {
@@ -175,6 +182,28 @@ export function QueryHistory({
               }
             />
           )}
+          {naming && (
+            <HistoryNamePanel
+              key={naming.id}
+              projectId={projectId}
+              entry={naming}
+              onClose={() => setNaming(null)}
+              onChanged={(value) =>
+                setItems((old) =>
+                  old.map((item) =>
+                    item.id === value.history_id
+                      ? {
+                          ...item,
+                          name: value.name,
+                          name_version_token: value.version_token,
+                          name_updated_at: value.updated_at,
+                        }
+                      : item,
+                  ),
+                )
+              }
+            />
+          )}
           {deleting && (
             <div className="notice" role="group" aria-label="确认删除历史记录">
               <p>
@@ -205,6 +234,12 @@ export function QueryHistory({
                 {items.map((entry) => (
                   <tr key={entry.id} data-testid={'query-history-' + entry.id}>
                     <td>
+                      {entry.name && (
+                        <strong data-testid={'history-name-' + entry.id}>
+                          {entry.name}
+                          <br />
+                        </strong>
+                      )}
                       {new Date(entry.started_at).toLocaleString()}
                       <br />
                       <code>{entry.endpoint_id}</code>
@@ -224,6 +259,18 @@ export function QueryHistory({
                     </td>
                     <td>{entry.duration_ms === null ? '—' : entry.duration_ms + ' ms'}</td>
                     <td>
+                      <button
+                        className="button"
+                        disabled={busy || !canDelete(entry)}
+                        aria-label={'管理历史名称 ' + entry.id}
+                        onClick={() => {
+                          setSharing(null);
+                          setDeleting(null);
+                          setNaming(entry);
+                        }}
+                      >
+                        名称
+                      </button>
                       <button
                         className="button"
                         disabled={busy}

@@ -58,6 +58,8 @@ func (s *server) routes() *http.ServeMux {
 	mux.Handle("GET /api/v1/projects/{project}/query-history/{history}", s.auth(http.HandlerFunc(s.sqlHistory), false))
 	mux.Handle("DELETE /api/v1/projects/{project}/query-history/{history}", s.auth(http.HandlerFunc(s.deleteSQLHistory), true))
 	mux.Handle("GET /api/v1/projects/{project}/query-history/{history}/sharing", s.auth(http.HandlerFunc(s.sqlHistorySharing), false))
+	mux.Handle("GET /api/v1/projects/{project}/query-history/{history}/name", s.auth(http.HandlerFunc(s.sqlHistoryName), false))
+	mux.Handle("PUT /api/v1/projects/{project}/query-history/{history}/name", s.auth(http.HandlerFunc(s.sqlHistoryName), true))
 	mux.Handle("PUT /api/v1/projects/{project}/query-history/{history}/sharing", s.auth(http.HandlerFunc(s.sqlHistorySharing), true))
 	mux.Handle("GET /api/v1/projects/{project}/shared-query-history", s.auth(http.HandlerFunc(s.sharedSQLHistory), false))
 	mux.Handle("GET /api/v1/projects/{project}/shared-query-history/{history}", s.auth(http.HandlerFunc(s.sharedSQLHistory), false))
