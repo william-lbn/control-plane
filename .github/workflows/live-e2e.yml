@@ -12,6 +12,11 @@ on:
         type: choice
         options: [none, storage-multipart-administration.spec.ts, storage-multipart.spec.ts, history-sharing.spec.ts, plan-comparison.spec.ts, history-delete.spec.ts, history-policy.spec.ts, console-mfa.spec.ts, console-session-feedback.spec.ts, console-sessions.spec.ts, sql-plan-tree.spec.ts, sql-xlsx.spec.ts, storage-copy-conditions.spec.ts, fractional-admission.spec.ts, fractional-cpu.spec.ts, query-history.spec.ts, shared-queries.spec.ts, auth-totp.spec.ts, storage-directory.spec.ts, storage-copy.spec.ts, storage-bulk-delete.spec.ts, storage-presigned-upload.spec.ts, storage-browser-metadata.spec.ts, functions-request-logs.spec.ts, storage-metadata-edit.spec.ts]
         default: none
+      product_suite:
+        description: Product UI suites (overrides other suite selectors when selected)
+        type: choice
+        options: [none, sql-assistant.spec.ts]
+        default: none
       poll_fault:
         description: Inject transient read failures for native/Data API observation recovery
         type: boolean
@@ -33,7 +38,7 @@ jobs:
       NEON_E2E_ATTEMPT: run-${{ github.run_id }}-${{ github.run_attempt }}
       NEON_E2E_EXPECT_SPLIT: 'true'
       NEON_E2E_POLL_FAULT: ${{ inputs.poll_fault && 'true' || 'false' }}
-      NEON_E2E_SUITE: ${{ inputs.additional_suite != 'none' && inputs.additional_suite || inputs.suite }}
+      NEON_E2E_SUITE: ${{ inputs.product_suite != 'none' && inputs.product_suite || inputs.additional_suite != 'none' && inputs.additional_suite || inputs.suite }}
       NEON_E2E_CREDENTIAL_PROJECT: ${{ inputs.credential_project }}
       NEON_E2E_FUNCTIONS_MONITOR_FIXTURE: ${{ vars.NEON_E2E_FUNCTIONS_MONITOR_FIXTURE }}
       NEON_E2E_CATALOG_OWNER_FIXTURE: ${{ vars.NEON_E2E_CATALOG_OWNER_FIXTURE }}
@@ -65,7 +70,7 @@ jobs:
             functions-request-logs.spec.ts|functions-http.spec.ts|functions-observation.spec.ts|functions-wake.spec.ts|functions-rollback.spec.ts) test -f "$NEON_E2E_FUNCTIONS_MONITOR_FIXTURE" ;;
             database-owner.spec.ts) test -f "$NEON_E2E_CATALOG_OWNER_FIXTURE" ;;
             history-sharing.spec.ts) test -f "$NEON_E2E_SQL_SCRIPT_FIXTURE"; test -f "$NEON_E2E_CONSOLE_ACCOUNT_FIXTURE" ;;
-            storage-multipart-administration.spec.ts|storage-multipart.spec.ts|plan-comparison.spec.ts|history-delete.spec.ts|auth-security.spec.ts|s3-storage.spec.ts|storage-directory.spec.ts|sql-plan-tree.spec.ts|sql-xlsx.spec.ts|storage-copy-conditions.spec.ts|storage-copy.spec.ts|storage-metadata-edit.spec.ts|storage-browser-metadata.spec.ts|storage-presigned-upload.spec.ts|storage-bulk-delete.spec.ts|sql-script.spec.ts|sql-tools.spec.ts) test -f "$NEON_E2E_SQL_SCRIPT_FIXTURE" ;;
+            sql-assistant.spec.ts|storage-multipart-administration.spec.ts|storage-multipart.spec.ts|plan-comparison.spec.ts|history-delete.spec.ts|auth-security.spec.ts|s3-storage.spec.ts|storage-directory.spec.ts|sql-plan-tree.spec.ts|sql-xlsx.spec.ts|storage-copy-conditions.spec.ts|storage-copy.spec.ts|storage-metadata-edit.spec.ts|storage-browser-metadata.spec.ts|storage-presigned-upload.spec.ts|storage-bulk-delete.spec.ts|sql-script.spec.ts|sql-tools.spec.ts) test -f "$NEON_E2E_SQL_SCRIPT_FIXTURE" ;;
             fractional-admission.spec.ts|fractional-cpu.spec.ts|query-history.spec.ts|shared-queries.spec.ts|auth-totp.spec.ts) test -f "$NEON_E2E_SQL_SCRIPT_FIXTURE" ;;
             auth-magic-link.spec.ts|auth-otp.spec.ts|auth-mail.spec.ts) test -f "$NEON_E2E_SQL_SCRIPT_FIXTURE"; test -f "$NEON_E2E_MAILBOX_FIXTURE" ;;
             backend-credentials.spec.ts|functions-metadata.spec.ts|ai-gateway.spec.ts|saved-queries.spec.ts) [[ "$NEON_E2E_CREDENTIAL_PROJECT" =~ ^prj_[a-f0-9]{16}$ ]] ;;
@@ -78,7 +83,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
         working-directory: web
       - name: Package pinned Functions example outside the checkout
-        if: (inputs.suite == 'functions-http.spec.ts' || inputs.additional_suite == 'functions-request-logs.spec.ts') || inputs.suite == 'functions-native.spec.ts' || inputs.suite == 'functions-observation.spec.ts' || inputs.suite == 'functions-wake.spec.ts' || inputs.suite == 'functions-rollback.spec.ts'
+        if: env.NEON_E2E_SUITE == 'functions-http.spec.ts' || env.NEON_E2E_SUITE == 'functions-request-logs.spec.ts' || env.NEON_E2E_SUITE == 'functions-native.spec.ts' || env.NEON_E2E_SUITE == 'functions-observation.spec.ts' || env.NEON_E2E_SUITE == 'functions-wake.spec.ts' || env.NEON_E2E_SUITE == 'functions-rollback.spec.ts'
         run: |
           npm ci --prefix examples/functions/postgres --ignore-scripts --no-audit --fund=false
           node tools/package-function-example.mjs examples/functions/postgres "$NEON_E2E_PRIVATE_DIR/function-example.zip"
@@ -114,5 +119,5 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         # MFA DOM/trace failures may contain one-time setup/recovery material.
         # Retain that evidence only on the protected Linux runner.
-        if: always() && env.NEON_E2E_SUITE != 'console-mfa.spec.ts' && env.NEON_E2E_SUITE != 'history-policy.spec.ts' && env.NEON_E2E_SUITE != 'history-sharing.spec.ts' && env.NEON_E2E_SUITE != 'storage-multipart.spec.ts' && env.NEON_E2E_SUITE != 'storage-multipart-administration.spec.ts'
+        if: always() && env.NEON_E2E_SUITE != 'console-mfa.spec.ts' && env.NEON_E2E_SUITE != 'history-policy.spec.ts' && env.NEON_E2E_SUITE != 'history-sharing.spec.ts' && env.NEON_E2E_SUITE != 'storage-multipart.spec.ts' && env.NEON_E2E_SUITE != 'storage-multipart-administration.spec.ts' && env.NEON_E2E_SUITE != 'sql-assistant.spec.ts'
         with: {name: live-ui-evidence, path: '${{ env.NEON_E2E_ARTIFACTS }}', retention-days: 30}

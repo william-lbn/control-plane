@@ -4,7 +4,7 @@
 
 沿用下载的官方 SQL Editor 文档：Explain、Analyze、结果下载是 Console 功能。
 本切片提供真实 PostgreSQL JSON 计划和当前有界结果的 CSV/JSON 下载。新增 [XLSX](SQL-XLSX.md)、个人保存/共享查询与个人执行历史有各自独立合同和交付回执。
-不依赖第三方账号，不增加导出 API/Worker 或元数据表；Time Travel UI、AI SQL、项目共享历史与图形计划分析仍有独立开发门槛。
+不依赖第三方账号，不增加导出 API/Worker 或元数据表；项目共享历史、图形计划/比较和受控 [SQL AI 草稿](SQL-ASSISTANT.md)已有独立交付；Time Travel UI、AI 修错/历史命名仍有开发门槛。
 
 ## 2. 执行与数据合同
 

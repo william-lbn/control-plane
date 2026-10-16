@@ -5,7 +5,7 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 
 **发行状态：预览版本。已经验证的实验环境功能不等于生产认证，也不等于 Neon 官网全部 Backend 服务。**
 
-最新状态：[2026-10-16 交付](docs/DELIVERY-2026-10-16-CURRENT.md)：新增已撤销身份的分段上传管理员运维、持久审计/未知结果恢复及实际 S3 目录分组分页；API 0.43.0 / migration 037 / Chart 0.9.33 / Helm revision 102。此前有界 multipart、共享历史、计划比较和 MFA 等保留独立回执。[35 组需求账本](docs/REMAINING-REQUIREMENTS-2026-10-16.md)仍有待开发和独立验收项。
+最新状态：[2026-10-16 交付](docs/DELIVERY-2026-10-16-CURRENT.md)：新增受控 [SQL AI 助手](docs/SQL-ASSISTANT.md)：实际本地模型、Schema 目录、人工草稿执行和计划建议通路；API 0.43.0 / Web 切片 0.44.0 / migration 037 / Chart 0.9.34 / Helm revision 104。此前有界 multipart、共享历史、计划比较和 MFA 等保留独立回执。[35 组需求账本](docs/REMAINING-REQUIREMENTS-2026-10-16.md)仍有待开发和独立验收项。
 
 此前增量：[应用 TOTP 双重认证](docs/DELIVERY-2026-10-15-AUTH-TOTP.md)八项 UI 与[项目共享查询](docs/DELIVERY-2026-10-15-SHARED-QUERIES.md)六项 UI 均通过；该批基线为 API 0.33 / Chart 0.9.17 / migration 031。
 
@@ -148,4 +148,4 @@ Postgres 下包含一个 Writer、多个 Readers、数据库、角色和 Data AP
 
 ## 2026-10-09 Object Storage increment
 
-[Branch Object Storage REST v1](docs/OBJECT-STORAGE.md) adds Go manifest/immutable-blob access and React bucket/file management while preserving native timeline inheritance and branch isolation. The 2026-10-09 seven-image deployment and 19 real Linux UI checks are recorded in its [versioned delivery](docs/DELIVERY-2026-10-09-OBJECT-STORAGE.md). Public S3 compatibility, multipart and physical GC remain future work. Native Functions deployment/invocation and manual lifecycle passed the exact 0.1.19 UI slice above; runtime monitoring and explicit retained wake have their own accepted version receipts. AI inference, HA/DR, external cross-instance fencing and whole-chain TLS remain unqualified. Historical receipts cannot replace the explicit active runtime image lock.
+[Branch Object Storage REST v1](docs/OBJECT-STORAGE.md) adds Go manifest/immutable-blob access and React bucket/file management while preserving native timeline inheritance and branch isolation. The 2026-10-09 seven-image deployment and 19 real Linux UI checks are recorded in its [versioned delivery](docs/DELIVERY-2026-10-09-OBJECT-STORAGE.md). Bounded S3 core/multipart and administrator abort have newer independent acceptance receipts; large objects and physical GC remain incomplete. Native Functions deployment/invocation and manual lifecycle passed the exact 0.1.19 UI slice above; runtime monitoring and explicit retained wake have their own accepted version receipts. AI inference, HA/DR, external cross-instance fencing and whole-chain TLS remain unqualified. Historical receipts cannot replace the explicit active runtime image lock.

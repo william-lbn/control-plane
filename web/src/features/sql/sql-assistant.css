@@ -1,0 +1,80 @@
+.sql-assistant {
+  padding: 1.4rem;
+  margin: 1.25rem 0;
+}
+.sql-assistant .panel-heading {
+  justify-content: space-between;
+  align-items: center;
+}
+.sql-assistant .panel-heading small {
+  color: var(--accent, #2dd4a4);
+  letter-spacing: 0.12em;
+  font-size: 0.68rem;
+}
+.sql-assistant h2 {
+  margin: 0.3rem 0 0.5rem;
+}
+.sql-assistant-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+.sql-assistant label {
+  display: block;
+  margin: 0.8rem 0;
+}
+.sql-assistant textarea {
+  width: 100%;
+  min-height: 5rem;
+  resize: vertical;
+}
+.sql-assistant select {
+  width: 100%;
+}
+.sql-assistant summary {
+  cursor: pointer;
+  padding: 0.6rem 0;
+  color: var(--muted, #9aa8b2);
+}
+.sql-assistant .sql-assistant-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  line-height: 1.6;
+}
+.sql-assistant-check input {
+  width: auto;
+  flex: 0 0 auto;
+  margin-top: 0.2rem;
+}
+.sql-assistant-output {
+  border-left: 1px solid var(--border, #283438);
+  padding-left: 1.5rem;
+  min-width: 0;
+}
+.sql-assistant-output pre,
+.sql-assistant-preview {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font:
+    0.78rem/1.65 ui-monospace,
+    monospace;
+  max-height: 24rem;
+  overflow: auto;
+}
+.sql-assistant [role='alert'] {
+  color: #f5a5a5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 1050px) {
+  .sql-assistant-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .sql-assistant-output {
+    padding: 1rem 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--border, #283438);
+  }
+}

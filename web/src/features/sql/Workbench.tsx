@@ -9,6 +9,8 @@ import { SavedQueries } from './SavedQueries';
 import { QueryHistory } from './QueryHistory';
 import { QueryPlan } from './QueryPlan';
 import { PlanComparison } from './PlanComparison';
+import { SQLAssistant } from './SQLAssistant';
+import { ASSISTANT_SCHEMA_SQL, assistantSchemaSnapshot } from './sqlAssistant';
 
 export function Workbench({
   projectId,
@@ -31,6 +33,7 @@ export function Workbench({
     result: QueryResult;
     analyzed: boolean;
     sequence: number;
+    sourceSQL: string;
   } | null>(null);
   const planSequence = useRef(0);
   const [scriptResult, setScriptResult] = useState<ScriptResult | null>(null);
@@ -61,6 +64,13 @@ export function Workbench({
       scopeEpoch.current++;
     };
   }, [projectId, endpoint?.id]);
+  useEffect(() => {
+    scopeEpoch.current++;
+    setPassword('');
+    setResult(null);
+    setScriptResult(null);
+    setPlanResult(null);
+  }, [role, database]);
   async function execute() {
     if (!endpoint) return;
     const epoch = scopeEpoch.current;
@@ -96,6 +106,7 @@ export function Workbench({
                 result: received,
                 analyzed: queryAction === 'analyze',
                 sequence: ++planSequence.current,
+                sourceSQL: sql,
               },
         );
       }
@@ -107,6 +118,27 @@ export function Workbench({
       if (epoch === scopeEpoch.current) {
         setPassword((current) => (current === submittedPassword ? '' : current));
         setBusy(false);
+        setHistoryRevision((value) => value + 1);
+      }
+    }
+  }
+  async function loadAssistantSchema() {
+    if (!endpoint || !password || busy)
+      throw new Error('请先确认当前角色/数据库并输入本次连接密码。');
+    const epoch = scopeEpoch.current,
+      submittedPassword = password;
+    setBusy(true);
+    try {
+      const value = await api<QueryResult>(endpointPath(projectId, endpoint.id) + '/query', {
+        method: 'POST',
+        body: JSON.stringify({ role, database, password, sql: ASSISTANT_SCHEMA_SQL }),
+      });
+      if (epoch !== scopeEpoch.current) throw new Error('连接范围已变化，请重新读取 Schema。');
+      return assistantSchemaSnapshot(value.columns, value.rows, value.truncated);
+    } finally {
+      if (epoch === scopeEpoch.current) {
+        setBusy(false);
+        setPassword((current) => (current === submittedPassword ? '' : current));
         setHistoryRevision((value) => value + 1);
       }
     }
@@ -300,6 +332,30 @@ export function Workbench({
           </div>
           <ResultExports result={result} />
         </div>
+      )}
+      {endpoint && (
+        <SQLAssistant
+          key={JSON.stringify(['assistant', projectId, endpoint.id, role, database])}
+          projectId={projectId}
+          branchId={endpoint.branch_id}
+          currentSQL={sql}
+          disabled={busy}
+          canLoadSchema={!!password && !busy}
+          onLoadSchema={loadAssistantSchema}
+          plan={
+            planResult && planResult.result === result && planResult.sourceSQL === sql
+              ? { rows: planResult.result.rows, analyzed: planResult.analyzed }
+              : null
+          }
+          onLoad={(text) => {
+            setSQL(text);
+            setMode('single');
+            setQueryAction('query');
+            setPassword('');
+            setResult(null);
+            setScriptResult(null);
+          }}
+        />
       )}
       <PlanComparison
         key={JSON.stringify([projectId, endpoint?.id, role, database])}
