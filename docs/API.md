@@ -1,7 +1,7 @@
 # 实际 API 合同
 
 OpenAPI 3 合同的权威源是 [openapi-v1.json](../contracts/openapi-v1.json)。
-版本 0.47.2，107 个路径、155 个操作，全部拥有稳定且唯一的 operationId。
+版本 0.48.0，109 个路径、157 个操作，全部拥有稳定且唯一的 operationId。
 运行 Swagger 位于 `/api/docs`，JSON 位于 `/api/openapi.json`。
 本合同是自托管 `/api/v1`，不声称兼容 Neon SaaS `/api/v2`。
 
@@ -179,6 +179,8 @@ request_id/operation_id/error_code，再由显式 retry 接口恢复可重试操
 | PATCH | `/api/v1/projects/{project}/branches/{branch}/functions-triggers/{trigger}` | `updateFunctionTrigger` | 200 |
 | DELETE | `/api/v1/projects/{project}/branches/{branch}/functions-triggers/{trigger}` | `deleteFunctionTrigger` | 204 |
 | GET | `/api/v1/projects/{project}/branches/{branch}/functions-triggers/{trigger}/invocations` | `listFunctionTriggerInvocations` | 200 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/roles/{role}/rename` | `renameBranchRole` | 202 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/databases/{database}/rename` | `renameBranchDatabase` | 202 |
 
 ## 3. 实现映射与演进
 

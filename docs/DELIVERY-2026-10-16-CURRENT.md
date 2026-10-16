@@ -1,91 +1,106 @@
-# 2026-10-17 当前交付：Functions UTC 定时触发器
+# 2026-10-17：数据库与角色重命名
 
 ## 1. 交付结论
 
-**F02 分支内 UTC 定时触发器的本地基础闭环已通过。整体仍为预览产品，未达到
-官网全部功能或生产准入。** 本页保留既有索引文件名；日期按 Asia/Shanghai。
-上一个完整切片是[个人历史名称与 AI 命名](DELIVERY-2026-10-16-HISTORY-NAMES.md)。
+**C01 自定义受管理数据库/角色重命名基础闭环已通过。整体仍为预览产品；官网全部
+功能及生产准入仍未完成。** 日期按 Asia/Shanghai。前一阶段为
+[Functions UTC 定时触发器](DELIVERY-2026-10-17-FUNCTION-SCHEDULES.md)。
 
 | 范围 | 实际结果 | 边界 |
 |---|---|---|
-| API/模型/UI | 持久计划、UTC 五字段 Cron、启用/暂停/删除、分页调用记录 | 分支内；未实现继承、对象事件、任意时区 |
-| 幂等/并发 | 已提交响应丢失后原 key/输入恢复同回执；旧 UI 412 | 数据库事务/租约不等于外部 fencing |
-| 真正冷启动 | 同一 Function、同一计划，Function/Compute 均为 0；下一分钟唤醒后 HTTP200，真实受限 SQL 仅一条回执 | Compute 原策略 scale_to_zero=false；实验前/收尾通过 UI 手动归零，不声称这个 Compute 自动休眠 |
-| 授权与追踪 | 普通请求伪造平台头为 403，无新增 SQL 行；schedule 请求账本对应原 invocation_id | 依赖可信 Guest TLS/HMAC；公网 TLS、完整 HA 另验 |
-| 正常退休 | 正确示例调用后 Function 自动休眠；UI 删除计划/Function，Compute 正常归零 | 源版本、SQL、Secret、所有旧失败/成功回执保留；未物理 GC |
+| API / UI | 两个异步 rename 接口、版本/幂等/当前授权、目录页确认与原请求恢复 | 自定义、受管理、非系统对象；默认连接/Backend 依赖被明确拒绝 |
+| PostgreSQL | ALTER ROLE / DATABASE，原 OID、原 SCRAM 密码、原数据/Owner/ACL 保留 | 不复制数据库、不强制断开、不自动收编外部 DDL |
+| 恢复 / 并发 | UI 丢失真实 202 后原 key 取回同一 Operation；不同 body 409、旧版本 412 | 控制库事务/协作锁不能代替跨系统 fencing |
+| 配置一致 | 所有原 Endpoint 配置与 Proxy 路由用原 UID/resourceVersion CAS；未知 PUT 结果观察恢复 | 活动分支操作序列化；完整 HA 另验 |
+| 冷启动 / 收尾 | 原 Writer、改名前创建的原 Reader 冷醒保留原 OID/数据/密码；Reader 正常删除、Writer 归零 | Compute 原策略未改，不声称该 Compute 自动缩零；业务对象与回执保留 |
 
-详细架构、接口/模型、错误和手工步骤见[定时触发器合同](FUNCTION-SCHEDULES.md)。
-[需求账本](REMAINING-REQUIREMENTS-2026-10-16.md)仍有 29 组代码或独立验收缺口，
-已验收基本组的扩展边界也没有自动关闭。下一阶段继续 C01 数据库/角色重命名与
-后续 Functions、Storage、Auth、生命周期和分布式基础设施工作。
+架构、数据模型、API、五步时序及手动/自动复测见[重命名合同](CATALOG-RENAME.md)。
+七组基本功能已有对应回执，其余 28 组仍有代码或独立验收缺口，已验收基本组的
+扩展边界也保留。继续 L01 异常 Functions 自动退休及其余需求。
 
-## 2. 精确运行版本与来源
+## 2. 精确版本与来源
 
-- API/Worker **0.47.2**；Web **0.47.0**；migration **039**；独立 Chart **0.9.39**；Helm revision **111**。
-- OpenAPI **107 paths / 155 operations**。
-- 构建父提交 `ac1701ea66fbc3c3a4a80b8a2f3a29e64b05f686`，不是本次部署源码的完整标识。
-- API 源快照 SHA-256 `0cea1f5e70513a386434fc300bbc91249371bd5e76de8d29d3e2302addf40fd1`。
-- API/Worker `neon.local/control-api@sha256:759c763f1d8ad10f37746856898ea2a77b84823f2474e00708073128272dc99c`。
-- Web `neon.local/control-web@sha256:a8525568a87e430a765d283ff63175c38368bc15da10a01fae99297d079f9d8d`，源快照 `77efe38c5a01dd7e8cedefd85737061ad72fcdb6305f9283ca85c34378d10e83`。
-- Guest `neon.local/control-functions-vm@sha256:24e348fc125f644cfb00ba3335f8a291d3ce5a974e388b17495057ce94ed13c7`。
-- Guest supervisor 源输入 SHA-256 `908d4306a07a42bed5a7fd70836860ed63e4b7dde09a6c8c60ab8c7b0241cb6d`，binary `ae4edc467d3a9d6e47d04ddc150e18b2c8081f4980e9b362ffba9d1143d6b1c7`。
-- Guest 是 supervisor 派生版本；父 rootfs/Node/包/内核保留自 `docker.io/williamluckyli/control-functions-vm@sha256:c4b5d20b248e0d3d0951f2c3ae04b917092b58c5ba2f146047e99a3828fbbc32`，**不是完整 Guest rootfs 从最新源重建**。
-- 元数据备份 SHA-256 `96551ec850331b257b2c9c2f93c48fb02d00007a4c1e4a199073e947098f326a`。
+- API/Worker、Web **0.48.0**；migration **039**；独立 Chart **0.9.40**；Helm revision **112**。
+- OpenAPI **109 paths / 157 operations**；公开 live workflow **56** 个可选且被准入的串行套件。
+- 构建父提交 `e0e2b81d6e86c839525946096340946eb97c9954`，不是未提交构建源码的完整标识。
+- API/Web 源快照 SHA-256 `7b867e2edfc702b8b4766d43cfedf11157f50ec74fa4cebf33a1bd25e4fab77b`。
+- API/Worker `neon.local/control-api@sha256:282fbdef52fc518d9a2df10050d53a192a3edbe84d8109e4eebdee7986753d4e`。
+- Web `neon.local/control-web@sha256:223e39a135b43a895f00732cf0763c86716586470be4b4020f22408173ef700a`。
+- 元数据备份 SHA-256 `d8c5a3f1199ff1d19509ff147f0feb99cc362c227c000963a42901ff8c26a202`。
 
-Linux 构建、三节点按 digest 串行导入、Helm 升级前备份；9 个 PVC 与既有 Secret
-UID 保留，其他六个 release 的 manifest 未变。新不可变 Functions 配置仅替换
-vm_image；原配置/根密钥/代理 CA 保留。API/合约与运行 Web 输入逐文件核对一致，
-测试后续修复按 test-only override hash 留证。Neon Rust/Autoscaling 源码没有修改。
-公开统一 Helm 0.1.31 仍锁 0.23.0 控制镜像，最新本地镜像尚未统一公开发行；
-不能把本地 digest 当作外部可拉取发行。
+Linux 串行构建并导入三节点；Helm 升级前备份。9 个 PVC、797 个既有 Secret UID
+保留，其他六个 release manifest 未变。未修改组件沿用单独记录的既有 digest。
+Functions Guest 保持 `neon.local/control-functions-vm@sha256:24e348fc125f644cfb00ba3335f8a291d3ce5a974e388b17495057ce94ed13c7`，
+其 supervisor 派生边界见前阶段报告；本批未重建 Guest。Neon Rust/Autoscaling 源码未改。
+公开统一 Helm 0.1.31 仍锁 0.23.0 控制镜像，最新本地镜像尚未统一公开发行。
 
-## 3. 实际验收与原证据
+## 3. 本批回执及失败记录
 
-1. Linux Go race：Cron/日期/输入/稳定 ID，可信 TLS/HMAC、平台头与能力协商。
-2. 独立 PostgreSQL control_ci：当前权限、幂等/版本、唯一入队、有限重试、租约过期
-   unknown、不可变终态、审计与单连接池场景；受影响 HTTP admission 检查通过。
-3. 认证元数据库异常正确为 503，失效凭据仍为 401；artifact 元数据不可用为 503，
-   确定的无效身份为 404。下载只对同一安全 GET 做三次新签名尝试，拒绝错误 CA、
-   401/404、重定向、篡改和越界；取消/次数上限通过。Guest 启动有界，未降级 TLS。
-4. 真实 UI 的业务部分在 `publication-ui-20261016165154` 通过：原 Function
-   `fnc_29918034cfee3d14`，原计划 `ftr_9380a86340211ba5f9cd9726`，新调用
-   `fti_e96c3f9834c2a5b93b93e393ed2500018e30dc2691c5ced181f095f12f6336ff`。
-   实际 SQL 回执只有该计划/调用的一行；普通伪造请求 403，原 schedule 日志一条。
-5. 该 Job 后因表中两条 succeeded 的测试选择器歧义失败，**原结果保留 failed**。
-   修正为原调用 ID 定位后，以独立 finalize 套件在 `publication-ui-20261016165656` 完成 UI 观察、
-   历史保留和正常退休；没有重新派发客户调用，没有重建定义/版本。三条原终态
-   调用记录删除前后完全相同。两批证据共同组成闭环，不重标旧失败为成功。
+维护者原证据为 `control-plane/production/evidence/20261017-catalog-rename`，不上传公共
+Git；私密密码/checkpoint、源码、OCI、失败日志均保留。`runtime-source-match.json`
+逐文件核对实际构建与当前 API/合约/Web 运行输入；文档可在验收后更新。
 
-未重复其他旧全量功能套件，也没有等待 GitHub CI。本批仅运行新增和受影响检查，
-运行 Web 未变化时复用之前 Vite 构建结果；新增测试仍做格式/TypeScript/准入核对。
+| 回执 | 结果 | 内容 |
+|---|---|---|
+| `go-20261016171049` | pass | 初版四个新测试；后续增量见下一回执 |
+| `go-20261016172135` | pass | race/vet、五个顶层新 Go/PG 测试，含六个 UID/CAS 子场景；另有三个 OpenAPI 合同检查 |
+| `quality1` | fail，未创建 Job | 私有调度脚本用了仅 API 的回执，缺 Auth/E2E 依赖；修正使用合并回执 |
+| `quality2` | fail | 新测试闭包的 string/undefined 类型错误，原日志保留 |
+| `quality3` | pass | 修正后格式、TypeScript、Vite、56 套件准入及 API 索引；未重跑旧业务 UI |
+| `images1` / `images2` | fail | API 构建通过；Web 基础 metadata 被出口代理 CONNECT 503 阻断 |
+| `web-local-resolve` | fail | 本地解析模式不能替代当前缺失的基础 metadata，诊断保留 |
+| `egress-recovery.json` | 恢复 | Linux gost 下一跳 Windows 端口无监听；恢复仅三个私网节点接入的转发后 TLS/Registry challenge 正常；未换 digest/禁用 TLS |
+| `images3` | pass | 同一源码归档、API/Web 两镜像，三节点串行 digest 导入 |
+| `deploy1` | pass | Helm 111 → 112；备份和原资源身份检查 |
+| `ui1` | pass | 从浏览器发起的十项新功能检查 |
+| `retirement-20261016173435` | pass | 三个终态 Job 留档后按 UID/RV 退休；3/3 Ready、87 workloads 符合期望，无坏 Pod，托管 VM 为 0 |
 
-## 4. 失败、纠正与明确限制
+Go/PG 检查包括当前授权、版本、审计失败原子回滚、原 OID/数据/密码/ACL、
+元数据未知提交、真实 Kubernetes HTTP CAS 冲突、丢失提交响应、同名 UID 替换拒绝。
+一次性 PostgreSQL 测试 Pod 已各自按原 UID 退休；没有访问现场业务库执行破坏测试。
 
-- 早期冷启动只保留 artifact 阶段失败；失败后 404 是已降级身份的正常拒绝，不能
-  证明原下载原因。修复加入安全错误分类与有界 GET 重试，原失败原样保留。
-- 一次恢复期间三台 Kubernetes API 同时拒绝连接，原操作在 SQL 前置步骤失败；
-  没有新 Function VM。之后只读 TLS1.3/hostname/CA、SQL provisioner 身份验证通过。
-  日志有 RKE2 重启及共同 I/O 压力，内存/磁盘容量充足；不声称已证明唯一根因或
-  完成硬件稳定性验收，没有重置 etcd/删除数据。当前功能在恢复后串行验证。
-- 私有执行器的通用启动命令覆盖了示例打包命令，早期实际部署旧 PostgreSQL 示例，
-  因而 transport HTTP200 没有要求的业务 SQL 回执。这是执行器缺陷；修正后通过 UI
-  为同一个 Function 明确部署正确示例，保留所有旧版本。新增 ZIP entry 与封存源码
-  的逐字节预检、部署 bundle digest 核对和实际执行命令回执，防止重现。
-- 旧示例 Node 不就绪时自动回收条件不成立，已通过 UI 明确停止原 UID 后再部署。
-  正确示例的健康调用后自动回收通过；**异常 Node 的有界自动回收仍需继续完善**，
-  不用正常路径覆盖这个生命周期缺口。
-- 分支继承、对象事件、stdout/stderr、WS、长期保留/GC、外部 fence、HA/DR、
-  全链路可信 TLS 和统一公开发行仍按各自门槛推进。
+真实 UI Job：`publication-ui-20261016173221`。沿用既有项目
+`prj_6f3c51bd15b772e3`、分支 `br_6f3c51bd15b772e3`、Writer
+`ep_6f3c51bd15b772e3`，只新增本用例专用目录对象。角色
+`rename_role_v1 → renamed_role_v1` 的原 OID **147456**，数据库
+`rename_database_v1 → renamed_database_v1` 的原 OID **147460**。
+`public.rename_probe` 原数据和原密码保留，密码未写公共回执。
 
-所有 fixture、失败/成功、ZIP、源/OCI、业务数据及记录保留；只退休明确自有的终态
-测试 Job/Pod/VM，保存 UID 和日志。完整维护者证据位于工作区
-`control-plane/production/evidence/20261016-function-triggers`；口令、Cookie、DOM、
-私密脚本和引导材料不上传公共 Git。公开产品依旧为 Go/PostgreSQL + React/TypeScript。
+十项实际 UI 检查：
 
-## 5. 本批收尾
+1. 创建专用角色。
+2. 创建专用数据库并指定其 Owner。
+3. SQL 写入并记录原 OID、业务行和 ACL。
+4. 改名前创建原 Reader `ep_94e4cd7ef1f630f0` 并归零。
+5. 角色改名丢失真实 202 后原 key 重取同一操作；不同 body 409、旧版本 412。
+6. 新角色名、原密码实际登录；原 OID、Owner、数据和 ACL 保留。
+7. UI 数据库改名，五步操作成功。
+8. Writer 缩零后用新名称冷醒，原 OID/密码/业务数据保留。
+9. Writer 再归零，原 Reader 新名称冷醒；实际只读 SQL、原 OID/Owner/密码/数据一致。
+10. Reader 正常删除、Writer 归零，业务表、角色和数据库保留。
 
-15 个明确自有的终态质量/UI Job 已先归档日志和 UID，再按 UID/resourceVersion 退休；
-临时 PostgreSQL 测试 Pod 也已正常退休。最终 3/3 节点 Ready、无 Memory/Disk/PID
-Pressure，87 个工作负载与期望一致（包含有意为 0 的服务），错误 Pod 0、托管 VM 0。
-55 个可信 live suite 的声明/准入对齐，新增测试格式/TypeScript 与公开源码门禁通过；
-305 个 API/合约文件及 67 个 Web 运行输入与实际镜像源快照逐文件一致。
+原 Operation：
+
+```
+op_cf0225882dd2c7bf10fddc9f
+op_449ecbab7c8ac958ecf9f7b1
+op_aa9b50ccb4c5f58c3f5ac10c
+op_827e7b00f20a5f2ad3a7ab4e
+op_9a6acdc10ee54dd746f2920c
+op_b7edccc3c8fa09e0d05e3a0f
+op_a4059a194117fbc407b8bd29
+op_afc80219c21b2d558766833c
+op_ed6feac804d31657ab3700ab
+```
+
+角色改名为 `op_9a6acdc10ee54dd746f2920c`；数据库改名为
+`op_b7edccc3c8fa09e0d05e3a0f`。未另建替代对象；未修改共享 `fn_native`、
+原 Backend 身份或旧 fixture 数据。
+
+## 4. 下一阶段
+
+继续按[需求账本](REMAINING-REQUIREMENTS-2026-10-16.md)开发和本地验收。
+L01 中 Node 异常不能因 `NodeReady=false` 永久占用 VM；应根据可信 supervisor
+活动观察、原身份/UID 及正常 GC 退休。TTL、失败创建清理、默认身份、WS/对象事件/
+完整日志、大对象/GC、OIDC/SSO、外部 fencing、HA/DR、TLS、长期监控和统一公开
+发行仍未全部完成。前阶段通过不能关闭这些独立门槛。

@@ -157,6 +157,15 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 			if stepErr == nil {
 				stepErr = s.reconcileManagedAuth(runCtx, id, workerID, action, p)
 			}
+		case "rename_role", "rename_database":
+			var p catalogRenamePayload
+			if err := json.Unmarshal(payload, &p); err != nil {
+				stepErr = err
+			} else if p.ProjectID != projectID || p.BranchID != resourceID || action != "rename_"+p.Kind || !p.valid() || !p.bindingsValid() {
+				stepErr = errors.New("catalog rename Operation scope mismatch")
+			} else {
+				stepErr = s.reconcileCatalogRename(runCtx, id, workerID, p)
+			}
 		case "create_role", "rotate_role_password", "delete_role", "create_database", "delete_database", "update_database_owner":
 			var p catalogPayload
 			if err := json.Unmarshal(payload, &p); err != nil {

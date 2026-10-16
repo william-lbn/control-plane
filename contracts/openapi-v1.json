@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.47.2",
+    "version": "0.48.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -5579,6 +5579,21 @@
           },
           "retention": {
             "const": "held_until_operator_policy"
+          }
+        }
+      },
+      "CatalogRenameInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "new_name"
+        ],
+        "properties": {
+          "new_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63,
+            "description": "Distinct non-system PostgreSQL identifier, at most 63 UTF-8 bytes; control characters and surrounding whitespace rejected."
           }
         }
       }
@@ -20086,6 +20101,192 @@
           },
           "503": {
             "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/roles/{role}/rename": {
+      "post": {
+        "operationId": "renameBranchRole",
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "Rename an original managed role while retaining its PostgreSQL OID",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          },
+          {
+            "$ref": "#/components/parameters/role"
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"[1-9][0-9]*\"$"
+            },
+            "description": "Canonical quoted decimal version_token from catalog listing."
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Durable accepted Operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "operation": {
+                      "$ref": "#/components/schemas/Operation"
+                    },
+                    "branch_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "description": "Editor/Admin and session CSRF or scoped API key. Same-key/input/version replay resolves the original durable Operation before re-observing old names. Admission captures the original PostgreSQL OID, branch marker, current metadata version and owned immutable credential/config/routes Secret UIDs. Worker performs transactional ALTER with an OID postcondition, all Writer/Reader cold configurations, Proxy credential publication and atomic final catalog/owner-reference rename. Password/verifier stays in its original immutable Secret; no object/data copy, forced disconnect, privilege escalation or name-only adoption. Target names retained by another managed catalog record are reserved. Default Endpoint identities and retained Backend database dependencies must migrate before rename; arbitrary external DDL management, cross-system fencing and uninterrupted HA remain independent gates.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogRenameInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/databases/{database}/rename": {
+      "post": {
+        "operationId": "renameBranchDatabase",
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "Rename an original managed database while retaining its PostgreSQL OID",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          },
+          {
+            "$ref": "#/components/parameters/database"
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"[1-9][0-9]*\"$"
+            },
+            "description": "Canonical quoted decimal version_token from catalog listing."
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Durable accepted Operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "operation": {
+                      "$ref": "#/components/schemas/Operation"
+                    },
+                    "branch_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "description": "Editor/Admin and session CSRF or scoped API key. Same-key/input/version replay resolves the original durable Operation before re-observing old names. Admission captures the original PostgreSQL OID, branch marker, current metadata version and owned immutable credential/config/routes Secret UIDs. Worker performs transactional ALTER with an OID postcondition, all Writer/Reader cold configurations, Proxy credential publication and atomic final catalog/owner-reference rename. Password/verifier stays in its original immutable Secret; no object/data copy, forced disconnect, privilege escalation or name-only adoption. Target names retained by another managed catalog record are reserved. Default Endpoint identities and retained Backend database dependencies must migrate before rename; arbitrary external DDL management, cross-system fencing and uninterrupted HA remain independent gates.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogRenameInput"
+              }
+            }
           }
         }
       }

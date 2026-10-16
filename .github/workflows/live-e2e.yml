@@ -15,7 +15,7 @@ on:
       product_suite:
         description: Product UI suites (overrides other suite selectors when selected)
         type: choice
-        options: [none, sql-assistant.spec.ts, sql-ai-repair.spec.ts, history-names.spec.ts, functions-schedules.spec.ts, functions-runtime-recovery.spec.ts, functions-schedules-finalize.spec.ts]
+        options: [none, sql-assistant.spec.ts, sql-ai-repair.spec.ts, history-names.spec.ts, functions-schedules.spec.ts, functions-runtime-recovery.spec.ts, functions-schedules-finalize.spec.ts, catalog-rename.spec.ts]
         default: none
       poll_fault:
         description: Inject transient read failures for native/Data API observation recovery
@@ -41,6 +41,7 @@ jobs:
       NEON_E2E_SUITE: ${{ inputs.product_suite != 'none' && inputs.product_suite || inputs.additional_suite != 'none' && inputs.additional_suite || inputs.suite }}
       NEON_E2E_CREDENTIAL_PROJECT: ${{ inputs.credential_project }}
       NEON_E2E_FUNCTIONS_MONITOR_FIXTURE: ${{ vars.NEON_E2E_FUNCTIONS_MONITOR_FIXTURE }}
+      NEON_E2E_CATALOG_RENAME_FIXTURE: ${{ vars.NEON_E2E_CATALOG_RENAME_FIXTURE }}
       NEON_E2E_CATALOG_OWNER_FIXTURE: ${{ vars.NEON_E2E_CATALOG_OWNER_FIXTURE }}
       NEON_E2E_SQL_SCRIPT_FIXTURE: ${{ vars.NEON_E2E_SQL_SCRIPT_FIXTURE }}
       NEON_E2E_CONSOLE_ACCOUNT_FIXTURE: ${{ vars.NEON_E2E_CONSOLE_ACCOUNT_FIXTURE }}
@@ -68,6 +69,7 @@ jobs:
             console-session-feedback.spec.ts|history-policy.spec.ts) test -f "$NEON_E2E_CONSOLE_ACCOUNT_FIXTURE" ;;
             native-product.spec.ts|restore.spec.ts|lifecycle.spec.ts|endpoint-deletion.spec.ts|data-api.spec.ts|console-invitations.spec.ts|console-mfa.spec.ts|console-sessions.spec.ts|managed-auth.spec.ts|object-storage.spec.ts|functions-native.spec.ts) ;;
             functions-schedules-finalize.spec.ts|functions-runtime-recovery.spec.ts|functions-schedules.spec.ts|functions-request-logs.spec.ts|functions-http.spec.ts|functions-observation.spec.ts|functions-wake.spec.ts|functions-rollback.spec.ts) test -f "$NEON_E2E_FUNCTIONS_MONITOR_FIXTURE" ;;
+            catalog-rename.spec.ts) test -f "$NEON_E2E_CATALOG_RENAME_FIXTURE" ;;
             database-owner.spec.ts) test -f "$NEON_E2E_CATALOG_OWNER_FIXTURE" ;;
             history-sharing.spec.ts) test -f "$NEON_E2E_SQL_SCRIPT_FIXTURE"; test -f "$NEON_E2E_CONSOLE_ACCOUNT_FIXTURE" ;;
             history-names.spec.ts|sql-ai-repair.spec.ts|sql-assistant.spec.ts|storage-multipart-administration.spec.ts|storage-multipart.spec.ts|plan-comparison.spec.ts|history-delete.spec.ts|auth-security.spec.ts|s3-storage.spec.ts|storage-directory.spec.ts|sql-plan-tree.spec.ts|sql-xlsx.spec.ts|storage-copy-conditions.spec.ts|storage-copy.spec.ts|storage-metadata-edit.spec.ts|storage-browser-metadata.spec.ts|storage-presigned-upload.spec.ts|storage-bulk-delete.spec.ts|sql-script.spec.ts|sql-tools.spec.ts) test -f "$NEON_E2E_SQL_SCRIPT_FIXTURE" ;;

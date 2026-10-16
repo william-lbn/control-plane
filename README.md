@@ -5,7 +5,7 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 
 **发行状态：预览版本。已经验证的实验环境功能不等于生产认证，也不等于 Neon 官网全部 Backend 服务。**
 
-最新状态：[2026-10-17 定时触发器交付](docs/DELIVERY-2026-10-16-CURRENT.md)：UTC Cron、持久计划/回执、幂等/版本、真实 UI 从 Function/Compute 0 冷醒到受限 SQL、伪造拒绝与正常退休通过。API/Worker 0.47.2、Web 0.47.0 / migration 039 / Chart 0.9.39 / Helm revision 111。此前[历史名称/AI 命名](docs/DELIVERY-2026-10-16-HISTORY-NAMES.md)、multipart、共享历史、计划比较和 MFA 保留独立回执。[需求账本](docs/REMAINING-REQUIREMENTS-2026-10-16.md)仍有 29 组代码或独立验收缺口；继续逐项推进。
+最新状态：[2026-10-17 目录重命名交付](docs/DELIVERY-2026-10-16-CURRENT.md)：UI 原请求恢复、真实 PG 原 OID/密码/数据/Owner 保留、Writer/原 Reader 冷醒及正常退休通过。API/Worker、Web 0.48.0 / migration 039 / Chart 0.9.40 / Helm revision 112。此前 [Functions UTC 定时触发器](docs/DELIVERY-2026-10-17-FUNCTION-SCHEDULES.md)等保留独立回执。[需求账本](docs/REMAINING-REQUIREMENTS-2026-10-16.md)仍有 28 组代码或独立验收缺口；继续逐项推进。
 
 此前增量：[应用 TOTP 双重认证](docs/DELIVERY-2026-10-15-AUTH-TOTP.md)八项 UI 与[项目共享查询](docs/DELIVERY-2026-10-15-SHARED-QUERIES.md)六项 UI 均通过；该批基线为 API 0.33 / Chart 0.9.17 / migration 031。
 

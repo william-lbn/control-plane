@@ -1,6 +1,6 @@
 # 生产门槛与官网对齐
 
-状态截至 2026-10-17；API/Worker 0.47.2、Web 0.47.0 / migration 039 / Chart 0.9.39 / Helm revision 111。Console MFA、个人 SQL 历史采集/保留策略和单条删除已有 Linux Go/PG 与真实 UI 回执，见[当前交付](DELIVERY-2026-10-16-CURRENT.md)。[剩余需求账本](REMAINING-REQUIREMENTS-2026-10-16.md)区分未开发、部分实现和独立验收门槛。运行镜像按本地快照留证；公开统一 Helm 0.1.31 源码候选仍锁 0.23.0 公共控制镜像，不能冒充本地 0.47.2/0.47.0 发行。
+状态截至 2026-10-17；API/Worker、Web 0.48.0 / migration 039 / Chart 0.9.40 / Helm revision 112。Console MFA、个人 SQL 历史采集/保留策略和单条删除已有 Linux Go/PG 与真实 UI 回执，见[当前交付](DELIVERY-2026-10-16-CURRENT.md)。[剩余需求账本](REMAINING-REQUIREMENTS-2026-10-16.md)区分未开发、部分实现和独立验收门槛。运行镜像按本地快照留证；公开统一 Helm 0.1.31 源码候选仍锁 0.23.0 公共控制镜像，不能冒充本地 0.48.0 发行。
 前一版本 `be04cb4` 的真实 Linux/React 闭环见 [Auth/S3 交付](DELIVERY-2026-10-14-AUTH-S3.md)：
 788 Go/真实 PostgreSQL 检查、八个同源公开镜像、三节点 24 次串行 digest 导入；
 应用密码/会话十组 UI，以及实际 S3 SDK 签名/字节/权限/轮换/撤销/正常缩零均通过。
@@ -38,7 +38,7 @@ Functions 历史恢复在 0.1.25 通过原 fixture 的九组实际 UI 检查；S
 | 内存缩回 | 本批 VM status 1→2→1Gi 与 SQL 已通过，物理 RAM 归还和压力/OOM 仍未通过 | Guest 状态、压力/回收、OOM 防护、SQL 持续和冷醒完整循环 |
 | 基础设施稳定性 | 同物理盘 VM 存在共同 I/O 竞争 | 分离故障域/IO、持续负载、etcd 延迟与错误预算 |
 | TLS / 网络 | Auth→Proxy 已实现显式 CA/证书名称验证及真实 TLS 正反例；浏览器、控制库、Storage 等仍有实验传输例外 | 正确域名或 IP SAN、可信证书、verify-full、管理网络隔离及 NetworkPolicy；本地 CA 路径不依赖公网域名 |
-| 目录完整性 | 自定义 API-owned 数据库 Owner 变更已通过实际 UI/SQL、Writer/Reader 冷醒、幂等与正常回收；rename、默认/系统 Owner、外部 DDL 回收、默认身份迁移未完成 | 按版本 UI/实际 PG 验证；扩展动作与完整身份迁移另设门槛 |
+| 目录完整性 | 自定义 API-owned 数据库 Owner 变更已通过实际 UI/SQL、Writer/Reader 冷醒、幂等与正常回收；自定义 rename 基础已通过；默认/系统 Owner、外部 DDL 回收、默认身份迁移未完成 | 按版本 UI/实际 PG 验证；扩展动作与完整身份迁移另设门槛 |
 | 生命周期完整性 | 保护/依赖、保留删除、独立 Endpoint 退休/原密码重建、held tombstone、七天项目恢复已通过当前 UI；物理 GC、失败创建资源删除、TTL 和原分支 reset 仍缺 | 当前九套 UI 与原失败恢复分别留证；物理 GC、未知外部 DDL 自动恢复与分布式栅栏另设 Gate |
 | 监控与运营 | 长期指标、告警、审计、容量/计量不足 | SLO、持久 TSDB、告警测试、预算与容量恢复 |
 | 发布供应链 | 当前八镜像已有同源码公开 CI、匿名 OCI/source 验证及三节点 digest 拉取；长期签名/证明消费策略仍需治理 | 固定 SHA/digest、SBOM/provenance、匿名拉取、回滚镜像保留及独立消费验证 |
@@ -93,3 +93,8 @@ XLSX 与 Explain/Analyze 基础树形计划各四项真实 Linux UI 通过，版
 ## 2026-10-17：定时调用本地基础闭环
 
 UTC Cron 的代码/Go/PG、原计划从零冷醒到真实 SQL、伪造拒绝、UI 历史与正常退休已通过，[精确交付](DELIVERY-2026-10-17-FUNCTION-SCHEDULES.md)保留所有原失败与纠正。F02 的分支继承、完整 HA 不随之关闭；异常 Node 的自动有界回收另列生命周期缺口。下一阶段继续数据库/角色 rename 与其余工程。
+
+
+## 2026-10-17：目录重命名基础闭环
+
+[精确交付](DELIVERY-2026-10-17-CATALOG-RENAME.md)记录五个新 Go/PG 顶层测试、UID/CAS 及未知提交、三个 OpenAPI 合同测试和十项真实 UI。Writer/原 Reader 冷醒保留原 OID/密码/数据。C02、完整生命周期、外部 fencing 和 HA 等门槛继续保留。下一项处理异常 Functions 自动有界退休。

@@ -4,6 +4,7 @@ import { api, projectPath } from '../../api';
 import type { Branch, Operation, Page } from '../../api';
 import { Empty, PageHeading } from '../../shared/ui';
 import { newRequestKey } from '../../shared/requestKey';
+import { CatalogRename } from './CatalogRename';
 
 type CatalogItem = {
   name: string;
@@ -197,6 +198,16 @@ export function Catalog({
           </div>
         </div>
       )}
+      <CatalogRename
+        key={path}
+        path={path}
+        projectId={projectId}
+        roles={roles}
+        databases={databases}
+        disabled={busy || loading || !canEdit}
+        onBusy={setBusy}
+        onComplete={() => load()}
+      />
       <div className="identity-grid">
         <form
           className="panel"
