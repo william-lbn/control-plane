@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { api, endpointPath } from '../../api';
+import { api, endpointPath, ApiError } from '../../api';
 import type { Endpoint, QueryResult } from '../../api';
 import { PageHeading } from '../../shared/ui';
 import { useEndpointSelection } from '../../shared/useEndpointSelection';
@@ -29,6 +29,12 @@ export function Workbench({
   const [database, setDatabase] = useState('');
   const [sql, setSQL] = useState('SELECT current_database(), current_user, now();');
   const [result, setResult] = useState<QueryResult | null>(null);
+  const [queryFailure, setQueryFailure] = useState<{
+    sql: string;
+    code: string;
+    message: string;
+    requestId?: string;
+  } | null>(null);
   const [planResult, setPlanResult] = useState<{
     result: QueryResult;
     analyzed: boolean;
@@ -51,6 +57,7 @@ export function Workbench({
   useEffect(() => {
     scopeEpoch.current++;
     setResult(null);
+    setQueryFailure(null);
     setScriptResult(null);
     setPassword('');
     setQueryAction('query');
@@ -70,12 +77,14 @@ export function Workbench({
     setResult(null);
     setScriptResult(null);
     setPlanResult(null);
+    setQueryFailure(null);
   }, [role, database]);
   async function execute() {
     if (!endpoint) return;
     const epoch = scopeEpoch.current;
     const submittedPassword = password;
     setBusy(true);
+    setQueryFailure(null);
     setResult(null);
     setScriptResult(null);
     try {
@@ -111,7 +120,17 @@ export function Workbench({
         );
       }
     } catch (e) {
-      if (epoch === scopeEpoch.current) showError(e);
+      if (epoch === scopeEpoch.current) {
+        if (
+          mode === 'single' &&
+          queryAction === 'query' &&
+          e instanceof ApiError &&
+          e.status === 422 &&
+          e.code === 'sql_failed'
+        )
+          setQueryFailure({ sql, code: e.code, message: e.message, requestId: e.requestId });
+        else showError(e);
+      }
     } finally {
       // Passwords are single-request input, including rejected SQL/network
       // errors. Preserve a different value entered while the request waited.
@@ -334,28 +353,49 @@ export function Workbench({
         </div>
       )}
       {endpoint && (
-        <SQLAssistant
-          key={JSON.stringify(['assistant', projectId, endpoint.id, role, database])}
-          projectId={projectId}
-          branchId={endpoint.branch_id}
-          currentSQL={sql}
-          disabled={busy}
-          canLoadSchema={!!password && !busy}
-          onLoadSchema={loadAssistantSchema}
-          plan={
-            planResult && planResult.result === result && planResult.sourceSQL === sql
-              ? { rows: planResult.result.rows, analyzed: planResult.analyzed }
-              : null
-          }
-          onLoad={(text) => {
-            setSQL(text);
-            setMode('single');
-            setQueryAction('query');
-            setPassword('');
-            setResult(null);
-            setScriptResult(null);
-          }}
-        />
+        <>
+          {mode === 'single' &&
+            queryAction === 'query' &&
+            queryFailure &&
+            queryFailure.sql === sql && (
+              <div className="panel" role="alert" data-testid="sql-query-failure">
+                <strong>上次 SQL 请求失败</strong>
+                <p>{queryFailure.message}</p>
+                <small>
+                  {queryFailure.requestId || ''} ·
+                  此信息不构成自动重试许可；若原请求可能有写入，请先核验数据。
+                </small>
+              </div>
+            )}
+          <SQLAssistant
+            key={JSON.stringify(['assistant', projectId, endpoint.id, role, database])}
+            projectId={projectId}
+            branchId={endpoint.branch_id}
+            currentSQL={sql}
+            disabled={busy}
+            canLoadSchema={!!password && !busy}
+            onLoadSchema={loadAssistantSchema}
+            queryFailure={
+              mode === 'single' && queryAction === 'query' && queryFailure?.sql === sql
+                ? queryFailure
+                : null
+            }
+            plan={
+              planResult && planResult.result === result && planResult.sourceSQL === sql
+                ? { rows: planResult.result.rows, analyzed: planResult.analyzed }
+                : null
+            }
+            onLoad={(text) => {
+              setSQL(text);
+              setMode('single');
+              setQueryAction('query');
+              setPassword('');
+              setResult(null);
+              setScriptResult(null);
+              setQueryFailure(null);
+            }}
+          />
+        </>
       )}
       <PlanComparison
         key={JSON.stringify([projectId, endpoint?.id, role, database])}

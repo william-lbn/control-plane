@@ -6,6 +6,7 @@ import {
   parseSQLDraft,
   type AssistantModel,
   type AssistantPurpose,
+  type AssistantFailure,
   type SQLDraft,
 } from './sqlAssistant';
 import './sql-assistant.css';
@@ -46,6 +47,7 @@ export function SQLAssistant({
   onLoad,
   canLoadSchema,
   onLoadSchema,
+  queryFailure,
 }: {
   projectId: string;
   branchId: string;
@@ -55,6 +57,7 @@ export function SQLAssistant({
   onLoad: (sql: string) => void;
   canLoadSchema: boolean;
   onLoadSchema: () => Promise<string>;
+  queryFailure: AssistantFailure | null;
 }) {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [model, setModel] = useState('');
@@ -62,6 +65,7 @@ export function SQLAssistant({
   const [prompt, setPrompt] = useState('');
   const [schema, setSchema] = useState('');
   const [includeSQL, setIncludeSQL] = useState(false);
+  const [includeError, setIncludeError] = useState(false);
   const [consent, setConsent] = useState(false);
   const [busy, setBusy] = useState(false);
   const [raw, setRaw] = useState('');
@@ -119,7 +123,16 @@ export function SQLAssistant({
       if (!selected) return { request: null, error: '请选择已配置的文本模型。' };
       return {
         request: buildAssistantRequest(
-          { purpose, prompt, schema, includeSQL, currentSQL, plan },
+          {
+            purpose,
+            prompt,
+            schema,
+            includeSQL,
+            includeError,
+            failure: queryFailure,
+            currentSQL,
+            plan,
+          },
           selected,
         ),
         error: '',
@@ -127,10 +140,19 @@ export function SQLAssistant({
     } catch (error) {
       return { request: null, error: error instanceof Error ? error.message : '上下文无效。' };
     }
-  }, [selected, purpose, prompt, schema, includeSQL, currentSQL, plan]);
+  }, [selected, purpose, prompt, schema, includeSQL, includeError, queryFailure, currentSQL, plan]);
   const fingerprint = preview.request
     ? JSON.stringify(preview.request)
-    : JSON.stringify([purpose, model, prompt, schema, includeSQL, preview.error]);
+    : JSON.stringify([
+        purpose,
+        model,
+        prompt,
+        schema,
+        includeSQL,
+        includeError,
+        queryFailure,
+        preview.error,
+      ]);
   useEffect(() => {
     epoch.current++;
     active.current?.abort();
@@ -182,9 +204,9 @@ export function SQLAssistant({
       const text = assistantResponseText(value);
       if (current !== epoch.current) return;
       setRaw(text);
-      if (requestedPurpose === 'sql_draft') setDraft(parseSQLDraft(text));
+      if (requestedPurpose !== 'plan_advice') setDraft(parseSQLDraft(text));
       setNotice(
-        requestedPurpose === 'sql_draft'
+        requestedPurpose !== 'plan_advice'
           ? '已生成未验证草稿。审阅后可显式载入编辑器。'
           : '已返回模型建议。请结合实际数据和多次测量人工验证。',
       );
@@ -235,6 +257,9 @@ export function SQLAssistant({
                 onChange={(e) => setPurpose(e.target.value as AssistantPurpose)}
               >
                 <option value="sql_draft">SQL 草稿</option>
+                <option value="sql_fix" disabled={!queryFailure}>
+                  修复当前 SQL · 需失败响应
+                </option>
                 <option value="plan_advice" disabled={!plan}>
                   计划建议 · 需当前计划
                 </option>
@@ -259,6 +284,22 @@ export function SQLAssistant({
               </select>
             </label>
           </div>
+          {queryFailure && (
+            <button
+              className="button ghost"
+              onClick={() => {
+                setPurpose('sql_fix');
+                setIncludeSQL(true);
+                setIncludeError(true);
+                setPrompt(
+                  'Fix the PostgreSQL syntax in the selected SQL. Preserve its intended result and identifiers. Return only one SQL fenced block; do not change credentials or access policy.',
+                );
+              }}
+              disabled={busy || disabled}
+            >
+              修复当前 SQL
+            </button>
+          )}
           <label>
             请求说明
             <textarea
@@ -314,6 +355,18 @@ export function SQLAssistant({
             />
             附带当前编辑器 SQL（默认不发送）
           </label>
+          {purpose === 'sql_fix' && (
+            <label className="sql-assistant-check">
+              <input
+                type="checkbox"
+                aria-label="附带当前错误信息"
+                checked={includeError}
+                disabled={busy || disabled || !queryFailure}
+                onChange={(e) => setIncludeError(e.target.checked)}
+              />
+              附带当前失败响应信息（可能含标识/字面量，请在发送前检查）
+            </label>
+          )}
           {purpose === 'plan_advice' && (
             <p className="muted">
               仅发送有界运算符和数值指标摘要，默认省略关系/索引名、条件、输出表达式和原始 SQL。
@@ -345,7 +398,11 @@ export function SQLAssistant({
               disabled={busy || disabled || !consent || !preview.request || !catalog?.enabled}
               onClick={() => void generate()}
             >
-              {purpose === 'sql_draft' ? '生成 SQL 草稿' : '获取计划建议'}
+              {purpose === 'plan_advice'
+                ? '获取计划建议'
+                : purpose === 'sql_fix'
+                  ? '生成修复草稿'
+                  : '生成 SQL 草稿'}
             </button>
             <button className="button ghost" disabled={!busy} onClick={cancel}>
               取消建议请求
@@ -353,7 +410,14 @@ export function SQLAssistant({
           </div>
         </div>
         <div className="sql-assistant-output">
-          <h3>{purpose === 'sql_draft' ? '待审阅草稿' : '模型计划建议'}</h3>
+          <h3>{purpose !== 'plan_advice' ? '待审阅草稿' : '模型计划建议'}</h3>
+          {purpose === 'plan_advice' && (
+            <p role="status" data-testid="sql-assistant-plan-measurement">
+              {plan?.analyzed
+                ? '当前上下文含 Analyze 实测。实际节点值可能按循环统计，父节点包含子节点；单次样本不能证明优化。'
+                : '当前仅估算：未采集执行耗时或实际行数。模型提及这些值不构成测量。'}
+            </p>
+          )}
           {!raw && !busy && (
             <p className="muted">
               明确确认发送内容后，在这里查看结果。模型建议尚未经过数据库验证。
@@ -397,7 +461,7 @@ export function SQLAssistant({
           {raw && purpose === 'plan_advice' && (
             <pre data-testid="sql-assistant-plan-advice">{raw}</pre>
           )}
-          {raw && purpose === 'sql_draft' && (
+          {raw && purpose !== 'plan_advice' && (
             <details>
               <summary>原始模型输出</summary>
               <pre data-testid="sql-assistant-raw">{raw}</pre>

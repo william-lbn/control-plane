@@ -5,7 +5,7 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 
 **发行状态：预览版本。已经验证的实验环境功能不等于生产认证，也不等于 Neon 官网全部 Backend 服务。**
 
-最新状态：[2026-10-16 交付](docs/DELIVERY-2026-10-16-CURRENT.md)：新增受控 [SQL AI 助手](docs/SQL-ASSISTANT.md)：实际本地模型、Schema 目录、人工草稿执行和计划建议通路；API 0.43.0 / Web 切片 0.44.0 / migration 037 / Chart 0.9.34 / Helm revision 104。此前有界 multipart、共享历史、计划比较和 MFA 等保留独立回执。[35 组需求账本](docs/REMAINING-REQUIREMENTS-2026-10-16.md)仍有待开发和独立验收项。
+最新状态：[2026-10-16 交付](docs/DELIVERY-2026-10-16-CURRENT.md)：新增 [SQL AI 修错](docs/SQL-AI-REPAIR.md)：真实 PG 失败、明确上下文/确认、真实模型修复与人工 Proxy 执行；API 0.43.0 / Web 切片 0.45.0 / migration 037 / Chart 0.9.35 / Helm revision 107。此前有界 multipart、共享历史、计划比较和 MFA 等保留独立回执。[35 组需求账本](docs/REMAINING-REQUIREMENTS-2026-10-16.md)仍有待开发和独立验收项。
 
 此前增量：[应用 TOTP 双重认证](docs/DELIVERY-2026-10-15-AUTH-TOTP.md)八项 UI 与[项目共享查询](docs/DELIVERY-2026-10-15-SHARED-QUERIES.md)六项 UI 均通过；该批基线为 API 0.33 / Chart 0.9.17 / migration 031。
 

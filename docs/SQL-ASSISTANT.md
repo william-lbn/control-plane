@@ -136,3 +136,5 @@ Explain 不发送实际行数/时间；Analyze 才发送相应观察值。建议
 `web/e2e/sql-assistant.spec.ts`。后者使用受保护的原 Owner fixture、真实模型与 Proxy，
 单 worker、零自动重试；执行入口见可信 Linux live workflow 的 `product_suite`。
 实际运行版本和通过范围以[当前交付](DELIVERY-2026-10-16-CURRENT.md)为准。
+
+后续 Web 0.45.0 增加[AI 修错与确定性计划提示](SQL-AI-REPAIR.md)，有独立真实 UI 回执；历史 AI 命名仍在后续清单。
