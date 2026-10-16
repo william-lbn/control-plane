@@ -540,6 +540,11 @@ func (s *server) s3WriteObject(w http.ResponseWriter, r *http.Request, conn *pgx
 }
 
 func s3QuerySupported(q url.Values) bool {
+	for _, name := range []string{"part-number-marker", "max-parts", "key-marker", "upload-id-marker", "max-uploads"} {
+		if q.Has(name) && !q.Has("uploads") && !q.Has("uploadId") {
+			return false
+		}
+	}
 	for name := range q {
 		if strings.HasPrefix(name, "X-Amz-") {
 			continue

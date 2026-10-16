@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.42.0",
+    "version": "0.43.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -2602,7 +2602,14 @@
           "driver_enabled",
           "s3_compatible",
           "protocol",
-          "limits"
+          "limits",
+          "s3_protocol",
+          "s3_endpoint",
+          "s3_region",
+          "s3_supported",
+          "s3_missing",
+          "multipart_administration_enabled",
+          "spec"
         ],
         "properties": {
           "branch_id": {
@@ -2629,7 +2636,7 @@
           },
           "s3_compatible": {
             "type": "boolean",
-            "const": false
+            "description": "SigV4 core adapter configured; inspect s3_protocol, supported/missing and limits. Does not certify all S3 features or production readiness."
           },
           "protocol": {
             "const": "neon-object-rest-v1"
@@ -2645,13 +2652,82 @@
             ]
           },
           "limits": {
-            "type": "object"
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "object_bytes",
+              "branch_bytes",
+              "buckets",
+              "objects",
+              "active_uploads",
+              "parts_per_upload",
+              "multipart_minimum_nonfinal_part_bytes"
+            ],
+            "properties": {
+              "object_bytes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "branch_bytes": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "buckets": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "objects": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "active_uploads": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "parts_per_upload": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "multipart_minimum_nonfinal_part_bytes": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
           },
           "updated_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "s3_protocol": {
+            "type": "string",
+            "const": "sigv4-core-preview"
+          },
+          "s3_endpoint": {
+            "type": "string"
+          },
+          "s3_region": {
+            "type": "string"
+          },
+          "s3_supported": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "s3_missing": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "uniqueItems": true
+          },
+          "multipart_administration_enabled": {
+            "type": "boolean",
+            "description": "Driver capability only; current Admin Console authorization still required"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "StorageBucket": {
         "type": "object",
@@ -4921,6 +4997,125 @@
           "upload",
           "parts",
           "physical_gc"
+        ]
+      },
+      "MultipartAdministrationEntry": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "upload_id": {
+            "type": "string",
+            "pattern": "^mpu_[a-f0-9]{24}$"
+          },
+          "key": {
+            "type": "string"
+          },
+          "initiator": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "uploading",
+              "completed",
+              "aborted"
+            ]
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "part_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "part_bytes": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "upload_id",
+          "key",
+          "initiator",
+          "state",
+          "created_at",
+          "updated_at",
+          "part_count",
+          "part_bytes"
+        ]
+      },
+      "MultipartAdministrationList": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 32,
+            "items": {
+              "$ref": "#/components/schemas/MultipartAdministrationEntry"
+            }
+          },
+          "limit": {
+            "type": "integer",
+            "enum": [
+              32
+            ]
+          },
+          "physical_gc": {
+            "type": "string",
+            "enum": [
+              "held_for_branch_and_pitr_references"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "limit",
+          "physical_gc"
+        ]
+      },
+      "MultipartAdministrationReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "upload_id": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "aborted"
+            ]
+          },
+          "initiator": {
+            "type": "string"
+          },
+          "physical_gc": {
+            "type": "string",
+            "enum": [
+              "held_for_branch_and_pitr_references"
+            ]
+          },
+          "intent_id": {
+            "type": "string",
+            "pattern": "^mpa_[a-f0-9]{24}$"
+          },
+          "request_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "upload_id",
+          "state",
+          "initiator",
+          "physical_gc",
+          "intent_id",
+          "request_id"
         ]
       }
     },
@@ -18503,6 +18698,198 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/multipart-administration": {
+      "get": {
+        "tags": [
+          "Object Storage"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bucket",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "upload_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^mpu_[a-f0-9]{24}$"
+            },
+            "description": "Inspect original upload state; omitted lists current bucket active uploads"
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Console authentication required"
+          },
+          "403": {
+            "description": "Current project Admin Console session required; global role and API key do not grant access"
+          },
+          "404": {
+            "description": "Project/branch not found"
+          },
+          "429": {
+            "description": "60 new administrator intents per actor/hour; exact replay does not consume a new admission"
+          },
+          "503": {
+            "description": "Outcome may be unknown; original admitted intent and audit retained"
+          },
+          "200": {
+            "description": "Bounded administrator metadata view",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MultipartAdministrationList"
+                }
+              }
+            }
+          }
+        },
+        "operationId": "listMultipartAdministration",
+        "summary": "Inspect all current-branch initiators or the original terminal upload; no credentials or file bytes"
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/multipart-administration/{upload}/abort": {
+      "post": {
+        "tags": [
+          "Object Storage"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bucket",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "upload",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^mpu_[a-f0-9]{24}$"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Console authentication required"
+          },
+          "403": {
+            "description": "Current project Admin Console session required; global role and API key do not grant access"
+          },
+          "404": {
+            "description": "Project/branch not found"
+          },
+          "429": {
+            "description": "60 new administrator intents per actor/hour; exact replay does not consume a new admission"
+          },
+          "503": {
+            "description": "Outcome may be unknown; original admitted intent and audit retained"
+          },
+          "200": {
+            "description": "Logical abort and control receipt confirmed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MultipartAdministrationReceipt"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Different key/input or upload already completed; existing object unchanged"
+          },
+          "422": {
+            "description": "Explicit valid reason/key required"
+          }
+        },
+        "operationId": "abortMultipartAsAdministrator",
+        "summary": "Audit durable intent, then logically abort original upload even if its initiator is revoked",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 512,
+                    "description": "Unicode characters; no control characters or leading/trailing whitespace; never include secrets"
+                  }
+                },
+                "required": [
+                  "reason"
+                ]
+              }
+            }
+          }
+        },
+        "description": "Intent and admission audit commit before branch I/O. Branch abort is serialized with completion and never changes a completed object. Lost response/audit failure retains admitted intent; exact key/input retry confirms the original receipt. Confirmed replay does not reopen storage or mutate again. Physical bytes remain retained."
       }
     }
   }

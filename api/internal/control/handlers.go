@@ -145,6 +145,8 @@ func (s *server) routes() *http.ServeMux {
 	mux.Handle("DELETE /api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/multipart-uploads/{upload}", s.auth(http.HandlerFunc(s.storageMultipart), true))
 	mux.Handle("PUT /api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/multipart-uploads/{upload}/parts/{part}", s.auth(http.HandlerFunc(s.storageMultipart), true))
 	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/multipart-uploads/{upload}/complete", s.auth(http.HandlerFunc(s.storageMultipart), true))
+	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/multipart-administration", s.auth(http.HandlerFunc(s.storageMultipartAdmin), false))
+	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/multipart-administration/{upload}/abort", s.auth(http.HandlerFunc(s.storageMultipartAdmin), true))
 	mux.HandleFunc("GET /storage/v1/{storageBranch}/{bucket}", s.storagePublic)
 	mux.HandleFunc("HEAD /storage/v1/{storageBranch}/{bucket}", s.storagePublic)
 	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/presign-upload", s.auth(http.HandlerFunc(s.storagePresignUpload), true))

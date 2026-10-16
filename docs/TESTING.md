@@ -540,3 +540,7 @@ See [the branch email/recovery contract](AUTH-EMAIL-RECOVERY.md). The protected 
 ## Bounded S3 multipart
 
 `storage-multipart.spec.ts` verifies the original UI upload across interruption/reload, final bytes, seven real signed MinIO SDK operations, abort, credential revocation and Compute zero. It requires the retained SQL owner fixture, protected admin file/private directory and a Linux `storage-sdk-probe` binary built from the candidate snapshot. Reuse the original checkpoint after any failure; never create replacement fixtures to hide an unknown mutation. See [the full contract and manual steps](OBJECT-STORAGE-MULTIPART.md). New `TestMultipart*` uses disposable `control_ci` only; the actual SDK signature test is `TestSignatureActualSDKMultipartSevenOperations`. Old accepted UI suites are not repeated by this slice.
+
+## Multipart administration and grouped listing
+
+`storage-multipart-administration.spec.ts` creates three real SDK uploads, revokes their original credential in UI, then exercises administrator logical abort, deliberately lost response and exact original receipt replay. Its narrow continuation reuses the confirmed upload/intent IDs and revoked credential, verifies local read-error recovery, and creates no replacement SDK mutations. See [the administration contract](MULTIPART-ADMINISTRATION.md). New `TestMultipartAdministration*` covers real metadata audit rollback/recovery/authorization and isolated branch directory grouping/quota. Keep protected checkpoints and all failed attempts; only retire terminal owned resources by UID.

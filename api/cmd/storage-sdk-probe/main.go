@@ -94,6 +94,9 @@ func main() {
 		key := "folder/中文 file.bin"
 		payload := []byte("Neon real S3 SDK bytes 中文\n")
 		switch c.Mode {
+		case "multipart-administration":
+			stage = "actual_signed_multipart_grouping_and_administration_fixture"
+			return probeMultipartAdministration(ctx, client, c, func(check string) { checks = append(checks, check) })
 		case "multipart":
 			stage = "actual_signed_multipart_operations"
 			return probeMultipart(ctx, client, c, func(check string) { checks = append(checks, check) })

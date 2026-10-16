@@ -8,6 +8,7 @@ import { PageHeading, status } from '../../shared/ui';
 import { newRequestKey } from '../../shared/requestKey';
 import { followOperation } from '../../shared/followOperation';
 import { MultipartUpload } from './MultipartUpload';
+import { MultipartAdministration } from './MultipartAdministration';
 
 type Instance = {
   generation: number;
@@ -733,6 +734,12 @@ export function ObjectStorage({
                   await loadBuckets(current);
                 }}
               />
+              {canAdmin && (
+                <MultipartAdministration
+                  key={`admin/${projectId}/${branch}/${bucket}`}
+                  bucketPath={bucketPath}
+                />
+              )}
               <section className="backend-panel" data-testid="storage-cors-panel">
                 <h3>浏览器跨域访问</h3>
                 <p>

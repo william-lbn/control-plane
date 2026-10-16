@@ -23,6 +23,7 @@ const multipartPartLimit = 1000
 const multipartMinimumPart = 5 << 20
 
 var multipartID = regexp.MustCompile(`^mpu_[a-f0-9]{24}$`)
+var multipartETag = regexp.MustCompile(`^[a-f0-9]{32}$`)
 
 type multipartUpload struct {
 	ID             string            `json:"upload_id"`
@@ -86,7 +87,7 @@ func loadMultipart(ctx context.Context, tx pgx.Tx, p objectStoragePayload, princ
 }
 func (s *server) createMultipart(ctx context.Context, conn *pgx.Conn, p objectStoragePayload, principal, bucket, requestKey string, input multipartCreate) (multipartUpload, error) {
 	var u multipartUpload
-	if !validStorageKey(input.Key) || !storageBucketName.MatchString(bucket) || len(input.ContentType) > 256 || input.Size < -1 || input.Size > storageObjectLimit || (input.SHA256 != "" && !validStorageDigest(input.SHA256)) {
+	if !validStorageKey(input.Key) || !storageBucketName.MatchString(bucket) || len(input.ContentType) > 256 || input.Size < -1 || input.Size > storageObjectLimit || (input.SHA256 != "" && !storageSHA256.MatchString(input.SHA256)) {
 		return u, multipartFault(400, "InvalidArgument")
 	}
 	if input.ContentType == "" {
@@ -286,7 +287,7 @@ func multipartManifestHash(parts []multipartSelection, match, none string) (stri
 		}
 		last = v.Number
 		v.ETag = strings.Trim(v.ETag, "\"")
-		if !regexp.MustCompile(`^[a-f0-9]{32}$`).MatchString(v.ETag) {
+		if !multipartETag.MatchString(v.ETag) {
 			return "", multipartFault(400, "InvalidPart")
 		}
 	}

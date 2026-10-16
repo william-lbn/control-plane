@@ -10,6 +10,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -34,7 +36,7 @@ func validMultipartQuery(q url.Values) bool {
 		if q.Get("uploads") != "" || q.Has("uploadId") || q.Has("partNumber") || q.Has("max-parts") || q.Has("part-number-marker") {
 			return false
 		}
-	} else if q.Get("uploadId") == "" || q.Has("max-uploads") || q.Has("key-marker") || q.Has("upload-id-marker") || q.Has("prefix") || q.Has("delimiter") {
+	} else if q.Get("uploadId") == "" || q.Has("max-uploads") || q.Has("key-marker") || q.Has("upload-id-marker") || q.Has("prefix") || q.Has("delimiter") || q.Has("encoding-type") {
 		return false
 	}
 	return q.Get("encoding-type") == "" || q.Get("encoding-type") == "url"
@@ -56,7 +58,7 @@ func (s *server) s3Multipart(w http.ResponseWriter, r *http.Request, conn *pgx.C
 	}
 	for k := range r.Header {
 		v := strings.ToLower(k)
-		if strings.HasPrefix(v, "x-amz-checksum-") || strings.HasPrefix(v, "x-amz-server-side-") || v == "x-amz-acl" || v == "x-amz-tagging" || v == "x-amz-storage-class" || v == "x-amz-sdk-checksum-algorithm" || strings.HasPrefix(v, "x-amz-object-lock-") {
+		if strings.HasPrefix(v, "x-amz-checksum-") || strings.HasPrefix(v, "x-amz-server-side-") || v == "x-amz-acl" || v == "x-amz-tagging" || v == "x-amz-storage-class" || v == "x-amz-sdk-checksum-algorithm" || strings.HasPrefix(v, "x-amz-object-lock-") || v == "x-amz-expected-bucket-owner" || v == "x-amz-request-payer" {
 			s3Error(w, r, 501, "NotImplemented")
 			return
 		}
@@ -146,7 +148,7 @@ func (s *server) s3Multipart(w http.ResponseWriter, r *http.Request, conn *pgx.C
 			Bucket   string   `xml:"Bucket"`
 			Key      string   `xml:"Key"`
 			ETag     string   `xml:"ETag"`
-		}{XMLNS: s3XMLNamespace, Location: s3Origin() + "/s3/" + p.BranchID + "/" + bucket + "/" + key, Bucket: bucket, Key: key, ETag: "\"" + u.SHA256 + "\""})
+		}{XMLNS: s3XMLNamespace, Location: multipartObjectLocation(p.BranchID, bucket, key), Bucket: bucket, Key: key, ETag: "\"" + u.SHA256 + "\""})
 	case http.MethodDelete:
 		if len(data) != 0 || len(qWithoutSignature(q)) != 1 {
 			s3Error(w, r, 400, "InvalidRequest")
@@ -328,13 +330,7 @@ func (s *server) s3ListMultipartParts(w http.ResponseWriter, r *http.Request, co
 	}{XMLNS: s3XMLNamespace, Bucket: bucket, Key: key, ID: id, Marker: marker, Next: next, Max: max, Truncated: truncated, Owner: owner, Initiator: owner, Storage: "STANDARD", Parts: selected})
 }
 func (s *server) s3ListMultipart(w http.ResponseWriter, r *http.Request, conn *pgx.Conn, p objectStoragePayload, principal, bucket string, q url.Values) {
-	// Delimiter grouping is advertised separately; reject it explicitly until
-	// its common-prefix pagination contract is implemented.
-	if q.Get("delimiter") != "" {
-		s3Error(w, r, 501, "NotImplemented")
-		return
-	}
-	max, e := multipartNumber(q, "max-uploads", 1000, 0, 1000)
+	max, e := multipartNumber(q, "max-uploads", 1000, 1, 1000)
 	if e != nil {
 		multipartError(w, r, e, true)
 		return
@@ -349,11 +345,27 @@ func (s *server) s3ListMultipart(w http.ResponseWriter, r *http.Request, conn *p
 		return
 	}
 	marker, idmarker, prefix := q.Get("key-marker"), q.Get("upload-id-marker"), q.Get("prefix")
-	if len(marker) > 1024 || len(prefix) > 1024 || (idmarker != "" && (!multipartID.MatchString(idmarker) || marker == "")) {
+	delimiter := q.Get("delimiter")
+	if !validMultipartFilter(marker) || !validMultipartFilter(prefix) || !validMultipartFilter(delimiter) || (idmarker != "" && (!multipartID.MatchString(idmarker) || marker == "")) {
 		s3Error(w, r, 400, "InvalidArgument")
 		return
 	}
-	rows, e := conn.Query(r.Context(), `SELECT id,key,created_at FROM neon_storage.multipart_uploads WHERE branch_id=$1 AND principal=$2 AND bucket=$3 AND state='uploading' AND starts_with(key,$4) AND ($5='' OR key COLLATE "C">$5 COLLATE "C" OR (key=$5 AND $6<>'' AND id>$6)) ORDER BY key COLLATE "C",id LIMIT $7`, p.BranchID, principal, bucket, prefix, marker, idmarker, max+1)
+	// Upload IDs are opaque. Resolve a returned marker against the retained
+	// initiation receipt, including completed/aborted ones, so a concurrent
+	// completion between pages does not skip another upload with the same key.
+	var markerTime time.Time
+	if idmarker != "" {
+		e = conn.QueryRow(r.Context(), `SELECT created_at FROM neon_storage.multipart_uploads WHERE id=$1 AND branch_id=$2 AND principal=$3 AND bucket=$4 AND key=$5`, idmarker, p.BranchID, principal, bucket, marker).Scan(&markerTime)
+		if isNoRows(e) {
+			s3Error(w, r, 400, "InvalidUploadMarker")
+			return
+		}
+		if e != nil {
+			multipartError(w, r, e, true)
+			return
+		}
+	}
+	rows, e := conn.Query(r.Context(), `SELECT id,key,created_at FROM neon_storage.multipart_uploads WHERE branch_id=$1 AND principal=$2 AND bucket=$3 AND state='uploading' AND starts_with(key,$4) ORDER BY key COLLATE "C",created_at,id LIMIT $5`, p.BranchID, principal, bucket, prefix, multipartActiveLimit+1)
 	if e != nil {
 		multipartError(w, r, e, true)
 		return
@@ -368,6 +380,11 @@ func (s *server) s3ListMultipart(w http.ResponseWriter, r *http.Request, conn *p
 		Storage   string        `xml:"StorageClass"`
 	}
 	items := []upload{}
+	prefixes := []struct {
+		Prefix string `xml:"Prefix"`
+	}{}
+	groups := map[string]bool{}
+	count := 0
 	truncated := false
 	nextKey, nextID := "", ""
 	owner := s3ObjectOwner{ID: principal, Name: principal}
@@ -384,12 +401,34 @@ func (s *server) s3ListMultipart(w http.ResponseWriter, r *http.Request, conn *p
 			multipartError(w, r, e, true)
 			return
 		}
-		if len(items) >= max {
+		group := ""
+		if delimiter != "" {
+			if index := strings.Index(strings.TrimPrefix(key, prefix), delimiter); index >= 0 {
+				group = prefix + strings.TrimPrefix(key, prefix)[:index+len(delimiter)]
+			}
+		}
+		if group != "" {
+			if groups[group] || group <= marker {
+				continue
+			}
+			groups[group] = true
+		} else if key < marker || (key == marker && (idmarker == "" || created.Before(markerTime) || (created.Equal(markerTime) && id <= idmarker))) {
+			continue
+		}
+		if count >= max {
 			truncated = true
 			break
 		}
-		items = append(items, upload{encode(key), id, created.UTC().Format(time.RFC3339Nano), owner, owner, "STANDARD"})
-		nextKey, nextID = key, id
+		count++
+		if group != "" {
+			prefixes = append(prefixes, struct {
+				Prefix string `xml:"Prefix"`
+			}{encode(group)})
+			nextKey, nextID = group, ""
+		} else {
+			items = append(items, upload{encode(key), id, created.UTC().Format(time.RFC3339Nano), owner, owner, "STANDARD"})
+			nextKey, nextID = key, id
+		}
 	}
 	if e = rows.Err(); e != nil {
 		multipartError(w, r, e, true)
@@ -404,9 +443,35 @@ func (s *server) s3ListMultipart(w http.ResponseWriter, r *http.Request, conn *p
 		NextKey   string   `xml:"NextKeyMarker"`
 		NextID    string   `xml:"NextUploadIdMarker"`
 		Prefix    string   `xml:"Prefix"`
+		Delimiter string   `xml:"Delimiter,omitempty"`
 		Max       int      `xml:"MaxUploads"`
 		Encoding  string   `xml:"EncodingType,omitempty"`
 		Truncated bool     `xml:"IsTruncated"`
 		Uploads   []upload `xml:"Upload"`
-	}{XMLNS: s3XMLNamespace, Bucket: bucket, Marker: encode(marker), IDMarker: idmarker, NextKey: encode(nextKey), NextID: nextID, Prefix: encode(prefix), Max: max, Encoding: q.Get("encoding-type"), Truncated: truncated, Uploads: items})
+		Prefixes  []struct {
+			Prefix string `xml:"Prefix"`
+		} `xml:"CommonPrefixes"`
+	}{XMLNS: s3XMLNamespace, Bucket: bucket, Marker: encode(marker), IDMarker: idmarker, NextKey: encode(nextKey), NextID: nextID, Prefix: encode(prefix), Delimiter: encode(delimiter), Max: max, Encoding: q.Get("encoding-type"), Truncated: truncated, Uploads: items, Prefixes: prefixes})
+}
+func validMultipartFilter(value string) bool {
+	if len(value) > 1024 || !utf8.ValidString(value) {
+		return false
+	}
+	for _, r := range value {
+		if unicode.IsControl(r) {
+			return false
+		}
+	}
+	return true
+}
+func multipartObjectLocation(branch, bucket, key string) string {
+	u, _ := url.Parse(s3Origin())
+	if u == nil {
+		u = &url.URL{}
+	}
+	u.Path = "/s3/" + branch + "/" + bucket + "/" + key
+	u.RawPath = ""
+	u.RawQuery = ""
+	u.Fragment = ""
+	return u.String()
 }

@@ -10,7 +10,7 @@ on:
       additional_suite:
         description: Additional real UI suites (overrides suite when selected)
         type: choice
-        options: [none, storage-multipart.spec.ts, history-sharing.spec.ts, plan-comparison.spec.ts, history-delete.spec.ts, history-policy.spec.ts, console-mfa.spec.ts, console-session-feedback.spec.ts, console-sessions.spec.ts, sql-plan-tree.spec.ts, sql-xlsx.spec.ts, storage-copy-conditions.spec.ts, fractional-admission.spec.ts, fractional-cpu.spec.ts, query-history.spec.ts, shared-queries.spec.ts, auth-totp.spec.ts, storage-directory.spec.ts, storage-copy.spec.ts, storage-bulk-delete.spec.ts, storage-presigned-upload.spec.ts, storage-browser-metadata.spec.ts, functions-request-logs.spec.ts, storage-metadata-edit.spec.ts]
+        options: [none, storage-multipart-administration.spec.ts, storage-multipart.spec.ts, history-sharing.spec.ts, plan-comparison.spec.ts, history-delete.spec.ts, history-policy.spec.ts, console-mfa.spec.ts, console-session-feedback.spec.ts, console-sessions.spec.ts, sql-plan-tree.spec.ts, sql-xlsx.spec.ts, storage-copy-conditions.spec.ts, fractional-admission.spec.ts, fractional-cpu.spec.ts, query-history.spec.ts, shared-queries.spec.ts, auth-totp.spec.ts, storage-directory.spec.ts, storage-copy.spec.ts, storage-bulk-delete.spec.ts, storage-presigned-upload.spec.ts, storage-browser-metadata.spec.ts, functions-request-logs.spec.ts, storage-metadata-edit.spec.ts]
         default: none
       poll_fault:
         description: Inject transient read failures for native/Data API observation recovery
@@ -65,7 +65,7 @@ jobs:
             functions-request-logs.spec.ts|functions-http.spec.ts|functions-observation.spec.ts|functions-wake.spec.ts|functions-rollback.spec.ts) test -f "$NEON_E2E_FUNCTIONS_MONITOR_FIXTURE" ;;
             database-owner.spec.ts) test -f "$NEON_E2E_CATALOG_OWNER_FIXTURE" ;;
             history-sharing.spec.ts) test -f "$NEON_E2E_SQL_SCRIPT_FIXTURE"; test -f "$NEON_E2E_CONSOLE_ACCOUNT_FIXTURE" ;;
-            storage-multipart.spec.ts|plan-comparison.spec.ts|history-delete.spec.ts|auth-security.spec.ts|s3-storage.spec.ts|storage-directory.spec.ts|sql-plan-tree.spec.ts|sql-xlsx.spec.ts|storage-copy-conditions.spec.ts|storage-copy.spec.ts|storage-metadata-edit.spec.ts|storage-browser-metadata.spec.ts|storage-presigned-upload.spec.ts|storage-bulk-delete.spec.ts|sql-script.spec.ts|sql-tools.spec.ts) test -f "$NEON_E2E_SQL_SCRIPT_FIXTURE" ;;
+            storage-multipart-administration.spec.ts|storage-multipart.spec.ts|plan-comparison.spec.ts|history-delete.spec.ts|auth-security.spec.ts|s3-storage.spec.ts|storage-directory.spec.ts|sql-plan-tree.spec.ts|sql-xlsx.spec.ts|storage-copy-conditions.spec.ts|storage-copy.spec.ts|storage-metadata-edit.spec.ts|storage-browser-metadata.spec.ts|storage-presigned-upload.spec.ts|storage-bulk-delete.spec.ts|sql-script.spec.ts|sql-tools.spec.ts) test -f "$NEON_E2E_SQL_SCRIPT_FIXTURE" ;;
             fractional-admission.spec.ts|fractional-cpu.spec.ts|query-history.spec.ts|shared-queries.spec.ts|auth-totp.spec.ts) test -f "$NEON_E2E_SQL_SCRIPT_FIXTURE" ;;
             auth-magic-link.spec.ts|auth-otp.spec.ts|auth-mail.spec.ts) test -f "$NEON_E2E_SQL_SCRIPT_FIXTURE"; test -f "$NEON_E2E_MAILBOX_FIXTURE" ;;
             backend-credentials.spec.ts|functions-metadata.spec.ts|ai-gateway.spec.ts|saved-queries.spec.ts) [[ "$NEON_E2E_CREDENTIAL_PROJECT" =~ ^prj_[a-f0-9]{16}$ ]] ;;
@@ -114,5 +114,5 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         # MFA DOM/trace failures may contain one-time setup/recovery material.
         # Retain that evidence only on the protected Linux runner.
-        if: always() && env.NEON_E2E_SUITE != 'console-mfa.spec.ts' && env.NEON_E2E_SUITE != 'history-policy.spec.ts' && env.NEON_E2E_SUITE != 'history-sharing.spec.ts' && env.NEON_E2E_SUITE != 'storage-multipart.spec.ts'
+        if: always() && env.NEON_E2E_SUITE != 'console-mfa.spec.ts' && env.NEON_E2E_SUITE != 'history-policy.spec.ts' && env.NEON_E2E_SUITE != 'history-sharing.spec.ts' && env.NEON_E2E_SUITE != 'storage-multipart.spec.ts' && env.NEON_E2E_SUITE != 'storage-multipart-administration.spec.ts'
         with: {name: live-ui-evidence, path: '${{ env.NEON_E2E_ARTIFACTS }}', retention-days: 30}
