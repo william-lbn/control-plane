@@ -1,74 +1,89 @@
-# 2026-10-16 当前交付：MFA、历史策略与单条删除
+# 2026-10-16 当前交付：共享执行历史与计划比较
 
 ## 1. 结论
 
-本地运行 API **0.40.0**、migration **035**、Chart **0.9.28**、控制面 Helm revision **95**。
-本次实现并按阶段验收 Console MFA、个人 SQL 历史采集/保留策略和单条手工删除。
-后端 Go、前端 React/TypeScript、元数据库 PostgreSQL；未修改 Neon Rust 源码。
-Python 只在维护者私有 SSH/证据传输中使用，不进入公共仓库或产品运行路径。
+本地运行 **API 0.41.1 / migration 036 / Chart 0.9.31 / Helm revision 98**，
+**97 paths / 139 operations**。本阶段新增项目共享执行历史和执行计划比较；前一阶段
+MFA、个人历史策略/删除记录见[0.40 交付](DELIVERY-2026-10-16-HISTORY-DELETION.md)。
 
-| 能力 | 实现 / 验收 | 边界 |
+| 功能 | 已完成并本地验收 | 独立边界 |
 |---|---|---|
-| Console MFA | TOTP、一次性恢复码、加密绑定、密码确认、防重放、会话撤销、旧版 INSERT 保护和真实 UI/PG | 组织强制、WebAuthn/SSO、完整恢复/攻击矩阵仍缺 |
-| 个人历史策略 | 采集开关、0/7/30/90 天保留、显式确认、版本/幂等、owner 隔离、到期清理与事务审计 | 默认保留全部；不清理进行中/未知结果；共享历史与人工定性仍缺 |
-| 单条历史删除 | 本人终态、UI 二次确认、Cookie/CSRF、并发重试、审计原子性，Compute 0 下真实 UI 验收 | 元数据 DELETE 非安全擦盘；不撤销 SQL、不删除备份/测试证据 |
+| 项目共享执行历史 Q02 | 默认私有、作者逐条确认、原密文引用、版本/幂等/审计、当前作者/读者授权、撤回/删除/到期失效、元数据分页、React UI | 不含密码/结果；不能收回已复制内容；当前 Console session only；不代表合规销毁 |
+| 计划比较 Q03 切片 | 真实 Explain/Analyze 的内存基线、成本/行数/实际指标差值、树路径观察、连接范围变化/重载清除、React UI | 不自动 SQL/Analyze，不调用模型、不声称单次耗时变化代表性能提升；AI SQL/建议仍缺 |
+| 跨组织深链接修复 | 与 Project 合同一致读取 org_id，使用前端 Project 类型；实际切换到项目组织后再操作 | 不更改服务端项目授权模型 |
 
-**官网全部功能和生产准入仍未完成**。未开发与部分实现/待验收分列于
-[35 项需求账本](REMAINING-REQUIREMENTS-2026-10-16.md)和[生产门槛](PRODUCTION-GATES.md)。
-本账本不是官网全部 SaaS 子功能的穷尽计数。详细合同见 [MFA](CONSOLE-MFA.md)、
-[历史策略](SQL-HISTORY-POLICY.md)、[单条删除](SQL-HISTORY-DELETION.md)。
+**整个产品、官网全部功能和生产准入仍未完成。** 逐项工程与独立验收门槛继续见
+[剩余需求账本](REMAINING-REQUIREMENTS-2026-10-16.md)和[生产门槛](PRODUCTION-GATES.md)。
+本次通过只关闭对应基础切片，不能理解为其余需求已经有完整代码。
 
-## 2. 当前部署与镜像来源
+## 2. 数据模型、API、UI 与部署
 
-当前合同 **94 paths / 135 operations**。API/Worker 与 Web 均来自不可变 Linux 本地快照
-`a715af6db9c2bd58c327798e2b9dafe562254c991d8366dc2f28480b53f240f5`，父 Git 为 `19558ec`；父提交不冒充运行源码。
+详细模型、API 错误/并发语义、流程图和手工复测步骤见
+[共享历史](SHARED-SQL-HISTORY.md)、[计划比较](SQL-PLAN-COMPARISON.md)及生成的
+[API 文档](API.md)。迁移 036 增加共享时间、版本和 metadata-only 幂等表，无默认共享、
+无 SQL 明文副本、无历史删除。本人删除/到期删除原记录时，关联共享引用同时失效。
 
-| 组件 | 实际本地 digest |
-|---|---|
-| API / Worker | `sha256:3eeedafc1dec74bc1fa9c38de1893b6f10d6ada89a0ebcbe662af6979970be65` |
-| Web | `sha256:72815df15d0d3e3033315d585ebcd2cdd6da032a7add7c759ff75362f94ddbf0` |
+Linux 本地 BuildKit 串行构建、三节点 checksum/digest 核对与 containerd 导入。
+父 Git 为 `72f4b29`，父提交不冒充运行源码。组织字段修复只更新 Web。随后 0.41.1 补齐闭合响应模型；三个 Go 执行文件与此前 UI 验收版本逐字节 SHA-256 相同，只更新合同工件，Web 镜像保持。
 
-Linux BuildKit 串行构建，逐节点 checksum/digest 核对并导入 containerd。其余组件沿用各自
-已接受镜像。升级前元数据库备份 SHA-256 为
-`76795b4ff50ce29aef7183a33f7f58bda0f95ec8828351a5220d6019f3bce136`；9 个 PVC、779 个既有非 Helm Secret UID 和
-其他六个 neon release manifest 保持。没有在 Windows 构建或执行 CI。
+| 组件 | 不可变源快照 SHA-256 | 实际本地 digest |
+|---|---|---|
+| API / Worker | `7efece48b3e3985721a3afc54f044596fb1e5a6a052cf2b575c8e585c9136a0c` | `sha256:6cf6978e8dd52f697fc59e8a543e3388456aa1b3b6551662035bf09de1d91a67` |
+| Web | `3588ba9c886554c780bcd8e019315d41a076bcec5c14b6d3077dcffaeea8ead3` | `sha256:80d9432ede5c51639d2fd555bf4f5ec6580ff5920e29d5f977e9bc3244a01605` |
 
-公开统一 Helm 0.1.31 源码候选仍锁 0.23.0 公共控制镜像；当前 0.40.0 是带本地精确
-image overrides 的独立 Chart 部署。完整公开镜像发行、匿名验证和统一版本锁更新
-仍是 O02，不声称默认下载旧锁即可复现最新功能。
+在测试续跑和文档更新后，逐文件核对当前 Go/契约与 API 快照、当前 Web 运行源码与
+Web 快照一致；后续变化限测试/文档。三次 Helm 升级均先备份元数据/values/manifest，
+保留 9 个 PVC、779 个既有非 Helm Secret UID 及其他六个 neon release manifest。
+最新备份 SHA-256：`0a2a846cdaca4b28390bd47837bf1729ad1f0ea5419f39e4ba2b74bed6aaf642`。
 
-## 3. 实际测试与失败记录
+当前是本地精确 image overrides 部署；公开镜像发行与统一 Helm 旧锁升级仍属 O02。
+公开统一 Helm 0.1.31 源码候选不能冒充已默认消费本地 0.41.0 镜像。
 
-- 前一阶段：两个 MFA Go race 测试、一个个人历史策略 Go race/PG 测试；MFA 累计
-  12 条与历史策略/补充因素验证 11 条 UI 账本通过。准确旧快照、原账号续测和 HTTP
-  UUID 修复见[0.39 阶段回执](DELIVERY-2026-10-16-MFA-HISTORY-POLICY.md)。
-- 新增删除：`TestSQLHistoryDeleteIsolationProtectionReplayAndAtomicAudit` 真实一次性
-  control_ci PostgreSQL/race 通过，覆盖项目/owner/API Key/CSRF、显式确认、未结束/
-  未知结果/缺回执保护、审计失败回滚、并发和重复 DELETE。vet 与三项 OpenAPI 合同
-  检查通过。首轮审计字段不符合已有模型，事务回滚后修正；失败证据保留。
-- TypeScript、Prettier、Vite 通过。对修改过的 API response decoder 单独执行五项测试，
-  含新 204 空响应与旧的损坏 JSON/权限/请求身份保护。新增 UI suite 分页变量补全显式
-  类型后通过；原类型失败保留。45 个受保护 suite 的声明/准入/文件存在检查通过。
-- 实际 Linux UI Job **publication-ui-20261015195624** 五项检查通过：记录原历史集合；通过页面一次无写入
-  SELECT 创建新记录；缩零后取消；确认只删除新记录且保留编辑器；重复 DELETE、
-  重载及 Compute 0。新记录原始详情先保存证据，原 **10** 条历史全部保留。
-  本次仅 **1** 次 SQL 请求，没有重跑旧功能全量套件。
+## 3. 真实验证
 
-三个阶段 UI 账本为 12 + 11 + 5，不冒充一次官网全量回归。新版本只重新验收新增路径
-和修改过的共享 decoder；旧功能按其已有版本回执保留，不能声称全产品已准入。
+### Go / 元数据 PG
 
-## 4. 数据、资源与复测
+新 `TestSQLHistorySharingConsentIsolationRevocationAndLifecycle` 在独立 control_ci
+PostgreSQL 与 race 下通过；补充同 key 并发请求只产生一个 generation/一条审计后
+再次通过。覆盖 owner/Editor/Viewer/外组织、API Key、默认私有、显式确认、版本冲突、
+旧重放不重启共享、作者停用/降权、读者降权、密钥缺失、审计失败回滚、分页隔离、
+原记录删除和到期撤回。vet 与三项 OpenAPI 合同检查通过。最终另在真实 PG 测试中对照实际 HTTP 字段与 closed/required schema，修复共享 allOf 叠加 closed 基类及个人新增字段遗漏；0.41.1 已部署。当前 Go 执行文件与 UI 验收版本完全一致，因此不重复运行整套 UI；不以 DB 租约冒充跨实例
+Compute 栅栏或 HA 验收。
 
-本批三个终态 UI/quality Job 均先归档描述/容器日志，再按 UID/resourceVersion 退休；
-一次性 PG 测试 Pod 也在各自回执中保留 UID/日志后退休。失败、源码、OCI、密码保护
-输入、原测试文件和所有原业务历史保持。SQL 新记录只通过被验收的产品功能删除，
-其原始内容仍在证据中。MFA/策略测试账号最终恢复 MFA 关闭、采集开启、保留全部。
+### Linux 前端与实际 UI
 
-最终检查 3 节点 Ready、无压力条件，87 个 Deployment/StatefulSet 达到各自期望副本，
-错误 Pod 0、托管 Compute VM 0。瞬时健康不等于 HA、物理独立或长期 SLO。
-私有 evidence 为 `control-plane/production/evidence/20261016-history-delete` 与前一阶段
-各根目录；不进入 Git。各阶段只清理已确认归属的运行资源，不删除原始测试证据。
+TypeScript/Prettier/Vite 通过，最终测试定位调整另做格式/类型检查，不重跑旧业务全集。
+四项新计划比较模型测试通过；47 个 UI suite 声明/准入/文件存在检查通过。
 
-完整手工步骤和 API/模型见三个功能合同及 [Linux 开发流程](LOCAL-LINUX-DEVELOPMENT.md)。
-只允许一次性 control_ci 做合成破坏性 Go 测试；真实浏览器使用受保护 owner fixture。
-失败核对同一原请求/历史 ID，不重新建 fixture 或盲目重发 SQL。
+- 共享历史 Job **publication-ui-20261015235003**，**8 条**检查通过：UI 临时单项目授权、一次真实
+  SELECT 的默认私有、作者确认、另一 Editor 实际加载、撤回/旧重放、权限撤回/恢复、
+  保留原私有历史、移除临时成员和 Compute 0。仅 **1 次**无写入 SQL。
+- 计划比较 Job **publication-ui-20261015235217**，**5 条**检查通过：真实 Explain 内存基线、第二计划
+  差值/结构、真实 Analyze 指标门槛及差值、清除/连接变化、重载无持久基线。仅
+  **4 次**用户主动只读 Explain/Analyze，随后 Compute 0。
+
+本阶段合计 13 条新 UI 检查，不冒充一次官网全量回归。其他功能保留各版本已验收
+记录；本批不反复执行 MFA 或旧业务套件。
+
+## 4. 原失败、恢复与资料
+
+首次 UI 在任何成员/SQL 修改前发现 Project `org_id` 与 Web `organization_id` 不一致；
+按正式合同修正并复用 Project 类型，只重建 Web。第二次在已确认临时单项目授权后，
+遇到 select 的 exact label 定位超时；原 SQL 请求数仍为 0。改用真实 combobox 角色，
+从原账号/原 checkpoint 接续，不创建新账号，不重复已有授权，不隐藏两次失败。
+测试 privateDir 类型收窄和维护者 formatter 路径错误也保留于私有日志。
+
+最终专用读者恢复原组织权限、临时项目/组织授权移除、密码/MFA 未改；新共享历史
+`qh_d869ac730e7def2f8bf0bb02` 最终保留为私有，所有原历史、SQL 回执、失败、源码
+快照和 OCI 保留。原始材料位于维护者私有
+`control-plane/production/evidence/20261016-history-sharing`，不随公共源上传。
+共享 suite 的原始 DOM/trace 不上传 GitHub artifact；公开源不包含密码或 Python 运维脚本。
+
+终态 Job/Pod 先留描述、容器日志，再按 UID/resourceVersion 退休；一次性 PG Pod 已在
+各自回执中退休。最终只读资源回执记录节点、控制面期望副本、错误 Pod 与 Compute 0。
+节点瞬时健康不代表物理故障域独立、HA/DR 或长期 SLO 已达标。
+
+## 5. 下一阶段
+
+继续 S3 multipart 的实现与实际 SDK/UI 验证，再推进大对象/安全 GC、Functions 和
+其余 Auth/生命周期/分布式工程门槛。不能把阶段提交当成整个任务完成。

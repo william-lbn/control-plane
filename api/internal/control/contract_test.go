@@ -74,7 +74,11 @@ func TestOpenAPIRouteParity(t *testing.T) {
 
 func loadOpenAPI(t *testing.T) map[string]any {
 	t.Helper()
-	data, err := os.ReadFile("../../../contracts/openapi-v1.json")
+	filename := os.Getenv("NEON_V2_TEST_OPENAPI_FILE")
+	if filename == "" {
+		filename = "../../../contracts/openapi-v1.json"
+	}
+	data, err := os.ReadFile(filename)
 	if err != nil {
 		t.Fatal(err)
 	}

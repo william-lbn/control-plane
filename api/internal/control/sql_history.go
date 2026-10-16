@@ -102,7 +102,7 @@ type sqlHistoryCursor struct {
 	ID      string    `json:"id"`
 }
 
-const sqlHistoryColumns = `id,project_id,owner_id,endpoint_id,branch_id,mode,database_name,role_name,original_bytes,truncated,outcome,sqlstate,started_at,finished_at,deadline_at,duration_ms,(finished_at IS NULL AND deadline_at<now()) AS completion_unconfirmed`
+const sqlHistoryColumns = `id,project_id,owner_id,endpoint_id,branch_id,mode,database_name,role_name,original_bytes,truncated,outcome,sqlstate,started_at,finished_at,deadline_at,duration_ms,(finished_at IS NULL AND deadline_at<now()) AS completion_unconfirmed,shared_at,share_generation::text AS sharing_version_token`
 
 // Personal SQL text remains owner-only, including against another project admin.
 // Metadata reads have no data-plane/SQL connection and cannot wake Compute.

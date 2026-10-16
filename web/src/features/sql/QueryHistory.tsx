@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { api, projectPath } from '../../api';
 import { HistoryPolicy } from '../identity/HistoryPolicy';
-type Entry = {
+import { HistorySharingPanel, SharedHistory } from './SharedHistory';
+export type Entry = {
   id: string;
   endpoint_id: string;
   branch_id: string;
@@ -16,6 +17,8 @@ type Entry = {
   truncated: boolean;
   original_bytes: number;
   completion_unconfirmed: boolean;
+  shared_at: string | null;
+  sharing_version_token: string;
 };
 export function QueryHistory({
   projectId,
@@ -33,6 +36,7 @@ export function QueryHistory({
     [enabled, setEnabled] = useState(false),
     [busy, setBusy] = useState(false),
     [deleting, setDeleting] = useState<string | null>(null),
+    [sharing, setSharing] = useState<Entry | null>(null),
     [notice, setNotice] = useState('');
   useEffect(() => {
     epoch.current++;
@@ -41,6 +45,7 @@ export function QueryHistory({
     setCursor(null);
     setNotice('');
     setDeleting(null);
+    setSharing(null);
     setBusy(true);
     api<{ enabled: boolean; items: Entry[]; next_cursor: string | null }>(base)
       .then((v) => {
@@ -149,6 +154,27 @@ export function QueryHistory({
             <summary>管理本账号的历史采集与保留</summary>
             <HistoryPolicy />
           </details>
+          {sharing && (
+            <HistorySharingPanel
+              key={sharing.id}
+              projectId={projectId}
+              historyId={sharing.id}
+              onClose={() => setSharing(null)}
+              onChanged={(value) =>
+                setItems((old) =>
+                  old.map((item) =>
+                    item.id === value.history_id
+                      ? {
+                          ...item,
+                          shared_at: value.shared_at,
+                          sharing_version_token: value.version_token,
+                        }
+                      : item,
+                  ),
+                )
+              }
+            />
+          )}
           {deleting && (
             <div className="notice" role="group" aria-label="确认删除历史记录">
               <p>
@@ -209,6 +235,17 @@ export function QueryHistory({
                       <button
                         className="button"
                         disabled={busy || !canDelete(entry)}
+                        aria-label={'管理历史共享 ' + entry.id}
+                        onClick={() => {
+                          setDeleting(null);
+                          setSharing(entry);
+                        }}
+                      >
+                        {entry.shared_at ? '已共享 · 管理' : '共享到项目'}
+                      </button>
+                      <button
+                        className="button"
+                        disabled={busy || !canDelete(entry)}
                         aria-label={'删除历史 ' + entry.id}
                         title={
                           canDelete(entry) ? '删除本人历史记录' : '保留进行中或结果未确认的记录'
@@ -236,6 +273,7 @@ export function QueryHistory({
           {notice}
         </p>
       )}
+      {enabled && <SharedHistory key={projectId} projectId={projectId} onLoad={onLoad} />}
     </section>
   );
 }

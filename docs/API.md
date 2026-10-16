@@ -1,7 +1,7 @@
 # 实际 API 合同
 
 OpenAPI 3 合同的权威源是 [openapi-v1.json](../contracts/openapi-v1.json)。
-版本 0.40.0，94 个路径、135 个操作，全部拥有稳定且唯一的 operationId。
+版本 0.41.1，97 个路径、139 个操作，全部拥有稳定且唯一的 operationId。
 运行 Swagger 位于 `/api/docs`，JSON 位于 `/api/openapi.json`。
 本合同是自托管 `/api/v1`，不声称兼容 Neon SaaS `/api/v2`。
 
@@ -159,6 +159,10 @@ request_id/operation_id/error_code，再由显式 retry 接口恢复可重试操
 | GET | `/api/v1/account/query-history-policy` | `getOwnSQLHistoryPolicy` | 200 |
 | PATCH | `/api/v1/account/query-history-policy` | `updateOwnSQLHistoryPolicy` | 200 |
 | POST | `/api/v1/account/query-history-cleanup` | `cleanupOwnExpiredSQLHistory` | 200 |
+| GET | `/api/v1/projects/{project}/query-history/{history}/sharing` | `getPersonalSQLHistorySharing` | 200 |
+| PUT | `/api/v1/projects/{project}/query-history/{history}/sharing` | `putPersonalSQLHistorySharing` | 200 |
+| GET | `/api/v1/projects/{project}/shared-query-history` | `listProjectSharedSQLHistory` | 200 |
+| GET | `/api/v1/projects/{project}/shared-query-history/{history}` | `getProjectSharedSQLHistory` | 200 |
 
 ## 3. 实现映射与演进
 

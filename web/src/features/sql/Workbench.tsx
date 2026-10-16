@@ -8,6 +8,7 @@ import { ResultExports } from './ResultExports';
 import { SavedQueries } from './SavedQueries';
 import { QueryHistory } from './QueryHistory';
 import { QueryPlan } from './QueryPlan';
+import { PlanComparison } from './PlanComparison';
 
 export function Workbench({
   projectId,
@@ -300,6 +301,18 @@ export function Workbench({
           <ResultExports result={result} />
         </div>
       )}
+      <PlanComparison
+        key={JSON.stringify([projectId, endpoint?.id, role, database])}
+        current={
+          planResult && planResult.result === result
+            ? {
+                rows: planResult.result.rows,
+                analyzed: planResult.analyzed,
+                sequence: planResult.sequence,
+              }
+            : null
+        }
+      />
       {scriptResult && <ScriptResults result={scriptResult} />}
       <QueryHistory
         projectId={projectId}

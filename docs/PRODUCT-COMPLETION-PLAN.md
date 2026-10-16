@@ -2,7 +2,7 @@
 
 ## 1. 本轮约束
 
-当前 Linux 本地批次已推进到 API 0.40.0、migration 035、Chart 0.9.28、Helm revision 95。最新已完成 Console MFA、个人 SQL 历史采集/保留策略和单条删除，真实 Linux UI/PG、失败续测、镜像来源和资源退休见[当前交付](DELIVERY-2026-10-16-CURRENT.md)。完整的待开发/待验收内容按 35 项列于[剩余需求账本](REMAINING-REQUIREMENTS-2026-10-16.md)。
+当前 Linux 本地批次已推进到 API 0.41.1、migration 036、Chart 0.9.31、Helm revision 98。最新已完成项目共享执行历史和计划比较，保留此前 Console MFA、个人 SQL 历史采集/保留策略和单条删除回执，真实 Linux UI/PG、失败续测、镜像来源和资源退休见[当前交付](DELIVERY-2026-10-16-CURRENT.md)。完整的待开发/待验收内容按 35 项列于[剩余需求账本](REMAINING-REQUIREMENTS-2026-10-16.md)。
 
 后续优先未完成的 Functions WS/触发器/客户日志、S3 multipart/大对象/安全 GC、Auth 高级服务与组织安全、目录/生命周期、跨实例外部栅栏、HA/DR 和可信 TLS。个人 MFA 与保留策略的通过不关闭这些独立门槛。继续使用 Linux 本地构建、串行 UI、原 fixture 与精确源码快照，只重跑具体受影响的路径。
 下方带日期段落是历史增量，不覆盖本节当前状态。

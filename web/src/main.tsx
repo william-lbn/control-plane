@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { api, ApiError, route } from './api';
-import type { Capabilities, User, Organization, Page } from './api';
+import type { Capabilities, User, Organization, Page, Project } from './api';
 import { short } from './shared/ui';
 import { Projects, ProjectWorkspace } from './features/projects/Projects';
 import { Organizations } from './features/identity/Organizations';
@@ -69,12 +69,11 @@ function App() {
   useEffect(() => {
     let cancelled = false;
     if (user && projectId && organizationsLoaded)
-      api<{ organization_id: string }>(`/api/v1/projects/${encodeURIComponent(projectId)}`)
+      api<Pick<Project, 'org_id'>>(`/api/v1/projects/${encodeURIComponent(projectId)}`)
         .then((project) => {
-          if (cancelled || !organizations.some((item) => item.id === project.organization_id))
-            return;
-          setOrganizationId(project.organization_id);
-          sessionStorage.setItem(`neon_v2_org_${user.id}`, project.organization_id);
+          if (cancelled || !organizations.some((item) => item.id === project.org_id)) return;
+          setOrganizationId(project.org_id);
+          sessionStorage.setItem(`neon_v2_org_${user.id}`, project.org_id);
         })
         .catch(() => {}); // ProjectWorkspace renders the authorized resource error.
     return () => {

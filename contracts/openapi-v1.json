@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.40.0",
+    "version": "0.41.1",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -3852,7 +3852,9 @@
           "deadline_at",
           "finished_at",
           "duration_ms",
-          "completion_unconfirmed"
+          "completion_unconfirmed",
+          "shared_at",
+          "sharing_version_token"
         ],
         "properties": {
           "id": {
@@ -3930,6 +3932,17 @@
           },
           "completion_unconfirmed": {
             "type": "boolean"
+          },
+          "shared_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "sharing_version_token": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
           }
         }
       },
@@ -3954,7 +3967,9 @@
           "finished_at",
           "duration_ms",
           "completion_unconfirmed",
-          "sql"
+          "sql",
+          "shared_at",
+          "sharing_version_token"
         ],
         "properties": {
           "id": {
@@ -4037,6 +4052,17 @@
             "type": "string",
             "maxLength": 9216,
             "description": "UTF-8 bytes <=9 KiB including truncation marker. Owner detail only, no passwords/results."
+          },
+          "shared_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "sharing_version_token": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
           }
         }
       },
@@ -4381,6 +4407,315 @@
           "batch_limit",
           "more_possible"
         ]
+      },
+      "SQLHistorySharing": {
+        "type": "object",
+        "required": [
+          "history_id",
+          "is_shared",
+          "version_token",
+          "shared_at"
+        ],
+        "properties": {
+          "history_id": {
+            "type": "string"
+          },
+          "is_shared": {
+            "type": "boolean"
+          },
+          "version_token": {
+            "type": "string"
+          },
+          "shared_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "SQLHistorySharingInput": {
+        "type": "object",
+        "required": [
+          "shared"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "shared": {
+            "type": "boolean"
+          },
+          "acknowledge_sensitive_sql_sharing": {
+            "type": "boolean",
+            "description": "Must be true to expose SQL text and execution metadata to current project SQL editors."
+          }
+        }
+      },
+      "SharedSQLHistoryDetail": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "project_id",
+          "owner_id",
+          "endpoint_id",
+          "branch_id",
+          "mode",
+          "database_name",
+          "role_name",
+          "original_bytes",
+          "truncated",
+          "outcome",
+          "sqlstate",
+          "started_at",
+          "deadline_at",
+          "finished_at",
+          "duration_ms",
+          "completion_unconfirmed",
+          "sql",
+          "shared_at",
+          "sharing_version_token",
+          "owner_username"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^qh_[a-f0-9]{24}$"
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "owner_id": {
+            "type": "string"
+          },
+          "endpoint_id": {
+            "type": "string"
+          },
+          "branch_id": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "single",
+              "script"
+            ]
+          },
+          "database_name": {
+            "type": "string"
+          },
+          "role_name": {
+            "type": "string"
+          },
+          "original_bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 32000
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "admitted",
+              "completed",
+              "failed",
+              "not_submitted",
+              "outcome_unknown"
+            ]
+          },
+          "sqlstate": {
+            "type": "string",
+            "pattern": "^([A-Z0-9]{5})?$"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deadline_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "duration_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "completion_unconfirmed": {
+            "type": "boolean"
+          },
+          "sql": {
+            "type": "string",
+            "maxLength": 9216,
+            "description": "UTF-8 bytes <=9 KiB including truncation marker. Owner detail only, no passwords/results."
+          },
+          "shared_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sharing_version_token": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "owner_username": {
+            "type": "string"
+          }
+        }
+      },
+      "SharedSQLHistoryPage": {
+        "type": "object",
+        "required": [
+          "enabled",
+          "items",
+          "limit",
+          "next_cursor"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SharedSQLHistoryEntry"
+            }
+          },
+          "limit": {
+            "type": "integer",
+            "const": 25
+          },
+          "next_cursor": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "SharedSQLHistoryEntry": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "project_id",
+          "owner_id",
+          "endpoint_id",
+          "branch_id",
+          "mode",
+          "database_name",
+          "role_name",
+          "original_bytes",
+          "truncated",
+          "outcome",
+          "sqlstate",
+          "started_at",
+          "deadline_at",
+          "finished_at",
+          "duration_ms",
+          "completion_unconfirmed",
+          "shared_at",
+          "sharing_version_token",
+          "owner_username"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^qh_[a-f0-9]{24}$"
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "owner_id": {
+            "type": "string"
+          },
+          "endpoint_id": {
+            "type": "string"
+          },
+          "branch_id": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "single",
+              "script"
+            ]
+          },
+          "database_name": {
+            "type": "string"
+          },
+          "role_name": {
+            "type": "string"
+          },
+          "original_bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 32000
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "admitted",
+              "completed",
+              "failed",
+              "not_submitted",
+              "outcome_unknown"
+            ]
+          },
+          "sqlstate": {
+            "type": "string",
+            "pattern": "^([A-Z0-9]{5})?$"
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "deadline_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "duration_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          },
+          "completion_unconfirmed": {
+            "type": "boolean"
+          },
+          "shared_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "sharing_version_token": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "owner_username": {
+            "type": "string"
+          }
+        }
       }
     },
     "responses": {
@@ -17014,6 +17349,332 @@
                 "$ref": "#/components/schemas/SQLHistoryCleanupInput"
               }
             }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/query-history/{history}/sharing": {
+      "get": {
+        "operationId": "getPersonalSQLHistorySharing",
+        "tags": [
+          "SQL"
+        ],
+        "summary": "Owner reads explicit per-entry sharing state",
+        "description": "Console session; current project Editor+ required. no-store. API keys rejected. No Compute startup or SQL execution. Owner reads explicit per-entry sharing state",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "history",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^qh_[a-f0-9]{24}$"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Owner reads explicit per-entry sharing state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SQLHistorySharing"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "put": {
+        "operationId": "putPersonalSQLHistorySharing",
+        "tags": [
+          "SQL"
+        ],
+        "summary": "Owner explicitly shares or revokes one confirmed terminal journal entry. Durable metadata-only replay never re-applies an old policy; re-read current state after replay. Non-terminal sharing returns 409. Operator opt-out blocks new sharing but allows revocation.",
+        "description": "Console session; current project Editor+ required. no-store. API keys rejected. No Compute startup or SQL execution. Owner explicitly shares or revokes one confirmed terminal journal entry. Durable metadata-only replay never re-applies an old policy; re-read current state after replay. Non-terminal sharing returns 409. Operator opt-out blocks new sharing but allows revocation.",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "history",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^qh_[a-f0-9]{24}$"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"[0-9]+\"$"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Owner explicitly shares or revokes one confirmed terminal journal entry. Durable metadata-only replay never re-applies an old policy; re-read current state after replay. Non-terminal sharing returns 409. Operator opt-out blocks new sharing but allows revocation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SQLHistorySharing"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SQLHistorySharingInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/shared-query-history": {
+      "get": {
+        "operationId": "listProjectSharedSQLHistory",
+        "tags": [
+          "SQL"
+        ],
+        "summary": "List explicitly shared metadata with current author membership/grant and disabled-user recheck. Keyset cursor is bound to project and reader; text is not included.",
+        "description": "Console session; current project Editor+ required. no-store. API keys rejected. No Compute startup or SQL execution. List explicitly shared metadata with current author membership/grant and disabled-user recheck. Keyset cursor is bound to project and reader; text is not included.",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "maxLength": 1024
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List explicitly shared metadata with current author membership/grant and disabled-user recheck. Keyset cursor is bound to project and reader; text is not included.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedSQLHistoryPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/shared-query-history/{history}": {
+      "get": {
+        "operationId": "getProjectSharedSQLHistory",
+        "tags": [
+          "SQL"
+        ],
+        "summary": "Read explicitly shared SQL using original author envelope AAD. Revocation, deletion, retention, disabled author or lost author/reader access deny subsequent reads. Already copied data cannot be recalled.",
+        "description": "Console session; current project Editor+ required. no-store. API keys rejected. No Compute startup or SQL execution. Read explicitly shared SQL using original author envelope AAD. Revocation, deletion, retention, disabled author or lost author/reader access deny subsequent reads. Already copied data cannot be recalled.",
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "history",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^qh_[a-f0-9]{24}$"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Read explicitly shared SQL using original author envelope AAD. Revocation, deletion, retention, disabled author or lost author/reader access deny subsequent reads. Already copied data cannot be recalled.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedSQLHistoryDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
         }
       }
