@@ -51,7 +51,7 @@ jobs:
           NEON_CI_ATTEMPT: run_${{ github.run_id }}_${{ github.run_attempt }}
           NEON_DATA_API_TEST_POSTGREST: ${{ runner.temp }}/neon-postgrest/postgrest
         run: bash tools/ci-go.sh
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with: {name: go-evidence, path: artifacts/go-*, retention-days: 30}
   web:
@@ -80,7 +80,7 @@ jobs:
       - run: echo "$RUNNER_TEMP/neon-helm" >> "$GITHUB_PATH"
       - run: npm ci --prefix tools --ignore-scripts --no-audit --fund=false
       - run: bash tools/ci-helm.sh
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with: {name: helm-packages-and-gates, path: artifacts/helm, retention-days: 30}
   auth:
@@ -192,5 +192,5 @@ jobs:
         run: |
           mkdir -p artifacts
           node --input-type=module -e 'import fs from "node:fs"; fs.writeFileSync("artifacts/image-"+process.env.COMPONENT+".json", JSON.stringify({component:process.env.COMPONENT,commit:process.env.GITHUB_SHA,digest:process.env.DIGEST,tags:process.env.TAGS.split("\n"),platform:"linux/amd64"},null,2)+"\n")'
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with: {name: 'image-${{ matrix.component }}', path: artifacts/image-*.json, retention-days: 90}
