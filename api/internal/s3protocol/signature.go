@@ -191,7 +191,14 @@ func (s Signature) Verify(r *http.Request, body []byte, secret, region string) e
 		// Limit this exception to bounded XML configuration, never object PUT.
 		checksum := md5.Sum(body)
 		cors := r.Method == http.MethodPut && r.URL.Query().Has("cors") && len(body) > 0 && len(body) <= 65536 && r.Header.Get("X-Amz-Copy-Source") == "" && strings.Contains(";"+s.Headers+";", ";content-md5;") && r.Header.Get("Content-MD5") == base64.StdEncoding.EncodeToString(checksum[:])
-		if !upload && !cors && ((!read && !copy) || len(body) != 0) {
+		// Actual S3 SDKs use UNSIGNED-PAYLOAD for bodyless initiate/abort.
+		// The canonical signature still binds method, upload ID, path and all
+		// metadata. No bytes or general POST/DELETE are admitted by this case.
+		q := r.URL.Query()
+		multipartControl := !s.Presigned && len(body) == 0 && r.Header.Get("X-Amz-Copy-Source") == "" &&
+			((r.Method == http.MethodPost && q.Has("uploads") && q.Get("uploads") == "" && !q.Has("uploadId")) ||
+				(r.Method == http.MethodDelete && q.Get("uploadId") != "" && !q.Has("uploads") && !q.Has("partNumber")))
+		if !upload && !cors && !multipartControl && ((!read && !copy) || len(body) != 0) {
 			return ErrSignature
 		}
 	} else if !digestPattern.MatchString(payload) || !hmac.Equal([]byte(payload), []byte(Hash(body))) {

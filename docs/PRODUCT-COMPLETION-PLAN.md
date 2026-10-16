@@ -2,7 +2,7 @@
 
 ## 1. 本轮约束
 
-当前 Linux 本地批次已推进到 API 0.41.1、migration 036、Chart 0.9.31、Helm revision 98。最新已完成项目共享执行历史和计划比较，保留此前 Console MFA、个人 SQL 历史采集/保留策略和单条删除回执，真实 Linux UI/PG、失败续测、镜像来源和资源退休见[当前交付](DELIVERY-2026-10-16-CURRENT.md)。完整的待开发/待验收内容按 35 项列于[剩余需求账本](REMAINING-REQUIREMENTS-2026-10-16.md)。
+当前 Linux 本地批次已推进到 API 0.42.0、migration 036、Chart 0.9.32、Helm revision 100。最新已完成项目共享执行历史和计划比较，保留此前 Console MFA、个人 SQL 历史采集/保留策略和单条删除回执，真实 Linux UI/PG、失败续测、镜像来源和资源退休见[当前交付](DELIVERY-2026-10-16-CURRENT.md)。完整的待开发/待验收内容按 35 项列于[剩余需求账本](REMAINING-REQUIREMENTS-2026-10-16.md)。
 
 后续优先未完成的 Functions WS/触发器/客户日志、S3 multipart/大对象/安全 GC、Auth 高级服务与组织安全、目录/生命周期、跨实例外部栅栏、HA/DR 和可信 TLS。个人 MFA 与保留策略的通过不关闭这些独立门槛。继续使用 Linux 本地构建、串行 UI、原 fixture 与精确源码快照，只重跑具体受影响的路径。
 下方带日期段落是历史增量，不覆盖本节当前状态。
@@ -137,3 +137,5 @@ Functions HTTP/SSE、自动零/一次冷醒、Auth 密码/会话、S3 基础 SDK
 源/镜像/Helm 锁、失败恢复、原对象和剩余门槛见当前交付。本地先完成 Auth 邮件验证、
 找回、Email OTP/Magic Link 和管理流程；公网与外部送信后置。MFA 在官方 roadmap
 仍为 coming soon，本项目既定 MFA 也须独立实现，不能用当前会话安全代替。
+
+有界 multipart 已通过原用例 UI 续传和七类实际 SDK 操作，见[本次交付](DELIVERY-2026-10-16-CURRENT.md)与[合同](OBJECT-STORAGE-MULTIPART.md)。8 MiB 上限、大对象、GC、跨凭据接管及独立 Storage gateway 等门槛仍保留。

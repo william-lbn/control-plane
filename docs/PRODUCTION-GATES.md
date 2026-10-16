@@ -1,6 +1,6 @@
 # 生产门槛与官网对齐
 
-状态截至 2026-10-16；API 0.41.1 / migration 036 / Chart 0.9.31 / Helm revision 98。Console MFA、个人 SQL 历史采集/保留策略和单条删除已有 Linux Go/PG 与真实 UI 回执，见[当前交付](DELIVERY-2026-10-16-CURRENT.md)。[剩余需求账本](REMAINING-REQUIREMENTS-2026-10-16.md)区分未开发、部分实现和独立验收门槛。运行镜像按本地快照留证；公开统一 Helm 0.1.31 源码候选仍锁 0.23.0 公共控制镜像，不能冒充本地 0.41.1 发行。
+状态截至 2026-10-16；API 0.42.0 / migration 036 / Chart 0.9.32 / Helm revision 100。Console MFA、个人 SQL 历史采集/保留策略和单条删除已有 Linux Go/PG 与真实 UI 回执，见[当前交付](DELIVERY-2026-10-16-CURRENT.md)。[剩余需求账本](REMAINING-REQUIREMENTS-2026-10-16.md)区分未开发、部分实现和独立验收门槛。运行镜像按本地快照留证；公开统一 Helm 0.1.31 源码候选仍锁 0.23.0 公共控制镜像，不能冒充本地 0.42.0 发行。
 前一版本 `be04cb4` 的真实 Linux/React 闭环见 [Auth/S3 交付](DELIVERY-2026-10-14-AUTH-S3.md)：
 788 Go/真实 PostgreSQL 检查、八个同源公开镜像、三节点 24 次串行 digest 导入；
 应用密码/会话十组 UI，以及实际 S3 SDK 签名/字节/权限/轮换/撤销/正常缩零均通过。
@@ -84,3 +84,5 @@ Linux 真实场景正反例 + 恢复证据共同验收。
 ## 2026-10-15：SQL 工作台新增闭环
 
 XLSX 与 Explain/Analyze 基础树形计划各四项真实 Linux UI 通过，版本和源码见 [交付](DELIVERY-2026-10-15-SQL-EXPORT-PLAN.md)。个人保留/到期记录删除已有独立本地验收；单条手工删除已在 0.40.0 验收；项目共享历史及基础计划比较已在 0.41.0 验收；AI SQL/自动建议仍未完成；个人加密历史和已保存共享草稿不能代替这些能力。
+
+有界 multipart 已通过原用例 UI 续传和七类实际 SDK 操作，见[本次交付](DELIVERY-2026-10-16-CURRENT.md)与[合同](OBJECT-STORAGE-MULTIPART.md)。8 MiB 上限、大对象、GC、跨凭据接管及独立 Storage gateway 等门槛仍保留。

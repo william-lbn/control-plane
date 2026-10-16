@@ -1,89 +1,82 @@
-# 2026-10-16 当前交付：共享执行历史与计划比较
+# 2026-10-16 当前交付：S3 分段上传与原用例续传验收
 
 ## 1. 结论
 
-本地运行 **API 0.41.1 / migration 036 / Chart 0.9.31 / Helm revision 98**，
-**97 paths / 139 operations**。本阶段新增项目共享执行历史和执行计划比较；前一阶段
-MFA、个人历史策略/删除记录见[0.40 交付](DELIVERY-2026-10-16-HISTORY-DELETION.md)。
+本地运行 **API 0.42.0 / 控制元数据库 migration 036 / Chart 0.9.32 /
+Helm revision 100**，**101 paths / 145 operations**。分段表由受控 Storage Driver
+在分支数据库增量安装，不新增控制元库 migration。已实现并验收的基础切片：
 
-| 功能 | 已完成并本地验收 | 独立边界 |
+| 项目 | 现场结果 | 边界 |
 |---|---|---|
-| 项目共享执行历史 Q02 | 默认私有、作者逐条确认、原密文引用、版本/幂等/审计、当前作者/读者授权、撤回/删除/到期失效、元数据分页、React UI | 不含密码/结果；不能收回已复制内容；当前 Console session only；不代表合规销毁 |
-| 计划比较 Q03 切片 | 真实 Explain/Analyze 的内存基线、成本/行数/实际指标差值、树路径观察、连接范围变化/重载清除、React UI | 不自动 SQL/Analyze，不调用模型、不声称单次耗时变化代表性能提升；AI SQL/建议仍缺 |
-| 跨组织深链接修复 | 与 Project 合同一致读取 org_id，使用前端 Project 类型；实际切换到项目组织后再操作 | 不更改服务端项目授权模型 |
+| Console multipart | 创建、第二片中断、重载原上传续传、跳过已确认第一片、完整下载、中止 | 文件仍限 8 MiB，UI 使用 5 MiB 串行分片，新对象条件发布 |
+| 实际 S3 SDK | Create、UploadPart、UploadPartCopy、ListMultipartUploads、ListParts、Complete、Abort 均通过；非连续分片号/分页、来源范围、完整字节/摘要/metadata 核验 | 当前 credential/branch 绑定；未实现跨凭据接管、multipart delimiter 和进阶 checksums |
+| 原子发布和重试 | 真实 PostgreSQL 约束故障同时回滚目录/回执；原完成重试不覆盖后来对象；创建幂等、中止和账号/分支隔离 | Blob 不可变字节保留；失败/覆盖/中止不等于物理擦除 |
+| 运行资源 | 专用凭据从 UI 撤销；服务回到测试前 disabled；Compute 0；5 个终态 Job 按 UID 留证退休 | 历史 fixture、业务对象、原失败、源码/OCI 和日志全部保留 |
 
-**整个产品、官网全部功能和生产准入仍未完成。** 逐项工程与独立验收门槛继续见
-[剩余需求账本](REMAINING-REQUIREMENTS-2026-10-16.md)和[生产门槛](PRODUCTION-GATES.md)。
-本次通过只关闭对应基础切片，不能理解为其余需求已经有完整代码。
+**官网全部功能和生产准入仍未完成。** 本次交付是 S01 有界基础切片，不把 8 MiB
+上传称为官网 5 GiB 能力，不关闭大对象、GC、Storage 运维接管或全链路 TLS 门槛。
+[剩余账本](REMAINING-REQUIREMENTS-2026-10-16.md)继续逐项实施。上一批共享历史与
+计划比较见[独立交付](DELIVERY-2026-10-16-SHARED-HISTORY.md)，不重复旧 UI 套件。
 
-## 2. 数据模型、API、UI 与部署
+## 2. 代码、API、模型和手工步骤
 
-详细模型、API 错误/并发语义、流程图和手工复测步骤见
-[共享历史](SHARED-SQL-HISTORY.md)、[计划比较](SQL-PLAN-COMPARISON.md)及生成的
-[API 文档](API.md)。迁移 036 增加共享时间、版本和 metadata-only 幂等表，无默认共享、
-无 SQL 明文副本、无历史删除。本人删除/到期删除原记录时，关联共享引用同时失效。
+[分段上传合同](OBJECT-STORAGE-MULTIPART.md)包含总览、组件、SQL 模型、状态图、
+时序图、并发/失败语义、六个 Console 操作和手工复测。机器合同见
+[OpenAPI](../contracts/openapi-v1.json)，[API 索引](API.md)由实际合同在 Linux 生成。
+UI 采用当前 React/TypeScript，产品后端为 Go；未向公开仓库加入 Python 运维/验证。
+本阶段未修改原 Neon Rust 或 Autoscaling 内核代码。
 
-Linux 本地 BuildKit 串行构建、三节点 checksum/digest 核对与 containerd 导入。
-父 Git 为 `72f4b29`，父提交不冒充运行源码。组织字段修复只更新 Web。随后 0.41.1 补齐闭合响应模型；三个 Go 执行文件与此前 UI 验收版本逐字节 SHA-256 相同，只更新合同工件，Web 镜像保持。
+`multipart_uploads` 与 `multipart_parts` 在原分支 SQL 数据库内。发布对象和完成
+回执在一次目录事务提交，避免跨库 COMMIT 间隙；同一目录 advisory lock 与现有
+PUT/COPY/DELETE 共用。S3 adapter 先验证 SigV4、当前 credential 和 scope；Console
+走当前项目 Editor、session/CSRF 与 branch/user 绑定。新分支不接管父分支在途上传。
 
-| 组件 | 不可变源快照 SHA-256 | 实际本地 digest |
-|---|---|---|
-| API / Worker | `7efece48b3e3985721a3afc54f044596fb1e5a6a052cf2b575c8e585c9136a0c` | `sha256:6cf6978e8dd52f697fc59e8a543e3388456aa1b3b6551662035bf09de1d91a67` |
-| Web | `3588ba9c886554c780bcd8e019315d41a076bcec5c14b6d3077dcffaeea8ead3` | `sha256:80d9432ede5c51639d2fd555bf4f5ec6580ff5920e29d5f977e9bc3244a01605` |
+## 3. 精确构建和部署
 
-在测试续跑和文档更新后，逐文件核对当前 Go/契约与 API 快照、当前 Web 运行源码与
-Web 快照一致；后续变化限测试/文档。三次 Helm 升级均先备份元数据/values/manifest，
-保留 9 个 PVC、779 个既有非 Helm Secret UID 及其他六个 neon release manifest。
-最新备份 SHA-256：`0a2a846cdaca4b28390bd47837bf1729ad1f0ea5419f39e4ba2b74bed6aaf642`。
+所有构建/测试在 Linux 串行执行，使用固定 builder 和缓存。没有等待 GitHub CI，
+没有为本阶段重复打包不相关的六个服务组件。首次构建 API/Web/SDK，签名兼容修复
+只更新 API/Worker 和同源 SDK probe，已验收 Web digest 保持。
 
-当前是本地精确 image overrides 部署；公开镜像发行与统一 Helm 旧锁升级仍属 O02。
-公开统一 Helm 0.1.31 源码候选不能冒充已默认消费本地 0.41.0 镜像。
+- 父 Git 提交 `63456a7ff01631e2106f3a18300515cb33aaf2cc`；它是父提交，实际运行输入由下列快照界定。
+- API/Worker 输入 SHA-256：`426bd67931e9e02c2bb9c17aae8bc930def874e98a68faae368dff20b45bd070`。
+- API/Worker 镜像：`neon.local/control-api@sha256:7072414f678d7c6350c31ab43e42cb2682b2a2694da227371915f67e5a40a792`。
+- Web 输入 SHA-256：`24fc4e901123571bae346e5ed7f87d5799fad9d55c46c505738a528fbff35de6`。
+- Web 镜像：`neon.local/control-web@sha256:8bcd4ab3de87665e2356bf72308af5810e58aed68d93de103aad7e3e4e75b8d9`。
+- SDK probe 与最终 API 候选同一快照，二进制 SHA-256：`9de418e703085bf11584bee2a24528af110be4437b26396e42eb3c2d2b868c5a`。
 
-## 3. 真实验证
+两次 Helm 升级各自先保存元数据/values/manifest；最后 metadata backup SHA-256：
+`9ff5b5c6503d2d5dc78537ebb921aa4fe70a534a0e1d07c5c17c4ad27a4c8f5f`。9 个 PVC、全部既有 Secret UID 与其他六个 Neon
+发布保持。最终依 Docker COPY 输入重新核验 API/Web 源码摘要一致；文档和 test-only
+续测改动独立记录，不冒充运行时代码变更。镜像已按 digest 导入三节点，未统一公开
+发行这一批本地镜像；公开统一 Helm 0.1.31 候选仍锁 0.23.0 控制镜像。
 
-### Go / 元数据 PG
+## 4. 新增验证和原失败链
 
-新 `TestSQLHistorySharingConsentIsolationRevocationAndLifecycle` 在独立 control_ci
-PostgreSQL 与 race 下通过；补充同 key 并发请求只产生一个 generation/一条审计后
-再次通过。覆盖 owner/Editor/Viewer/外组织、API Key、默认私有、显式确认、版本冲突、
-旧重放不重启共享、作者停用/降权、读者降权、密钥缺失、审计失败回滚、分页隔离、
-原记录删除和到期撤回。vet 与三项 OpenAPI 合同检查通过。最终另在真实 PG 测试中对照实际 HTTP 字段与 closed/required schema，修复共享 allOf 叠加 closed 基类及个人新增字段遗漏；0.41.1 已部署。当前 Go 执行文件与 UI 验收版本完全一致，因此不重复运行整套 UI；不以 DB 租约冒充跨实例
-Compute 栅栏或 HA 验收。
+1. Linux Go race/真实 PG：`TestMultipartParserRejectsAmbiguousOrUnsupportedInput` 与
+   `TestMultipartPostgreSQLAtomicPublicationIsolationReplayAndAbort` 通过；包含严格 XML、
+   分片替换/MD5、分支/用户隔离、摘要、故障回滚、旧完成重试、来源范围和中止。
+2. Go vet、三项 OpenAPI 检查通过；实际 MinIO SDK 的七类签名请求独立测试通过，
+   包括请求方法/query/注入字节篡改拒绝。普通 unsigned 写入策略未放开。
+3. React 类型检查、格式和 Vite 构建通过。公开 live suite 声明与准入同步。
+4. 原 UI Job `publication-ui-20261016003314` 先通过实际中断/续传/下载和凭据创建，
+   随后 SDK init 被旧 verifier 拒绝：唯一 HTTP 403、checks 为空、checkpoint 在
+   before_create、无 SDK upload ID，证明失败发生在 admission 前。未创建新桶重试。
+5. 修复仅准入签名绑定的空体 init/abort，不允许任意 unsigned POST/DELETE 或注入
+   对象字节。SDK 七类请求先在 Linux 验证；最终 Job `publication-ui-20261016004103` 复用原桶、文件、
+   Console upload 与凭据，从原 checkpoint 继续，完成七类真实 S3 操作和 UI 中止。
+   累计 ledger 18 条包含原通过、失败定位和资源收尾，**不把它叫
+   18 个独立产品功能或官网全量回归**。
 
-### Linux 前端与实际 UI
+测试桶 `ci-s3-multipart-1792110797526`、项目 `prj_6f3c51bd15b772e3` 与已发布
+文件保留；第一轮上传 ID `mpu_f3f42a837887beff7ce4b7c4`。专用凭据已撤销。最终服务
+disabled、Compute/VM 0。历史记录和所有私有输入保留在维护者
+`control-plane/production/evidence/20261016-multipart`；密钥、原 DOM/trace 不上传公共 Git。
 
-TypeScript/Prettier/Vite 通过，最终测试定位调整另做格式/类型检查，不重跑旧业务全集。
-四项新计划比较模型测试通过；47 个 UI suite 声明/准入/文件存在检查通过。
+## 5. 终态和后续
 
-- 共享历史 Job **publication-ui-20261015235003**，**8 条**检查通过：UI 临时单项目授权、一次真实
-  SELECT 的默认私有、作者确认、另一 Editor 实际加载、撤回/旧重放、权限撤回/恢复、
-  保留原私有历史、移除临时成员和 Compute 0。仅 **1 次**无写入 SQL。
-- 计划比较 Job **publication-ui-20261015235217**，**5 条**检查通过：真实 Explain 内存基线、第二计划
-  差值/结构、真实 Analyze 指标门槛及差值、清除/连接变化、重载无持久基线。仅
-  **4 次**用户主动只读 Explain/Analyze，随后 Compute 0。
+最终资源记录：三节点 Ready/无 Pressure，87 个 Deployment/StatefulSet 与期望副本
+一致（包含有意的 0），错误 Pod 0、托管 VM 0。5 个终态 Job 在保存描述和全部容器
+日志后按 UID/resourceVersion 退休。瞬时健康不等于 HA/DR、物理域隔离或长期 SLO。
 
-本阶段合计 13 条新 UI 检查，不冒充一次官网全量回归。其他功能保留各版本已验收
-记录；本批不反复执行 MFA 或旧业务套件。
-
-## 4. 原失败、恢复与资料
-
-首次 UI 在任何成员/SQL 修改前发现 Project `org_id` 与 Web `organization_id` 不一致；
-按正式合同修正并复用 Project 类型，只重建 Web。第二次在已确认临时单项目授权后，
-遇到 select 的 exact label 定位超时；原 SQL 请求数仍为 0。改用真实 combobox 角色，
-从原账号/原 checkpoint 接续，不创建新账号，不重复已有授权，不隐藏两次失败。
-测试 privateDir 类型收窄和维护者 formatter 路径错误也保留于私有日志。
-
-最终专用读者恢复原组织权限、临时项目/组织授权移除、密码/MFA 未改；新共享历史
-`qh_d869ac730e7def2f8bf0bb02` 最终保留为私有，所有原历史、SQL 回执、失败、源码
-快照和 OCI 保留。原始材料位于维护者私有
-`control-plane/production/evidence/20261016-history-sharing`，不随公共源上传。
-共享 suite 的原始 DOM/trace 不上传 GitHub artifact；公开源不包含密码或 Python 运维脚本。
-
-终态 Job/Pod 先留描述、容器日志，再按 UID/resourceVersion 退休；一次性 PG Pod 已在
-各自回执中退休。最终只读资源回执记录节点、控制面期望副本、错误 Pod 与 Compute 0。
-节点瞬时健康不代表物理故障域独立、HA/DR 或长期 SLO 已达标。
-
-## 5. 下一阶段
-
-继续 S3 multipart 的实现与实际 SDK/UI 验证，再推进大对象/安全 GC、Functions 和
-其余 Auth/生命周期/分布式工程门槛。不能把阶段提交当成整个任务完成。
+继续按账本推进分段运维恢复/兼容、大对象/安全 GC、Functions、Auth/生命周期与
+分布式门槛。阶段提交后继续下一项，不能把本轮通过当作整体完成。

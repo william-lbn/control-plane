@@ -7,6 +7,7 @@ import type { Branch, Operation } from '../../api';
 import { PageHeading, status } from '../../shared/ui';
 import { newRequestKey } from '../../shared/requestKey';
 import { followOperation } from '../../shared/followOperation';
+import { MultipartUpload } from './MultipartUpload';
 
 type Instance = {
   generation: number;
@@ -721,6 +722,17 @@ export function ObjectStorage({
                   ))}
                 </nav>
               )}
+              <MultipartUpload
+                key={`${projectId}/${branch}/${bucket}`}
+                bucketPath={bucketPath}
+                canEdit={canEdit}
+                showError={showError}
+                onPublished={async () => {
+                  const current = epoch.current;
+                  await loadObjects(current);
+                  await loadBuckets(current);
+                }}
+              />
               <section className="backend-panel" data-testid="storage-cors-panel">
                 <h3>浏览器跨域访问</h3>
                 <p>

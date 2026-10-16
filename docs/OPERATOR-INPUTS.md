@@ -21,7 +21,7 @@
 下列工作属于工程任务，不应转交给用户选择或误记为“等待凭据”：
 
 - Functions WS、分支复制、触发器、完整日志/计量；HTTP/SSE 和自动零/一次冷醒已在 0.1.28 验收。
-- Object Storage multipart/大文件、引用安全 GC 和独立网关；基础 S3/SigV4/signed chunks 已在 0.1.29 实际验收。
+- Object Storage 有界 multipart 已在 0.42.0 通过实际 SDK/UI；继续大文件、分段运维接管、引用安全 GC 和独立网关。基础 S3/SigV4/signed chunks 保留 0.1.29 实际验收。
 - Auth 组织强制 MFA、OAuth/SSO、分支 factor 迁移和完整管理流程（Console MFA 自助已验收）；应用密码和会话安全已验收。
 - 完整目录/删除/恢复：rename、系统身份迁移、TTL/物理 GC、原分支恢复和 Backend 一致性。
 - 严格小数 CPU Guest 隔离/计量、完整内存归还、跨实例外部栅栏、软件 HA/DR 流程和本地全链路 TLS。

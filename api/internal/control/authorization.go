@@ -94,6 +94,9 @@ func (s *server) authorizeRoute(w http.ResponseWriter, r *http.Request, u user) 
 		if strings.HasSuffix(r.URL.Path, "/storage") && r.Method != http.MethodGet {
 			required = 3
 		}
+		if strings.Contains(r.URL.Path, "/multipart-uploads") {
+			required = 2
+		}
 		var state string
 		if err := s.db.QueryRow(r.Context(), "SELECT state FROM projects WHERE id=$1", project).Scan(&state); err != nil {
 			fail(w, r, 503, "metadata_unavailable", "Could not check lifecycle")

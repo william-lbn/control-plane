@@ -122,7 +122,7 @@ func TestS3SDKListUsesActualPostgreSQLDirectoryAndPagination(t *testing.T) {
 	if w.Code != 200 || xml.Unmarshal(w.Body.Bytes(), &listed) != nil || listed.Count != 2 || len(listed.Prefixes) != 1 || listed.Prefixes[0].Prefix != "folder%2F%E4%B8%AD%E6%96%87%E7%9B%AE%E5%BD%95%2F" || len(listed.Objects) != 1 {
 		t.Fatal("StartAfter must filter full common prefix; UTF8 delimiter encoding failed", w.Code, w.Body.String())
 	}
-	for _, query := range []url.Values{{"uploads": {""}}, {"metadata": {"true"}}} {
+	for _, query := range []url.Values{{"metadata": {"true"}}} {
 		if s3QuerySupported(query) {
 			t.Fatal("Unimplemented subresource accepted")
 		}

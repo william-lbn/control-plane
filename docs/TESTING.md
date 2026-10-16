@@ -536,3 +536,7 @@ See [the branch email/recovery contract](AUTH-EMAIL-RECOVERY.md). The protected 
 ## Email OTP candidate
 
 `auth-otp.spec.ts` uses the protected owner/mailbox fixtures and actual SMTP. Deploy the version declaring `ManagedAuthSpec.email_otp_enabled` before running it. It verifies native passwordless signup, incorrect/replayed codes, verification of a password user, and an independently captured server cookie before/after OTP recovery. Normal cleanup retains data/mail and retires owned Auth/Compute. See [the OTP contract](AUTH-EMAIL-OTP.md).
+
+## Bounded S3 multipart
+
+`storage-multipart.spec.ts` verifies the original UI upload across interruption/reload, final bytes, seven real signed MinIO SDK operations, abort, credential revocation and Compute zero. It requires the retained SQL owner fixture, protected admin file/private directory and a Linux `storage-sdk-probe` binary built from the candidate snapshot. Reuse the original checkpoint after any failure; never create replacement fixtures to hide an unknown mutation. See [the full contract and manual steps](OBJECT-STORAGE-MULTIPART.md). New `TestMultipart*` uses disposable `control_ci` only; the actual SDK signature test is `TestSignatureActualSDKMultipartSevenOperations`. Old accepted UI suites are not repeated by this slice.

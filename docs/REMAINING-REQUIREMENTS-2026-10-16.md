@@ -2,7 +2,7 @@
 
 ## 1. 核对基线
 
-审计基线为控制面 `b4ad4f4`，此前已交付 `72f4b29`，当前增量 0.41.1；并核对 Autoscaling `1720924` 和统一 Helm `648488a`，以及本地
+审计基线为控制面 `b4ad4f4`，此前已交付 `63456a7`，当前增量 0.42.0；并核对 Autoscaling `1720924` 和统一 Helm `648488a`，以及本地
 website 文档快照 `c0d49cbb6979b2ce79ea502d62dbc40780a923b0`（提交时间
 2026-09-24T19:22:11+01:00）。这是本地可追溯的官方文档基线，不声称它包含该提交后
 所有在线变更。公开 Git 源码已推送，不等于所有最新本地镜像已公开发行。
@@ -16,7 +16,7 @@ website 文档快照 `c0d49cbb6979b2ce79ea502d62dbc40780a923b0`（提交时间
 `content/docs/ai-gateway/`。本仓库对应 `api/internal/control/functions_public.go`、
 `object_storage.go`、`sql_history*.go`、`services/functions/runtime/server.mjs`、
 `services/auth/`、`api/internal/control/ai*.go`、授权/生命周期/调谐代码与 Chart。
-例如 Functions 网关明确返回 426，Object Storage 响应明确列出 multipart 等 missing；
+例如 Functions 网关明确返回 426，Object Storage 已实现有界 multipart，响应仍明确列出 large_objects/physical_gc 等 missing；
 没有把文档目标推断为现有功能。历史通过记录以对应 delivery 的源码与镜像为界。
 
 | ID | 需求 | 基线状态 / 缺口 | 下一验收闭环 |
@@ -27,7 +27,7 @@ website 文档快照 `c0d49cbb6979b2ce79ea502d62dbc40780a923b0`（提交时间
 | F04 | Functions stdout/stderr | 只有结构化请求日志；没有客户输出采集 | 有界流、脱敏策略/明确授权、实例/版本归属、分页/保留和 UI |
 | F05 | Functions 分支复制及恢复 | 未形成完整实现 | 代码共享、环境重封装、受限 SQL 身份重建、隔离与失败恢复 |
 | F06 | Functions 完整计量与独立 edge | 未完成；当前 public listener 同 API 进程 | 最小权限进程、实际资源/调用计量、长流与部署切换 |
-| S01 | S3 multipart | 未开发；`object_storage.go` 明确列为 missing | 创建/分片/列出/完成/中止、签名/权限、重放、原子可见、UI/真实 SDK |
+| S01 | S3 multipart | 有界基础已实现并验收：七类 S3 操作、当前身份隔离、原子发布/回执、UI 原上传中断续传、中止与 SDK 字节校验；仍限 8 MiB | [当前交付](DELIVERY-2026-10-16-CURRENT.md)；跨凭据运维接管、multipart delimiter/进阶 checksum 与大对象另推进 |
 | S02 | 大对象与完整 checksum | 当前单对象 8 MiB；官网快照描述 5 GiB | 有界内存流式 I/O、Range/checksum、断线/配额和大文件 UI |
 | S03 | 引用安全物理 GC | 未开发；删除只移除分支清单 | 分支/PITR/保留窗口引用证明、隔离清扫、失败恢复；不得删除历史业务字节 |
 | S04 | S3 兼容扩展 | anonymous public read、trailers、STS 等未完成 | 按官网支持矩阵分别实现；每项签名/负例/真实 SDK 验证 |
@@ -71,4 +71,4 @@ fixture、失败、日志、密码保护输入和所有业务字节。测试完�
 
 ## 4. 当前读法
 
-这 35 项是本次审计的需求分组，不是 35 个全部没有代码的模块。A01 基础自助与 Q01 个人策略/到期清理/单条删除已验收；Q02 基础共享也已验收，Q03 仅计划比较切片通过；其余 32 组仍有代码或独立验收缺口（含 Q03 的 AI/建议）。Functions WS/触发器、multipart、大对象、GC、OIDC/SSO 等明确缺实现；小数 CPU、内存缩回、HA、PITR、TLS 等已有部分代码，仍须补齐并独立验收。不能把它们概括为“代码都写完，只差测试”。更多官网运营集成的子项须继续按实际合同细化，不用本表行数声称官网全部能力已穷尽。
+这 35 项是本次审计的需求分组，不是 35 个全部没有代码的模块。A01 基础自助与 Q01 个人策略/到期清理/单条删除已验收；Q02 基础共享也已验收，Q03 仅计划比较切片通过；其余 32 组仍有代码或独立验收缺口（含 Q03 的 AI/建议）。Functions WS/触发器、大对象、GC、OIDC/SSO 等明确缺实现；multipart 基础已验收，仍有运维/兼容扩展缺口；小数 CPU、内存缩回、HA、PITR、TLS 等已有部分代码，仍须补齐并独立验收。不能把它们概括为“代码都写完，只差测试”。更多官网运营集成的子项须继续按实际合同细化，不用本表行数声称官网全部能力已穷尽。

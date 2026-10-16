@@ -170,6 +170,10 @@ func (s *server) s3Invoke(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	if query.Has("uploads") || query.Has("uploadId") || query.Has("partNumber") {
+		s.s3Multipart(w, r, conn, p, "credential:"+signature.KeyID, bucket, key, data, query)
+		return
+	}
 	if query.Has("cors") {
 		if key != "" {
 			s3Error(w, r, 400, "InvalidRequest")
@@ -403,7 +407,7 @@ func (s *server) s3Bucket(w http.ResponseWriter, r *http.Request, conn *pgx.Conn
 			return
 		}
 		var occupied bool
-		if tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM neon_storage.objects WHERE bucket=$1)`, bucket).Scan(&occupied) != nil {
+		if tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM neon_storage.objects WHERE bucket=$1) OR EXISTS(SELECT 1 FROM neon_storage.multipart_uploads WHERE bucket=$1 AND branch_id=$2 AND state='uploading')`, bucket, p.BranchID).Scan(&occupied) != nil {
 			s3Error(w, r, 503, "ServiceUnavailable")
 			return
 		}
@@ -541,6 +545,7 @@ func s3QuerySupported(q url.Values) bool {
 			continue
 		}
 		switch name {
+		case "uploads", "uploadId", "partNumber", "part-number-marker", "max-parts", "key-marker", "upload-id-marker", "max-uploads":
 		case "cors", "delete", "list-type", "prefix", "marker", "max-keys", "continuation-token", "start-after", "delimiter", "encoding-type", "location", "fetch-owner":
 		default:
 			return false

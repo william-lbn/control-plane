@@ -94,6 +94,9 @@ func main() {
 		key := "folder/中文 file.bin"
 		payload := []byte("Neon real S3 SDK bytes 中文\n")
 		switch c.Mode {
+		case "multipart":
+			stage = "actual_signed_multipart_operations"
+			return probeMultipart(ctx, client, c, func(check string) { checks = append(checks, check) })
 		case "copy-conditions":
 			stage = "actual_signed_copy_source_conditions"
 			return probeCopyConditions(ctx, client, c, transport, func(check string) { checks = append(checks, check) })
