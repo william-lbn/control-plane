@@ -39,7 +39,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with: {go-version: '1.27.1', cache-dependency-path: api/go.sum}
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with: {node-version: '24.19.0'}
       - name: Public source boundary
         run: node tools/check-public-source.mjs
@@ -62,7 +62,7 @@ jobs:
       run: {working-directory: web}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with: {node-version: '24.19.0', cache: npm, cache-dependency-path: web/package-lock.json}
       - run: npm ci --no-audit --fund=false
       - run: npm run format:check
@@ -74,7 +74,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with: {node-version: '24.19.0'}
       - run: bash tools/install-helm.sh "$RUNNER_TEMP/neon-helm"
       - run: echo "$RUNNER_TEMP/neon-helm" >> "$GITHUB_PATH"
@@ -99,7 +99,7 @@ jobs:
       run: {working-directory: services/auth}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with: {node-version: '24.19.0', cache: npm, cache-dependency-path: services/auth/package-lock.json}
       - run: npm ci --ignore-scripts --no-audit --fund=false
       - run: npm audit --audit-level=high
@@ -115,7 +115,7 @@ jobs:
       run: {working-directory: services/functions}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with: {node-version: '24.19.0'}
       # Native Node modules only; no network dependency install is required.
       - run: bash -n ../../tools/build-functions-vm.sh
@@ -138,7 +138,7 @@ jobs:
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
         with: {node-version: '24.19.0'}
       - name: Immutable image names and locked builders
         id: names
