@@ -89,7 +89,7 @@ jobs:
           import fs from 'node:fs';
           fs.writeFileSync('artifacts/functions-vm/image.json', JSON.stringify({component:'functions-vm',commit:process.env.GITHUB_SHA,digest:process.env.DIGEST,tags:process.env.TAGS.split('\n'),platform:'linux/amd64',quality_run_id:process.env.QUALITY_RUN_ID,microvm_acceptance:false},null,2)+'\n');
           NODE
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         if: always()
         with:
           name: functions-vm-receipt
