@@ -144,6 +144,8 @@ github.com/william-lbn/autoscaling v0.0.0-20261020225115-3eeafd997c8c h1:aZD7ZCM
 github.com/william-lbn/autoscaling v0.0.0-20261020225115-3eeafd997c8c/go.mod h1:5qW3EK3EXET9Tg0MQLNpUnvqE42xJ7iXytCBbD3BOHI=
 github.com/william-lbn/autoscaling v0.0.0-20261021012450-f60ff588b4db h1:DYYZzozVoXq5Mk03QDFSTnTrddDZ1fPN8KW959kT1uM=
 github.com/william-lbn/autoscaling v0.0.0-20261021012450-f60ff588b4db/go.mod h1:5qW3EK3EXET9Tg0MQLNpUnvqE42xJ7iXytCBbD3BOHI=
+github.com/william-lbn/autoscaling v0.0.0-20261021061647-8e1e0ea93d5f h1:m52e9Lndjn9mH7UMr8BfxcBTG1Md7ZI8ODYEA0/evS8=
+github.com/william-lbn/autoscaling v0.0.0-20261021061647-8e1e0ea93d5f/go.mod h1:5qW3EK3EXET9Tg0MQLNpUnvqE42xJ7iXytCBbD3BOHI=
 github.com/x448/float16 v0.8.4 h1:qLwI1I70+NjRFUR3zs1JPUCgaCXSh3SW62uAKT1mSBM=
 github.com/x448/float16 v0.8.4/go.mod h1:14CWIYCyZA/cWjXOioeEpHeN/83MdbZDRQHoFcYsOfg=
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=

@@ -182,7 +182,7 @@ func TestDSGAProxyAllSixRoutesPreserveOriginalBytesAndCredential(t *testing.T) {
 }
 
 func TestDSGAProxyRejectsStaleOwnerAndUnsafeServiceBeforeNative(t *testing.T) {
-	for _, scenario := range []string{"owner_epoch", "lease_expired", "vm_recreated", "unmanaged", "service_project", "service_selector", "service_external", "service_port", "bad_journal"} {
+	for _, scenario := range []string{"owner_epoch", "lease_expired", "vm_recreated", "unmanaged", "service_project", "service_selector", "service_external", "service_port", "bad_journal", "bootstrap_config", "config_owner"} {
 		t.Run(scenario, func(t *testing.T) {
 			var calls atomic.Int32
 			f, client, base, token := proxyFixture(t, func(w http.ResponseWriter, r *http.Request) {
@@ -192,6 +192,10 @@ func TestDSGAProxyRejectsStaleOwnerAndUnsafeServiceBeforeNative(t *testing.T) {
 			})
 			f.mu.Lock()
 			switch scenario {
+			case "bootstrap_config":
+				f.vm.Spec.DSGABootstrap.ConfigSecretUID = "recreated-config"
+			case "config_owner":
+				f.config.OwnerReferences[0].UID = "foreign-vm"
 			case "owner_epoch":
 				holder := "dsga-" + strings.Repeat("c", 32) + ".replacement"
 				f.lease.Spec.HolderIdentity = &holder

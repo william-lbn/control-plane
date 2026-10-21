@@ -183,7 +183,10 @@ func newBrokerTest(t *testing.T) (*brokerTestAPI, *journal.Store, owner.Ownershi
 	t.Helper()
 	f := &brokerTestAPI{validAPIAuth: true}
 	f.vm = &vmv1.VirtualMachine{ObjectMeta: metav1.ObjectMeta{Name: brokerTestWorkload, Namespace: "neon", UID: "vm-uid", ResourceVersion: "1", Labels: credentialLabels("project-1", "ep_0123456789abcdef")}}
+	f.vm.Spec.DSGABootstrap = &vmv1.DSGABootstrap{ProtocolVersion: 1, Incarnation: strings.Repeat("a", 32), ComputeInstanceID: "compute-1", VMUID: "", ConfigSecretUID: "", Ready: false}
 	f.config = &core.Secret{ObjectMeta: metav1.ObjectMeta{Name: brokerTestWorkload + "-config", Namespace: "neon", UID: "config-uid", ResourceVersion: "1", Labels: credentialLabels("project-1", "ep_0123456789abcdef")}}
+	configOwner := true
+	f.config.OwnerReferences = []metav1.OwnerReference{{APIVersion: vmv1.SchemeGroupVersion.String(), Kind: "VirtualMachine", Name: brokerTestWorkload, UID: f.vm.UID, Controller: &configOwner}}
 	f.credentials = &core.Secret{ObjectMeta: metav1.ObjectMeta{Name: brokerTestWorkload + "-credentials", Namespace: "neon", UID: "credentials-uid", ResourceVersion: "1", Labels: credentialLabels("project-1", "ep_0123456789abcdef")}}
 	_, key, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
@@ -212,7 +215,11 @@ func newBrokerTest(t *testing.T) (*brokerTestAPI, *journal.Store, owner.Ownershi
 		t.Fatal(err)
 	}
 	holder := "dsga-" + strings.Repeat("b", 32) + ".pod-uid"
-	if _, err := store.Initialize(context.Background(), "1", holder); err != nil {
+	initial, err := store.Initialize(context.Background(), "1", holder)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err = store.ReleaseBootstrap(context.Background(), initial.ResourceVersion(), f.config.UID); err != nil {
 		t.Fatal(err)
 	}
 	f.mu.Lock()
@@ -380,6 +387,42 @@ func TestDSGABrokerIssuesOnlyBoundShortTokenOverActualTLS(t *testing.T) {
 	defer f.mu.Unlock()
 	if !f.validAPIAuth || f.secretWrites != 0 {
 		t.Fatal("confused Kubernetes identity or unexpected key write")
+	}
+}
+
+func TestDSGABrokerRequiresReadyOriginalBootstrapAndConfigUID(t *testing.T) {
+	for _, scenario := range []string{"config_recreated", "config_owner", "bootstrap_compute", "bootstrap_config", "bootstrap_missing", "bootstrap_held", "changed_after_key"} {
+		t.Run(scenario, func(t *testing.T) {
+			f, _, claim, _, client, address := newBrokerTest(t)
+			f.mu.Lock()
+			switch scenario {
+			case "config_recreated":
+				f.config.UID = "recreated-config"
+			case "config_owner":
+				f.config.OwnerReferences[0].UID = "foreign-vm"
+			case "bootstrap_compute":
+				f.vm.Spec.DSGABootstrap.ComputeInstanceID = "different-compute"
+			case "bootstrap_config":
+				f.vm.Spec.DSGABootstrap.ConfigSecretUID = "different-config"
+			case "bootstrap_missing":
+				f.vm.Spec.DSGABootstrap = nil
+			case "bootstrap_held":
+				f.vm.Spec.DSGABootstrap.Ready = false
+			case "changed_after_key":
+				f.afterKeyRead = func() {
+					f.mu.Lock()
+					defer f.mu.Unlock()
+					f.vm.Spec.DSGABootstrap.ConfigSecretUID = "changed-after-key"
+					f.vm.ResourceVersion += "x"
+				}
+			}
+			f.mu.Unlock()
+			body, _ := json.Marshal(claim)
+			code, data := brokerRequest(t, client, address, body)
+			if code != http.StatusForbidden || bytes.Contains(data, []byte("access_token")) {
+				t.Fatalf("bootstrap %s unexpectedly minted (%d)", scenario, code)
+			}
+		})
 	}
 }
 

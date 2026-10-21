@@ -16,6 +16,7 @@ import (
 
 	vmclient "github.com/neondatabase/autoscaling/neonvm/client/clientset/versioned"
 	dsgapi "github.com/neondatabase/autoscaling/pkg/api/dsga"
+	"github.com/neondatabase/autoscaling/pkg/dsga/bootstrap"
 	"github.com/neondatabase/autoscaling/pkg/dsga/journal"
 	"github.com/neondatabase/autoscaling/pkg/dsga/owner"
 	core "k8s.io/api/core/v1"
@@ -103,9 +104,15 @@ func dsgaOwnedSecret(secret *core.Secret, namespace, name, project, endpoint str
 
 // signingIdentity不调用会创建/轮转私钥的computeControlKey兜底。缺失/坏seed、
 // 目标配置未启用、VM/实例绑定不同或JWK不匹配均拒绝，不能先发令牌再改Compute。
-func (broker *dsgaCredentialBroker) signingIdentity(ctx context.Context, workload, project, endpoint string, claim owner.Ownership) (ed25519.PrivateKey, string, error) {
+func (broker *dsgaCredentialBroker) signingIdentity(ctx context.Context, workload, project, endpoint string, claim owner.Ownership, snapshot *journal.Snapshot) (ed25519.PrivateKey, string, error) {
 	configSecret, err := broker.core.Secrets(broker.kube.namespace).Get(ctx, workload+"-config", metav1.GetOptions{})
 	if err != nil || !dsgaOwnedSecret(configSecret, broker.kube.namespace, workload+"-config", project, endpoint) {
+		return nil, "", owner.ErrCredentialsDenied
+	}
+	// 启动记录已经固定真实VM/Config Secret UID与Compute身份。复用同一
+	// 完整日志/owned配置核验，不能只看同名Secret或一份可改变的config.json。
+	// 这仍不是预算/VM许可，记录必须由受管创建流程先行准备并解除屏障。
+	if snapshot == nil || bootstrap.CheckReady(snapshot.VirtualMachine(), configSecret, false) != nil {
 		return nil, "", owner.ErrCredentialsDenied
 	}
 	raw := configSecret.Data["config.json"]
@@ -200,7 +207,8 @@ func (broker *dsgaCredentialBroker) ServeHTTP(w http.ResponseWriter, r *http.Req
 		deny(http.StatusForbidden)
 		return
 	}
-	key, instance, err := broker.signingIdentity(ctx, workload, project, endpoint, claim)
+	expectedBootstrap := snapshot.VirtualMachine().Spec.DSGABootstrap
+	key, instance, err := broker.signingIdentity(ctx, workload, project, endpoint, claim, snapshot)
 	if err != nil {
 		deny(http.StatusForbidden)
 		return
@@ -211,7 +219,8 @@ func (broker *dsgaCredentialBroker) ServeHTTP(w http.ResponseWriter, r *http.Req
 		return
 	}
 	confirmedProject, valid := dsgaSubjectProject(snapshot, endpoint)
-	if !valid || confirmedProject != project || ctx.Err() != nil {
+	currentBootstrap := snapshot.VirtualMachine().Spec.DSGABootstrap
+	if !valid || confirmedProject != project || expectedBootstrap == nil || currentBootstrap == nil || *expectedBootstrap != *currentBootstrap || ctx.Err() != nil {
 		deny(http.StatusForbidden)
 		return
 	}

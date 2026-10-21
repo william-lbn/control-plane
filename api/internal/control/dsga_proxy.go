@@ -15,6 +15,7 @@ import (
 	"time"
 
 	dsgapi "github.com/neondatabase/autoscaling/pkg/api/dsga"
+	"github.com/neondatabase/autoscaling/pkg/dsga/bootstrap"
 	"github.com/neondatabase/autoscaling/pkg/dsga/journal"
 	"github.com/neondatabase/autoscaling/pkg/dsga/owner"
 	core "k8s.io/api/core/v1"
@@ -234,7 +235,7 @@ func (proxy *dsgaProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	snapshot, err := proxy.current(preflight, store, claims)
-	if err != nil || snapshot.VirtualMachine().Labels["neon-control/project-id"] != secret.Labels["neon-control/project-id"] || snapshot.VirtualMachine().Labels["neon-control/endpoint-id"] != endpoint {
+	if err != nil || snapshot.VirtualMachine().Labels["neon-control/project-id"] != secret.Labels["neon-control/project-id"] || snapshot.VirtualMachine().Labels["neon-control/endpoint-id"] != endpoint || bootstrap.CheckReady(snapshot.VirtualMachine(), secret, false) != nil {
 		deny(http.StatusForbidden)
 		return
 	}

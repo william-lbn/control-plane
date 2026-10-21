@@ -1,8 +1,42 @@
 # DSGA 专用凭据签发与Mac验证
 
-本批仅是完整弹性链中的中心凭据模块，默认关闭；Agent真实消费、可信TLS启动链、
-DSGA管理代理、创建屏障、预算/Monitor/最终Runner与多PG版本还要继续。不能据本批
-通过宣称完整生产功能完成。没有构建镜像、准备部署、连接实际K8s或合并主分支。
+本页按模块记录实际证据。当前中心凭据/六路由代理已接线，启动身份消费者已
+固定自有Autoscaling8e1e0ea；**整体弹性功能仍未完成、默认关闭**。Driver完整
+创建接线、租户/管理角色隔离、预算/quiesce、Monitor/最终Runner、多PG版本及完整
+存储E2E继续实施。没有构建镜像、准备部署、连接实际K8s或合并主分支。
+
+## 2026-10-21：中心消费持久启动身份
+
+本批固定依赖自有`william-lbn/autoscaling`提交
+`8e1e0ea93d5f2775376622a38ed10f39d9d1fc8c`，Go伪版本
+`v0.0.0-20261021061647-8e1e0ea93d5f`及go.sum同时锁定；保留官方模块名。
+签发与代理复用生产`bootstrap.CheckReady`和唯一完整journal解码器，必须核对
+ready记录中的真实VM UID、固定Compute ID、配置Secret UID、唯一controller
+ownerref及业务归属。删除后同名重建Secret或外来owner均拒绝，不能只凭labels
+和config.json自报身份签发/派发。读取私钥后第二次主体核验还要求完整bootstrap
+记录与先前相同，阻止检查过程中改变Config UID等身份事实。
+
+新增7类签发及2类代理拒绝场景，最终DSGA race共78个pass事件。受影响全API
+Mac race **966个pass事件（256顶层、710子事件），9测试包通过、10无测试文件
+包单列，0用例fail/skip**。与CI同版官方Darwin PostgREST16.4实际RLS、一次性
+SCRAM PG0806及隔离schema均运行，结束关闭自有临时PG。不是Kubernetes实体认证。
+日志：根工作区`build/control-plane-bootstrap-mac-final/`，含最终源码SHA256清单；
+`build/control-bootstrap-bound-final-focused.jsonl`为独立DSGA测试。
+三项实际生产反向分别移除原Config UID/ownerref校验、读key后完整bootstrap相等
+检查、代理Config owner检查，均触发对应业务断言；首次注入因unused import导致
+编译错误，不计成功，修正为保留类型引用后重新取得3项真实断言失败。源码finally
+逐字节恢复，与上述全量执行源码SHA256一致，再跑全部78个DSGA race事件及全仓
+vet通过。Linux/amd64 CGO0全部cmd交叉编译通过，非Linux运行认证。
+日志：`build/control-bootstrap-negative/`、`control-bootstrap-restored.jsonl`、
+`control-bootstrap-vet.log`及`control-bootstrap-linux-cli.log`。
+
+本批只加强已经接线入口的启动身份约束。它没有把身份ready变成预算或VM许可，
+也未开启对外DSGA创建。实际Driver仍使用旧PG16创建顺序，必须改为持久意图→
+CREATE held→实际VM UID/安全原生spec/owned Secret/完整日志→UID/RV一次释放。
+复核还确认旧Driver把租户密码赋给cloud_admin，而Compute以SUPERUSER创建该
+内部管理角色；PG启动准入门禁为管理超级用户保留通道。因此在启用DSGA新建前
+必须先隔离租户角色与管理角色、覆盖已有连接的新SQL/后台工作及恢复后准入。
+这是代码缺口，不能写成只待Linux验收，亦不能靠单独改PG_VERSION为17完成。
 
 ## 依赖与实际入口
 
