@@ -156,6 +156,8 @@ jobs:
             export NEON_E2E_KUBE_SERVER="${NEON_E2E_KUBE_API_SERVERS%%,*}"
             node tools/observe-branch-expiration.mjs --fixture-dir "$NEON_E2E_PRIVATE_DIR" --evidence-dir "$NEON_E2E_PRIVATE_DIR/expiration-observer" --scope "$NEON_E2E_FUNCTIONS_MONITOR_FIXTURE" > "$NEON_E2E_PRIVATE_DIR/expiration-observer.log" 2>&1 &
             task_observer_pid=$!
+            # EXIT invokes this callback on an errexit path before the trap is reset.
+            # shellcheck disable=SC2317
             task_expiration_cleanup() {
               node -e 'require("node:fs").writeFileSync(process.env.NEON_E2E_PRIVATE_DIR+"/branch-expiration-abort.json",JSON.stringify({abort:true}),{mode:0o600})'
               wait "$task_observer_pid" || true
@@ -174,6 +176,8 @@ jobs:
             if [ "$NEON_E2E_SUITE" = failed-parent-cleanup.spec.ts ]; then task_creation_kind="$NEON_E2E_FAILED_PARENT_KIND"; fi
             node tools/failed-endpoint-create-fault.mjs --resource-kind "$task_creation_kind" --fixture-dir "$NEON_E2E_PRIVATE_DIR" --evidence-dir "$NEON_E2E_PRIVATE_DIR/native-create-fault" --scope "$NEON_E2E_FUNCTIONS_MONITOR_FIXTURE" --api-servers "$NEON_E2E_KUBE_API_SERVERS" > "$NEON_E2E_PRIVATE_DIR/native-create-fault.log" 2>&1 &
             task_fault_pid=$!
+            # EXIT invokes this callback on an errexit path before the trap is reset.
+            # shellcheck disable=SC2317
             task_fault_cleanup() {
               node -e 'require("node:fs").writeFileSync(process.env.NEON_E2E_PRIVATE_DIR+"/failed-endpoint-abort.json",JSON.stringify({abort:true}),{mode:0o600})'
               wait "$task_fault_pid" || true
