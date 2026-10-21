@@ -556,3 +556,5 @@ See [the branch email/recovery contract](AUTH-EMAIL-RECOVERY.md). The protected 
 继承目录局部验收使用 `catalog-inheritance.spec.ts`：保护的原连接默认 checkpoint 与上一批目录身份 checkpoint 只在 Linux 提供，失败后续用同一操作和检查点。覆盖新分支首次启动、父凭据 UID rename、子分支改密/Owner、Reader 冷醒、无 Compute 分支原代际及替换 Writer；不重复旧套件。实际六项结果见 [2026-10-21 首次启动保留继承目录](DELIVERY-2026-10-21-CATALOG-INHERITANCE.md)。
 
 当前身份局部验收使用 `catalog-current-inventory.spec.ts`，续用 0.67/0.68 原保护夹具，检查当前/历史分离、独立继承代际、角色/数据库排除、禁止重新首次记录和 Console 展示；五项通过后核对 16 张目录表未变并正常缩零。见 [2026-10-21 当前目录身份展示](DELIVERY-2026-10-21-CATALOG-CURRENT-INVENTORY.md)。
+
+`catalog-current-observation.spec.ts` 复用原继承夹具，五项检查涵盖首次观察、Console 显式衔接、Owner 顺序、改名/改密、原请求重放、Writer/Reader 冷目录和原父数据保留；见 [2026-10-21 旧目录身份衔接](DELIVERY-2026-10-21-CATALOG-CURRENT-OBSERVATION.md)。只验证新增及受影响路径。

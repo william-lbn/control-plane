@@ -1,6 +1,6 @@
 # 生产门槛与官网对齐
 
-当前增量：[2026-10-21 当前目录身份展示](DELIVERY-2026-10-21-CATALOG-CURRENT-INVENTORY.md)：持续身份与首次观察历史分开展示，普通创建/变更和分支继承的原 OID、Owner、代际及排除状态可读；已知身份再次首次记录拒绝，五项累计现场检查通过。API/Worker 0.69.0，Web 本轮重建，管理网关沿用 0.66.3，AI 沿用 0.58.0 / migration 057（本轮无新迁移）/ 控制面 Chart 0.9.66、Helm 149 / 管理网关 Chart 0.1.1、Helm 56。16 张目录表前后摘要一致，原有身份与数据保留，最终 VM 0；旧身份链衔接、完整系统漂移和 Backend 名称依赖继续，性能/可靠性专项后置。
+当前增量：[2026-10-21 旧目录身份衔接](DELIVERY-2026-10-21-CATALOG-CURRENT-OBSERVATION.md)：继承旧角色的原凭据背书、原 OID 到当前代际的显式衔接、控制台入口、改名/改密及原请求重放通过；五项实机功能检查、四项新增及四项受影响 Go 测试通过。API/Worker 0.70.0，Web 重建，migration 058 / Chart 0.9.67 / Core Helm 150；Gateway 0.66.3 / Helm 56、AI 0.58.0 保留。目标分支之外 16 张目录表范围摘要一致，最终 VM 0。C02 默认/系统漂移和 Backend 名称依赖继续，性能/可靠性专项后置。
 
 状态截至 2026-10-17；API/Worker、Web 0.48.0 / migration 039 / Chart 0.9.40 / Helm revision 112。Console MFA、个人 SQL 历史采集/保留策略和单条删除已有 Linux Go/PG 与真实 UI 回执，见[当前交付](DELIVERY-2026-10-16-CURRENT.md)。[剩余需求账本](REMAINING-REQUIREMENTS-2026-10-16.md)区分未开发、部分实现和独立验收门槛。运行镜像按本地快照留证；公开统一 Helm 0.1.31 源码候选仍锁 0.23.0 公共控制镜像，不能冒充本地 0.48.0 发行。
 前一版本 `be04cb4` 的真实 Linux/React 闭环见 [Auth/S3 交付](DELIVERY-2026-10-14-AUTH-S3.md)：

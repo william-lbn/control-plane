@@ -20,7 +20,7 @@ on:
       catalog_suite:
         description: Catalog identity acceptance
         type: choice
-        options: [none, catalog-object-bindings.spec.ts, catalog-inheritance.spec.ts, catalog-current-inventory.spec.ts]
+        options: [none, catalog-object-bindings.spec.ts, catalog-inheritance.spec.ts, catalog-current-observation.spec.ts, catalog-current-inventory.spec.ts]
         default: none
       failed_parent_kind:
         description: Exact parent create failure to validate (branch or project)
@@ -80,7 +80,7 @@ jobs:
           test -n "$NEON_E2E_BASE_URL"
           test -n "$ADMIN_PASSWORD"
           case "$NEON_E2E_SUITE" in
-            catalog-current-inventory.spec.ts|catalog-inheritance.spec.ts|catalog-object-bindings.spec.ts|compute-catalog-bootstrap.spec.ts|catalog-rename-results.spec.ts|catalog-mutation-results.spec.ts|default-database-owner.spec.ts|catalog-identity-restore.spec.ts|catalog-identities.spec.ts|connection-defaults.spec.ts) test -f "$NEON_E2E_CONNECTION_DEFAULTS_FIXTURE" ;;
+            catalog-current-observation.spec.ts|catalog-current-inventory.spec.ts|catalog-inheritance.spec.ts|catalog-object-bindings.spec.ts|compute-catalog-bootstrap.spec.ts|catalog-rename-results.spec.ts|catalog-mutation-results.spec.ts|default-database-owner.spec.ts|catalog-identity-restore.spec.ts|catalog-identities.spec.ts|connection-defaults.spec.ts) test -f "$NEON_E2E_CONNECTION_DEFAULTS_FIXTURE" ;;
             ai-providers.spec.ts) test -f "$NEON_E2E_AI_PROVIDER_FIXTURE"; test -f "$NEON_E2E_AI_PROVIDER_KEY_FILE" ;;
             console-session-feedback.spec.ts|history-policy.spec.ts) test -f "$NEON_E2E_CONSOLE_ACCOUNT_FIXTURE" ;;
             native-product.spec.ts|restore.spec.ts|lifecycle.spec.ts|endpoint-deletion.spec.ts|data-api.spec.ts|console-invitations.spec.ts|console-mfa.spec.ts|console-sessions.spec.ts|managed-auth.spec.ts|object-storage.spec.ts|functions-native.spec.ts) ;;

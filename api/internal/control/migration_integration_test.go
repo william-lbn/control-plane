@@ -53,8 +53,10 @@ func TestMigrateFreshSchema(t *testing.T) {
 		if err := pool.QueryRow(ctx, "SELECT count(*) FROM schema_migrations").Scan(&count); err != nil {
 			t.Fatal(err)
 		}
-		if count != len(entries) {
-			t.Fatalf("migration run %d: expected %d embedded versions, got %d", run, len(entries), count)
+		// 两份已发布058保留原字节，只有该已审查重复由高位前向join补齐。
+		// 登记器对其他重复先失败，因此numeric登记比源码文件恰少1条。
+		if count != len(entries)-1 {
+			t.Fatalf("migration run %d: expected %d distinct versions, got %d", run, len(entries)-1, count)
 		}
 	}
 	for _, table := range []string{"organizations", "projects", "branches", "branch_service_instances", "login_failures", "operations", "api_keys", "organization_quotas", "branch_roles", "branch_databases"} {

@@ -7,7 +7,7 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 
 功能进度与当前优先级见 [已验收/剩余清单](docs/FUNCTIONAL-STATUS-2026-10-21.md)：13 组基础已有回执；五组专项后置，17 组尚未整体闭环。后续优先业务功能，复用来源未变的既有验收。
 
-最新状态：[2026-10-21 当前目录身份展示](docs/DELIVERY-2026-10-21-CATALOG-CURRENT-INVENTORY.md)：持续身份与首次观察历史分开展示，普通创建/变更和分支继承的原 OID、Owner、代际及排除状态可读；已知身份再次首次记录拒绝，五项累计现场检查通过。API/Worker 0.69.0，Web 本轮重建，管理网关沿用 0.66.3，AI 沿用 0.58.0 / migration 057（本轮无新迁移）/ 控制面 Chart 0.9.66、Helm 149 / 管理网关 Chart 0.1.1、Helm 56。16 张目录表前后摘要一致，原有身份与数据保留，最终 VM 0；旧身份链衔接、完整系统漂移和 Backend 名称依赖继续，性能/可靠性专项后置。
+最新状态：[2026-10-21 旧目录身份衔接](docs/DELIVERY-2026-10-21-CATALOG-CURRENT-OBSERVATION.md)：继承旧角色的原凭据背书、原 OID 到当前代际的显式衔接、控制台入口、改名/改密及原请求重放通过；五项实机功能检查、四项新增及四项受影响 Go 测试通过。API/Worker 0.70.0，Web 重建，migration 058 / Chart 0.9.67 / Core Helm 150；Gateway 0.66.3 / Helm 56、AI 0.58.0 保留。目标分支之外 16 张目录表范围摘要一致，最终 VM 0。C02 默认/系统漂移和 Backend 名称依赖继续，性能/可靠性专项后置。
 
 此前增量：[应用 TOTP 双重认证](docs/DELIVERY-2026-10-15-AUTH-TOTP.md)八项 UI 与[项目共享查询](docs/DELIVERY-2026-10-15-SHARED-QUERIES.md)六项 UI 均通过；该批基线为 API 0.33 / Chart 0.9.17 / migration 031。
 

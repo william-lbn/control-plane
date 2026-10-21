@@ -1,7 +1,7 @@
 # 实际 API 合同
 
 OpenAPI 3 合同的权威源是 [openapi-v1.json](../contracts/openapi-v1.json)。
-版本 0.69.0，127 个路径、181 个操作，全部拥有稳定且唯一的 operationId。
+版本 0.70.0，128 个路径、182 个操作，全部拥有稳定且唯一的 operationId。
 运行 Swagger 位于 `/api/docs`，JSON 位于 `/api/openapi.json`。
 本合同是自托管 `/api/v1`，不声称兼容 Neon SaaS `/api/v2`。
 
@@ -205,6 +205,7 @@ request_id/operation_id/error_code，再由显式 retry 接口恢复可重试操
 | POST | `/api/v1/projects/{project}/branches/{branch}/catalog-identities/{binding}/restore` | `restoreOriginalCatalogIdentity` | 202 |
 | GET | `/api/v1/projects/{project}/branches/{branch}/default-database-owner` | `getDefaultDatabaseOwner` | 200 |
 | PATCH | `/api/v1/projects/{project}/branches/{branch}/default-database-owner` | `updateDefaultDatabaseOwner` | 202 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/catalog-identities/{binding}/observe-current` | `observeCurrentCatalogIdentity` | 200 |
 
 ## 3. 实现映射与演进
 

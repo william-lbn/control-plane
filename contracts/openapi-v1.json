@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.69.0",
+    "version": "0.70.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -7093,7 +7093,8 @@
               "mutation_result",
               "rename_result",
               "rename_follower",
-              "inherited_identity"
+              "inherited_identity",
+              "current_observation"
             ]
           },
           "options": {
@@ -7104,6 +7105,77 @@
           }
         },
         "description": "Read-only current identity generation. Attests original OID, name, Owner and provenance; no historical options or customer credentials are observed."
+      },
+      "CatalogCurrentObservationInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "acknowledge_current_observation"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          },
+          "acknowledge_current_observation": {
+            "const": true
+          }
+        }
+      },
+      "CatalogCurrentObservationReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "binding_id",
+          "identity_id",
+          "source_binding_id",
+          "kind",
+          "name",
+          "object_oid",
+          "version_token",
+          "basis",
+          "credentials",
+          "options"
+        ],
+        "properties": {
+          "binding_id": {
+            "type": "string"
+          },
+          "identity_id": {
+            "type": "string"
+          },
+          "source_binding_id": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "role",
+              "database"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "object_oid": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4294967295
+          },
+          "version_token": {
+            "type": "string"
+          },
+          "basis": {
+            "const": "explicit_current_observation"
+          },
+          "credentials": {
+            "const": "not_observed"
+          },
+          "options": {
+            "const": "not_recorded"
+          }
+        }
       }
     },
     "responses": {
@@ -23822,6 +23894,97 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/DefaultDatabaseOwnerInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/catalog-identities/{binding}/observe-current": {
+      "post": {
+        "operationId": "observeCurrentCatalogIdentity",
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "Explicitly connect an original legacy OID to its current managed generation",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"[1-9][0-9]*\"$"
+            },
+            "description": "Canonical quoted decimal version_token from catalog listing."
+          },
+          {
+            "name": "binding",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^cbi_[a-f0-9]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "200": {
+            "description": "Atomic immutable current observation or original-key replay",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogCurrentObservationReceipt"
+                }
+              }
+            }
+          }
+        },
+        "description": "Project Admin, session CSRF or scoped Admin key, canonical current If-Match, Idempotency-Key and explicit acknowledgment required. Observe the complete native catalog without SQL writes. The immutable original baseline OID, tenant/timeline, current managed name and provenance must match; database Owner requires a current persistent role identity. Changed names require the original successful rename; changed role credentials require their exact original committed immutable Secret UID witness. Historical ordinary results attest their credential UID only and are never backfilled with an OID. Existing persistent identity history cannot be replaced. Atomic current identity, immutable observation, original-key receipt and audit; replay precedes current native or credential reads. Earlier baseline, options and password history remain unmodified and unobserved.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogCurrentObservationInput"
               }
             }
           }
