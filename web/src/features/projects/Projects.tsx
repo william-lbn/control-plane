@@ -217,7 +217,14 @@ export function ProjectWorkspace({
     );
   if (page === 'databases')
     return (
-      <Catalog projectId={projectId} branches={branches} canEdit={canEdit} showError={showError} />
+      <Catalog
+        key={projectId}
+        projectId={projectId}
+        branches={branches}
+        canEdit={canEdit}
+        canAdmin={canAdmin}
+        showError={showError}
+      />
     );
   if (page === 'permissions')
     return <ProjectPermissions projectId={projectId} canAdmin={canAdmin} showError={showError} />;
@@ -333,7 +340,8 @@ export function ProjectWorkspace({
           </table>
         </div>
         <div className="subtle-note">
-          当前只有 PostgreSQL 数据分支。完整 Backend 分支需要每项服务独立实现与验收。
+          PostgreSQL 数据与函数策略分别准备，函数准备后保持暂停。其他 Backend
+          服务按各自的分支策略管理。
         </div>
       </>
     );
@@ -562,14 +570,23 @@ function BranchDetail({
         <h2>Backend 服务</h2>
         {status(branch.state)}
       </div>
-      {canCreateEndpoint && branch.state === 'ready' && endpoints.length > 0 && (
-        <div className="section-header">
-          <span className="muted">1 个读写节点 · 可添加多个独立只读节点</span>
-          <button className="button primary" onClick={() => setShowCreateEndpoint(true)}>
-            ＋ 添加 Compute
-          </button>
-        </div>
+      {branch.expires_at && (
+        <p className="notice compact">
+          此分支将在 {branch.expires_at} 到期。添加 Compute
+          前，请先在生命周期页面取消未来的到期设置。
+        </p>
       )}
+      {canCreateEndpoint &&
+        !branch.expires_at &&
+        branch.state === 'ready' &&
+        endpoints.length > 0 && (
+          <div className="section-header">
+            <span className="muted">1 个读写节点 · 可添加多个独立只读节点</span>
+            <button className="button primary" onClick={() => setShowCreateEndpoint(true)}>
+              ＋ 添加 Compute
+            </button>
+          </div>
+        )}
       {endpoints.length === 0 && (
         <div className="notice compact">
           <span>◈</span>
@@ -578,7 +595,7 @@ function BranchDetail({
             <p>Timeline 已创建。添加 Endpoint 后可通过 Proxy 连接并执行 SQL。</p>
             <button
               className="button primary"
-              disabled={!canCreateEndpoint || branch.state !== 'ready'}
+              disabled={!canCreateEndpoint || !!branch.expires_at || branch.state !== 'ready'}
               onClick={() => setShowCreateEndpoint(true)}
             >
               ＋ 创建 Endpoint

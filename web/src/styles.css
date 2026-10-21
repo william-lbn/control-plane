@@ -1499,3 +1499,57 @@ textarea:focus {
   flex: 0 0 18px;
   accent-color: var(--accent, #31cf9a);
 }
+.provider-list {
+  display: flex;
+  align-items: end;
+  gap: 16px;
+}
+.provider-list label {
+  flex: 1;
+}
+.provider-editor {
+  padding: 24px;
+  margin-top: 20px;
+}
+.provider-editor fieldset {
+  border: 0;
+  padding: 0;
+  min-width: 0;
+  display: grid;
+  gap: 16px;
+}
+.provider-editor label,
+.provider-list label {
+  display: grid;
+  gap: 8px;
+  font-size: 13px;
+}
+.provider-editor p {
+  color: var(--text-muted, #919b97);
+  line-height: 1.7;
+}
+.provider-editor code {
+  overflow-wrap: anywhere;
+}
+.provider-editor .provider-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.provider-checkbox input {
+  width: 18px;
+  flex: 0 0 18px;
+}
+.provider-model-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--border, #26352f);
+  border-radius: 8px;
+}
+@media (max-width: 700px) {
+  .provider-model-row {
+    grid-template-columns: 1fr;
+  }
+}

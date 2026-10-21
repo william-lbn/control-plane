@@ -173,11 +173,16 @@ func (s *server) querySQLScript(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	role, database := body.Role, body.Database
+	defaults, err := s.publicConnectionDefaults(r.Context(), item)
+	if err != nil {
+		fail(w, r, 503, "connection_defaults_unavailable", "Script was not submitted because customer connection defaults could not be read")
+		return
+	}
 	if role == "" {
-		role = stringVal(item["role_name"])
+		role = stringVal(defaults["role"])
 	}
 	if database == "" {
-		database = stringVal(item["database_name"])
+		database = stringVal(defaults["database"])
 	}
 	if !validPGIdentifier(role) || !validPGIdentifier(database) || (role != "cloud_admin" && protectedPGRole(role)) {
 		fail(w, r, 422, "invalid_connection_target", "Choose a valid public database role and database")

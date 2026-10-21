@@ -276,25 +276,57 @@ func (s *server) nativeCreateRole(ctx context.Context, p catalogPayload, verifie
 	}
 	var count int
 	var exists bool
-	err = conn.QueryRow(ctx, "SELECT count(*),(SELECT EXISTS(SELECT 1 FROM pg_roles WHERE rolname=$1)) FROM pg_roles WHERE rolcanlogin", p.Name).Scan(&count, &exists)
+	var invalidDatabase, privilegedRole bool
+	err = conn.QueryRow(ctx, `SELECT count(*),EXISTS(SELECT 1 FROM pg_roles WHERE rolname=$1),
+ EXISTS(SELECT 1 FROM pg_database WHERE datconnlimit=-2),EXISTS(SELECT 1 FROM pg_roles WHERE rolname='neon_superuser')
+ FROM pg_roles WHERE rolcanlogin`, p.Name).Scan(&count, &exists, &invalidDatabase, &privilegedRole)
 	conn.Close(context.Background())
 	if err != nil {
 		return err
 	}
-	if !exists && count >= 500 {
+	acknowledged, err := s.catalogCreateObservation(ctx, p, "create_role")
+	if err != nil {
+		return err
+	}
+	if exists && acknowledged == 0 || !exists && acknowledged != 0 || invalidDatabase || !privilegedRole {
+		return errors.New("native role creation requires absent target, existing platform role and no invalid database cleanup")
+	}
+	if count >= 500 && acknowledged == 0 {
 		return errors.New("branch login role quota exceeded")
 	}
-	if err = catalogDelta(config, p, "create_role", verifier); err != nil {
+	if acknowledged != 0 {
+		if nested(config, "spec", "skip_pg_catalog_updates") != true {
+			return errors.New("original role restore requires protected catalog")
+		}
+		if err = catalogDelta(config, p, "create_role", verifier); err != nil {
+			return err
+		}
+		return s.nativeComputeRequest(ctx, p, config, key)
+	}
+	apply, restore, err := computeCatalogBootstrapNativeRoleConfigs(config, p, verifier)
+	if err != nil {
 		return err
 	}
 	// PostgreSQL 16 requires ADMIN OPTION for subsequent service mutations.
 	// Only CREATE accepts this option. It is sent on the first native CREATE,
 	// not kept in cold specs or ALTER ROLE password configuration.
-	for _, v := range nested(config, "spec", "cluster", "roles").([]any) {
-		role := v.(map[string]any)
-		if role["name"] == p.Name {
-			role["options"] = []any{map[string]any{"name": "ADMIN", "value": "control_probe", "vartype": "enum"}}
+	if acknowledged == 0 {
+		if err = s.nativeComputeRequest(ctx, p, apply, key); err != nil {
+			return err
+		}
+		conn, err := s.catalogConnection(ctx, p)
+		if err != nil {
+			return err
+		}
+		var oid uint32
+		err = conn.QueryRow(ctx, `SELECT oid FROM pg_roles WHERE rolname=$1 AND NOT rolsuper`, p.Name).Scan(&oid)
+		conn.Close(context.Background())
+		if err != nil {
+			return err
+		}
+		if err = s.recordCatalogCreateObservation(ctx, p, "create_role", oid); err != nil {
+			return err
 		}
 	}
-	return s.nativeComputeRequest(ctx, p, config, key)
+	return s.nativeComputeRequest(ctx, p, restore, key)
 }

@@ -22,13 +22,14 @@ import (
 )
 
 type aiTicket struct {
-	Actor   string `json:"actor"`
-	Branch  string `json:"branch"`
-	Model   string `json:"model"`
-	ID      string `json:"id"`
-	Hash    string `json:"hash"`
-	Version string `json:"version"`
-	Expires int64  `json:"expires"`
+	Actor      string `json:"actor"`
+	Branch     string `json:"branch"`
+	Model      string `json:"model"`
+	ID         string `json:"id"`
+	Hash       string `json:"hash"`
+	Version    string `json:"version"`
+	Expires    int64  `json:"expires"`
+	Generation int    `json:"generation,omitempty"`
 }
 
 func (s *server) aiEnabled() bool {
@@ -52,7 +53,9 @@ func (s *server) aiRelay(w http.ResponseWriter, r *http.Request) {
 	}
 	request.Header.Set("Authorization", r.Header.Get("Authorization"))
 	request.Header.Set("Content-Type", "application/json")
-	client := &http.Client{Timeout: time.Duration(s.ai.TimeoutSeconds+5) * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	transport := &http.Transport{Proxy: nil, ResponseHeaderTimeout: time.Duration(s.ai.TimeoutSeconds) * time.Second}
+	defer transport.CloseIdleConnections()
+	client := &http.Client{Transport: transport, Timeout: time.Duration(s.ai.TimeoutSeconds+5) * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	response, e := client.Do(request)
 	if e != nil {
 		aigateway.Error(w, 502, "gateway_unavailable")
@@ -84,7 +87,10 @@ func (s *server) aiRelay(w http.ResponseWriter, r *http.Request) {
 	}
 }
 func (s *server) signAITicket(actor, branch, model string, raw []byte) string {
-	t := aiTicket{actor, branch, model, newID("air_"), digest(string(raw)), s.backendKeys.Active, time.Now().Add(30 * time.Second).Unix()}
+	return s.signAITicketFor(actor, branch, model, raw, s.ai.Generation)
+}
+func (s *server) signAITicketFor(actor, branch, model string, raw []byte, generation int) string {
+	t := aiTicket{Actor: actor, Branch: branch, Model: model, ID: newID("air_"), Hash: digest(string(raw)), Version: s.backendKeys.Active, Expires: time.Now().Add(30 * time.Second).Unix(), Generation: generation}
 	b, _ := json.Marshal(t)
 	value := base64.RawURLEncoding.EncodeToString(b)
 	return value + "." + s.backendHash("ai-console-ticket", value, t.Version)
@@ -135,7 +141,12 @@ func (s *server) aiRead(w http.ResponseWriter, r *http.Request) {
 	enabled := s.ai != nil && s.backendKeys != nil && os.Getenv("NEON_AI_GATEWAY_URL") != ""
 	models := []map[string]any{}
 	if enabled {
-		models = s.ai.PublicModels()
+		snapshot, err := s.aiCatalog(r.Context(), false)
+		if err != nil {
+			fail(w, r, 503, "provider_catalog_unavailable", "Could not read published model routes")
+			return
+		}
+		models = snapshot.Config.PublicModels()
 	}
 	jsonResponse(w, 200, record{"enabled": enabled, "models": models, "public_endpoint": "/ai/v1/" + branch + "/v1", "supported_protocols": []string{"chat_completions"}, "billing_enabled": false, "reason": "operator_routes_text_chat_preview"})
 }
@@ -153,7 +164,12 @@ func (s *server) aiConsoleRequest(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 422, "invalid_request", "Invalid chat request")
 		return
 	}
-	q, _, e := aigateway.Decode(raw, s.ai)
+	snapshot, e := s.aiCatalog(r.Context(), false)
+	if e != nil {
+		fail(w, r, 503, "provider_catalog_unavailable", "Could not read published model routes")
+		return
+	}
+	q, _, e := aigateway.Decode(raw, snapshot.Config)
 	if e != nil {
 		fail(w, r, 422, "invalid_request", e.Error())
 		return
@@ -174,8 +190,10 @@ func (s *server) aiConsoleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	upstream.Header.Set("Content-Type", "application/json")
-	upstream.Header.Set("X-Neon-Console-Ticket", s.signAITicket(userFrom(r).ID, branch, q.Model, raw))
-	client := &http.Client{Timeout: time.Duration(s.ai.TimeoutSeconds+5) * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	upstream.Header.Set("X-Neon-Console-Ticket", s.signAITicketFor(userFrom(r).ID, branch, q.Model, raw, snapshot.Config.Generation))
+	transport := &http.Transport{Proxy: nil, ResponseHeaderTimeout: time.Duration(s.ai.TimeoutSeconds) * time.Second}
+	defer transport.CloseIdleConnections()
+	client := &http.Client{Transport: transport, Timeout: time.Duration(s.ai.TimeoutSeconds+5) * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	response, e := client.Do(upstream)
 	if e != nil {
 		fail(w, r, 502, "gateway_unavailable", "Inference outcome unavailable; request was not replayed")
@@ -242,7 +260,11 @@ func RunAIGateway(ctx context.Context) error {
 	if e = db.Ping(ctx); e != nil {
 		return errors.New("AI metadata unavailable")
 	}
-	s := &server{db: db, backendKeys: keys, ai: cfg}
+	providers, e := loadAIProviderSettings(true)
+	if e != nil {
+		return e
+	}
+	s := &server{db: db, backendKeys: keys, ai: cfg, aiProviders: providers}
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { jsonResponse(w, 200, record{"status": "ok"}) })
 	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
@@ -275,6 +297,12 @@ func RunAIGateway(ctx context.Context) error {
 func (s *server) aiPublic(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
+	snapshot, catalogErr := s.aiCatalog(r.Context(), true)
+	if catalogErr != nil || snapshot.Config == nil {
+		aigateway.Error(w, 503, "provider_catalog_unavailable")
+		return
+	}
+	cfg := snapshot.Config
 	branch := r.PathValue("branch")
 	model := ""
 	var q aigateway.ChatRequest
@@ -287,7 +315,7 @@ func (s *server) aiPublic(w http.ResponseWriter, r *http.Request) {
 			aigateway.Error(w, 400, "invalid_request")
 			return
 		}
-		q, route, e = aigateway.Decode(raw, s.ai)
+		q, route, e = aigateway.Decode(raw, cfg)
 		if e != nil {
 			aigateway.Error(w, 400, "invalid_request")
 			return
@@ -301,6 +329,10 @@ func (s *server) aiPublic(w http.ResponseWriter, r *http.Request) {
 		t, e := s.verifyAITicket(ticket, raw, branch, model)
 		if e != nil {
 			aigateway.Error(w, 401, "invalid_console_ticket")
+			return
+		}
+		if s.aiProviders != nil && t.Generation != cfg.Generation {
+			aigateway.Error(w, 409, "provider_catalog_changed")
 			return
 		}
 		actor = t.Actor
@@ -337,7 +369,7 @@ func (s *server) aiPublic(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if r.Method == http.MethodGet {
-		allowed := s.ai.PublicModels()
+		allowed := cfg.PublicModels()
 		if len(models) > 0 {
 			filtered := []map[string]any{}
 			for _, m := range allowed {
@@ -353,10 +385,18 @@ func (s *server) aiPublic(w http.ResponseWriter, r *http.Request) {
 		jsonResponse(w, 200, record{"object": "list", "data": allowed})
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(s.ai.TimeoutSeconds)*time.Second)
+	if snapshot.Unavailable[model] {
+		aigateway.Error(w, 503, "provider_credential_unavailable")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(cfg.TimeoutSeconds)*time.Second)
 	defer cancel()
-	admitted, e := s.reserveAIRequest(ctx, requestID, project, branch, actor, credential, q)
+	admitted, e := s.reserveAIRequestFor(ctx, requestID, project, branch, actor, credential, q, cfg)
 	if e != nil {
+		if errors.Is(e, errAIProviderCatalogChanged) {
+			aigateway.Error(w, 409, "provider_catalog_changed")
+			return
+		}
 		aigateway.Error(w, 503, "request_ledger_unavailable")
 		return
 	}
@@ -367,7 +407,7 @@ func (s *server) aiPublic(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("X-Request-ID", requestID)
 	started := time.Now()
-	outcome := aigateway.Forward(ctx, w, q, route, time.Duration(s.ai.TimeoutSeconds)*time.Second)
+	outcome := aigateway.Forward(ctx, w, q, route, time.Duration(cfg.TimeoutSeconds)*time.Second)
 	// A disconnected caller must not cancel settlement. On DB failure, preserve
 	// the running reservation for operator recovery; never infer zero token usage.
 	settle, close := context.WithTimeout(context.Background(), 5*time.Second)
@@ -383,11 +423,26 @@ func (s *server) aiPublic(w http.ResponseWriter, r *http.Request) {
 	}
 }
 func (s *server) reserveAIRequest(ctx context.Context, id, project, branch, actor, credential string, q aigateway.ChatRequest) (bool, error) {
+	return s.reserveAIRequestFor(ctx, id, project, branch, actor, credential, q, s.ai)
+}
+func (s *server) reserveAIRequestFor(ctx context.Context, id, project, branch, actor, credential string, q aigateway.ChatRequest, cfg *aigateway.Config) (bool, error) {
 	tx, e := s.db.Begin(ctx)
 	if e != nil {
 		return false, e
 	}
 	defer tx.Rollback(ctx)
+	if s.aiProviders != nil {
+		var revision int
+		if _, e = tx.Exec(ctx, `SELECT pg_advisory_xact_lock_shared(794210047)`); e != nil {
+			return false, e
+		}
+		if e = tx.QueryRow(ctx, `SELECT revision FROM ai_provider_catalog_state WHERE singleton`).Scan(&revision); e != nil {
+			return false, e
+		}
+		if cfg.Generation != s.ai.Generation+revision {
+			return false, errAIProviderCatalogChanged
+		}
+	}
 	hash := sha256.Sum256([]byte("ai-branch:" + branch))
 	lock := hex.EncodeToString(hash[:])
 	if _, e = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,0))`, lock); e != nil {
@@ -397,14 +452,14 @@ func (s *server) reserveAIRequest(ctx context.Context, id, project, branch, acto
 	if e = tx.QueryRow(ctx, `SELECT count(*) FILTER(WHERE state='running' AND expires_at>clock_timestamp()),count(*) FILTER(WHERE started_at>clock_timestamp()-interval '1 minute') FROM ai_gateway_requests WHERE branch_id=$1 AND started_at>clock_timestamp()-interval '5 minutes'`, branch).Scan(&active, &recent); e != nil {
 		return false, e
 	}
-	if active >= s.ai.MaxConcurrentPerBranch || recent >= s.ai.RequestsPerMinute {
+	if active >= cfg.MaxConcurrentPerBranch || recent >= cfg.RequestsPerMinute {
 		return false, nil
 	}
 	var cid any
 	if credential != "" {
 		cid = credential
 	}
-	_, e = tx.Exec(ctx, `INSERT INTO ai_gateway_requests(id,project_id,branch_id,actor_id,credential_id,model_id,route_generation,streaming,state,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'running',clock_timestamp()+make_interval(secs=>$9))`, id, project, branch, actor, cid, q.Model, s.ai.Generation, q.Stream, s.ai.TimeoutSeconds+10)
+	_, e = tx.Exec(ctx, `INSERT INTO ai_gateway_requests(id,project_id,branch_id,actor_id,credential_id,model_id,route_generation,streaming,state,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'running',clock_timestamp()+make_interval(secs=>$9))`, id, project, branch, actor, cid, q.Model, cfg.Generation, q.Stream, cfg.TimeoutSeconds+10)
 	if e != nil {
 		return false, e
 	}

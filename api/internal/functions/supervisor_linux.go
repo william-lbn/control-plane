@@ -166,7 +166,7 @@ func ServeGuest(ctx context.Context) (result error) {
 		return err
 	}
 	stage = "bootstrap-tls"
-	identity, err := b.ManagerTLS(time.Now())
+	_, err = b.ManagerTLS(time.Now())
 	if err != nil {
 		return err
 	}
@@ -244,23 +244,16 @@ func ServeGuest(ctx context.Context) (result error) {
 	if err = os.MkdirAll("/tmp/function", 0700); err != nil || os.Chown("/tmp/function", 65532, 65532) != nil {
 		return errors.New("guest child scratch directory unavailable")
 	}
-	if err = os.MkdirAll("/var/log/neon-function", 0700); err != nil {
-		return errors.New("guest log directory unavailable")
-	}
-	output, err := os.OpenFile("/var/log/neon-function/child.log", os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
-	if err != nil {
-		return errors.New("fresh guest log required")
-	}
-	defer output.Close()
+	journal := NewOutputJournal(b.DatabaseURL, b.Environment)
+	stdout, stderr := journal.Writer("stdout"), journal.Writer("stderr")
 	stage = "child"
 	command, err := group.Command(context.Background(), "/opt/neon/functions/runtime/boot.mjs", b.Environment, b.DatabaseURL)
 	if err != nil {
 		return err
 	}
 	command.Args = append(command.Args, "/srv/function/"+installed.Entry)
-	writer := &cappedLog{file: output, left: 1 << 20}
-	command.Stdout = writer
-	command.Stderr = writer
+	command.Stdout = stdout
+	command.Stderr = stderr
 	child, err := startChild(command, group)
 	if err != nil {
 		return err
@@ -276,6 +269,8 @@ func ServeGuest(ctx context.Context) (result error) {
 		if err := child.Stop(ctx); err != nil {
 			return err
 		}
+		stdout.Flush()
+		stderr.Flush()
 		// NeonVM init must not respawn this root supervisor while Worker retires VM.
 		if err := os.Remove("/neonvm/vmstart.allowed"); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return errors.New("guest respawn inhibition failed")
@@ -288,6 +283,11 @@ func ServeGuest(ctx context.Context) (result error) {
 	}
 	stage = "manager"
 	manager, err := NewManager(b.Scope, managerKey, "http://127.0.0.1:8081", stop)
+	if err != nil {
+		return err
+	}
+	manager.output = journal
+	identity, err := manager.EnableIdentityRenewal(b, time.Now())
 	if err != nil {
 		return err
 	}

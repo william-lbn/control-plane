@@ -35,6 +35,18 @@ func applyCatalogRenameSQL(ctx context.Context, conn *pgx.Conn, p catalogRenameP
 		return err
 	}
 	defer tx.Rollback(ctx)
+	if p.NativeIdentity != nil {
+		if p.NativeIdentity.Object.OID != p.ObjectOID {
+			return errors.New("rename binding OID rejected")
+		}
+		var scope catalogNativeScope
+		if err = tx.QueryRow(ctx, `SELECT current_setting('neon.tenant_id',true),current_setting('neon.timeline_id',true)`).Scan(&scope.TenantID, &scope.TimelineID); err != nil || scope != p.NativeIdentity.Scope {
+			return errCatalogInventoryScope
+		}
+		if err = verifyCatalogOwnerBindings(ctx, tx, p.catalogPayload); err != nil {
+			return err
+		}
+	}
 	if _, err = tx.Exec(ctx, `SET LOCAL lock_timeout='5s'; SET LOCAL statement_timeout='30s'`, pgx.QueryExecModeSimpleProtocol); err != nil {
 		return err
 	}
@@ -70,7 +82,7 @@ func applyCatalogRenameSQL(ctx context.Context, conn *pgx.Conn, p catalogRenameP
 			return sqlExecutionError{"catalog_rename", err}
 		}
 	}
-	if p.Kind == "role" {
+	if p.Kind == "role" && p.NativeIdentity == nil {
 		literal, err := conn.PgConn().EscapeString(verifier)
 		if err != nil {
 			return err

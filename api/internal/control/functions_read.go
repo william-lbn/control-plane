@@ -72,7 +72,7 @@ func (s *server) functionsList(w http.ResponseWriter, r *http.Request) {
 	for _, item := range items {
 		s.functionReadSummary(item)
 	}
-	jsonResponse(w, 200, record{"items": items, "next_cursor": next, "driver_enabled": s.functions != nil, "execution_mode": "console_envelope_preview"})
+	jsonResponse(w, 200, record{"items": items, "next_cursor": next, "driver_enabled": s.functions != nil, "branch_copy_enabled": s.functionBranchCopyEnabled(), "execution_mode": "console_envelope_preview"})
 }
 func (s *server) functionReadSummary(item record) {
 	// A deployment can be retained or have failed since the last VM observation.

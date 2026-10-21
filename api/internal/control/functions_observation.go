@@ -126,27 +126,39 @@ func failFunctionObservation(w http.ResponseWriter, r *http.Request, err error) 
 
 // Deliberately exclude customer NodeObservation, keys, environment, SQL URL,
 // Pod IPs and raw transport errors. Background work is explicitly unmetered;
-// these observations are never authorization for automatic retirement.
+// customer Node health never authorizes automatic retirement. The separately
+// verified supervisor counters and acknowledged idle policy govern that action.
 type functionRuntimeObservation struct {
-	FunctionID                string     `json:"function_id"`
-	DefinitionState           string     `json:"definition_state"`
-	DefinitionVersionToken    string     `json:"definition_version_token"`
-	GenerationToken           string     `json:"generation_token"`
-	Observed                  bool       `json:"observed"`
-	ObservationSource         string     `json:"observation_source"`
-	CheckedAt                 time.Time  `json:"checked_at"`
-	InstanceID                string     `json:"instance_id,omitempty"`
-	DeploymentID              string     `json:"deployment_id,omitempty"`
-	VMPhase                   string     `json:"vm_phase,omitempty"`
-	NodeReady                 *bool      `json:"node_ready,omitempty"`
-	Draining                  *bool      `json:"draining,omitempty"`
-	ActiveInvocations         *int       `json:"active_invocations,omitempty"`
-	LastActivity              *time.Time `json:"last_activity,omitempty"`
-	BackgroundCountersTrusted bool       `json:"background_counters_trusted"`
+	FunctionID                string                                 `json:"function_id"`
+	DefinitionState           string                                 `json:"definition_state"`
+	DefinitionVersionToken    string                                 `json:"definition_version_token"`
+	GenerationToken           string                                 `json:"generation_token"`
+	Observed                  bool                                   `json:"observed"`
+	ObservationSource         string                                 `json:"observation_source"`
+	CheckedAt                 time.Time                              `json:"checked_at"`
+	InstanceID                string                                 `json:"instance_id,omitempty"`
+	DeploymentID              string                                 `json:"deployment_id,omitempty"`
+	VMPhase                   string                                 `json:"vm_phase,omitempty"`
+	NodeReady                 *bool                                  `json:"node_ready,omitempty"`
+	Draining                  *bool                                  `json:"draining,omitempty"`
+	ActiveInvocations         *int                                   `json:"active_invocations,omitempty"`
+	LastActivity              *time.Time                             `json:"last_activity,omitempty"`
+	BackgroundCountersTrusted bool                                   `json:"background_counters_trusted"`
+	ManagerCertificate        *functionManagerCertificateObservation `json:"manager_certificate,omitempty"`
+}
+
+type functionManagerCertificateObservation struct {
+	Fingerprint string    `json:"fingerprint"`
+	ExpiresAt   time.Time `json:"expires_at"`
+	Renewals    int64     `json:"renewals"`
 }
 
 func observedFunctionRuntime(runtime publishedFunctionRuntime, status functions.InstanceStatus) functionRuntimeObservation {
-	return functionRuntimeObservation{FunctionID: runtime.target.FunctionID, DefinitionState: "active", DefinitionVersionToken: strconv.FormatInt(runtime.version, 10), GenerationToken: strconv.FormatInt(runtime.target.Generation, 10), Observed: true, ObservationSource: "authenticated_supervisor", CheckedAt: time.Now(), InstanceID: runtime.instance.Scope.InstanceID, DeploymentID: runtime.target.DeploymentID, VMPhase: "Running", NodeReady: &status.NodeReady, Draining: &status.Draining, ActiveInvocations: &status.ActiveInvocations, LastActivity: &status.LastActivity, BackgroundCountersTrusted: false}
+	out := functionRuntimeObservation{FunctionID: runtime.target.FunctionID, DefinitionState: "active", DefinitionVersionToken: strconv.FormatInt(runtime.version, 10), GenerationToken: strconv.FormatInt(runtime.target.Generation, 10), Observed: true, ObservationSource: "authenticated_supervisor", CheckedAt: time.Now(), InstanceID: runtime.instance.Scope.InstanceID, DeploymentID: runtime.target.DeploymentID, VMPhase: "Running", NodeReady: &status.NodeReady, Draining: &status.Draining, ActiveInvocations: &status.ActiveInvocations, LastActivity: &status.LastActivity, BackgroundCountersTrusted: false}
+	if v := status.ManagerIdentity; v != nil && v.Scope == runtime.instance.Scope && v.BootID == runtime.bootID {
+		out.ManagerCertificate = &functionManagerCertificateObservation{Fingerprint: v.Fingerprint, ExpiresAt: v.NotAfter, Renewals: v.Renewals}
+	}
+	return out
 }
 
 func (s *server) functionRuntimeRead(w http.ResponseWriter, r *http.Request) {

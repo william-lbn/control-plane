@@ -1,5 +1,8 @@
 import { FunctionRequestLogs } from './FunctionRequestLogs';
 import { ScheduleTriggers } from './ScheduleTriggers';
+import { FunctionOutput } from './FunctionOutput';
+import { FunctionBranchCopy } from './FunctionBranchCopy';
+import { FunctionCopyPlans } from './FunctionCopyPlans';
 import { useEffect, useRef, useState } from 'react';
 import { api, projectPath } from '../../api';
 import type { Branch, Page, Operation } from '../../api';
@@ -10,6 +13,7 @@ import './functions.css';
 import './authoring.css';
 import { RuntimePanel } from './RuntimePanel';
 import { HTTPPolicyPanel } from './HTTPPolicyPanel';
+import { WebSocketPanel } from './WebSocketPanel';
 
 type FunctionDefinition = {
   id: string;
@@ -86,6 +90,7 @@ export function Functions({
   const [refresh, setRefresh] = useState(0);
   const [observedAt, setObservedAt] = useState('');
   const [driver, setDriver] = useState(false);
+  const [copyDriver, setCopyDriver] = useState(false);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState('');
   const [operation, setOperation] = useState<Operation | null>(null);
@@ -127,13 +132,17 @@ export function Functions({
       setLoading(false);
       return () => controller.abort();
     }
-    api<Page<FunctionDefinition> & { driver_enabled: boolean }>(path + '?limit=100', {
-      signal: controller.signal,
-    })
+    api<Page<FunctionDefinition> & { driver_enabled: boolean; branch_copy_enabled: boolean }>(
+      path + '?limit=100',
+      {
+        signal: controller.signal,
+      },
+    )
       .then((data) => {
         if (disposed) return;
         setItems(data.items);
         setDriver(data.driver_enabled);
+        setCopyDriver(data.branch_copy_enabled);
         setObservedAt(new Date().toLocaleTimeString());
         setSelected(data.items[0]?.slug || '');
       })
@@ -365,7 +374,7 @@ export function Functions({
         <strong>{driver ? '原生 microVM 函数执行预览' : '此集群尚未启用函数部署与调用'}</strong>
         <p>
           {driver
-            ? '支持不可变 ZIP、环境版本、受控调用和手动停止。可显式开启独立 HTTP/SSE 入口及自动休眠唤醒；WebSocket、外部栅栏和生产准入尚未完成。数据库 owner 须明确授权；此页面不代替授权修改共享 PUBLIC 权限。'
+            ? '支持不可变 ZIP、环境版本、受控调用和手动停止。可显式开启 HTTP/SSE/WebSocket 入口、自动休眠唤醒及定时/对象触发器。数据库 owner 须明确授权；此页面不代替授权修改共享 PUBLIC 权限。'
             : '当前可查看已保存的定义和历史。部署、公开访问、数据库授权及休眠唤醒需通过独立验收后开放。'}
         </p>
       </section>
@@ -408,6 +417,25 @@ export function Functions({
             创建函数定义
           </button>
         </section>
+      )}
+      {driver && canEdit && (
+        <FunctionBranchCopy
+          key={`copy/${projectId}/${branch}`}
+          projectId={projectId}
+          targetBranch={branch}
+          branches={branches}
+          enabled={copyDriver}
+          disabled={busy}
+          onAccepted={(reply) => void mutate(() => Promise.resolve(reply))}
+        />
+      )}
+      {driver && (
+        <FunctionCopyPlans
+          key={`copy-plans/${projectId}/${branch}`}
+          projectId={projectId}
+          branch={branch}
+          onRefreshed={() => setRefresh((v) => v + 1)}
+        />
       )}
       {actionError && (
         <div className="error-box" role="alert">
@@ -490,6 +518,16 @@ export function Functions({
                   disabled={busy}
                 />
                 <FunctionRequestLogs path={`${path}/${current.slug}`} />
+                <FunctionOutput
+                  key={`output/${current.id}`}
+                  path={`${path}/${current.slug}`}
+                  canEdit={canEdit && !busy}
+                />
+                <WebSocketPanel
+                  key={`websocket/${current.id}`}
+                  url={current.invocation_url || null}
+                  enabled={!!current.public_enabled && !busy}
+                />
                 <ScheduleTriggers
                   key={`${path}/${current.slug}`}
                   path={path.replace(/\/functions$/, '/functions-triggers')}

@@ -330,7 +330,7 @@ export function Compute({
                 disabled={
                   readOnly ||
                   busy ||
-                  endpoint.state !== 'active' ||
+                  !['active', 'error'].includes(endpoint.state) ||
                   endpoint.workload_kind !== 'neonvm'
                 }
                 onClick={() => setDeleting(endpoint)}

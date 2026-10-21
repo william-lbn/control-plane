@@ -1,5 +1,13 @@
 {{- $name := include "neonControl.name" . -}}
 {{- $config := .Files.Get "files/nginx.conf" -}}
+{{- if and .Values.functions.enabled .Values.functions.publicHTTP.enabled -}}
+{{- $origin := required "functions.publicHTTP.origin is required" .Values.functions.publicHTTP.origin -}}
+{{- if not (regexMatch "^https?://[A-Za-z0-9.:\\[\\]-]+$" $origin) -}}
+{{- fail "Functions connect origin must be an exact HTTP(S) authority" -}}
+{{- end -}}
+{{- $socket := regexReplaceAll "^http" $origin "ws" -}}
+{{- $config = replace "connect-src 'self';" (printf "connect-src 'self' %s %s;" $origin $socket) $config -}}
+{{- end -}}
 {{- if not .Values.aiGateway.enabled -}}
 {{- $config = regexReplaceAll "(?s)    location \\^~ /ai/v1/ \\{.*?    \\}\\r?\\n" $config "" -}}
 {{- end -}}
@@ -28,7 +36,7 @@ spec:
         {{- include "neonControl.labels" . | nindent 8 }}
         app.kubernetes.io/component: web
       annotations:
-        checksum/config: {{ printf "%s-%t" (.Files.Get "files/nginx.conf") .Values.aiGateway.enabled | sha256sum }}
+        checksum/config: {{ $config | sha256sum }}
     spec:
       automountServiceAccountToken: false
       {{- with .Values.imagePullSecrets }}

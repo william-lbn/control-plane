@@ -1,6 +1,18 @@
 {{- define "neonControl.runtimeEnv" -}}
+{{- if and .Values.functions.managerCertificateRenewal.enabled (not .Values.functions.enabled) }}
+{{- fail "Manager certificate renewal requires functions.enabled" }}
+{{- end }}
+{{- if and .Values.functions.branchCopies.enabled (not .Values.functions.enabled) }}
+{{- fail "Function branch copies require functions.enabled" }}
+{{- end }}
+{{- if and .Values.functions.outputLogs.enabled (not .Values.functions.enabled) }}
+{{- fail "Function output collection requires functions.enabled" }}
+{{- end }}
 {{- if and .Values.functions.schedules.enabled (not .Values.functions.enabled) }}
 {{- fail "Functions schedules require functions.enabled" }}
+{{- end }}
+{{- if and .Values.functions.objectEvents.enabled (or (not .Values.functions.enabled) (not .Values.functions.publicHTTP.enabled) (not .Values.objectStorage.enabled)) }}
+{{- fail "Functions object events require Functions, public HTTP, and Object Storage" }}
 {{- end }}
 {{- if and .Values.objectStorage.s3.enabled (not .Values.objectStorage.enabled) }}
 {{- fail "S3 requires objectStorage.enabled" }}
@@ -10,6 +22,11 @@
 {{- fail "Functions schedules require functions.publicHTTP.enabled" }}
 {{- end }}
 - {name: NEON_FUNCTION_SCHEDULES_ENABLED, value: {{ .Values.functions.schedules.enabled | quote }}}
+- {name: NEON_FUNCTION_OBJECT_EVENTS_ENABLED, value: {{ .Values.functions.objectEvents.enabled | quote }}}
+- {name: NEON_FUNCTION_OUTPUT_ENABLED, value: {{ .Values.functions.outputLogs.enabled | quote }}}
+- {name: NEON_FUNCTION_BRANCH_COPY_ENABLED, value: {{ .Values.functions.branchCopies.enabled | quote }}}
+- {name: NEON_FUNCTION_MANAGER_RENEWAL_ENABLED, value: {{ .Values.functions.managerCertificateRenewal.enabled | quote }}}
+- {name: NEON_FUNCTION_MANAGER_RENEW_BEFORE_SECONDS, value: {{ .Values.functions.managerCertificateRenewal.renewBeforeSeconds | quote }}}
 - {name: NEON_FUNCTIONS_PREVIEW_ENABLED, value: 'true'}
 - {name: NEON_FUNCTIONS_CONFIG_FILE, value: /run/functions-common/config.json}
 {{- if .Values.functions.publicHTTP.enabled }}

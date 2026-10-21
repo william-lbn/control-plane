@@ -2,6 +2,7 @@ import http from 'node:http';
 import { once } from 'node:events';
 import { pathToFileURL } from 'node:url';
 import { invocationContext } from './context.mjs';
+import { createWebSocketServer, registerWebSocketRequest, upgradeForResponse } from './websocket.mjs';
 
 const maxRequestBytes = 1024 * 1024;
 const maxConcurrency = 16;
@@ -103,6 +104,70 @@ export async function startRuntime({ entry, port = 8081, deadlineMs = durationMs
     } finally {
       state.closed = true; active--; lastActivity = clock(); requests.delete(controller); clearTimeout(timer);
       controller.signal.removeEventListener('abort', abortResponse); outgoing.off('close', clientClosed);
+    }
+  });
+  const webSockets = createWebSocketServer();
+  server.on('upgrade', async (incoming, socket, head) => {
+    socket.on('error', () => {});
+    socket.pause();
+    let upgraded, finished = false;
+    const reject = (status, text) => {
+      if (!socket.destroyed) socket.end(`HTTP/1.1 ${status} Rejected\r\nConnection: close\r\nContent-Type: text/plain\r\nContent-Length: ${Buffer.byteLength(text)}\r\n\r\n${text}`);
+    };
+    if (draining || active + pending >= maxConcurrency) { reject(429, 'Function capacity unavailable'); return; }
+    if (incoming.method !== 'GET' || incoming.headers.upgrade?.toLowerCase() !== 'websocket' || incoming.headers['transfer-encoding'] || Number(incoming.headers['content-length'] || 0) !== 0) { reject(400, 'Invalid WebSocket handshake'); return; }
+    const controller = new AbortController(), state = { pending: [], closed: false };
+    requests.add(controller); active++; lastActivity = clock();
+    const abort = () => { upgraded?.terminate(); socket.destroy(); };
+    const timer = setTimeout(() => controller.abort(), deadlineMs);
+    controller.signal.addEventListener('abort', abort, { once: true });
+    try {
+      const url = new URL(incoming.headers['x-neon-request-url']);
+      if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) throw new Error('Invalid invocation URL');
+      const headers = new Headers();
+      for (const [key, value] of Object.entries(incoming.headers)) {
+        if ((excludedHeaders.has(key) && key !== 'upgrade') || key === 'host' || value === undefined) continue;
+        headers.set(key, Array.isArray(value) ? value.join(', ') : value);
+      }
+      const request = new Request(url, { method: 'GET', headers, signal: controller.signal });
+      const binding = registerWebSocketRequest(request);
+      let onAbort;
+      const cancelled = new Promise((_, reject) => { onAbort = () => reject(new Error('Invocation cancelled')); controller.signal.addEventListener('abort', onAbort, { once: true }); if (controller.signal.aborted) onAbort(); });
+      try {
+        await invocationContext.run(state, async () => {
+          const response = await Promise.race([handler(request), cancelled]);
+          const upgrade = upgradeForResponse(response, request);
+          if (binding.upgrade && !upgrade) { reject(500, 'websocket_upgrade_response_lost'); finished = true; return; }
+          if (!upgrade) {
+            if (!(response instanceof Response) || response.status < 200 || response.status > 599) throw new Error('Invalid handler response');
+            await response.body?.cancel(); reject(response.status, 'WebSocket handshake rejected by function'); finished = true; return;
+          }
+          if (controller.signal.aborted || socket.destroyed) return;
+          incoming.neonSelectedProtocol = upgrade.protocol;
+          await Promise.race([new Promise((resolve, reject) => {
+            socket.once('close', resolve);
+            try { webSockets.handleUpgrade(incoming, socket, head, ws => {
+              upgraded = ws;
+              ws.once('close', resolve);
+              upgrade.socket.bind(ws, upgrade.protocol);
+              socket.resume();
+            }); } catch (error) { reject(error); }
+          }), cancelled]);
+          finished = true;
+          if (state.pending.length) {
+            active--; pending++;
+            try { const results = await Promise.race([Promise.all(state.pending), cancelled]); failures += results.filter(success => !success).length; }
+            finally { pending--; active++; }
+          }
+        });
+      } finally { controller.signal.removeEventListener('abort', onAbort); }
+    } catch {
+      failures++;
+      if (!upgraded && !finished && !controller.signal.aborted) reject(502, 'Function execution failed');
+      else if (!finished) socket.destroy();
+    } finally {
+      state.closed = true; active--; lastActivity = clock(); requests.delete(controller); clearTimeout(timer);
+      controller.signal.removeEventListener('abort', abort);
     }
   });
   server.requestTimeout = durationMs;

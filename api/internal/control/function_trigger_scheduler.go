@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/william-lbn/control-plane/api/internal/functions"
@@ -15,10 +16,13 @@ import (
 // Snapshots contain routing metadata only. Customer bodies, credentials, URLs,
 // headers and environment are never persisted in the occurrence queue.
 type functionTriggerSnapshot struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	Slug string `json:"slug"`
-	Path string `json:"path"`
+	ID        string              `json:"id"`
+	Name      string              `json:"name"`
+	Slug      string              `json:"slug"`
+	Path      string              `json:"path"`
+	Type      string              `json:"type,omitempty"`
+	LogicalID string              `json:"logical_invocation_id,omitempty"`
+	Object    *storageCreatedData `json:"object,omitempty"`
 }
 type functionTriggerRun struct {
 	ID, Trigger, Project, Branch, Function, Actor, Owner string
@@ -26,6 +30,7 @@ type functionTriggerRun struct {
 	Scheduled                                            time.Time
 	Snapshot                                             functionTriggerSnapshot
 	Attempts                                             int
+	ObjectEvent, Parent                                  string
 }
 
 func (s *server) runFunctionScheduleController(ctx context.Context) {
@@ -62,7 +67,7 @@ func (s *server) enqueueFunctionSchedules(ctx context.Context) error {
 	rows, err := tx.Query(ctx, `SELECT t.id,t.project_id,t.branch_id,t.function_id,t.actor_id,t.generation,t.next_run_at,t.name,f.slug,t.function_path,t.cron
  FROM function_triggers t JOIN function_definitions f ON f.id=t.function_id
  JOIN branches b ON b.id=t.branch_id JOIN projects p ON p.id=t.project_id JOIN organizations o ON o.id=t.org_id
- WHERE t.state='ready' AND t.enabled AND t.next_run_at<=$1 AND f.state NOT IN ('deleting','deleted')
+ WHERE t.type='schedule' AND t.state='ready' AND t.enabled AND t.next_run_at<=$1 AND f.state NOT IN ('deleting','deleted')
  AND b.state='ready' AND b.deleted_at IS NULL AND p.state='ready' AND p.deleted_at IS NULL AND o.state='active'
  ORDER BY t.next_run_at,t.id LIMIT 16 FOR UPDATE OF t SKIP LOCKED`, now)
 	if err != nil {
@@ -115,7 +120,7 @@ func (s *server) enqueueFunctionSchedules(ctx context.Context) error {
 			code = "schedule_misfire"
 		}
 		_, err = tx.Exec(ctx, `INSERT INTO function_trigger_invocations(id,trigger_id,project_id,branch_id,function_id,actor_id,trigger_generation,scheduled_at,snapshot,state,finished_at,error_code)
-  VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT(trigger_id,branch_id,scheduled_at) DO NOTHING`, id, run.Trigger, run.Project, run.Branch, run.Function, run.Actor, run.Generation, run.Scheduled, snapshot, state, finished, code)
+  VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT(trigger_id,branch_id,scheduled_at) WHERE object_event_id IS NULL DO NOTHING`, id, run.Trigger, run.Project, run.Branch, run.Function, run.Actor, run.Generation, run.Scheduled, snapshot, state, finished, code)
 		if err != nil {
 			return err
 		}
@@ -160,10 +165,17 @@ func (s *server) claimFunctionTrigger(ctx context.Context) (*functionTriggerRun,
 		return nil, err
 	}
 	run := &functionTriggerRun{Owner: newID("trigger_worker_")}
+	allowed := []string{}
+	if s.functionSchedulesEnabled() {
+		allowed = append(allowed, "schedule")
+	}
+	if s.functionObjectEventsEnabled() {
+		allowed = append(allowed, "storage_object_created")
+	}
 	var raw []byte
-	err = tx.QueryRow(ctx, `WITH candidate AS (SELECT id FROM function_trigger_invocations WHERE state='queued' AND next_attempt_at<=clock_timestamp() AND attempts<3 ORDER BY next_attempt_at,admitted_at,id LIMIT 1 FOR UPDATE SKIP LOCKED)
+	err = tx.QueryRow(ctx, `WITH candidate AS (SELECT id FROM function_trigger_invocations WHERE state='queued' AND next_attempt_at<=clock_timestamp() AND attempts<3 AND COALESCE(snapshot->>'type','schedule')=ANY($2) ORDER BY next_attempt_at,admitted_at,id LIMIT 1 FOR UPDATE SKIP LOCKED)
  UPDATE function_trigger_invocations i SET state='dispatching',attempts=attempts+1,lease_owner=$1,lease_expires_at=clock_timestamp()+interval '300 seconds',started_at=COALESCE(started_at,clock_timestamp())
- FROM candidate c WHERE i.id=c.id RETURNING i.id,i.trigger_id,i.project_id,i.branch_id,i.function_id,i.actor_id,i.trigger_generation,i.scheduled_at,i.snapshot,i.attempts`, run.Owner).Scan(&run.ID, &run.Trigger, &run.Project, &run.Branch, &run.Function, &run.Actor, &run.Generation, &run.Scheduled, &raw, &run.Attempts)
+ FROM candidate c WHERE i.id=c.id RETURNING i.id,i.trigger_id,i.project_id,i.branch_id,i.function_id,i.actor_id,i.trigger_generation,i.scheduled_at,i.snapshot,i.attempts,COALESCE(i.object_event_id,''),COALESCE(i.parent_invocation_id,'')`, run.Owner, allowed).Scan(&run.ID, &run.Trigger, &run.Project, &run.Branch, &run.Function, &run.Actor, &run.Generation, &run.Scheduled, &raw, &run.Attempts, &run.ObjectEvent, &run.Parent)
 	if isNoRows(err) {
 		return nil, tx.Commit(ctx)
 	}
@@ -176,6 +188,13 @@ func (s *server) claimFunctionTrigger(ctx context.Context) (*functionTriggerRun,
 	if !functionTriggerID.MatchString(run.Snapshot.ID) || run.Trigger != run.Snapshot.ID || !triggers.ValidName(run.Snapshot.Name) || !functions.ValidSlug(run.Snapshot.Slug) || !triggers.ValidPath(run.Snapshot.Path) {
 		return nil, errors.New("invalid durable trigger snapshot")
 	}
+	if run.Snapshot.Type == "storage_object_created" {
+		if !storageEventIDPattern.MatchString(run.ObjectEvent) || run.Snapshot.Object == nil || !functions.ValidTriggerInvocationID(run.Snapshot.LogicalID) || (run.Parent == "" && run.ID != run.Snapshot.LogicalID) || (run.Parent != "" && run.Parent != run.Snapshot.LogicalID) || !storageBucketName.MatchString(run.Snapshot.Object.Bucket) || !validStorageKey(run.Snapshot.Object.Key) {
+			return nil, errors.New("invalid durable object occurrence")
+		}
+	} else if run.ObjectEvent != "" || run.Parent != "" || run.Snapshot.Object != nil || run.Snapshot.LogicalID != "" {
+		return nil, errors.New("invalid durable schedule occurrence")
+	}
 	if err = tx.Commit(ctx); err != nil {
 		return nil, err
 	}
@@ -186,7 +205,11 @@ func (s *server) finishFunctionTrigger(run functionTriggerRun, state, code strin
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	if retry && run.Attempts < 3 {
-		s.db.Exec(ctx, `UPDATE function_trigger_invocations SET state='queued',next_attempt_at=clock_timestamp()+interval '15 seconds',error_code=$3,lease_owner=NULL,lease_expires_at=NULL WHERE id=$1 AND state='dispatching' AND lease_owner=$2 AND lease_expires_at>clock_timestamp()`, run.ID, run.Owner, code)
+		delay := 15
+		if run.ObjectEvent != "" {
+			delay = 2 * run.Attempts
+		}
+		s.db.Exec(ctx, `UPDATE function_trigger_invocations SET state='queued',next_attempt_at=clock_timestamp()+make_interval(secs=>$4),error_code=$3,lease_owner=NULL,lease_expires_at=NULL WHERE id=$1 AND state='dispatching' AND lease_owner=$2 AND lease_expires_at>clock_timestamp()`, run.ID, run.Owner, code, delay)
 		return
 	}
 	var applicationStatus any
@@ -259,20 +282,30 @@ func (s *server) dispatchFunctionTrigger(ctx context.Context, run functionTrigge
 		fail("skipped", "actor_authorization_revoked", false)
 		return
 	}
-	body, _ := json.Marshal(record{"version": 1, "invocation_id": run.ID, "trigger": record{"type": "schedule", "id": run.Trigger, "name": run.Snapshot.Name}, "data": record{"scheduled_at": run.Scheduled.UTC()}})
-	invocation := functions.Invocation{BootID: runtime.bootID, Generation: runtime.target.Generation, Method: http.MethodPost, URL: functionPublicOrigin() + "/functions/v1/" + run.Branch + "/" + run.Snapshot.Slug + run.Snapshot.Path, Headers: map[string][]string{"Content-Type": {"application/json"}}, Body: body, TriggerInvocationID: run.ID}
+	logical, channel, requestIDValue := run.ID, "schedule", run.ID
+	typeName := "schedule"
+	data := record{"scheduled_at": run.Scheduled.UTC()}
+	if run.ObjectEvent != "" {
+		logical = run.Snapshot.LogicalID
+		channel = "object_storage"
+		requestIDValue = run.ID + "-" + strconv.Itoa(run.Attempts)
+		typeName = "storage_object_created"
+		data = record{"bucket_name": run.Snapshot.Object.Bucket, "object_key": run.Snapshot.Object.Key, "sha256": run.Snapshot.Object.SHA256, "size": run.Snapshot.Object.Size, "event_id": run.ObjectEvent}
+	}
+	body, _ := json.Marshal(record{"version": 1, "invocation_id": logical, "trigger": record{"type": typeName, "id": run.Trigger, "name": run.Snapshot.Name}, "data": data})
+	invocation := functions.Invocation{BootID: runtime.bootID, Generation: runtime.target.Generation, Method: http.MethodPost, URL: functionPublicOrigin() + "/functions/v1/" + run.Branch + "/" + run.Snapshot.Slug + run.Snapshot.Path, Headers: map[string][]string{"Content-Type": {"application/json"}}, Body: body, TriggerInvocationID: logical}
 	if !functions.ValidateInvocation(runtime.instance.Scope, invocation) {
 		fail("failed", "trigger_envelope_rejected", false)
 		return
 	}
-	request, _ := http.NewRequestWithContext(context.WithValue(ctx, requestIDKey, run.ID), http.MethodPost, "http://schedule.internal", nil)
-	event, err := s.beginFunctionEvent(ctx, request, runtime.target, runtime.instance.Scope.InstanceID, "schedule", http.MethodPost)
+	request, _ := http.NewRequestWithContext(context.WithValue(ctx, requestIDKey, requestIDValue), http.MethodPost, "http://trigger.internal", nil)
+	event, err := s.beginFunctionEvent(ctx, request, runtime.target, runtime.instance.Scope.InstanceID, channel, http.MethodPost)
 	if err != nil {
 		fail("failed", "request_journal_unavailable", true)
 		return
 	}
-	tag, err := s.db.Exec(ctx, `UPDATE function_trigger_invocations SET request_event_id=$3 WHERE id=$1 AND state='dispatching' AND lease_owner=$2 AND lease_expires_at>clock_timestamp() AND request_event_id IS NULL`, run.ID, run.Owner, event.ID)
-	if err != nil || tag.RowsAffected() != 1 {
+	err = s.attachFunctionTriggerAttempt(ctx, run, event.ID)
+	if err != nil {
 		s.finishFunctionEvent(event, 0, 0, "outcome_unknown")
 		fail("outcome_unknown", "dispatch_admission_unconfirmed", false)
 		return
@@ -295,5 +328,6 @@ func (s *server) dispatchFunctionTrigger(ctx context.Context, run functionTrigge
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		state, code = "failed", "application_response_failed"
 	}
-	s.finishFunctionTrigger(run, state, code, response.StatusCode, n, false)
+	retry := run.ObjectEvent != "" && (response.StatusCode == 429 || response.StatusCode >= 500)
+	s.finishFunctionTrigger(run, state, code, response.StatusCode, n, retry)
 }

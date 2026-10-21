@@ -12,6 +12,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -284,6 +285,182 @@ func TestEndpointDeletionIntegration(t *testing.T) {
 		}
 		if e = service.reserveEndpointCredentials(ctx, payload, password); e != nil || newSecrets != 1 {
 			t.Fatal("replacement writer credential reservation failed", e)
+		}
+	})
+	addFailed := func(endpoint, original string) {
+		t.Helper()
+		exec(`INSERT INTO endpoints(id,project_id,branch_id,selector,workload_kind,workload_name,service_name,state,role_name,database_name,endpoint_type,created_at,updated_at) VALUES($1,'prj_epdelete','br_epdelete',$2,'neonvm',$3,$3,'provisioning','cloud_admin','postgres','read_only',now(),now())`, endpoint, selector(endpoint), kubeName(endpoint))
+		payload, _ := json.Marshal(createPayload{ProjectID: "prj_epdelete", BranchID: "br_epdelete", EndpointID: endpoint})
+		exec(`INSERT INTO operations(id,project_id,resource_type,resource_id,action,state,actor_id,request_id,payload,finished_at,retryable) VALUES($1,'prj_epdelete','endpoint',$2,'create_endpoint','failed','editor_epdelete','original-create-failure',$3,now(),true)`, original, endpoint, payload)
+		exec(`UPDATE endpoints SET state='error' WHERE id=$1`, endpoint)
+	}
+	t.Run("failed_creation_requires_original_receipt_and_preserves_absent_route", func(t *testing.T) {
+		id, original := "ep_failed", "op_failed_original"
+		addFailed(id, original)
+		path := base + "/endpoints/" + id
+		body := `{"confirm_selector":"ep-failed"}`
+		beforeWrites := writes
+		request("viewer_epdelete", "DELETE", path, body, "failed-cleanup", `"1"`, 403)
+		request("outside_epdelete", "DELETE", path, body, "failed-cleanup", `"1"`, 404)
+		request("editor_epdelete", "DELETE", path, body, "failed-cleanup", `"99"`, 412)
+		exec(`UPDATE operations SET payload=jsonb_set(payload,'{branch_id}','"wrong-branch"') WHERE id=$1`, original)
+		request("editor_epdelete", "DELETE", path, body, "failed-cleanup", `"1"`, 409)
+		exec(`UPDATE operations SET payload=jsonb_set(payload,'{branch_id}','"br_epdelete"'),state='succeeded' WHERE id=$1`, original)
+		request("editor_epdelete", "DELETE", path, body, "failed-cleanup", `"1"`, 409)
+		exec(`UPDATE operations SET state='failed' WHERE id=$1`, original)
+		if writes != beforeWrites {
+			t.Fatal("rejected cleanup touched Kubernetes")
+		}
+		v := request("editor_epdelete", "DELETE", path, body, "failed-cleanup", `"1"`, 202)
+		op := stringVal(v["operation"].(map[string]any)["id"])
+		if v["operation"].(map[string]any)["action"] != "cleanup_failed_endpoint" {
+			t.Fatal("failed cleanup was sent to an old Worker action")
+		}
+		var raw []byte
+		if err := db.QueryRow(ctx, `SELECT payload FROM operations WHERE id=$1`, op).Scan(&raw); err != nil {
+			t.Fatal(err)
+		}
+		var scope endpointDeletionPayload
+		if json.Unmarshal(raw, &scope) != nil || scope.FailedCreateOperationID != original {
+			t.Fatal("original failed creation not bound")
+		}
+		request("editor_epdelete", "POST", base+"/operations/"+original+"/retry", "", "", "", 409)
+		_, unleased := db.Exec(ctx, `INSERT INTO failed_endpoint_resource_bindings(operation_id,resource_kind,project_id,endpoint_id,namespace,resource_name,observed_uid) VALUES($1,'vm','prj_epdelete','ep_failed','neon','cp-failed','forged-unleased-uid')`, op)
+		var unleasedDenied *pgconn.PgError
+		if !errors.As(unleased, &unleasedDenied) || unleasedDenied.Code != "23514" {
+			t.Fatal("queued or unleased Worker could pin a destructive VM identity", unleased)
+		}
+		if err := s.workOnce(ctx, "failed-cleanup-worker"); err != nil {
+			t.Fatal(err)
+		}
+		v = request("editor_epdelete", "GET", base+"/operations/"+op, "", "", "", 200)
+		if v["state"] != "succeeded" || writes != beforeWrites {
+			t.Fatal("absent route was rewritten or cleanup failed", v)
+		}
+		var uid, originalState string
+		if err := db.QueryRow(ctx, `SELECT observed_uid FROM failed_endpoint_resource_bindings WHERE operation_id=$1 AND resource_kind='vm'`, op).Scan(&uid); err != nil || uid != "" {
+			t.Fatal("verified absence was not retained", err)
+		}
+		if err := db.QueryRow(ctx, `SELECT state FROM operations WHERE id=$1`, original).Scan(&originalState); err != nil || originalState != "failed" {
+			t.Fatal("original failure was rewritten", err)
+		}
+		_, err := db.Exec(ctx, `UPDATE failed_endpoint_resource_bindings SET observed_uid='replacement' WHERE operation_id=$1`, op)
+		var denied *pgconn.PgError
+		if !errors.As(err, &denied) || denied.Code != "23514" {
+			t.Fatal("VM witness could be rewritten", err)
+		}
+		v = request("editor_epdelete", "DELETE", path, body, "failed-cleanup", `"1"`, 202)
+		if v["operation"].(map[string]any)["id"] != op {
+			t.Fatal("cleanup replay changed operation")
+		}
+		request("editor_epdelete", "POST", base+"/operations/"+original+"/retry", "", "", "", 409)
+	})
+	t.Run("failed_cleanup_unknown_deletes_never_adopt_vm_or_service_replacements_on_retry", func(t *testing.T) {
+		id, original := "ep_failed_vm", "op_failed_vm_original"
+		addFailed(id, original)
+		var phase, deletes, servicePhase, serviceDeletes atomic.Int32
+		probeRoutes := map[string]record{selector(id): {"project_id": "prj_epdelete", "branch_id": "br_epdelete", "state": "active"}, "unrelated": {"project_id": "foreign", "branch_id": "foreign", "state": "active"}}
+		probe := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch {
+			case strings.HasSuffix(r.URL.Path, "/secrets/"+routesSecret):
+				if r.Method == http.MethodPut {
+					var secret record
+					_ = json.NewDecoder(r.Body).Decode(&secret)
+					text, _ := secretText(secret, "routes.json")
+					_ = json.Unmarshal([]byte(text), &probeRoutes)
+					if probeRoutes["unrelated"]["state"] != "active" {
+						t.Error("unrelated route changed")
+					}
+				}
+				raw, _ := json.Marshal(probeRoutes)
+				jsonResponse(w, 200, record{"metadata": record{"resourceVersion": "42"}, "data": record{"routes.json": base64.StdEncoding.EncodeToString(raw)}})
+			case strings.HasSuffix(r.URL.Path, "/virtualmachines/"+kubeName(id)):
+				if phase.Load() == 2 {
+					jsonResponse(w, 404, record{})
+					return
+				}
+				if r.Method == http.MethodDelete {
+					deletes.Add(1)
+					var options record
+					_ = json.NewDecoder(r.Body).Decode(&options)
+					if nested(options, "preconditions", "uid") != "vm-original" || nested(options, "preconditions", "resourceVersion") != "42" {
+						t.Error("original UID/RV not used")
+					}
+					phase.Store(1)
+					jsonResponse(w, 503, record{})
+					return // Original delete committed; reply was lost.
+				}
+				uid := "vm-original"
+				if phase.Load() == 1 {
+					uid = "vm-successor"
+				}
+				jsonResponse(w, 200, record{"metadata": record{"uid": uid, "resourceVersion": "42", "labels": credentialLabels("prj_epdelete", id)}})
+			case strings.HasSuffix(r.URL.Path, "/pods"):
+				jsonResponse(w, 200, record{"items": []any{}})
+			case strings.HasSuffix(r.URL.Path, "/services/"+kubeName(id)):
+				if servicePhase.Load() == 2 {
+					jsonResponse(w, 404, record{})
+					return
+				}
+				if r.Method == http.MethodDelete {
+					serviceDeletes.Add(1)
+					var options record
+					_ = json.NewDecoder(r.Body).Decode(&options)
+					if nested(options, "preconditions", "uid") != "service-original" || nested(options, "preconditions", "resourceVersion") != "73" {
+						t.Error("original Service UID/RV not used")
+					}
+					servicePhase.Store(1)
+					jsonResponse(w, 503, record{})
+					return
+				}
+				uid := "service-original"
+				if servicePhase.Load() == 1 {
+					uid = "service-successor"
+				}
+				jsonResponse(w, 200, record{"metadata": record{"uid": uid, "resourceVersion": "73", "labels": credentialLabels("prj_epdelete", id)}, "spec": record{"type": "ClusterIP", "selector": record{"vm.neon.tech/name": kubeName(id)}}})
+			default:
+				t.Errorf("unexpected request %s %s", r.Method, r.URL.Path)
+				jsonResponse(w, 404, record{})
+			}
+		}))
+		defer probe.Close()
+		previous := s.kube
+		s.kube = &kubeClient{base: probe.URL, namespace: "neon", http: probe.Client()}
+		defer func() { s.kube = previous }()
+		confirmation, _ := json.Marshal(record{"confirm_selector": selector(id)})
+		v := request("editor_epdelete", "DELETE", base+"/endpoints/"+id, string(confirmation), "failed-vm-cleanup", `"1"`, 202)
+		op := stringVal(v["operation"].(map[string]any)["id"])
+		for attempt := 0; attempt < 5; attempt++ {
+			if attempt > 0 {
+				request("editor_epdelete", "POST", base+"/operations/"+op+"/retry", "", "", "", 202)
+			}
+			if attempt >= 2 {
+				phase.Store(2)
+			} // The unrelated successor disappeared normally; never delete it here.
+			if attempt == 4 {
+				servicePhase.Store(2)
+			}
+			if err := s.workOnce(ctx, "failed-vm-worker"); err != nil {
+				t.Fatal(err)
+			}
+			state := request("editor_epdelete", "GET", base+"/operations/"+op, "", "", "", 200)
+			want := "failed"
+			if attempt == 4 {
+				want = "succeeded"
+			}
+			if state["state"] != want || deletes.Load() != 1 {
+				t.Fatal("successor adopted or failed receipt hidden", attempt, state, deletes.Load())
+			}
+			if attempt >= 2 && serviceDeletes.Load() != 1 {
+				t.Fatal("Service successor was adopted or original DELETE lost", serviceDeletes.Load())
+			}
+		}
+		var uid string
+		if err := db.QueryRow(ctx, `SELECT observed_uid FROM failed_endpoint_resource_bindings WHERE operation_id=$1 AND resource_kind='vm'`, op).Scan(&uid); err != nil || uid != "vm-original" {
+			t.Fatal("original UID witness changed", err, uid)
+		}
+		if err := db.QueryRow(ctx, `SELECT observed_uid FROM failed_endpoint_resource_bindings WHERE operation_id=$1 AND resource_kind='service'`, op).Scan(&uid); err != nil || uid != "service-original" {
+			t.Fatal("original Service witness changed", err, uid)
 		}
 	})
 }

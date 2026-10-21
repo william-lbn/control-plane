@@ -16,6 +16,7 @@ type RuntimeObservation = {
   draining?: boolean;
   active_invocations?: number;
   last_activity?: string;
+  manager_certificate?: { fingerprint: string; expires_at: string; renewals: number };
   background_counters_trusted: false;
 };
 
@@ -131,11 +132,22 @@ export function RuntimePanel({
                 </dd>
               </div>
             )}
+            {observation.manager_certificate && (
+              <div data-testid="function-manager-certificate">
+                <dt>管理证书</dt>
+                <dd>
+                  到期 {new Date(observation.manager_certificate.expires_at).toLocaleString()} ·
+                  当前实例已续期 {observation.manager_certificate.renewals} 次
+                  <code>{observation.manager_certificate.fingerprint}</code>
+                </dd>
+              </div>
+            )}
           </dl>
         </>
       )}
       <p className="muted">
-        后台任务未计量；这些观测不能用于自动停止，也不代表 SQL、历史指标或计费验收。
+        后台任务未计量。自动休眠仅使用原受信任 supervisor 的调用计数与空闲时间；Node
+        就绪信息不作为资源安全保证，也不代表 SQL、历史指标或计费验收。
       </p>
     </section>
   );

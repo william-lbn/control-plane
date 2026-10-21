@@ -595,6 +595,60 @@
               "type": "boolean"
             }
           }
+        },
+        "objectEvents": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            }
+          }
+        },
+        "outputLogs": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            }
+          }
+        },
+        "branchCopies": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            }
+          }
+        },
+        "managerCertificateRenewal": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "renewBeforeSeconds"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "renewBeforeSeconds": {
+              "type": "integer",
+              "minimum": 600,
+              "maximum": 7140
+            }
+          }
         }
       },
       "allOf": [
@@ -666,6 +720,26 @@
       "properties": {
         "enabled": {
           "type": "boolean"
+        }
+      }
+    },
+    "aiProviderManagement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "existingPublicSecret",
+        "existingPrivateSecret"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "existingPublicSecret": {
+          "type": "string"
+        },
+        "existingPrivateSecret": {
+          "type": "string"
         }
       }
     }

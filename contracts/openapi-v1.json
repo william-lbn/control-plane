@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.48.0",
+    "version": "0.69.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -37,6 +37,9 @@
     },
     {
       "name": "AI Gateway"
+    },
+    {
+      "name": "AI Providers"
     }
   ],
   "components": {
@@ -326,6 +329,60 @@
               "timestamp",
               "lsn"
             ]
+          },
+          "expires_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "ttl_interval_seconds": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 1,
+            "maximum": 2592000
+          },
+          "expiration_generation": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "expiration_actor_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expiration_operation_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expiration_status": {
+            "type": "string",
+            "enum": [
+              "none",
+              "scheduled",
+              "blocked",
+              "retiring",
+              "retired"
+            ]
+          },
+          "expiration_error_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expiration_last_checked_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
           }
         }
       },
@@ -401,6 +458,9 @@
             "type": "integer",
             "minimum": 60,
             "maximum": 3600
+          },
+          "connection_defaults": {
+            "$ref": "#/components/schemas/ConnectionDefaults"
           }
         }
       },
@@ -797,6 +857,22 @@
             "type": "string",
             "pattern": "^[0-9A-Fa-f]{1,8}/[0-9A-Fa-f]{1,8}$",
             "description": "Retained WAL point, mutually exclusive with parent_timestamp. A distinct branch is created; existing Endpoints are unchanged."
+          },
+          "function_copy_policy": {
+            "type": "string",
+            "enum": [
+              "inherit_paused",
+              "omit"
+            ],
+            "description": "With verified branch-copy driver enabled defaults to inherit_paused, otherwise omit. Freeze accepted parent Function metadata/code/env and disabled trigger configuration in this original branch creation transaction. No Writer means pending preparation until its first native Writer is ready."
+          },
+          "acknowledge_function_environment_copy": {
+            "type": "boolean",
+            "description": "Required true when inherit_paused would copy any non-retired parent Functions. Values are never returned by the admission API."
+          },
+          "acknowledge_current_functions_for_historical_data": {
+            "type": "boolean",
+            "description": "Historical SQL restore additionally requires this consent: use Function code/env frozen at this request admission, not code from the historical SQL data point."
           }
         },
         "not": {
@@ -1408,6 +1484,10 @@
           },
           "replication": {
             "type": "boolean"
+          },
+          "management_excluded": {
+            "type": "boolean",
+            "description": "Inherited external or replaced SQL identity is retained outside platform catalog mutations."
           }
         }
       },
@@ -1441,6 +1521,10 @@
           "size_bytes": {
             "type": "integer",
             "format": "int64"
+          },
+          "management_excluded": {
+            "type": "boolean",
+            "description": "Inherited external or replaced SQL identity is retained outside platform catalog mutations."
           }
         }
       },
@@ -3290,6 +3374,31 @@
           "last_activity": {
             "type": "string",
             "format": "date-time"
+          },
+          "manager_certificate": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "fingerprint",
+              "expires_at",
+              "renewals"
+            ],
+            "properties": {
+              "fingerprint": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "expires_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "renewals": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2147483648
+              }
+            },
+            "description": "Authenticated original supervisor leaf metadata; absent for a paused or older Guest. Does not expose the private key or authorize a new boot."
           }
         },
         "allOf": [
@@ -5239,12 +5348,15 @@
         "required": [
           "type",
           "name",
-          "function_slug",
-          "schedule"
+          "function_slug"
         ],
         "properties": {
           "type": {
-            "const": "schedule"
+            "type": "string",
+            "enum": [
+              "schedule",
+              "storage_object_created"
+            ]
           },
           "name": {
             "type": "string",
@@ -5278,8 +5390,64 @@
           },
           "enabled": {
             "type": "boolean"
+          },
+          "storage_object_created": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "bucket_name"
+            ],
+            "properties": {
+              "bucket_name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{1,61}[a-z0-9]$"
+              },
+              "prefix": {
+                "type": "string",
+                "maxLength": 1024,
+                "default": ""
+              }
+            }
+          },
+          "acknowledge_at_least_once": {
+            "type": "boolean",
+            "description": "Must be true for an enabled object-trigger mutation; use invocation_id deduplication"
           }
-        }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "schedule"
+                }
+              },
+              "required": [
+                "type"
+              ]
+            },
+            "then": {
+              "required": [
+                "schedule"
+              ],
+              "not": {
+                "required": [
+                  "storage_object_created"
+                ]
+              }
+            },
+            "else": {
+              "required": [
+                "storage_object_created"
+              ],
+              "not": {
+                "required": [
+                  "schedule"
+                ]
+              }
+            }
+          }
+        ]
       },
       "FunctionTriggerPatch": {
         "type": "object",
@@ -5289,7 +5457,11 @@
         ],
         "properties": {
           "type": {
-            "const": "schedule"
+            "type": "string",
+            "enum": [
+              "schedule",
+              "storage_object_created"
+            ]
           },
           "name": {
             "type": "string",
@@ -5323,6 +5495,28 @@
           },
           "enabled": {
             "type": "boolean"
+          },
+          "storage_object_created": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "bucket_name"
+            ],
+            "properties": {
+              "bucket_name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{1,61}[a-z0-9]$"
+              },
+              "prefix": {
+                "type": "string",
+                "maxLength": 1024,
+                "default": ""
+              }
+            }
+          },
+          "acknowledge_at_least_once": {
+            "type": "boolean",
+            "description": "Must be true for an enabled object-trigger mutation; use invocation_id deduplication"
           }
         }
       },
@@ -5335,7 +5529,6 @@
           "name",
           "function_slug",
           "function_path",
-          "schedule",
           "enabled",
           "version_token",
           "next_run_at",
@@ -5349,7 +5542,11 @@
             "pattern": "^ftr_[a-f0-9]{24}$"
           },
           "type": {
-            "const": "schedule"
+            "type": "string",
+            "enum": [
+              "schedule",
+              "storage_object_created"
+            ]
           },
           "name": {
             "type": "string",
@@ -5405,8 +5602,60 @@
           "updated_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "storage_object_created": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "bucket_name"
+            ],
+            "properties": {
+              "bucket_name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{1,61}[a-z0-9]$"
+              },
+              "prefix": {
+                "type": "string",
+                "maxLength": 1024,
+                "default": ""
+              }
+            }
           }
-        }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "schedule"
+                }
+              },
+              "required": [
+                "type"
+              ]
+            },
+            "then": {
+              "required": [
+                "schedule"
+              ],
+              "not": {
+                "required": [
+                  "storage_object_created"
+                ]
+              }
+            },
+            "else": {
+              "required": [
+                "storage_object_created"
+              ],
+              "not": {
+                "required": [
+                  "schedule"
+                ]
+              }
+            }
+          }
+        ]
       },
       "FunctionTriggerResponse": {
         "type": "object",
@@ -5449,6 +5698,9 @@
             "maximum": 100
           },
           "scheduling_enabled": {
+            "type": "boolean"
+          },
+          "object_events_enabled": {
             "type": "boolean"
           }
         }
@@ -5542,6 +5794,61 @@
               "null"
             ],
             "format": "date-time"
+          },
+          "version_token": {
+            "type": "string",
+            "description": "Immutable receipt ID for exact quoted If-Match"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "schedule",
+              "storage_object_created"
+            ]
+          },
+          "object_event_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "parent_invocation_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "logical_invocation_id": {
+            "type": "string"
+          },
+          "object": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "properties": {
+              "bucket_name": {
+                "type": "string"
+              },
+              "object_key": {
+                "type": "string"
+              },
+              "sha256": {
+                "type": "string"
+              },
+              "size": {
+                "type": "integer"
+              }
+            }
+          },
+          "redrive_succeeded": {
+            "type": "boolean"
+          },
+          "redrive_active": {
+            "type": "boolean"
+          },
+          "redrive_count": {
+            "type": "integer"
           }
         }
       },
@@ -5596,6 +5903,1207 @@
             "description": "Distinct non-system PostgreSQL identifier, at most 63 UTF-8 bytes; control characters and surrounding whitespace rejected."
           }
         }
+      },
+      "FunctionOutputPolicy": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "enabled",
+          "version_token",
+          "capture_since",
+          "retention_days"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "version_token": {
+            "type": "string",
+            "pattern": "^(0|[1-9][0-9]*)$"
+          },
+          "capture_since": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "retention_days": {
+            "const": 3
+          },
+          "last_error_code": {
+            "type": "string"
+          },
+          "last_checked_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "FunctionOutputRecord": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "instance_id",
+          "boot_id",
+          "sequence",
+          "deployment_id",
+          "generation_token",
+          "timestamp",
+          "captured_at",
+          "stream",
+          "severity",
+          "scope_name",
+          "message",
+          "truncated"
+        ],
+        "properties": {
+          "instance_id": {
+            "type": "string"
+          },
+          "boot_id": {
+            "type": "string"
+          },
+          "deployment_id": {
+            "type": "string"
+          },
+          "generation_token": {
+            "type": "string"
+          },
+          "scope_name": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "sequence": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "captured_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "stream": {
+            "enum": [
+              "stdout",
+              "stderr",
+              "platform"
+            ]
+          },
+          "severity": {
+            "enum": [
+              "DEBUG",
+              "INFO",
+              "WARN",
+              "ERROR"
+            ]
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        }
+      },
+      "CopyFunctionBranch": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source_branch_id",
+          "source_function_slug",
+          "source_deployment_id",
+          "slug",
+          "acknowledge_environment_copy"
+        ],
+        "properties": {
+          "source_branch_id": {
+            "type": "string",
+            "pattern": "^br_[a-f0-9]{16}$"
+          },
+          "source_function_slug": {
+            "type": "string",
+            "pattern": "^[a-z0-9]{1,20}$"
+          },
+          "source_deployment_id": {
+            "type": "string",
+            "pattern": "^fdp_[a-f0-9]{16}$"
+          },
+          "slug": {
+            "type": "string",
+            "pattern": "^[a-z0-9]{1,20}$"
+          },
+          "acknowledge_environment_copy": {
+            "type": "boolean",
+            "const": true
+          }
+        }
+      },
+      "AIProviderCredentialInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "enum": [
+              "none",
+              "sealed",
+              "operator_reference",
+              "reuse"
+            ]
+          },
+          "secret": {
+            "type": "string",
+            "minLength": 16,
+            "maxLength": 8192,
+            "writeOnly": true,
+            "description": "New key; actual Console TLS with Secure cookies required. An explicitly configured private lab endpoint may require an additional lab acknowledgment."
+          },
+          "source_id": {
+            "type": "string"
+          },
+          "reuse_revision_id": {
+            "type": "string"
+          },
+          "lab_secret_acknowledged": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "mode"
+        ]
+      },
+      "AIProviderDraftInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "0 for creation; exact current provider version for a revision"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "base_url": {
+            "type": "string",
+            "maxLength": 2048,
+            "description": "HTTPS public /v1, or an exact operator-approved private endpoint"
+          },
+          "credential": {
+            "$ref": "#/components/schemas/AIProviderCredentialInput"
+          }
+        },
+        "required": [
+          "version",
+          "name",
+          "base_url",
+          "credential"
+        ]
+      },
+      "AIProviderModel": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,127}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "upstream_model": {
+            "type": "string"
+          },
+          "max_output_tokens": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4096
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "upstream_model",
+          "max_output_tokens"
+        ]
+      },
+      "AIProviderPublishInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "revision_id": {
+            "type": "string"
+          },
+          "models": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 16,
+            "items": {
+              "$ref": "#/components/schemas/AIProviderModel"
+            }
+          }
+        },
+        "required": [
+          "version",
+          "revision_id",
+          "models"
+        ]
+      },
+      "AIProviderVersionInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          }
+        },
+        "required": [
+          "version"
+        ]
+      },
+      "AIProvider": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "state": {
+            "enum": [
+              "draft",
+              "active",
+              "disabled",
+              "deleted"
+            ]
+          },
+          "active_publication_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "target_revision_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_by": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "version",
+          "state",
+          "active_publication_id",
+          "target_revision_id",
+          "created_by",
+          "created_at",
+          "updated_at"
+        ]
+      },
+      "AIProviderRevision": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "provider_id": {
+            "type": "string"
+          },
+          "base_url": {
+            "type": "string"
+          },
+          "credential_mode": {
+            "enum": [
+              "none",
+              "sealed",
+              "operator_reference",
+              "reuse"
+            ]
+          },
+          "credential_source_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "has_credential": {
+            "type": "boolean"
+          },
+          "state": {
+            "enum": [
+              "pending",
+              "tested",
+              "failed"
+            ]
+          },
+          "models": {
+            "type": [
+              "array",
+              "null"
+            ],
+            "items": {
+              "type": "string"
+            }
+          },
+          "tested_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "operation_id": {
+            "type": "string"
+          },
+          "operation_state": {
+            "enum": [
+              "queued",
+              "running",
+              "succeeded",
+              "failed"
+            ]
+          },
+          "attempts": {
+            "type": "integer"
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "error_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "provider_id",
+          "base_url",
+          "credential_mode",
+          "has_credential",
+          "state",
+          "operation_id",
+          "operation_state",
+          "attempts",
+          "retryable"
+        ]
+      },
+      "AIProviderPublication": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "revision_id": {
+            "type": "string"
+          },
+          "models": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AIProviderModel"
+            }
+          },
+          "created_by": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "revision_id",
+          "models",
+          "created_by",
+          "created_at"
+        ]
+      },
+      "AIProviderDetail": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/AIProvider"
+          },
+          "revisions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AIProviderRevision"
+            }
+          },
+          "publications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AIProviderPublication"
+            }
+          }
+        },
+        "required": [
+          "provider",
+          "revisions",
+          "publications"
+        ]
+      },
+      "AIProviderOperation": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "provider_id": {
+            "type": "string"
+          },
+          "revision_id": {
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "queued",
+              "running",
+              "succeeded",
+              "failed"
+            ]
+          },
+          "attempts": {
+            "type": "integer"
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "error_code": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "provider_id",
+          "revision_id",
+          "state",
+          "attempts",
+          "retryable",
+          "error_code",
+          "created_at",
+          "finished_at"
+        ]
+      },
+      "AIProviderMutationReceipt": {
+        "type": "object",
+        "properties": {
+          "provider_id": {
+            "type": "string"
+          },
+          "revision_id": {
+            "type": "string"
+          },
+          "operation_id": {
+            "type": "string"
+          },
+          "publication_id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "description": "Public immutable receipt for actor-scoped idempotency replay. Read the provider and original operation for current state."
+      },
+      "AIProviderCapabilities": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "can_manage": {
+            "type": "boolean"
+          },
+          "raw_secret_input": {
+            "type": "boolean"
+          },
+          "lab_secret_input": {
+            "type": "boolean"
+          },
+          "protocols": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "discovery_performs_inference": {
+            "const": false
+          },
+          "credential_sources": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "allowed_base_urls": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "allowed_base_urls"
+              ]
+            }
+          }
+        },
+        "required": [
+          "enabled",
+          "can_manage",
+          "raw_secret_input",
+          "lab_secret_input",
+          "credential_sources",
+          "protocols",
+          "discovery_performs_inference"
+        ]
+      },
+      "EmptyRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {},
+        "required": []
+      },
+      "ConnectionDefaults": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mode",
+          "role",
+          "database",
+          "version_token"
+        ],
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "platform",
+              "managed"
+            ]
+          },
+          "role": {
+            "type": "string"
+          },
+          "database": {
+            "type": "string"
+          },
+          "version_token": {
+            "type": "string",
+            "pattern": "^[1-9][0-9]*$"
+          },
+          "platform_role": {
+            "type": "string",
+            "description": "Original endpoint bootstrap role; fresh projections include this name, historical original receipts may omit it."
+          },
+          "platform_database": {
+            "type": "string",
+            "description": "Original endpoint bootstrap database, including postgres where configured; fresh projections include it."
+          }
+        },
+        "description": "Customer connection defaults shared by Writer/Readers on one branch; original endpoint bootstrap credentials and Backend identities are independent. Version 1 is the virtual initial platform default."
+      },
+      "ConnectionDefaultsInput": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "mode"
+            ],
+            "properties": {
+              "mode": {
+                "const": "platform"
+              }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "mode",
+              "role",
+              "database"
+            ],
+            "properties": {
+              "mode": {
+                "const": "managed"
+              },
+              "role": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              },
+              "database": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63
+              }
+            }
+          }
+        ]
+      },
+      "CatalogIdentityReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "binding_id",
+          "kind",
+          "expected_name",
+          "expected_oid",
+          "intent_version",
+          "basis",
+          "captured_at",
+          "credentials"
+        ],
+        "properties": {
+          "binding_id": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "role",
+              "database"
+            ]
+          },
+          "expected_name": {
+            "type": "string"
+          },
+          "expected_oid": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4294967295
+          },
+          "intent_version": {
+            "type": "string"
+          },
+          "basis": {
+            "const": "admin_initial_observation"
+          },
+          "captured_at": {
+            "type": "string"
+          },
+          "credentials": {
+            "const": "not_observed"
+          }
+        }
+      },
+      "CatalogIdentityDifference": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "binding_id",
+          "kind",
+          "expected_name",
+          "expected_oid",
+          "intent_version",
+          "basis",
+          "captured_at",
+          "status",
+          "catalog_status",
+          "changes",
+          "credentials"
+        ],
+        "properties": {
+          "binding_id": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "role",
+              "database"
+            ]
+          },
+          "expected_name": {
+            "type": "string"
+          },
+          "expected_oid": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4294967295
+          },
+          "intent_version": {
+            "type": "string"
+          },
+          "basis": {
+            "const": "admin_initial_observation"
+          },
+          "captured_at": {
+            "type": "string"
+          },
+          "credentials": {
+            "const": "not_observed"
+          },
+          "observed_name": {
+            "type": "string"
+          },
+          "observed_oid": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4294967295
+          },
+          "observed_owner": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "catalog_matches",
+              "renamed",
+              "replaced",
+              "missing",
+              "name_collision",
+              "privilege_conflict",
+              "provenance_changed",
+              "owner_changed",
+              "owner_role_renamed",
+              "role_options_changed",
+              "database_options_changed",
+              "scope_conflict",
+              "binding_invalid",
+              "observation_invalid",
+              "intent_changed"
+            ]
+          },
+          "catalog_status": {
+            "enum": [
+              "catalog_matches",
+              "renamed",
+              "replaced",
+              "missing",
+              "name_collision",
+              "privilege_conflict",
+              "provenance_changed",
+              "owner_changed",
+              "owner_role_renamed",
+              "role_options_changed",
+              "database_options_changed",
+              "scope_conflict",
+              "binding_invalid",
+              "observation_invalid"
+            ]
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "CatalogNativeIdentity": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "name",
+          "oid",
+          "protected",
+          "managed",
+          "can_initialize"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "role",
+              "database"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "oid": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4294967295
+          },
+          "owner": {
+            "type": "string"
+          },
+          "protected": {
+            "type": "boolean"
+          },
+          "managed": {
+            "type": "boolean"
+          },
+          "can_initialize": {
+            "type": "boolean"
+          },
+          "intent_state": {
+            "type": "string"
+          },
+          "intent_version": {
+            "type": "string"
+          },
+          "management_excluded": {
+            "type": "boolean"
+          },
+          "identity_status": {
+            "type": "string",
+            "enum": [
+              "catalog_matches",
+              "renamed",
+              "replaced",
+              "missing",
+              "name_collision",
+              "privilege_conflict",
+              "provenance_changed",
+              "owner_changed",
+              "owner_role_renamed",
+              "role_options_changed",
+              "database_options_changed",
+              "scope_conflict",
+              "binding_invalid",
+              "observation_invalid",
+              "intent_changed",
+              "management_excluded"
+            ]
+          }
+        }
+      },
+      "CatalogIdentityInventory": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "branch_id",
+          "endpoint_id",
+          "items",
+          "native_objects",
+          "credentials",
+          "complete",
+          "limit",
+          "current_bindings"
+        ],
+        "properties": {
+          "branch_id": {
+            "type": "string"
+          },
+          "endpoint_id": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 1024,
+            "items": {
+              "$ref": "#/components/schemas/CatalogIdentityDifference"
+            }
+          },
+          "native_objects": {
+            "type": "array",
+            "maxItems": 2048,
+            "items": {
+              "$ref": "#/components/schemas/CatalogNativeIdentity"
+            }
+          },
+          "credentials": {
+            "const": "not_observed"
+          },
+          "complete": {
+            "const": true
+          },
+          "limit": {
+            "const": 1024
+          },
+          "current_bindings": {
+            "type": "array",
+            "maxItems": 1024,
+            "items": {
+              "$ref": "#/components/schemas/CatalogCurrentIdentity"
+            }
+          }
+        }
+      },
+      "CatalogIdentityInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "kind",
+          "name",
+          "oid",
+          "acknowledge_initial_observation"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "role",
+              "database"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63
+          },
+          "oid": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4294967295
+          },
+          "acknowledge_initial_observation": {
+            "const": true
+          }
+        }
+      },
+      "CatalogIdentityRestoreInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "acknowledge_restore"
+        ],
+        "properties": {
+          "acknowledge_restore": {
+            "const": true
+          },
+          "acknowledge_role_credential_reset": {
+            "type": "boolean",
+            "description": "Must be true for a role: explicitly reset to the original immutable managed verifier; false for a database. Native password state was not observed."
+          }
+        }
+      },
+      "DefaultDatabaseOwnerInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "mode",
+          "expected_database_oid",
+          "expected_previous_owner_oid",
+          "acknowledge_owner_change",
+          "acknowledge_initial_observation",
+          "password"
+        ],
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "managed",
+              "platform"
+            ]
+          },
+          "owner": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63,
+            "description": "Required only in managed mode, with the observed native OID."
+          },
+          "owner_oid": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4294967295
+          },
+          "expected_database_oid": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4294967295
+          },
+          "expected_previous_owner_oid": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4294967295
+          },
+          "acknowledge_owner_change": {
+            "const": true
+          },
+          "acknowledge_initial_observation": {
+            "type": "boolean",
+            "description": "Must acknowledge first observation only if no original binding exists. Earlier identity history is not proven."
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "writeOnly": true,
+            "description": "Current password of the original cloud_admin platform role. Never returned, logged or placed in an Operation payload. Purpose-bound AEAD escrow is cleared atomically with the original successful result."
+          }
+        }
+      },
+      "CatalogCurrentIdentity": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "binding_id",
+          "kind",
+          "expected_name",
+          "expected_oid",
+          "intent_version",
+          "basis",
+          "captured_at",
+          "status",
+          "catalog_status",
+          "changes",
+          "credentials",
+          "identity_id",
+          "current_intent_version",
+          "source_type",
+          "options"
+        ],
+        "properties": {
+          "binding_id": {
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "role",
+              "database"
+            ]
+          },
+          "expected_name": {
+            "type": "string"
+          },
+          "expected_oid": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4294967295
+          },
+          "intent_version": {
+            "type": "string"
+          },
+          "basis": {
+            "const": "current_native_identity"
+          },
+          "captured_at": {
+            "type": "string"
+          },
+          "credentials": {
+            "const": "not_observed"
+          },
+          "observed_name": {
+            "type": "string"
+          },
+          "observed_oid": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4294967295
+          },
+          "observed_owner": {
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "catalog_matches",
+              "renamed",
+              "replaced",
+              "missing",
+              "name_collision",
+              "privilege_conflict",
+              "provenance_changed",
+              "owner_changed",
+              "owner_role_renamed",
+              "role_options_changed",
+              "database_options_changed",
+              "scope_conflict",
+              "binding_invalid",
+              "observation_invalid",
+              "intent_changed",
+              "management_excluded"
+            ]
+          },
+          "catalog_status": {
+            "enum": [
+              "catalog_matches",
+              "renamed",
+              "replaced",
+              "missing",
+              "name_collision",
+              "privilege_conflict",
+              "provenance_changed",
+              "owner_changed",
+              "owner_role_renamed",
+              "role_options_changed",
+              "database_options_changed",
+              "scope_conflict",
+              "binding_invalid",
+              "observation_invalid"
+            ]
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "identity_id": {
+            "type": "string"
+          },
+          "current_intent_version": {
+            "type": "string"
+          },
+          "source_type": {
+            "enum": [
+              "initial_observation",
+              "create_result",
+              "mutation_result",
+              "rename_result",
+              "rename_follower",
+              "inherited_identity"
+            ]
+          },
+          "options": {
+            "const": "not_recorded"
+          },
+          "management_excluded": {
+            "type": "boolean"
+          }
+        },
+        "description": "Read-only current identity generation. Attests original OID, name, Owner and provenance; no historical options or customer credentials are observed."
       }
     },
     "responses": {
@@ -5952,7 +7460,8 @@
       },
       "delete": {
         "operationId": "DeleteProject",
-        "summary": "Close access, retire owned runtimes and retain project for seven-day recovery; no physical GC",
+        "summary": "Retire a ready project with seven-day recovery, or clean up its unique original failed creation; data retained",
+        "description": "Admin only. Exact name, quoted If-Match and stable Idempotency-Key required. Ready-project deletion retains its existing contract. Error projects require one terminal, unleased original create_project matching the only live root branch, optional original Writer, tenant and timeline. Only untouched version-one default project/root protection is included in this explicit failed-create confirmation. Other protection, extra branches, Computes, active Operations or Backend dependencies reject cleanup. Separate cleanup_failed_project action serializes against original create retry, durably pins original VM/Service UIDs or absence, observes Runner GC and retains Secrets, native data and the original failure. Failed cleanup grants no ready-project recovery window and performs no physical GC. Lost replies replay the same cleanup Operation.",
         "tags": [
           "Catalog"
         ],
@@ -6176,7 +7685,8 @@
             "$ref": "#/components/responses/Error"
           }
         },
-        "operationId": "createBranch"
+        "operationId": "createBranch",
+        "description": " Live fork creation freezes known source-role identity checks. A same-name replaced original role with unchanged managed credential generation and no default/Backend dependency is excluded from managed inheritance; physical SQL role/data are retained. Original immutable baseline/ref/UID and observed replacement OID bind the exclusion. The child cold spec and only its Proxy credential projection remove the old managed entry via fixed-UID CAS, without native role/password/configure SQL. Critical dependencies, missing originals, new excluded OIDs, altered credential/UID or target native deltas refuse. Exclusions propagate to descendants; historical restores do not copy current managed catalog intent. Resume the same failed creation Operation. This is a bounded known-generation guard, not complete ordinary CRUD lineage or distributed DDL fencing."
       }
     },
     "/api/v1/projects/{project}/branches/{branch}": {
@@ -6219,7 +7729,8 @@
       },
       "delete": {
         "operationId": "DeleteBranch",
-        "summary": "Delete an unprotected non-root leaf branch; native data retained for safe-GC gate",
+        "summary": "Retire an unprotected non-root leaf branch or clean up its unique original failed creation; native data retained",
+        "description": "Editor/Admin only under a ready managed project. Exact name, quoted If-Match and stable Idempotency-Key required. Error branches require one terminal, unleased original create_branch matching the branch, optional original Writer, tenant and timeline. Protection, descendants, extra Computes, active Operations and Backend dependencies reject cleanup. Separate cleanup_failed_branch action blocks original create retry, closes only verified original routes, binds original VM/Service UIDs or absence, observes normal Runner GC and commits a held tombstone. Parent branch, tenant/timeline, WAL, objects, credential/config Secrets and original failure remain retained. Lost replies return the same Operation. No physical GC or distributed external fencing.",
         "tags": [
           "Catalog"
         ],
@@ -6801,7 +8312,7 @@
             }
           }
         },
-        "description": "Editor/Admin only. A quoted current endpoint version, stable Idempotency-Key and exact selector confirmation are required. Ready managed endpoint and no active project Operation; dependent Data API/Auth/Object Storage services must be disabled first. Admission closes synchronously. A leased Worker closes only this Proxy route using resourceVersion CAS, deletes the owned NeonVM using UID/resourceVersion preconditions, waits for Runner garbage collection, then persists a retained endpoint tombstone. No timeline, role, database, blob, credential Secret or other endpoint is deleted. Replaying the original request returns the same Operation even after deletion; retry uses the original failed Operation. A replacement endpoint has a new selector and reuses branch SQL credentials. This is not physical data GC or distributed connection fencing."
+        "description": "Editor/Admin only. A quoted current endpoint version, stable Idempotency-Key and exact selector confirmation are required. Requires ready managed parents, no active project Operation and either an active endpoint or a unique terminal failed independent create_endpoint receipt matching the original project/branch/endpoint. Dependent Backends must be retired first. Failed creation uses a separate cleanup_failed_endpoint Operation; its original failure is retained and cannot be retried after cleanup admission. Only this route is closed with resourceVersion CAS; an unpublished route is accepted solely under the verified failed-create scope. Before any external delete, failed cleanup durably pins the original owned VM and Service UIDs or verified absence. UID/resourceVersion deletes and explicit retries reject replacements. Normal Runner collection and original Service retirement must finish before the retained tombstone; credential/config Secrets remain retained. No timeline, role, database, blob, credential Secret or other endpoint is deleted. Original key/body/version replays the same Operation after completion. This is not physical GC, failed project/branch cleanup or distributed external fencing."
       }
     },
     "/api/v1/projects/{project}/endpoints/{endpoint}/connection-info": {
@@ -9233,7 +10744,8 @@
           "503": {
             "description": "Dependency unavailable"
           }
-        }
+        },
+        "description": "Known replaced, missing or incompatible inherited roles remain SQL objects outside platform mutation, with management_excluded=true, managed=false and state=external_identity. Versioned original OID and credential witnesses are inherited only after target SQL scope verification; unobserved legacy source names do not acquire an invented original OID."
       },
       "post": {
         "operationId": "PostBranchRoles",
@@ -9323,7 +10835,7 @@
             }
           }
         },
-        "description": "Immutable verifier Secret; queued Operation reconciles PostgreSQL, all branch compute specs, Proxy and metadata. Console/API roles are NOSUPERUSER members of neon_superuser, with CREATEROLE/CREATEDB/BYPASSRLS/REPLICATION. Password is not returned or persisted in control metadata. Existing SQL-created objects are not adopted. Cookie writes require CSRF."
+        "description": "Immutable verifier Secret; queued Operation reconciles PostgreSQL, all branch compute specs, Proxy and metadata. Console/API roles are NOSUPERUSER members of neon_superuser, with CREATEROLE/CREATEDB/BYPASSRLS/REPLICATION. Password is not returned or persisted in control metadata. Existing SQL-created objects are not adopted. Cookie writes require CSRF. New ordinary catalog operations bind the admitted intent version and prior credential reference; role create/rotate also bind the immutable target Secret UID. The intent/version, immutable original result and success audit commit atomically. Recovery of that original committed result settles its original steps before SQL/credential/config/route access, preserving later authorized passwords, Owner and versions. Original HTTP catalog replay precedes current Writer lookup. Legacy unknown operations without a retained admitted version are preserved and refused rather than inferred from the current catalog. This receipt does not claim full ordinary native OID lineage or external DDL fencing."
       }
     },
     "/api/v1/projects/{project}/branches/{branch}/roles/{role}": {
@@ -9390,7 +10902,7 @@
             "description": "Dependency unavailable"
           }
         },
-        "description": "Ready managed non-system object required. PostgreSQL dependencies and active database connections are preserved as rejection conditions. Operation ID and all attempts are retained. PATCH updates all Writer/Reader cold specs and Proxy verifiers. Cookie writes require CSRF."
+        "description": "Ready managed non-system object required. PostgreSQL dependencies and active database connections are preserved as rejection conditions. Operation ID and all attempts are retained. PATCH updates all Writer/Reader cold specs and Proxy verifiers. Cookie writes require CSRF. New ordinary catalog operations bind the admitted intent version and prior credential reference; role create/rotate also bind the immutable target Secret UID. The intent/version, immutable original result and success audit commit atomically. Recovery of that original committed result settles its original steps before SQL/credential/config/route access, preserving later authorized passwords, Owner and versions. Original HTTP catalog replay precedes current Writer lookup. Legacy unknown operations without a retained admitted version are preserved and refused rather than inferred from the current catalog. This receipt does not claim full ordinary native OID lineage or external DDL fencing."
       },
       "patch": {
         "operationId": "PatchBranchRole",
@@ -9455,7 +10967,7 @@
             "description": "Dependency unavailable"
           }
         },
-        "description": "Ready managed non-system object required. PostgreSQL dependencies and active database connections are preserved as rejection conditions. Operation ID and all attempts are retained. PATCH updates all Writer/Reader cold specs and Proxy verifiers. Cookie writes require CSRF.",
+        "description": "Ready managed non-system object required. PostgreSQL dependencies and active database connections are preserved as rejection conditions. Operation ID and all attempts are retained. PATCH updates all Writer/Reader cold specs and Proxy verifiers. Cookie writes require CSRF. New ordinary catalog operations bind the admitted intent version and prior credential reference; role create/rotate also bind the immutable target Secret UID. The intent/version, immutable original result and success audit commit atomically. Recovery of that original committed result settles its original steps before SQL/credential/config/route access, preserving later authorized passwords, Owner and versions. Original HTTP catalog replay precedes current Writer lookup. Legacy unknown operations without a retained admitted version are preserved and refused rather than inferred from the current catalog. This receipt does not claim full ordinary native OID lineage or external DDL fencing.",
         "requestBody": {
           "required": true,
           "content": {
@@ -9544,7 +11056,7 @@
             "description": "Dependency unavailable"
           }
         },
-        "description": " Managed entries include decimal-string version_token for If-Match; state updating is a pending owner transition."
+        "description": "Known replaced, missing or incompatible inherited databases remain SQL objects outside platform mutation, with management_excluded=true, managed=false and state=external_identity. Versioned original OID and credential witnesses are inherited only after target SQL scope verification; unobserved legacy source names do not acquire an invented original OID."
       },
       "post": {
         "operationId": "PostBranchDatabases",
@@ -9633,7 +11145,7 @@
             }
           }
         },
-        "description": "Immutable verifier Secret; queued Operation reconciles PostgreSQL, all branch compute specs, Proxy and metadata. Console/API roles are NOSUPERUSER members of neon_superuser, with CREATEROLE/CREATEDB/BYPASSRLS/REPLICATION. Password is not returned or persisted in control metadata. Existing SQL-created objects are not adopted. Cookie writes require CSRF."
+        "description": "Immutable verifier Secret; queued Operation reconciles PostgreSQL, all branch compute specs, Proxy and metadata. Console/API roles are NOSUPERUSER members of neon_superuser, with CREATEROLE/CREATEDB/BYPASSRLS/REPLICATION. Password is not returned or persisted in control metadata. Existing SQL-created objects are not adopted. Cookie writes require CSRF. New ordinary catalog operations bind the admitted intent version and prior credential reference; role create/rotate also bind the immutable target Secret UID. The intent/version, immutable original result and success audit commit atomically. Recovery of that original committed result settles its original steps before SQL/credential/config/route access, preserving later authorized passwords, Owner and versions. Original HTTP catalog replay precedes current Writer lookup. Legacy unknown operations without a retained admitted version are preserved and refused rather than inferred from the current catalog. This receipt does not claim full ordinary native OID lineage or external DDL fencing."
       }
     },
     "/api/v1/projects/{project}/branches/{branch}/databases/{database}": {
@@ -9700,7 +11212,7 @@
             "description": "Dependency unavailable"
           }
         },
-        "description": "Ready managed non-system object required. PostgreSQL dependencies and active database connections are preserved as rejection conditions. Operation ID and all attempts are retained. PATCH updates all Writer/Reader cold specs and Proxy verifiers. Cookie writes require CSRF."
+        "description": "Ready managed non-system object required. PostgreSQL dependencies and active database connections are preserved as rejection conditions. Operation ID and all attempts are retained. PATCH updates all Writer/Reader cold specs and Proxy verifiers. Cookie writes require CSRF. New ordinary catalog operations bind the admitted intent version and prior credential reference; role create/rotate also bind the immutable target Secret UID. The intent/version, immutable original result and success audit commit atomically. Recovery of that original committed result settles its original steps before SQL/credential/config/route access, preserving later authorized passwords, Owner and versions. Original HTTP catalog replay precedes current Writer lookup. Legacy unknown operations without a retained admitted version are preserved and refused rather than inferred from the current catalog. This receipt does not claim full ordinary native OID lineage or external DDL fencing."
       },
       "patch": {
         "operationId": "updateDatabaseOwner",
@@ -9780,7 +11292,7 @@
             "$ref": "#/components/responses/Error"
           }
         },
-        "description": "Editor/Admin and CSRF; Idempotency-Key plus numeric If-Match catalog version_token. Only ready API-owned non-system databases with non-system managed owners on the same branch are eligible. Original PostgreSQL OID, branch ownership marker and old owner are captured before admission and checked by the Worker. Atomic branch/parent/role/version checks queue the existing catalog pipeline; real ALTER DATABASE OWNER, all Compute configuration Secrets, route verification and final metadata CAS are required. No data/table/schema ownership/ACL is rewritten, no connection is terminated and no privilege grants or superuser bypass are introduced. Same-key replay returns the original Operation after completion; unknown outcomes are observed by original OID/marker/old-or-final owner, never adopted by name alone. Default/system-owned databases, rename, arbitrary external DDL and distributed fencing remain separate gates.",
+        "description": "Editor/Admin and CSRF; Idempotency-Key plus numeric If-Match catalog version_token. Only ready API-owned non-system databases with non-system managed owners on the same branch are eligible. Original PostgreSQL OID, branch ownership marker and old owner are captured before admission and checked by the Worker. Atomic branch/parent/role/version checks queue the existing catalog pipeline; real ALTER DATABASE OWNER, all Compute configuration Secrets, route verification and final metadata CAS are required. No data/table/schema ownership/ACL is rewritten, no connection is terminated and no privilege grants or superuser bypass are introduced. Same-key replay returns the original Operation after completion; unknown outcomes are observed by original OID/marker/old-or-final owner, never adopted by name alone. Default/system-owned databases, rename, arbitrary external DDL and distributed fencing remain separate gates. New ordinary catalog operations bind the admitted intent version and prior credential reference; role create/rotate also bind the immutable target Secret UID. The intent/version, immutable original result and success audit commit atomically. Recovery of that original committed result settles its original steps before SQL/credential/config/route access, preserving later authorized passwords, Owner and versions. Original HTTP catalog replay precedes current Writer lookup. Legacy unknown operations without a retained admitted version are preserved and refused rather than inferred from the current catalog. This receipt does not claim full ordinary native OID lineage or external DDL fencing.",
         "requestBody": {
           "required": true,
           "content": {
@@ -16128,7 +17640,7 @@
           "Functions"
         ],
         "summary": "Opt in to a separate public HTTP origin and idle eviction/cold wake",
-        "description": "Editor authorization, durable metadata-only Idempotency-Key replay and exact numeric If-Match. Existing functions remain private. Idle eviction ends background work after active requests/streams finish. Manual suspension is not automatically woken. Cookie and WebSocket are not supported on this preview listener.",
+        "description": "Editor authorization, durable metadata-only Idempotency-Key replay and exact numeric If-Match. Existing functions remain private. Idle eviction ends background work after active requests/streams finish. Manual suspension is not automatically woken. Customer cookies remain stripped; WebSocket has its separately accepted fixed-origin transport.",
         "security": [
           {
             "sessionCookie": []
@@ -20185,7 +21697,7 @@
             "$ref": "#/components/responses/Error"
           }
         },
-        "description": "Editor/Admin and session CSRF or scoped API key. Same-key/input/version replay resolves the original durable Operation before re-observing old names. Admission captures the original PostgreSQL OID, branch marker, current metadata version and owned immutable credential/config/routes Secret UIDs. Worker performs transactional ALTER with an OID postcondition, all Writer/Reader cold configurations, Proxy credential publication and atomic final catalog/owner-reference rename. Password/verifier stays in its original immutable Secret; no object/data copy, forced disconnect, privilege escalation or name-only adoption. Target names retained by another managed catalog record are reserved. Default Endpoint identities and retained Backend database dependencies must migrate before rename; arbitrary external DDL management, cross-system fencing and uninterrupted HA remain independent gates.",
+        "description": "Editor/Admin and session CSRF or scoped API key. Same-key/input/version replay resolves the original durable Operation before re-observing old names. Admission captures the original PostgreSQL OID, branch marker, current metadata version and owned immutable credential/config/routes Secret UIDs. Worker performs transactional ALTER with an OID postcondition, all Writer/Reader cold configurations, Proxy credential publication and atomic final catalog/owner-reference rename. Password/verifier stays in its original immutable Secret; no object/data copy, forced disconnect, privilege escalation or name-only adoption. Target names retained by another managed catalog record are reserved. Default Endpoint identities and retained Backend database dependencies must migrate before rename; arbitrary external DDL management, cross-system fencing and uninterrupted HA remain independent gates. New rename completion atomically commits the renamed metadata and follower Owner references, immutable original result and success audit. The result binds the full original typed payload including object OID and immutable backing/credential UIDs. Original result recovery settles only its five original steps before credential/SQL/config/routes access, preserving later names and authorized password rotations even after the original Writer retires. Fresh execution and commit recheck the original lease/payload, current actor permission, parents, exact Endpoint set, dependencies and original updating metadata generation. Legacy final-looking names do not manufacture a result. This does not establish a complete current native identity lineage or distributed DDL fence.",
         "requestBody": {
           "required": true,
           "content": {
@@ -20278,13 +21790,2038 @@
             "$ref": "#/components/responses/Error"
           }
         },
-        "description": "Editor/Admin and session CSRF or scoped API key. Same-key/input/version replay resolves the original durable Operation before re-observing old names. Admission captures the original PostgreSQL OID, branch marker, current metadata version and owned immutable credential/config/routes Secret UIDs. Worker performs transactional ALTER with an OID postcondition, all Writer/Reader cold configurations, Proxy credential publication and atomic final catalog/owner-reference rename. Password/verifier stays in its original immutable Secret; no object/data copy, forced disconnect, privilege escalation or name-only adoption. Target names retained by another managed catalog record are reserved. Default Endpoint identities and retained Backend database dependencies must migrate before rename; arbitrary external DDL management, cross-system fencing and uninterrupted HA remain independent gates.",
+        "description": "Editor/Admin and session CSRF or scoped API key. Same-key/input/version replay resolves the original durable Operation before re-observing old names. Admission captures the original PostgreSQL OID, branch marker, current metadata version and owned immutable credential/config/routes Secret UIDs. Worker performs transactional ALTER with an OID postcondition, all Writer/Reader cold configurations, Proxy credential publication and atomic final catalog/owner-reference rename. Password/verifier stays in its original immutable Secret; no object/data copy, forced disconnect, privilege escalation or name-only adoption. Target names retained by another managed catalog record are reserved. Default Endpoint identities and retained Backend database dependencies must migrate before rename; arbitrary external DDL management, cross-system fencing and uninterrupted HA remain independent gates. New rename completion atomically commits the renamed metadata and follower Owner references, immutable original result and success audit. The result binds the full original typed payload including object OID and immutable backing/credential UIDs. Original result recovery settles only its five original steps before credential/SQL/config/routes access, preserving later names and authorized password rotations even after the original Writer retires. Fresh execution and commit recheck the original lease/payload, current actor permission, parents, exact Endpoint set, dependencies and original updating metadata generation. Legacy final-looking names do not manufacture a result. This does not establish a complete current native identity lineage or distributed DDL fence.",
         "requestBody": {
           "required": true,
           "content": {
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/CatalogRenameInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/expiration": {
+      "patch": {
+        "operationId": "setBranchExpiration",
+        "summary": "Set, update or clear a future branch expiration; retain business data on retirement",
+        "description": "Editor/Admin only. Exact name, quoted If-Match and durable Idempotency-Key required. Explicit expires_at RFC3339 timestamp in the next thirty days, or null to clear a future policy. Ready managed unprotected non-default leaf branch and completed native Computes required. Active Operations, children, Data API, Functions or unsupported services reject scheduling. Future policies prevent protection, child branches and additional Compute/Data API/Functions. Policy and completed Operation commit atomically. Database-time controller later creates one expire_branch Operation with the original graph and VM/Service UID witnesses, closes access, retires Backends/compute/services, observes normal Runner GC, and commits a held tombstone. Auth/Object Storage use existing retained parent retirement drivers. Elapsed expiration cannot be cancelled. Native timeline, WAL, objects, Secrets and audit remain retained; no physical GC or exact-time external fencing guarantee.",
+        "tags": [
+          "Catalog"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "$ref": "#/components/parameters/resourceVersion"
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          }
+        ],
+        "responses": {
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found in current tenant",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Protection, dependency, active Operation, expired recovery, idempotency or quota conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "412": {
+            "description": "Resource version changed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Exact name confirmation or input invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "428": {
+            "description": "Quoted If-Match required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Metadata or driver unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Expiration policy and completed persistent Operation committed atomically; replay returns the same Operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "expires_at",
+                  "confirm_name"
+                ],
+                "properties": {
+                  "expires_at": {
+                    "type": [
+                      "string",
+                      "null"
+                    ],
+                    "format": "date-time"
+                  },
+                  "confirm_name": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/functions-triggers/{trigger}/invocations/{invocation}/retry": {
+      "post": {
+        "operationId": "retryFunctionObjectInvocation",
+        "tags": [
+          "Functions"
+        ],
+        "summary": "Append an explicit object-event redrive while retaining the original terminal receipt",
+        "description": "Editor permission and current original Function exposure required. Object events only; failed/outcome_unknown receipts, duplicate-side-effect acknowledgment, exact immutable ETag and persistent key required. New delivery ID retains the original logical invocation_id and event metadata. Original terminal rows and attempt journals remain unchanged. Three manual redrives maximum; active/successful descendants prevent another. Known 429/5xx object responses retry at most three attempts with the same logical ID; unknown dispatch is not automatically replayed. Schedule semantics are unchanged.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "name": "trigger",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^ftr_[a-f0-9]{24}$"
+            }
+          },
+          {
+            "name": "invocation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^fti_[a-f0-9]{64}$"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Quoted immutable invocation version_token (its delivery ID)"
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Durable new delivery receipt, or exact committed replay",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "invocation_id": {
+                      "type": "string"
+                    },
+                    "logical_invocation_id": {
+                      "type": "string"
+                    },
+                    "parent_invocation_id": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "const": "queued"
+                    },
+                    "original_receipt_retained": {
+                      "const": true
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient current permission"
+          },
+          "404": {
+            "description": "Original scoped object receipt not found"
+          },
+          "409": {
+            "description": "Original receipt, target or redrive budget prevents admission"
+          },
+          "422": {
+            "description": "Acknowledgment or input rejected"
+          },
+          "428": {
+            "description": "Exact quoted immutable ETag required"
+          },
+          "503": {
+            "description": "Unavailable or commit outcome unconfirmed; inspect or replay original request"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "acknowledge_duplicate_side_effects"
+                ],
+                "properties": {
+                  "acknowledge_duplicate_side_effects": {
+                    "type": "boolean",
+                    "const": true
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/functions/{slug}/output-logs": {
+      "get": {
+        "operationId": "listFunctionCustomerOutput",
+        "summary": "Read acknowledged, encrypted-at-rest customer stdout/stderr history without waking a guest",
+        "description": "Known environment/database values are replaced in the privileged Guest, not a guarantee that arbitrary application secrets are detected. App severity/content is untrusted. Three-day/newest-10000-line retention; guest overflow reported explicitly.",
+        "tags": [
+          "Functions"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "string"
+            },
+            "description": "Last returned slug or deployment ID, exclusive stable cursor."
+          },
+          {
+            "name": "severity",
+            "in": "query",
+            "schema": {
+              "enum": [
+                "DEBUG",
+                "INFO",
+                "WARN",
+                "ERROR"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Encrypted history decrypted only after current project authorization; metadata reads never wake SQL or a Guest",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "items",
+                    "next_after",
+                    "function_id",
+                    "retention_days",
+                    "guest_dropped_lines",
+                    "record_limit",
+                    "capture",
+                    "redaction"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "maxItems": 100,
+                      "items": {
+                        "$ref": "#/components/schemas/FunctionOutputRecord"
+                      }
+                    },
+                    "next_after": {
+                      "type": "string"
+                    },
+                    "function_id": {
+                      "type": "string"
+                    },
+                    "retention_days": {
+                      "const": 3
+                    },
+                    "guest_dropped_lines": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "record_limit": {
+                      "const": 10000
+                    },
+                    "capture": {
+                      "type": "string"
+                    },
+                    "redaction": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient project permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project, branch or Function not accessible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid bounded pagination",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Metadata unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/functions/{slug}/output-policy": {
+      "get": {
+        "operationId": "getFunctionOutputPolicy",
+        "summary": "Read explicit customer-output consent and collection status",
+        "description": "Authorized metadata only; does not wake SQL or probe guests. Native execution preview requires explicit operator configuration and defaults to disabled. Retained completed source does not establish current VM readiness.",
+        "tags": [
+          "Functions"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Default disabled; policy version zero before first mutation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "policy",
+                    "collection_enabled",
+                    "capture",
+                    "limits"
+                  ],
+                  "properties": {
+                    "policy": {
+                      "$ref": "#/components/schemas/FunctionOutputPolicy"
+                    },
+                    "collection_enabled": {
+                      "type": "boolean"
+                    },
+                    "capture": {
+                      "type": "string"
+                    },
+                    "limits": {
+                      "type": "object",
+                      "properties": {
+                        "line_bytes": {
+                          "const": 4096
+                        },
+                        "guest_records": {
+                          "const": 512
+                        },
+                        "function_records": {
+                          "const": 10000
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Insufficient project permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project, branch or Function not accessible",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid bounded pagination",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Metadata unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "operationId": "setFunctionOutputPolicy",
+        "tags": [
+          "Functions"
+        ],
+        "summary": "Acknowledge sensitive customer output and shared project access, or disable future collection",
+        "description": "Editor/CSRF authorization, exact quoted output policy version (including zero), durable idempotency. Captures only records emitted after this consent. Disabling retains prior collected records for three days. Does not deploy, wake or invoke a Function.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"(0|[1-9][0-9]*)\"$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "enabled"
+                ],
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "acknowledge_sensitive_output": {
+                    "type": "boolean",
+                    "description": "Required true when enabling capture. Known-value replacement does not guarantee removal of arbitrary secrets."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed durable policy receipt; exact replay preserves original consent timestamp",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FunctionOutputPolicy"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/functions-copy": {
+      "post": {
+        "operationId": "copyFunctionBranch",
+        "tags": [
+          "Functions"
+        ],
+        "summary": "Prepare an exact source Function in another branch without executing it",
+        "description": "Same-project editor and explicit environment-copy consent. Exact completed source deployment and quoted source Function If-Match version, durable idempotency. Worker verifies original code/Secret, rewraps destination environment and creates a new restricted SQL identity; completed destination is suspended with public HTTP/triggers/output collection off. Failure preserves the original operation and backing for explicit retry. Source changes do not change an accepted copy.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"[1-9][0-9]*\"$"
+            },
+            "description": "Exact source Function version; this is not the target version."
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CopyFunctionBranch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Queued; follow Location header until succeeded",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/function-copy-plans": {
+      "get": {
+        "operationId": "listFunctionBranchCopyPlans",
+        "tags": [
+          "Functions"
+        ],
+        "summary": "Read frozen Function inheritance preparation for a branch",
+        "description": "Viewer-authorized metadata only. Exposes exact source branch/Function/completed deployment/version, original branch snapshot time, prepared Function and original operation. Without Writer returns waiting_for_writer; quota/precondition failure does not fail an already-ready SQL branch. Never reads environment values or wakes SQL/Functions.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Frozen branch plans, at most 100",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "items"
+                  ],
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/platform/ai-providers/capabilities": {
+      "get": {
+        "operationId": "getAIProviderCapabilities",
+        "tags": [
+          "AI Providers"
+        ],
+        "summary": "getAIProviderCapabilities",
+        "description": "Explicit platform-operator Console session required; organization/account roles and application API keys do not grant management. Every mutation is actor-scoped idempotent. Model discovery performs only a bounded authenticated GET, never inference. Only the current tested revision may publish; failed drafts preserve active publication. Disable affects future admissions; already admitted inference may finish. Definition deletion retains immutable revision/publication history. Read models indicate published compatibility configuration, not a health guarantee.",
+        "parameters": [],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIProviderCapabilities"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/platform/ai-providers": {
+      "get": {
+        "operationId": "listAIProviders",
+        "tags": [
+          "AI Providers"
+        ],
+        "summary": "listAIProviders",
+        "description": "Explicit platform-operator Console session required; organization/account roles and application API keys do not grant management. Every mutation is actor-scoped idempotent. Model discovery performs only a bounded authenticated GET, never inference. Only the current tested revision may publish; failed drafts preserve active publication. Disable affects future admissions; already admitted inference may finish. Definition deletion retains immutable revision/publication history. Read models indicate published compatibility configuration, not a health guarantee.",
+        "parameters": [],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AIProvider"
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createAIProvider",
+        "tags": [
+          "AI Providers"
+        ],
+        "summary": "createAIProvider",
+        "description": "Explicit platform-operator Console session required; organization/account roles and application API keys do not grant management. Every mutation is actor-scoped idempotent. Model discovery performs only a bounded authenticated GET, never inference. Only the current tested revision may publish; failed drafts preserve active publication. Disable affects future admissions; already admitted inference may finish. Definition deletion retains immutable revision/publication history. Read models indicate published compatibility configuration, not a health guarantee.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/csrf"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted provider operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIProviderMutationReceipt"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIProviderDraftInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/ai-providers/{provider}": {
+      "get": {
+        "operationId": "getAIProvider",
+        "tags": [
+          "AI Providers"
+        ],
+        "summary": "getAIProvider",
+        "description": "Explicit platform-operator Console session required; organization/account roles and application API keys do not grant management. Every mutation is actor-scoped idempotent. Model discovery performs only a bounded authenticated GET, never inference. Only the current tested revision may publish; failed drafts preserve active publication. Disable affects future admissions; already admitted inference may finish. Definition deletion retains immutable revision/publication history. Read models indicate published compatibility configuration, not a health guarantee.",
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIProviderDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteAIProvider",
+        "tags": [
+          "AI Providers"
+        ],
+        "summary": "deleteAIProvider",
+        "description": "Explicit platform-operator Console session required; organization/account roles and application API keys do not grant management. Every mutation is actor-scoped idempotent. Model discovery performs only a bounded authenticated GET, never inference. Only the current tested revision may publish; failed drafts preserve active publication. Disable affects future admissions; already admitted inference may finish. Definition deletion retains immutable revision/publication history. Read models indicate published compatibility configuration, not a health guarantee.",
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIProviderMutationReceipt"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIProviderVersionInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/ai-providers/{provider}/revisions": {
+      "post": {
+        "operationId": "testAIProviderRevision",
+        "tags": [
+          "AI Providers"
+        ],
+        "summary": "testAIProviderRevision",
+        "description": "Explicit platform-operator Console session required; organization/account roles and application API keys do not grant management. Every mutation is actor-scoped idempotent. Model discovery performs only a bounded authenticated GET, never inference. Only the current tested revision may publish; failed drafts preserve active publication. Disable affects future admissions; already admitted inference may finish. Definition deletion retains immutable revision/publication history. Read models indicate published compatibility configuration, not a health guarantee.",
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted provider operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIProviderMutationReceipt"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIProviderDraftInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/ai-providers/{provider}/publish": {
+      "post": {
+        "operationId": "publishAIProvider",
+        "tags": [
+          "AI Providers"
+        ],
+        "summary": "publishAIProvider",
+        "description": "Explicit platform-operator Console session required; organization/account roles and application API keys do not grant management. Every mutation is actor-scoped idempotent. Model discovery performs only a bounded authenticated GET, never inference. Only the current tested revision may publish; failed drafts preserve active publication. Disable affects future admissions; already admitted inference may finish. Definition deletion retains immutable revision/publication history. Read models indicate published compatibility configuration, not a health guarantee.",
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIProviderMutationReceipt"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIProviderPublishInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/ai-providers/{provider}/disable": {
+      "post": {
+        "operationId": "disableAIProvider",
+        "tags": [
+          "AI Providers"
+        ],
+        "summary": "disableAIProvider",
+        "description": "Explicit platform-operator Console session required; organization/account roles and application API keys do not grant management. Every mutation is actor-scoped idempotent. Model discovery performs only a bounded authenticated GET, never inference. Only the current tested revision may publish; failed drafts preserve active publication. Disable affects future admissions; already admitted inference may finish. Definition deletion retains immutable revision/publication history. Read models indicate published compatibility configuration, not a health guarantee.",
+        "parameters": [
+          {
+            "name": "provider",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIProviderMutationReceipt"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIProviderVersionInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/ai-provider-operations/{providerOperation}": {
+      "get": {
+        "operationId": "getAIProviderOperation",
+        "tags": [
+          "AI Providers"
+        ],
+        "summary": "getAIProviderOperation",
+        "description": "Explicit platform-operator Console session required; organization/account roles and application API keys do not grant management. Every mutation is actor-scoped idempotent. Model discovery performs only a bounded authenticated GET, never inference. Only the current tested revision may publish; failed drafts preserve active publication. Disable affects future admissions; already admitted inference may finish. Definition deletion retains immutable revision/publication history. Read models indicate published compatibility configuration, not a health guarantee.",
+        "parameters": [
+          {
+            "name": "providerOperation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIProviderOperation"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/platform/ai-provider-operations/{providerOperation}/retry": {
+      "post": {
+        "operationId": "retryAIProviderOperation",
+        "tags": [
+          "AI Providers"
+        ],
+        "summary": "retryAIProviderOperation",
+        "description": "Explicit platform-operator Console session required; organization/account roles and application API keys do not grant management. Every mutation is actor-scoped idempotent. Model discovery performs only a bounded authenticated GET, never inference. Only the current tested revision may publish; failed drafts preserve active publication. Disable affects future admissions; already admitted inference may finish. Definition deletion retains immutable revision/publication history. Read models indicate published compatibility configuration, not a health guarantee.",
+        "parameters": [
+          {
+            "name": "providerOperation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted provider operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIProviderMutationReceipt"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmptyRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/connection-defaults": {
+      "get": {
+        "tags": [
+          "Catalog"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Customer defaults; no password included",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionDefaults"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getBranchConnectionDefaults",
+        "summary": "Read customer connection defaults without waking a Compute",
+        "description": "Editor/Admin metadata read. Requires a ready branch Writer; no native SQL, credential reads or Compute allocation."
+      },
+      "patch": {
+        "tags": [
+          "Catalog"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"[1-9][0-9]*\"$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Customer defaults; no password included",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConnectionDefaults"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "updateBranchConnectionDefaults",
+        "summary": "Select customer connection defaults without changing platform identities",
+        "description": "Project Admin and session CSRF or scoped Admin API key. Canonical quoted If-Match and Idempotency-Key required. Managed selection verifies native tenant/timeline, non-system API role ownership marker, login, database identity/owner and CONNECT. Ready managed database or original platform database only. Atomic parent authorization, intent/credential/version checks, branch-operation exclusion, audit and replay receipt precede success. Same original request returns the original response before stale-version checks; no customer role password or SCRAM verifier is read or copied; the existing service probe credential authenticates the observation. Platform restore returns to original endpoint bootstrap defaults. Connection strings and omitted SQL targets use this projection; existing sessions, platform credentials and Backend identities are unchanged. Live branch forks inherit selected defaults/OIDs, historical restores do not inherit current defaults. Selected managed objects cannot be deleted/renamed until defaults migrate. Owner migration and external-DDL repair are separate workflows. The exact original platform database may be postgres; choosing it with a managed public role changes only customer connection defaults. Reserved databases cannot otherwise be selected, renamed, dropped or adopted.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConnectionDefaultsInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/catalog-identities": {
+      "get": {
+        "tags": [
+          "Catalog"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Complete bounded native observation and immutable baseline differences",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogIdentityInventory"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getCatalogIdentityInventory",
+        "summary": "Observe original catalog OIDs and external DDL differences",
+        "description": "Observe immutable first-observation history, current native identity generations and complete bounded native catalog. Reads do not seed or replace bindings. Known identities and inherited exclusions cannot be offered for another first observation. Passwords/verifiers are not observed; current generations contain no historical options snapshot."
+      },
+      "post": {
+        "tags": [
+          "Catalog"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"[1-9][0-9]*\"$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Immutable original response; no secret values",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogIdentityReceipt"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "initializeCatalogIdentity",
+        "summary": "Acknowledge and record the first trusted native identity",
+        "description": "Project Admin and session CSRF or scoped Admin key. Canonical quoted original catalog If-Match and Idempotency-Key required. Explicitly acknowledges that legacy history before this observation cannot be proven by a name or marker. Only a ready non-system managed object at the supplied current native OID, branch marker, canonical options and managed Owner can initialize. Role records bind the immutable Kubernetes credential UID without decoding its verifier; no customer credential is observed. Atomic current authorization, parent/intent version and competing-Operation checks, immutable OID/name uniqueness, audit and response receipt. The original request replays its original receipt before Writer/native/version checks, even after Writer retirement. A second request cannot overwrite the original baseline. No SQL mutation or automatic adoption, repair or default database Owner migration.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogIdentityInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/catalog-identities/{binding}/restore": {
+      "post": {
+        "operationId": "restoreOriginalCatalogIdentity",
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "Restore the original managed native name by immutable OID",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"[1-9][0-9]*\"$"
+            },
+            "description": "Canonical quoted decimal version_token from catalog listing."
+          },
+          {
+            "name": "binding",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^cbi_[a-f0-9]{24}$"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Durable accepted Operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "operation": {
+                      "$ref": "#/components/schemas/Operation"
+                    },
+                    "branch_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "description": "Project Admin with session CSRF or scoped Admin key. Canonical quoted original baseline intent If-Match and Idempotency-Key required. Explicit acknowledgment of name restoration and role credential reset. Only an unchanged managed intent with the original native tenant/timeline, original OID, provenance/options/Owner and solely a changed supported non-system name may restore. Replacements, missing originals, occupied target names and any other observed differences reject. Bind the original immutable role credential UID plus every retained Compute config UID and global Proxy routes UID; all cold specs/routes must already express the original desired name and credential. Transactional ALTER verifies the original OID, with complete native postcondition; no DROP, CREATE, user data copy, ACL or Owner migration. Original role verifier resets only under explicit acknowledgment, never returned publicly. Durable branch-catalog Operation, lease checks, original result/audit receipt and retry. A committed original result recovers metadata without reapplying old credentials after later external DDL. Managed name/version and immutable baseline remain unchanged. Historical receipt replay precedes current Writer/native/version checks. This workflow is not a distributed external DDL fencing or complete credential drift observation claim.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogIdentityRestoreInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/default-database-owner": {
+      "get": {
+        "tags": [
+          "Catalog"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Native default database preview and current desired Owner binding",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "getDefaultDatabaseOwner",
+        "summary": "Observe the original default database identity and Owner",
+        "description": "Editor read through the existing Writer and fixed template1 maintenance connection; may wake Compute. Bounded read-only native tenant/timeline, original database OID, Owner OID, original cloud_admin identity, version, managed Owner candidates and operation status. No password, verifier, comment content or internal credential digest is returned. Initial observation explicitly cannot prove earlier history. Arbitrary database comments and current options remain user content, independent of catalog management markers."
+      },
+      "patch": {
+        "operationId": "updateDefaultDatabaseOwner",
+        "tags": [
+          "Catalog"
+        ],
+        "summary": "Migrate the original default database Owner",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"[1-9][0-9]*\"$"
+            },
+            "description": "Canonical quoted decimal version_token from catalog listing."
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Durable accepted Operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "operation": {
+                      "$ref": "#/components/schemas/Operation"
+                    },
+                    "branch_id": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "description": "Admin with session CSRF or scoped Admin key, canonical quoted If-Match and original Idempotency-Key. Managed mode selects a ready API-managed original role OID/credential; platform mode derives the original cloud_admin identity. Authenticate the supplied current platform password using a fixed template1 connection. Bind tenant/timeline, original database and previous/target Owner OIDs, comment/options/ACL, platform/probe/target credential intent, all retained Compute config UIDs and Proxy routes UID. Durable original Operation publishes only the default database Owner cold intent (Readers first, Writer last), then transactionally ALTERs the original database Owner with strict postconditions. Database/table/schema OIDs, data, existing table/schema owners, arbitrary comment and original options are preserved. PostgreSQL rewrites Owner/grantor ACL references; unrelated grants are retained. No full compute configure, DROP, CREATE or REASSIGN OWNED. Credential is purpose-encrypted outside payloads and cleared with the successful result/audit. An achieved native postcondition is observed without reopening escrow. Original result replay never reapplies old credentials or reverts a later Owner change, and precedes current Writer/version checks. Failed Operations retain reservation; retry that original Operation. Selected default Owner cannot be deleted/renamed; original default database uses this dedicated workflow. Customer connection defaults remain independent. Live forks copy current binding under their new timeline; historical restore does not copy current Owner intent. This is not external DDL or HA fencing.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DefaultDatabaseOwnerInput"
               }
             }
           }

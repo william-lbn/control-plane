@@ -78,6 +78,29 @@ func DecodeBootstrap(content []byte) (Bootstrap, error) {
 	return b, nil
 }
 
+// DecodeRetainedBootstrap is for the trusted control plane's MAC/UID-verified
+// immutable receipt, never Guest boot or new admission. Verify the original
+// leaf at its signed issuance window; a live connection still independently
+// requires a currently valid TLS leaf. Renewal never rewrites bootstrap.
+func DecodeRetainedBootstrap(content []byte) (Bootstrap, error) {
+	var b Bootstrap
+	if len(content) == 0 || len(content) > MaxBootstrapBytes || strictJSON(content, &b) != nil {
+		return Bootstrap{}, errors.New("invalid retained bootstrap")
+	}
+	pair, err := tls.X509KeyPair([]byte(b.ManagerCertificate), []byte(b.ManagerPrivateKey))
+	if err != nil || len(pair.Certificate) == 0 {
+		return Bootstrap{}, errors.New("invalid retained manager identity")
+	}
+	leaf, err := x509.ParseCertificate(pair.Certificate[0])
+	if err != nil || leaf.NotBefore.After(time.Now()) || leaf.NotAfter.Sub(leaf.NotBefore) > 4*time.Hour+time.Minute {
+		return Bootstrap{}, errors.New("invalid retained manager validity")
+	}
+	if err = b.validateAt(leaf.NotBefore.Add(time.Minute)); err != nil {
+		return Bootstrap{}, err
+	}
+	return b, nil
+}
+
 func secretKey(encoded string) ([]byte, error) {
 	key, err := base64.StdEncoding.Strict().DecodeString(encoded)
 	if err != nil || len(key) != 32 {
@@ -99,6 +122,10 @@ func (b Bootstrap) artifactPath() string {
 }
 
 func (b Bootstrap) Validate() error {
+	return b.validateAt(time.Now())
+}
+
+func (b Bootstrap) validateAt(at time.Time) error {
 	if b.Scope.Validate() != nil || !digestPattern.MatchString(b.BundleDigest) || ValidateEnvironment(b.Environment) != nil {
 		return errors.New("invalid guest deployment contract")
 	}
@@ -138,7 +165,7 @@ func (b Bootstrap) Validate() error {
 	if queryErr != nil || !exists || len(password) < 24 || !writerEndpointPattern.MatchString(b.WriterEndpointID) || len(query) != 3 || query.Get("sslmode") != "verify-full" || query.Get("sslrootcert") != "/etc/neon-function/sql-ca.crt" || query.Get("options") != "endpoint="+selector || len(query["sslmode"]) != 1 || len(query["sslrootcert"]) != 1 || len(query["options"]) != 1 {
 		return errors.New("restricted SQL requires fixed Writer selector and verify-full CA")
 	}
-	_, err = b.ManagerTLS(time.Now())
+	_, err = b.ManagerTLS(at)
 	return err
 }
 

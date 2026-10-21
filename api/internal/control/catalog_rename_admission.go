@@ -59,6 +59,14 @@ func (s *server) catalogRenameMutation(w http.ResponseWriter, r *http.Request) {
 	if s.replayCatalog(w, r, key, hash) {
 		return
 	}
+	if err = checkDefaultOwnerReservation(r.Context(), s.db, p.ProjectID, p.BranchID); err != nil {
+		s.defaultOwnerFailure(w, r, err)
+		return
+	}
+	if err = checkCatalogForkExclusion(r.Context(), s.db, p.ProjectID, p.BranchID, p.Kind, p.Name); err != nil {
+		s.defaultOwnerFailure(w, r, err)
+		return
+	}
 	table, column := "branch_databases", "owner_name"
 	if p.Kind == "role" {
 		table, column = "branch_roles", "credential_ref"
@@ -128,16 +136,30 @@ func (s *server) catalogRenameMutation(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 409, "catalog_identity_conflict", "Original PostgreSQL OID, owner or marker differs from managed intent")
 		return
 	}
-	if err = s.captureCatalogRenameBindings(ctx, &p); err != nil {
-		s.catalogRenameFailure(w, r, err)
-		return
-	}
 	tx, err := s.db.Begin(r.Context())
 	if err != nil {
 		s.catalogRenameFailure(w, r, err)
 		return
 	}
 	defer tx.Rollback(r.Context())
+	var parentsReady bool
+	err = tx.QueryRow(ctx, `SELECT pr.source='managed' AND pr.state='ready' AND pr.deleted_at IS NULL AND b.state='ready' AND b.deleted_at IS NULL FROM projects pr JOIN branches b ON b.project_id=pr.id WHERE pr.id=$1 AND b.id=$2 FOR UPDATE OF pr,b`, p.ProjectID, p.BranchID).Scan(&parentsReady)
+	if err != nil || !parentsReady {
+		s.catalogRenameFailure(w, r, renameFault(409, "catalog_intent_changed", "Ready catalog parents required"))
+		return
+	}
+	if err = s.captureCatalogMutationIdentity(ctx, tx, &p.catalogPayload, "rename_"+p.Kind); err != nil {
+		s.catalogRenameFailure(w, r, err)
+		return
+	}
+	if p.NativeIdentity.Object.OID != p.ObjectOID {
+		fail(w, r, 409, "catalog_identity_conflict", "Rename target differs from original native binding")
+		return
+	}
+	if err = s.captureCatalogRenameBindings(ctx, &p); err != nil {
+		s.catalogRenameFailure(w, r, err)
+		return
+	}
 	operation, err := admitCatalogRenameTx(r.Context(), tx, p, userFrom(r).ID, requestID(r), keyHash(key), hash)
 	if err == nil {
 		err = tx.Commit(r.Context())
@@ -167,6 +189,12 @@ type catalogRenameReader interface {
 }
 
 func checkCatalogRenameDependencies(ctx context.Context, db catalogRenameReader, p catalogRenamePayload) error {
+	if err := checkDefaultOwnerDependency(ctx, db, p.ProjectID, p.BranchID, p.Kind, p.Name); err != nil {
+		return err
+	}
+	if err := checkConnectionDefaultDependency(ctx, db, p.BranchID, p.Kind, p.Name); err != nil {
+		return err
+	}
 	table := "branch_databases"
 	if p.Kind == "role" {
 		table = "branch_roles"
@@ -224,6 +252,9 @@ func admitCatalogRenameTx(ctx context.Context, tx pgx.Tx, p catalogRenamePayload
 		return "", err
 	}
 	if err = verifyCatalogRenameEndpointSet(ctx, tx, p); err != nil {
+		return "", err
+	}
+	if err = verifyCatalogMutationBindingsTx(ctx, tx, p.catalogPayload, "rename_"+p.Kind); err != nil {
 		return "", err
 	}
 	table, reference := "branch_databases", "owner_name"

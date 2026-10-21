@@ -102,6 +102,9 @@ stream 结束；Idle controller 每 5 秒尝试独占锁，锁不到就跳过。
 期间拒绝新 admission，返回 dispatch 前的 503，避免所有连接持锁后互相等待查询。
 原 supervisor 的 active count/last activity 是回收依据，不信任客户 Node 的后台计数。
 运营方明确开启策略时承认后台任务可能因 idle eviction 结束；不虚称支持持久任务队列。
+客户 Node 不就绪时仍按认证 supervisor 的原身份/调用计数/有效活动时间判断，观察
+失败则不停止。候选按 ID 分批遍历，避免首批繁忙函数饿死后续检查；具体准入和
+新增复测见[异常客户进程的空闲回收](FUNCTION-UNHEALTHY-IDLE.md)。
 
 手动 suspend 原子清除 idle_suspended，公开请求不会把主动停止的函数重新拉起。
 自动 suspend 同一事务设置 marker，避免 crash 后留下不可识别的自动休眠状态。

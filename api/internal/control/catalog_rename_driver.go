@@ -58,7 +58,7 @@ func (s *server) catalogRenameVerifier(ctx context.Context, p catalogRenamePaylo
 		return "", nil
 	}
 	secret, err := s.kube.request(ctx, http.MethodGet, s.kube.path("secret", p.CredentialRef), nil)
-	if err != nil || !owned(secret, p.ProjectID, p.EndpointID) || secret["immutable"] != true || stringVal(nested(secret, "metadata", "uid")) != p.CredentialUID {
+	if err != nil || !catalogRenameCredentialOwned(secret, p) || secret["immutable"] != true || stringVal(nested(secret, "metadata", "uid")) != p.CredentialUID {
 		return "", errors.New("original immutable managed role credential identity rejected")
 	}
 	value, err := secretText(secret, "verifier")
@@ -66,6 +66,13 @@ func (s *server) catalogRenameVerifier(ctx context.Context, p catalogRenamePaylo
 		return "", errors.New("original managed SCRAM verifier unavailable")
 	}
 	return value, nil
+}
+
+func catalogRenameCredentialOwned(secret map[string]any, p catalogRenamePayload) bool {
+	if p.NativeIdentity == nil {
+		return owned(secret, p.ProjectID, p.EndpointID)
+	}
+	return p.NativeIdentity.Object.CredentialRef == p.CredentialRef && p.NativeIdentity.Object.CredentialUID == p.CredentialUID && nested(secret, "metadata", "labels", "neon-control/project-id") == p.ProjectID
 }
 
 // Bind every external object before admitting the durable Operation. CAS may
@@ -94,7 +101,7 @@ func (s *server) captureCatalogRenameBindings(ctx context.Context, p *catalogRen
 	p.RoutesUID = stringVal(nested(routes, "metadata", "uid"))
 	if p.Kind == "role" {
 		secret, err := s.kube.request(ctx, http.MethodGet, s.kube.path("secret", p.CredentialRef), nil)
-		if err != nil || !owned(secret, p.ProjectID, p.EndpointID) || secret["immutable"] != true {
+		if err != nil || nested(secret, "metadata", "labels", "neon-control/project-id") != p.ProjectID || secret["immutable"] != true {
 			return errors.New("original managed role credential unavailable")
 		}
 		p.CredentialUID = stringVal(nested(secret, "metadata", "uid"))
@@ -264,6 +271,16 @@ func (s *server) reconcileCatalogRename(ctx context.Context, operation, worker s
 	if !p.valid() || !p.bindingsValid() {
 		return errors.New("invalid catalog rename payload")
 	}
+	recovered, err := s.prepareCatalogRenameResult(ctx, operation, worker, p)
+	if err != nil || recovered {
+		return err
+	}
+	if p.NativeIdentity == nil {
+		return catalogIdentityRequired()
+	}
+	if err = s.verifyCatalogCredentialBindings(ctx, p.catalogPayload); err != nil {
+		return err
+	}
 	verifier, err := s.catalogRenameVerifier(ctx, p)
 	if err != nil {
 		return err
@@ -306,7 +323,7 @@ func (s *server) reconcileCatalogRename(ctx context.Context, operation, worker s
 			if err = verifyCatalogRenameEndpointSet(ctx, tx, p); err != nil {
 				return err
 			}
-			if err = commitCatalogRenameTx(ctx, tx, p); err != nil {
+			if err = commitCatalogRenameResultTx(ctx, tx, operation, worker, p); err != nil {
 				return err
 			}
 			return tx.Commit(ctx)

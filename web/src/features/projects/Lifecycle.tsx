@@ -5,6 +5,7 @@ import { followOperation } from '../../shared/followOperation';
 import { newRequestKey } from '../../shared/requestKey';
 import { fmt, status, PageHeading } from '../../shared/ui';
 import { Operations } from '../operations/Operations';
+import { BranchExpiration, type ExpiringBranch } from './BranchExpiration';
 
 type Resource = {
   id: string;
@@ -16,12 +17,13 @@ type Resource = {
 };
 type Snapshot = {
   project: Resource & { source: string; recover_until: string | null };
-  branches: (Resource & {
-    is_default: boolean;
-    parent_branch_id: string | null;
-    child_count: number;
-    endpoint_count: number;
-  })[];
+  branches: (Resource &
+    ExpiringBranch & {
+      is_default: boolean;
+      parent_branch_id: string | null;
+      child_count: number;
+      endpoint_count: number;
+    })[];
   tombstones: {
     operation_id: string;
     resource_type: string;
@@ -164,7 +166,7 @@ export function Lifecycle({ projectId }: { projectId: string }) {
               <strong>保留数据的删除流程</strong>
               <p>
                 删除会断开 SQL 和 Data API 连接并回收
-                Compute，应用凭据永久撤销。项目可恢复，已单独删除的分支不会随项目恢复。原始
+                Compute，应用凭据永久撤销。就绪项目删除后可在保留期内恢复；失败创建清理保留原始证据，不提供就绪项目恢复。已单独删除的分支不会随项目恢复。原始
                 Timeline、WAL、对象和审计记录保留；物理清除与跨实例连接栅栏仍待独立验收。
               </p>
             </div>
@@ -203,6 +205,17 @@ export function Lifecycle({ projectId }: { projectId: string }) {
                     删除项目
                   </button>
                 </div>
+              )}
+            {data.project.state === 'error' &&
+              data.can_admin &&
+              data.project.source === 'managed' && (
+                <button
+                  className="button danger"
+                  disabled={data.project.protected && data.project.version !== 1}
+                  onClick={() => choose(data.project, 'project', 'delete')}
+                >
+                  清理失败项目
+                </button>
               )}
             {data.project.state === 'deleted' && data.can_admin && (
               <button
@@ -252,6 +265,12 @@ export function Lifecycle({ projectId }: { projectId: string }) {
                       <td>
                         {b.endpoint_count} Compute · {b.child_count} 子分支
                         {b.protected ? ' · 已保护' : ''}
+                        <BranchExpiration
+                          projectId={projectId}
+                          branch={b}
+                          canEdit={data.can_edit && data.project.state === 'ready'}
+                          onChanged={refresh}
+                        />
                       </td>
                       <td>{status(b.state)}</td>
                       <td>
@@ -260,6 +279,7 @@ export function Lifecycle({ projectId }: { projectId: string }) {
                             {data.can_admin && (
                               <button
                                 className="button"
+                                disabled={!!b.expires_at && !b.protected}
                                 onClick={() =>
                                   choose(b, 'branch', b.protected ? 'unprotect' : 'protect')
                                 }
@@ -277,6 +297,17 @@ export function Lifecycle({ projectId }: { projectId: string }) {
                               删除分支
                             </button>
                           </div>
+                        )}
+                        {!b.deleted_at && b.state === 'error' && data.project.state === 'ready' && (
+                          <button
+                            className="button danger"
+                            disabled={
+                              !data.can_edit || b.is_default || b.protected || b.child_count > 0
+                            }
+                            onClick={() => choose(b, 'branch', 'delete')}
+                          >
+                            清理失败分支
+                          </button>
                         )}
                       </td>
                     </tr>
@@ -362,6 +393,12 @@ export function Lifecycle({ projectId }: { projectId: string }) {
                 ? '确认后将关闭访问并断开此资源的连接。请先停止应用写入。'
                 : '请核对资源名称和当前状态。'}
             </p>
+            {action.action === 'delete' && action.resource.state === 'error' && (
+              <p>
+                仅清理能核对唯一原失败创建记录的资源和原
+                Compute，关闭旧入口。原失败记录、timeline、WAL、对象及凭据保留，原创建不能再重试。失败项目包含创建时自动保护且未经修改、从未就绪的项目及原根分支；清理不提供就绪项目恢复窗口。
+              </p>
+            )}
             {operation?.state === 'failed' && (
               <p role="alert">
                 {operation.error_code}：{operation.error_message}

@@ -54,6 +54,13 @@ node tools/local-images.mjs import \
 
 工具校验每个 OCI 包 SHA-256，并确认 `k8s.io` namespace 中存在精确摘要引用。不要将本地镜像设置为 `Always` 拉取。节点替换或镜像 GC 后须重新导入。
 
+containerd 导入使用本地命名镜像路径与 `--skip-digest-for-named`，随后校验 tag 的真实
+target，再创建完整的 repository@digest 引用。归档的外层索引不是运行镜像；不要
+把默认 `import-日期@digest` 当成可重启的 CRI 引用。对从旧工具恢复的缓存，应先
+证明每个实际镜像仍有原完整引用，再移除临时归档别名并刷新 CRI 元数据；不得
+改写 image digest 或重新初始化依赖数据库。导入的现场验证还包括 CRI inspect
+的 repoDigests 和受控重启后的原 Pod/数据恢复，不能只以导入命令退出 0 作为证明。
+
 将 `result.json` 的 `api/web/auth.reference` 写到私有 Helm 覆盖文件的 `api.image.reference`、`web.image.reference`、`managedAuth.runtimeImage`。保留数据库、Auth SMTP、Functions、AI、对象存储所有现有 Secret/PVC 配置。先 `helm lint/template`，查看实际 manifest 差异；仅升级控制面 release。数据库/PVC 不随代码版本重建。记录升级前 release 修订与资源 UID，用 Helm 已知上个版本回滚。
 
 ## 验收与发布

@@ -98,10 +98,10 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 			}
 		}()
 		switch action {
-		case "delete_endpoint":
+		case "delete_endpoint", "cleanup_failed_endpoint":
 			var p endpointDeletionPayload
 			stepErr = json.Unmarshal(payload, &p)
-			if stepErr == nil && (p.ProjectID != projectID || p.EndpointID != resourceID) {
+			if stepErr == nil && (p.ProjectID != projectID || p.EndpointID != resourceID || (p.FailedCreateOperationID != "") != (action == "cleanup_failed_endpoint")) {
 				stepErr = errors.New("endpoint deletion operation scope mismatch")
 			}
 			if stepErr == nil {
@@ -130,10 +130,10 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 			if stepErr == nil {
 				stepErr = s.reconcileObjectStorage(runCtx, id, workerID, action, p)
 			}
-		case "delete_project", "delete_branch", "recover_project":
+		case "delete_project", "delete_branch", "cleanup_failed_project", "cleanup_failed_branch", "expire_branch", "recover_project":
 			var p deletionPayload
 			stepErr = json.Unmarshal(payload, &p)
-			if stepErr == nil && p.ProjectID != projectID {
+			if stepErr == nil && (p.ProjectID != projectID || ((action == "cleanup_failed_project" || action == "cleanup_failed_branch") != (p.FailedCreateOperationID != "")) || ((action == "expire_branch") != (p.ExpirationGeneration > 0)) || ((action == "delete_project" || action == "cleanup_failed_project" || action == "recover_project") && resourceID != projectID) || ((action == "delete_branch" || action == "cleanup_failed_branch" || action == "expire_branch") && (len(p.BranchIDs) != 1 || p.BranchIDs[0] != resourceID))) {
 				stepErr = errors.New("deletion operation scope mismatch")
 			}
 			if stepErr == nil {
@@ -156,6 +156,24 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 			}
 			if stepErr == nil {
 				stepErr = s.reconcileManagedAuth(runCtx, id, workerID, action, p)
+			}
+		case "update_default_database_owner":
+			var p defaultOwnerPayload
+			if err := json.Unmarshal(payload, &p); err != nil {
+				stepErr = err
+			} else if p.ProjectID != projectID || p.BranchID != resourceID || !p.valid() {
+				stepErr = errors.New("default database Owner Operation scope mismatch")
+			} else {
+				stepErr = s.reconcileDefaultDatabaseOwner(runCtx, id, workerID, p)
+			}
+		case "restore_catalog_identity":
+			var p catalogIdentityRestorePayload
+			if err := json.Unmarshal(payload, &p); err != nil {
+				stepErr = err
+			} else if p.ProjectID != projectID || p.BranchID != resourceID || !p.validRestore() {
+				stepErr = errors.New("catalog identity restore Operation scope mismatch")
+			} else {
+				stepErr = s.reconcileCatalogIdentityRestore(runCtx, id, workerID, p)
 			}
 		case "rename_role", "rename_database":
 			var p catalogRenamePayload

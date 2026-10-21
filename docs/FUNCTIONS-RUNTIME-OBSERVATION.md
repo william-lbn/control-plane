@@ -22,7 +22,7 @@ OpenAPI 0.13 defines `FunctionRuntimeObservation` and this exact route.
 | `checked_at` | API observation/check timestamp, not SQL readiness |
 | `instance_id`, `deployment_id`, `vm_phase` | Returned only after original identity/specification verification |
 | `node_ready`, `draining`, `active_invocations`, `last_activity` | Privileged supervisor observations; not arbitrary customer JSON |
-| `background_counters_trusted=false` | Background work is unmetered; observation cannot authorize automatic retirement |
+| `background_counters_trusted=false` | Background work is unmetered; only the separately acknowledged idle policy and verified supervisor invocation counters may authorize retirement |
 
 Inactive/disabled definitions return `observed=false`, `metadata_only` and no
 invented Node health/counts. This path reads metadata only. Active observations
@@ -58,6 +58,11 @@ mutate Kubernetes, update invocation timestamps or imply historical metrics,
 billing, CPU/RAM metering or automatic suspension. Console invocation reuses the
 same identity/freshness checks, validates input before dispatch and still sends
 one customer POST without automatic replay.
+
+The idle controller separately observes that same authenticated supervisor under
+the acknowledged HTTP policy. Customer Node health is not a prerequisite for
+releasing an otherwise idle instance; see the [unhealthy idle contract](FUNCTION-UNHEALTHY-IDLE.md).
+This does not authorize retirement when the supervisor itself is unobservable.
 
 ## 3. Console and focused Linux acceptance
 

@@ -27,6 +27,8 @@ export type Branch = {
   is_default: boolean;
   protected: boolean;
   state: string;
+  expires_at?: string | null;
+  expiration_status?: string;
   created_at: string;
 };
 export type BranchService = {
@@ -51,6 +53,14 @@ export type Runtime = {
   error?: string;
 };
 export type Endpoint = {
+  connection_defaults?: {
+    mode: 'platform' | 'managed';
+    role: string;
+    database: string;
+    version_token: string;
+    platform_role?: string;
+    platform_database?: string;
+  };
   id: string;
   endpoint_type: 'read_write' | 'read_only';
   project_id: string;

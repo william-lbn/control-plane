@@ -31,6 +31,16 @@ aiGateway:
 # Existing Secrets are operator-managed and are retained across Helm upgrades.
 functions:
   enabled: false
+  objectEvents:
+    enabled: false
+  outputLogs:
+    enabled: false
+  branchCopies:
+    enabled: false
+  managerCertificateRenewal:
+    enabled: false
+    # Refresh a two-hour leaf before expiry, without replacing the Guest boot.
+    renewBeforeSeconds: 2700
   # Requires an upgraded Guest supervisor with signed trigger invocation support.
   # Off by default. Persistent UTC plans remain inspectable while disabled.
   schedules:
@@ -138,3 +148,10 @@ ingress:
 # personal history never records connection passwords or result rows.
 sqlHistory:
   enabled: false
+
+# Explicit platform operators, exact private origins and public encryption keys
+# are approved policy inputs. The API receives no private-key volume.
+aiProviderManagement:
+  enabled: false
+  existingPublicSecret: ''
+  existingPrivateSecret: ''

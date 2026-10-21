@@ -325,20 +325,22 @@ func computeConfig(projectID, tenantID, timelineID, adminVerifier, probeVerifier
 }
 
 type createPayload struct {
-	ProjectID        string `json:"project_id"`
-	BranchID         string `json:"branch_id"`
-	EndpointID       string `json:"endpoint_id"`
-	EndpointType     string `json:"endpoint_type,omitempty"`
-	TenantID         string `json:"tenant_id"`
-	TimelineID       string `json:"timeline_id"`
-	ParentTimelineID string `json:"parent_timeline_id"`
-	ParentLSN        string `json:"parent_lsn"`
-	RestoreSource    string `json:"restore_source,omitempty"`
-	CatalogSpec      string `json:"-"` // Runtime projection from branch intent; never persisted in Operation.
-	MinCPU           int    `json:"min_cpu_milli"`
-	MaxCPU           int    `json:"max_cpu_milli"`
-	MinMem           int    `json:"min_memory_mib"`
-	MaxMem           int    `json:"max_memory_mib"`
+	ProjectID                 string `json:"project_id"`
+	BranchID                  string `json:"branch_id"`
+	EndpointID                string `json:"endpoint_id"`
+	EndpointType              string `json:"endpoint_type,omitempty"`
+	TenantID                  string `json:"tenant_id"`
+	TimelineID                string `json:"timeline_id"`
+	ParentTimelineID          string `json:"parent_timeline_id"`
+	ParentLSN                 string `json:"parent_lsn"`
+	RestoreSource             string `json:"restore_source,omitempty"`
+	CatalogPolicy             string `json:"catalog_policy,omitempty"`
+	CatalogInitializePlatform bool   `json:"-"`
+	CatalogSpec               string `json:"-"` // Runtime projection from branch intent; never persisted in Operation.
+	MinCPU                    int    `json:"min_cpu_milli"`
+	MaxCPU                    int    `json:"max_cpu_milli"`
+	MinMem                    int    `json:"min_memory_mib"`
+	MaxMem                    int    `json:"max_memory_mib"`
 }
 
 // vmWaitError contains only a Kubernetes phase, never a Secret or SQL value.
@@ -451,6 +453,24 @@ func (k *kubeClient) createCompute(ctx context.Context, p createPayload) (map[st
 		encoded, e := json.Marshal(data)
 		if e != nil {
 			return nil, e
+		}
+		config = string(encoded)
+	}
+	if p.CatalogPolicy == catalogPreserveInheritedSQL {
+		var initial map[string]any
+		if json.Unmarshal([]byte(config), &initial) != nil {
+			return nil, errors.New("initial inheritance configuration invalid")
+		}
+		if !p.CatalogInitializePlatform {
+			initial["spec"].(map[string]any)["skip_pg_catalog_updates"] = true
+		}
+		initial, err = catalogInheritanceConfig(initial, true, nil)
+		if err != nil {
+			return nil, err
+		}
+		encoded, err := json.Marshal(initial)
+		if err != nil {
+			return nil, err
 		}
 		config = string(encoded)
 	}

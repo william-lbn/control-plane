@@ -79,17 +79,31 @@ func Client(r Route, timeout time.Duration) *http.Client {
 			return nil, e
 		}
 		ips, e := net.DefaultResolver.LookupIPAddr(ctx, host)
-		if e != nil {
+		if e != nil || len(ips) == 0 || len(ips) > 8 {
+			if e == nil {
+				e = errors.New("provider address rejected")
+			}
 			return nil, e
 		}
+		// Reject the complete DNS answer if any address left the tested pins.
+		// Selecting just one permitted answer would accept a mixed rebind.
 		for _, ip := range ips {
+			matched := false
 			for _, allowed := range r.AllowedIPs {
 				if ip.IP.Equal(net.ParseIP(allowed)) {
-					return (&net.Dialer{Timeout: 5 * time.Second}).DialContext(ctx, network, net.JoinHostPort(ip.IP.String(), port))
+					matched = true
+					break
 				}
 			}
+			if !matched {
+				return nil, errors.New("provider address rejected")
+			}
 		}
-		return nil, errors.New("provider address rejected")
+		target := net.JoinHostPort(ips[0].IP.String(), port)
+		if r.egressProxy != "" {
+			return dialProviderProxy(ctx, network, r.egressProxy, target)
+		}
+		return (&net.Dialer{Timeout: 5 * time.Second}).DialContext(ctx, network, target)
 	}
 	return &http.Client{Transport: transport, Timeout: timeout, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 }

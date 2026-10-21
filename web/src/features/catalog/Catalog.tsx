@@ -5,6 +5,9 @@ import type { Branch, Operation, Page } from '../../api';
 import { Empty, PageHeading } from '../../shared/ui';
 import { newRequestKey } from '../../shared/requestKey';
 import { CatalogRename } from './CatalogRename';
+import { ConnectionDefaults } from './ConnectionDefaults';
+import { CatalogIdentities } from './CatalogIdentities';
+import { DefaultDatabaseOwner } from './DefaultDatabaseOwner';
 
 type CatalogItem = {
   name: string;
@@ -15,22 +18,35 @@ type CatalogItem = {
   state: string;
   superuser?: boolean;
   version_token?: string;
+  default_owner_dependency?: boolean;
+  management_excluded?: boolean;
 };
+
+function initialCatalogBranch(projectId: string, branches: Branch[]) {
+  const available = branches.filter((b) => b.project_id === projectId && b.state === 'ready');
+  try {
+    const remembered = sessionStorage.getItem('neon-control:catalog-branch:' + projectId);
+    if (available.some((b) => b.id === remembered)) return remembered!;
+  } catch {
+    /* Storage restrictions must not block directory management. */
+  }
+  return available.find((b) => b.is_default)?.id || available[0]?.id || '';
+}
 
 export function Catalog({
   projectId,
   branches,
   canEdit,
+  canAdmin,
   showError,
 }: {
   projectId: string;
   branches: Branch[];
   canEdit: boolean;
+  canAdmin: boolean;
   showError: (error: unknown) => void;
 }) {
-  const [branch, setBranch] = useState(
-    branches.find((b) => b.is_default)?.id || branches[0]?.id || '',
-  );
+  const [branch, setBranch] = useState(() => initialCatalogBranch(projectId, branches));
   const [roles, setRoles] = useState<CatalogItem[]>([]);
   const [databases, setDatabases] = useState<CatalogItem[]>([]);
   const [roleName, setRoleName] = useState('');
@@ -42,10 +58,15 @@ export function Catalog({
   const [transferDatabase, setTransferDatabase] = useState('');
   const [transferOwner, setTransferOwner] = useState('');
   const [busy, setBusy] = useState(false);
+  const [ownerReserved, setOwnerReserved] = useState(false);
   const [loading, setLoading] = useState(true);
   const [operation, setOperation] = useState<Operation | null>(null);
   const scopeEpoch = useRef(0);
   const path = `${projectPath(projectId)}/branches/${encodeURIComponent(branch)}`;
+  useEffect(() => {
+    if (!branches.some((b) => b.project_id === projectId && b.state === 'ready' && b.id === branch))
+      setBranch(initialCatalogBranch(projectId, branches));
+  }, [projectId, branches, branch]);
   async function load(epoch = scopeEpoch.current) {
     const [r, d] = await Promise.all([
       api<Page<CatalogItem>>(path + '/roles'),
@@ -59,6 +80,7 @@ export function Catalog({
   useEffect(() => {
     scopeEpoch.current++;
     setBusy(false);
+    setOwnerReserved(false);
     let cancelled = false;
     setLoading(true);
     setRoles([]);
@@ -172,10 +194,17 @@ export function Catalog({
             aria-label="管理分支"
             value={branch}
             disabled={busy}
-            onChange={(e) => setBranch(e.target.value)}
+            onChange={(e) => {
+              setBranch(e.target.value);
+              try {
+                sessionStorage.setItem('neon-control:catalog-branch:' + projectId, e.target.value);
+              } catch {
+                /* Optional preference only. */
+              }
+            }}
           >
             {branches
-              .filter((b) => b.state === 'ready')
+              .filter((b) => b.project_id === projectId && b.state === 'ready')
               .map((b) => (
                 <option key={b.id} value={b.id}>
                   {b.name}
@@ -198,15 +227,40 @@ export function Catalog({
           </div>
         </div>
       )}
+      <ConnectionDefaults
+        key={path + '/defaults'}
+        path={path}
+        roles={roles}
+        databases={databases}
+        canAdmin={canAdmin}
+        disabled={busy || loading}
+        onBusy={setBusy}
+      />
+      <DefaultDatabaseOwner
+        key={path + '/default-owner'}
+        path={path}
+        canAdmin={canAdmin}
+        disabled={busy || loading}
+        onBusy={setBusy}
+        onReserved={setOwnerReserved}
+        onComplete={() => load()}
+      />
       <CatalogRename
         key={path}
         path={path}
         projectId={projectId}
-        roles={roles}
+        roles={roles.filter((r) => !r.default_owner_dependency)}
         databases={databases}
-        disabled={busy || loading || !canEdit}
+        disabled={busy || loading || ownerReserved || !canEdit}
         onBusy={setBusy}
         onComplete={() => load()}
+      />
+      <CatalogIdentities
+        key={path + '/identities'}
+        path={path}
+        canAdmin={canAdmin}
+        disabled={busy || loading}
+        onBusy={setBusy}
       />
       <div className="identity-grid">
         <form
@@ -236,7 +290,7 @@ export function Catalog({
             <select
               aria-label="变更 Owner 的数据库"
               value={transferDatabase}
-              disabled={busy || loading || !canEdit}
+              disabled={busy || ownerReserved || loading || !canEdit}
               onChange={(e) => {
                 setTransferDatabase(e.target.value);
                 setTransferOwner('');
@@ -263,7 +317,7 @@ export function Catalog({
             <select
               aria-label="新的数据库 Owner"
               value={transferOwner}
-              disabled={busy || loading || !canEdit}
+              disabled={busy || ownerReserved || loading || !canEdit}
               onChange={(e) => setTransferOwner(e.target.value)}
             >
               <option value="">选择 Owner</option>
@@ -286,6 +340,7 @@ export function Catalog({
             className="button primary"
             disabled={
               busy ||
+              ownerReserved ||
               loading ||
               !canEdit ||
               !transferOwner ||
@@ -333,7 +388,7 @@ export function Catalog({
           </label>
           <button
             className="button primary"
-            disabled={busy || loading || !roleName || password.length < 12}
+            disabled={busy || ownerReserved || loading || !roleName || password.length < 12}
           >
             创建角色
           </button>
@@ -374,7 +429,10 @@ export function Catalog({
               ))}
             </select>
           </label>
-          <button className="button primary" disabled={busy || loading || !databaseName || !owner}>
+          <button
+            className="button primary"
+            disabled={busy || ownerReserved || loading || !databaseName || !owner}
+          >
             创建数据库
           </button>
         </form>
@@ -407,7 +465,9 @@ export function Catalog({
                   <button
                     className="text-button"
                     aria-label={`删除数据库 ${d.name}`}
-                    disabled={busy || !d.managed || d.protected || d.state !== 'ready'}
+                    disabled={
+                      busy || ownerReserved || !d.managed || d.protected || d.state !== 'ready'
+                    }
                     onClick={() => {
                       if (
                         confirm(
@@ -442,19 +502,28 @@ export function Catalog({
                   <strong>{r.name}</strong>
                 </td>
                 <td>
-                  {r.protected
-                    ? '内部 / 保留角色'
-                    : r.managed
-                      ? 'Console / API 角色'
-                      : 'SQL 创建的角色'}
+                  {r.management_excluded
+                    ? '保留的外部 SQL 角色'
+                    : r.protected
+                      ? '内部 / 保留角色'
+                      : r.managed
+                        ? 'Console / API 角色'
+                        : 'SQL 创建的角色'}
                   {r.superuser && ' · PostgreSQL SUPERUSER'}
                 </td>
-                <td>{r.state}</td>
+                <td>{r.management_excluded ? '原身份不匹配 · 平台管理已隔离' : r.state}</td>
                 <td>
                   <button
                     className="text-button"
                     aria-label={`删除角色 ${r.name}`}
-                    disabled={busy || !r.managed || r.protected || r.state !== 'ready'}
+                    disabled={
+                      busy ||
+                      ownerReserved ||
+                      !r.managed ||
+                      r.protected ||
+                      r.default_owner_dependency ||
+                      r.state !== 'ready'
+                    }
                     onClick={() => {
                       if (confirm(`删除角色 ${r.name}？存在对象所有权或授权依赖时会拒绝执行。`))
                         void mutate('roles/' + encodeURIComponent(r.name), 'DELETE');
@@ -511,7 +580,7 @@ export function Catalog({
         </label>
         <button
           className="button primary"
-          disabled={busy || loading || !rotateName || rotatePassword.length < 12}
+          disabled={busy || ownerReserved || loading || !rotateName || rotatePassword.length < 12}
         >
           轮换密码
         </button>

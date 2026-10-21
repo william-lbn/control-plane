@@ -160,12 +160,31 @@ func (s *server) runLeaderControllers(ctx context.Context, role processRole, sta
 		go func() { defer group.Done(); run(controllerCtx) }()
 	}
 	start(s.runWorker)
+	start(s.runComputeCatalogBootstrapController)
+	start(s.runBranchExpirationController)
 	start(s.runMonitor)
 	start(s.cleanSessions)
+	if s.aiProviders != nil && s.aiProviders.opener != nil {
+		start(s.runAIProviderController)
+	}
+	if s.functionOutputEnabled() {
+		start(s.runFunctionOutputCollector)
+	}
+	if s.functionBranchCopyEnabled() {
+		start(s.functionBranchCopyController)
+	}
+	if s.functionManagerRenewalEnabled() {
+		start(s.runFunctionManagerRenewal)
+	}
 	if s.functions != nil && functionPublicOrigin() != "" {
 		start(s.runFunctionIdleController)
 		if s.functionSchedulesEnabled() {
 			start(s.runFunctionScheduleController)
+		}
+		if s.functionObjectEventsEnabled() {
+			start(s.runStorageFunctionEvents)
+		}
+		if s.functionSchedulesEnabled() || s.functionObjectEventsEnabled() {
 			start(s.runFunctionTriggerDispatcher)
 		}
 	}

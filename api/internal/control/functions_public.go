@@ -187,8 +187,9 @@ func (s *server) functionPublicInvoke(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 404, "not_found", "Function not found")
 		return
 	}
-	if r.Header.Get("Upgrade") != "" {
-		fail(w, r, 426, "function_websocket_unavailable", "WebSocket admission is not yet implemented")
+	websocket := r.Header.Get("Upgrade") != ""
+	if websocket && (!functions.ValidateWebSocketHandshake(r.Method, r.Header) || r.ContentLength > 0 || len(r.TransferEncoding) > 0) {
+		fail(w, r, 400, "invalid_websocket_handshake", "A standard GET WebSocket handshake is required")
 		return
 	}
 	body, e := io.ReadAll(io.LimitReader(r.Body, functions.MaxInvokeBytes+1))
@@ -243,6 +244,13 @@ func (s *server) functionPublicInvoke(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 503, "function_unavailable", "Runtime not accepting requests")
 		return
 	}
+	if websocket {
+		capabilities, err := client.Capabilities(ctx)
+		if err != nil || capabilities.BootID != runtime.bootID || !capabilities.WebSockets {
+			fail(w, r, 503, "function_websocket_runtime_unavailable", "Publish to a WebSocket capable runtime before connecting")
+			return
+		}
+	}
 	event, err := s.beginFunctionEvent(ctx, r, runtime.target, runtime.instance.Scope.InstanceID, "public_http", invocation.Method)
 	if err != nil {
 		fail(w, r, 503, "function_journal_unavailable", "Request not dispatched; admission journal unavailable")
@@ -256,6 +264,31 @@ func (s *server) functionPublicInvoke(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	defer finish(0, 0, "outcome_unknown")
+	if websocket {
+		response, err := client.WebSocket(ctx, invocation)
+		if err != nil {
+			fail(w, r, 502, "function_websocket_rejected", "WebSocket handshake unavailable; no automatic replay")
+			return
+		}
+		defer response.Body.Close()
+		if response.StatusCode != 101 {
+			copyFunctionPublicHeaders(w.Header(), response.Header)
+			w.WriteHeader(response.StatusCode)
+			n, _ := io.Copy(w, io.LimitReader(response.Body, 4096))
+			finish(response.StatusCode, n, "completed")
+			return
+		}
+		n, err := functions.RelayWebSocket(ctx, w, response)
+		outcome := "completed"
+		if err != nil {
+			outcome = "client_disconnected"
+		}
+		finish(101, n, outcome)
+		updateCtx, done := context.WithTimeout(context.Background(), 3*time.Second)
+		defer done()
+		s.db.Exec(updateCtx, `UPDATE function_instances SET last_invoked_at=now(),updated_at=now() WHERE id=$1 AND boot_id=$2`, runtime.instance.Scope.InstanceID, runtime.bootID)
+		return
+	}
 	response, e := client.Invoke(ctx, invocation)
 	if e != nil {
 		fail(w, r, 502, "function_invocation_outcome_unknown", "Invocation outcome unknown; no automatic replay")
@@ -300,24 +333,47 @@ func (s *server) functionPublicInvoke(w http.ResponseWriter, r *http.Request) {
 func (s *server) runFunctionIdleController(ctx context.Context) {
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
+	cursor := ""
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			s.suspendIdleFunctions(ctx)
+			cursor = s.suspendIdleFunctions(ctx, cursor)
 		}
 	}
 }
-func (s *server) suspendIdleFunctions(ctx context.Context) {
-	rows, e := s.many(ctx, `SELECT f.branch_id,f.slug FROM function_definitions f JOIN function_http_policies h ON h.function_id=f.id WHERE f.state='active' AND h.public_enabled AND h.idle_enabled ORDER BY f.id LIMIT 8`)
+
+// The supervisor, bound to the original boot and resource identity, owns these
+// counters. Customer Node health is not a prerequisite for releasing an idle
+// instance: a crashed Node must not keep an otherwise idle VM forever.
+func functionIdleEligible(status functions.InstanceStatus, timeout int, now time.Time) bool {
+	return timeout >= 30 && timeout <= 3600 && !status.Draining && status.ActiveInvocations == 0 && !status.LastActivity.IsZero() && !status.BackgroundCountersTrusted && now.Sub(status.LastActivity) >= time.Duration(timeout)*time.Second
+}
+
+func (s *server) functionIdleCandidates(ctx context.Context, after string) ([]record, error) {
+	return s.many(ctx, `SELECT f.id,f.branch_id,f.slug FROM function_definitions f JOIN function_http_policies h ON h.function_id=f.id WHERE f.id>$1 AND f.state='active' AND h.public_enabled AND h.idle_enabled ORDER BY f.id LIMIT 4`, after)
+}
+
+// Keyset traversal gives later functions a turn even when the first batch stays
+// busy or cannot be observed. Cursor is only a local observation optimization;
+// durable stop admission, authorization and leases remain in PostgreSQL.
+func (s *server) suspendIdleFunctions(ctx context.Context, cursor string) string {
+	rows, e := s.functionIdleCandidates(ctx, cursor)
 	if e != nil {
-		return
+		return cursor
+	}
+	if len(rows) == 0 {
+		return ""
 	}
 	for _, row := range rows {
+		if ctx.Err() != nil {
+			return cursor
+		}
+		cursor = stringVal(row["id"])
 		callCtx, cancel := context.WithTimeout(ctx, 25*time.Second)
 		p, err := s.functionHTTPIdentity(callCtx, stringVal(row["branch_id"]), stringVal(row["slug"]))
-		if err != nil {
+		if err != nil || p.ID != cursor {
 			cancel()
 			continue
 		}
@@ -327,13 +383,12 @@ func (s *server) suspendIdleFunctions(ctx context.Context) {
 			continue
 		}
 		fresh, err := s.functionHTTPIdentity(callCtx, p.Branch, p.Slug)
-		if err == nil && fresh.State == "active" && fresh.Idle {
+		if err == nil && fresh.ID == p.ID && fresh.State == "active" && fresh.Idle {
 			runtime, e := s.loadPublishedFunction(callCtx, p.Project, p.Branch, p.Slug)
-			if e == nil {
+			if e == nil && runtime.target.FunctionID == p.ID {
 				client, status, e := s.observePublishedFunction(callCtx, runtime)
 				if e == nil {
-					idle := status.NodeReady && !status.Draining && status.ActiveInvocations == 0 && time.Since(status.LastActivity) >= time.Duration(fresh.Timeout)*time.Second
-					if idle {
+					if functionIdleEligible(status, fresh.Timeout, time.Now()) {
 						s.automaticFunctionIntent(callCtx, fresh, false)
 					}
 					client.Close()
@@ -343,4 +398,5 @@ func (s *server) suspendIdleFunctions(ctx context.Context) {
 		release()
 		cancel()
 	}
+	return cursor
 }

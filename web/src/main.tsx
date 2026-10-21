@@ -6,6 +6,8 @@ import { short } from './shared/ui';
 import { Projects, ProjectWorkspace } from './features/projects/Projects';
 import { Organizations } from './features/identity/Organizations';
 import { Signup } from './features/identity/Invitations';
+import { AIProviders } from './features/ai/AIProviders';
+import type { ProviderCapabilities } from './features/ai/AIProviders';
 import './styles.css';
 
 function useHash() {
@@ -22,6 +24,9 @@ function App() {
   const hash = useHash();
   const [user, setUser] = useState<User | null | undefined>(undefined);
   const [capabilities, setCapabilities] = useState<Capabilities | null>(null);
+  const [providerCapabilities, setProviderCapabilities] = useState<ProviderCapabilities | null>(
+    null,
+  );
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [organizationId, setOrganizationId] = useState('');
   const [orgPicker, setOrgPicker] = useState(false);
@@ -41,6 +46,13 @@ function App() {
         .then(setCapabilities)
         .catch(() => setCapabilities(null));
   }, [user]);
+  useEffect(() => {
+    setProviderCapabilities(null);
+    if (user)
+      api<ProviderCapabilities>('/api/v1/platform/ai-providers/capabilities')
+        .then(setProviderCapabilities)
+        .catch(() => {});
+  }, [user?.id]);
   useEffect(() => {
     let cancelled = false;
     setOrganizations([]);
@@ -147,6 +159,11 @@ function App() {
         )}
         <div className="nav-label">工作空间</div>
         <nav className="nav">
+          {providerCapabilities?.can_manage && (
+            <a className={parts[0] === 'ai-providers' ? 'active' : ''} href="#/ai-providers">
+              <span>◈</span>AI 供应商
+            </a>
+          )}
           <a className={!projectId && parts[0] === 'projects' ? 'active' : ''} href="#/projects">
             <span>▦</span>项目列表
           </a>
@@ -277,6 +294,8 @@ function App() {
         <main className="content">
           {!organizationsLoaded ? (
             <div className="skeleton" />
+          ) : parts[0] === 'ai-providers' ? (
+            <AIProviders capabilities={providerCapabilities} />
           ) : parts[0] === 'organization' || !organizations.length ? (
             <Organizations
               organization={organization}

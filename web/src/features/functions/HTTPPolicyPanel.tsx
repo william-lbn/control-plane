@@ -53,9 +53,9 @@ export function HTTPPolicyPanel({
     <section className="function-authoring function-http-policy" data-testid="function-http-policy">
       <h3>HTTP 入口与自动休眠</h3>
       <p className="muted">
-        公开入口无需控制台登录；应用鉴权由函数代码负责。活动 HTTP/SSE
-        请求会阻止自动回收。空闲回收会结束后台任务，首次请求等待保留版本重新启动；手动停止保持关闭。当前入口不支持
-        WebSocket 或 Cookie。
+        公开入口无需控制台登录；应用鉴权由函数代码负责。活动 HTTP/SSE/WebSocket
+        请求会阻止自动回收。空闲回收会结束后台任务，首次请求等待保留版本重新启动；手动停止保持关闭。入口不传递控制台
+        Cookie。
       </p>
       <label>
         <input

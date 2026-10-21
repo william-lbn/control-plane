@@ -16,10 +16,14 @@ import (
 // IDs are the immutable deletion scope. No credential or VM template is stored
 // in an Operation: recovery uses the retained, namespace-scoped route Secret.
 type deletionPayload struct {
-	ProjectID   string   `json:"project_id"`
-	BranchIDs   []string `json:"branch_ids"`
-	EndpointIDs []string `json:"endpoint_ids"`
-	TombstoneID string   `json:"tombstone_id,omitempty"`
+	ProjectID               string            `json:"project_id"`
+	BranchIDs               []string          `json:"branch_ids"`
+	EndpointIDs             []string          `json:"endpoint_ids"`
+	TombstoneID             string            `json:"tombstone_id,omitempty"`
+	FailedCreateOperationID string            `json:"failed_create_operation_id,omitempty"`
+	ExpirationGeneration    int64             `json:"expiration_generation,omitempty"`
+	ExpectedVMUIDs          map[string]string `json:"expected_vm_uids,omitempty"`
+	ExpectedServiceUIDs     map[string]string `json:"expected_service_uids,omitempty"`
 }
 
 func lifecycleReadAllowed(r *http.Request) bool {
@@ -49,7 +53,7 @@ func (s *server) lifecycleOverview(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 503, "metadata_unavailable", "Could not read lifecycle")
 		return
 	}
-	branches, err := s.many(r.Context(), `SELECT b.id,b.name,b.parent_branch_id,b.is_default,b.protected,b.state,b.version,b.deleted_at,
+	branches, err := s.many(r.Context(), `SELECT b.id,b.name,b.parent_branch_id,b.is_default,b.protected,b.state,b.version,b.deleted_at,b.expires_at,b.ttl_interval_seconds,b.expiration_generation,b.expiration_status,b.expiration_error_code,b.expiration_operation_id,
  (SELECT count(*) FROM branches c WHERE c.parent_branch_id=b.id AND c.deleted_at IS NULL) AS child_count,
  (SELECT count(*) FROM endpoints e WHERE e.branch_id=b.id AND e.deleted_at IS NULL) AS endpoint_count
  FROM branches b WHERE b.project_id=$1 ORDER BY b.created_at LIMIT 1000`, r.PathValue("project"))
@@ -62,7 +66,7 @@ func (s *server) lifecycleOverview(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 503, "metadata_unavailable", "Could not read tombstones")
 		return
 	}
-	ids, err := s.many(r.Context(), `SELECT id FROM operations WHERE project_id=$1 AND action IN ('delete_project','delete_branch','delete_endpoint','recover_project') ORDER BY created_at DESC LIMIT 100`, r.PathValue("project"))
+	ids, err := s.many(r.Context(), `SELECT id FROM operations WHERE project_id=$1 AND action IN ('delete_project','delete_branch','delete_endpoint','cleanup_failed_endpoint','cleanup_failed_project','cleanup_failed_branch','set_branch_expiration','expire_branch','recover_project') ORDER BY created_at DESC LIMIT 100`, r.PathValue("project"))
 	if err != nil {
 		fail(w, r, 503, "metadata_unavailable", "Could not read lifecycle Operations")
 		return
@@ -126,6 +130,17 @@ func (s *server) setResourceProtection(w http.ResponseWriter, r *http.Request) {
 	if body.ConfirmName != name {
 		fail(w, r, 422, "confirmation_required", "Enter the exact resource name")
 		return
+	}
+	if table == "branches" && *body.Protected {
+		var expiring bool
+		if err = tx.QueryRow(r.Context(), `SELECT expires_at IS NOT NULL FROM branches WHERE id=$1`, id).Scan(&expiring); err != nil {
+			fail(w, r, 503, "metadata_unavailable", "Could not read branch expiration")
+			return
+		}
+		if expiring {
+			fail(w, r, 409, "branch_expiring", "Remove the future expiration before enabling protection")
+			return
+		}
 	}
 	_, err = tx.Exec(r.Context(), "UPDATE "+table+" SET protected=$2,version=version+1 WHERE id=$1", id, body.Protected)
 	if err == nil {
@@ -192,6 +207,9 @@ func (s *server) admitDeletion(w http.ResponseWriter, r *http.Request, recoverin
 	}
 	if source != "managed" {
 		fail(w, r, 422, "managed_project_required", "Imported resources cannot be deleted by this driver")
+		return
+	}
+	if !recovering && s.admitFailedParentCleanupTx(w, r, tx, kind, id, ps, pname, pv, protected, body.ConfirmName, version, key, hash) {
 		return
 	}
 	p := deletionPayload{ProjectID: project, BranchIDs: []string{}, EndpointIDs: []string{}}
@@ -368,6 +386,16 @@ func (s *server) admitDeletion(w http.ResponseWriter, r *http.Request, recoverin
 // resourceVersion CAS; only a known 409 is retried. Unknown write outcomes are
 // observed by a later explicit Operation retry, never blind transport replay.
 func (k *kubeClient) setDeletionRoutes(ctx context.Context, p deletionPayload, operationID string, recovering bool) error {
+	return k.setDeletionRoutesAllowUnpublished(ctx, p, operationID, recovering, nil)
+}
+
+// Missing routes are accepted only for endpoint IDs whose unique original
+// failed creation was verified by the endpoint retirement Driver. Normal and
+// recovery callers retain the strict existing-route contract.
+func (k *kubeClient) setDeletionRoutesAllowUnpublished(ctx context.Context, p deletionPayload, operationID string, recovering bool, unpublished map[string]bool) error {
+	if recovering && len(unpublished) != 0 {
+		return errors.New("recovery cannot omit retained routes")
+	}
 	wanted := map[string]bool{}
 	for _, id := range p.EndpointIDs {
 		wanted[selector(id)] = true
@@ -388,8 +416,13 @@ func (k *kubeClient) setDeletionRoutes(ctx context.Context, p deletionPayload, o
 		if err = json.Unmarshal([]byte(raw), &routes); err != nil {
 			return err
 		}
+		missing := 0
 		for key := range wanted {
 			route := routes[key]
+			if route == nil && unpublished[key] {
+				missing++
+				continue
+			}
 			if route == nil || route["project_id"] != p.ProjectID {
 				return errors.New("deletion route ownership mismatch")
 			}
@@ -428,6 +461,9 @@ func (k *kubeClient) setDeletionRoutes(ctx context.Context, p deletionPayload, o
 				}
 			}
 		}
+		if missing == len(wanted) {
+			return nil // No published route existed; do not rewrite unrelated data.
+		}
 		b, err := json.Marshal(routes)
 		if err != nil {
 			return err
@@ -447,6 +483,10 @@ func (k *kubeClient) setDeletionRoutes(ctx context.Context, p deletionPayload, o
 }
 
 func (s *server) retireDeletedCompute(ctx context.Context, p deletionPayload) error {
+	return s.retireDeletedComputeBound(ctx, p, nil)
+}
+
+func (s *server) retireDeletedComputeBound(ctx context.Context, p deletionPayload, expected map[string]string) error {
 	for _, id := range p.EndpointIDs {
 		name := kubeName(id)
 		path := s.kube.path("vm", name)
@@ -461,6 +501,9 @@ func (s *server) retireDeletedCompute(ctx context.Context, p deletionPayload) er
 			return errors.New("deletion VM ownership or generation mismatch")
 		}
 		uid := stringVal(nested(vm, "metadata", "uid"))
+		if bound, ok := expected[id]; ok && uid != bound {
+			return errors.New("VM appeared or was replaced after the original retirement observation")
+		}
 		if nested(vm, "metadata", "deletionTimestamp") == nil {
 			_, err = s.kube.request(ctx, http.MethodDelete, path, record{"apiVersion": "v1", "kind": "DeleteOptions", "preconditions": record{"uid": uid, "resourceVersion": nested(vm, "metadata", "resourceVersion")}})
 			if err != nil && !kubeStatusIs(err, 404) {
@@ -498,6 +541,18 @@ func (s *server) reconcileDeletion(ctx context.Context, id, worker, action strin
 	}
 	if json.Unmarshal(raw, &durable) != nil || s.createRequestHash("delete-scope", durable) != s.createRequestHash("delete-scope", p) {
 		return errors.New("deletion scope mismatch")
+	}
+	if action == "cleanup_failed_project" || action == "cleanup_failed_branch" {
+		return s.reconcileFailedParentCleanup(ctx, id, worker, action, p)
+	}
+	if p.FailedCreateOperationID != "" {
+		return errors.New("failed creation scope requires its dedicated cleanup action")
+	}
+	if action == "expire_branch" {
+		return s.reconcileBranchExpiration(ctx, id, worker, p)
+	}
+	if p.ExpirationGeneration != 0 || len(p.ExpectedVMUIDs) != 0 || len(p.ExpectedServiceUIDs) != 0 {
+		return errors.New("expiration scope requires its dedicated action")
 	}
 	recovering := action == "recover_project"
 	steps := []func(context.Context) error{
@@ -642,11 +697,16 @@ func (s *server) commitDeletion(ctx context.Context, id, worker, action string, 
 	} else {
 		snapshot, _ := json.Marshal(p)
 		if _, err = tx.Exec(ctx, `INSERT INTO resource_tombstones(operation_id,project_id,resource_type,resource_id,snapshot,recover_until)
-   SELECT id,project_id,CASE action WHEN 'delete_project' THEN 'project' ELSE 'branch' END,resource_id,$2,CASE action WHEN 'delete_project' THEN now()+interval '7 days' END FROM operations WHERE id=$1 ON CONFLICT(operation_id) DO NOTHING`, id, snapshot); err != nil {
+   SELECT id,project_id,CASE WHEN action IN ('delete_project','cleanup_failed_project') THEN 'project' ELSE 'branch' END,resource_id,$2,CASE action WHEN 'delete_project' THEN now()+interval '7 days' END FROM operations WHERE id=$1 ON CONFLICT(operation_id) DO NOTHING`, id, snapshot); err != nil {
 			return err
 		}
 		if _, err = tx.Exec(ctx, `UPDATE branches SET state='deleted',deleted_at=COALESCE(deleted_at,now()),version=version+CASE WHEN state='deleted' THEN 0 ELSE 1 END WHERE id=ANY($1::text[]) AND deletion_operation_id=$2`, p.BranchIDs, id); err != nil {
 			return err
+		}
+		if action == "expire_branch" {
+			if _, err = tx.Exec(ctx, `UPDATE branches SET expiration_status='retired',expiration_error_code=NULL WHERE id=ANY($1::text[]) AND deletion_operation_id=$2 AND expiration_generation=$3`, p.BranchIDs, id, p.ExpirationGeneration); err != nil {
+				return err
+			}
 		}
 		if _, err = tx.Exec(ctx, `UPDATE endpoints SET state='deleted',deleted_at=COALESCE(deleted_at,now()),version=version+CASE WHEN state='deleted' THEN 0 ELSE 1 END,updated_at=now() WHERE id=ANY($1::text[]) AND deletion_operation_id=$2`, p.EndpointIDs, id); err != nil {
 			return err
@@ -663,7 +723,7 @@ func (s *server) commitDeletion(ctx context.Context, id, worker, action string, 
 		if _, err = tx.Exec(ctx, `UPDATE branch_service_instances SET desired_state='disabled',observed_state='disabled',public_endpoint=NULL,version=version+1,last_observed_at=now() WHERE branch_id=ANY($1::text[])`, p.BranchIDs); err != nil {
 			return err
 		}
-		if action == "delete_project" {
+		if action == "delete_project" || action == "cleanup_failed_project" {
 			if _, err = tx.Exec(ctx, `UPDATE projects SET state='deleted',deleted_at=COALESCE(deleted_at,now()),recover_until=(SELECT recover_until FROM resource_tombstones WHERE operation_id=$2),version=version+CASE WHEN state='deleted' THEN 0 ELSE 1 END,updated_at=now() WHERE id=$1 AND deletion_operation_id=$2`, p.ProjectID, id); err != nil {
 				return err
 			}

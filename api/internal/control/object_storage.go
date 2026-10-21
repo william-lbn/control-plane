@@ -514,6 +514,9 @@ func (s *server) storageObjects(w http.ResponseWriter, r *http.Request) {
 	}
 	_, err = tx.Exec(r.Context(), `INSERT INTO neon_storage.objects(bucket,key,blob_key,sha256,size,content_type,metadata) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(bucket,key) DO UPDATE SET blob_key=$3,sha256=$4,size=$5,content_type=$6,metadata=$7,updated_at=now()`, bucket, key, blob, digest, len(data), contentType, metadata)
 	if err == nil {
+		err = s.publishStorageFunctionEvent(r.Context(), tx, p, bucket, key, digest, int64(len(data)))
+	}
+	if err == nil {
 		err = tx.Commit(r.Context())
 	}
 	if err != nil {

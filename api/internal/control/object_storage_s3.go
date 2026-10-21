@@ -248,7 +248,7 @@ func (s *server) s3Invoke(w http.ResponseWriter, r *http.Request) {
 			s3Error(w, r, 400, "InvalidArgument")
 			return
 		}
-		item, err := copyStorageObjectWithConditions(r.Context(), conn, p.ProjectID, srcBucket, srcKey, bucket, key, conditions, r.Header.Get("If-Match"), r.Header.Get("If-None-Match"), replacement...)
+		item, err := copyStorageObjectWithConditions(s.storagePublicationContext(r.Context(), p), conn, p.ProjectID, srcBucket, srcKey, bucket, key, conditions, r.Header.Get("If-Match"), r.Header.Get("If-None-Match"), replacement...)
 		if err != nil {
 			var fault *storageMutationFault
 			if errors.As(err, &fault) {
@@ -522,6 +522,9 @@ func (s *server) s3WriteObject(w http.ResponseWriter, r *http.Request, conn *pgx
 			return false
 		}
 		_, e = tx.Exec(r.Context(), `INSERT INTO neon_storage.objects(bucket,key,blob_key,sha256,size,content_type,metadata) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(bucket,key) DO UPDATE SET blob_key=$3,sha256=$4,size=$5,content_type=$6,metadata=$7,updated_at=now()`, bucket, key, blob, digest, len(data), contentType, metadata)
+		if e == nil {
+			e = s.publishStorageFunctionEvent(r.Context(), tx, p, bucket, key, digest, int64(len(data)))
+		}
 		w.Header().Set("ETag", "\""+digest+"\"")
 	}
 	if e == nil {

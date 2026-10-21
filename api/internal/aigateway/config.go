@@ -24,6 +24,7 @@ type Route struct {
 	LabHTTP         bool     `json:"lab_allow_http"`
 	MaxOutputTokens int      `json:"max_output_tokens"`
 	key             string
+	egressProxy     string
 }
 type Config struct {
 	Version                int     `json:"version"`
@@ -32,6 +33,16 @@ type Config struct {
 	MaxConcurrentPerBranch int     `json:"max_concurrent_per_branch"`
 	RequestsPerMinute      int     `json:"requests_per_minute"`
 	Routes                 []Route `json:"routes"`
+}
+
+// WithProviderCredential keeps the opened key outside JSON/public route fields.
+// Callers must validate the endpoint against their current provider policy first.
+func (r Route) WithProviderCredential(secret string) (Route, error) {
+	if secret != "" && !validProviderSecret(secret) {
+		return Route{}, errProviderCredential
+	}
+	r.key = secret
+	return r, nil
 }
 
 var modelID = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,127}$`)
@@ -73,7 +84,7 @@ func Load(path string) (*Config, error) {
 	return c, nil
 }
 func (c *Config) Validate() error {
-	if c.Version != 1 || c.Generation < 1 || c.TimeoutSeconds < 5 || c.TimeoutSeconds > 180 || c.MaxConcurrentPerBranch < 1 || c.MaxConcurrentPerBranch > 16 || c.RequestsPerMinute < 1 || c.RequestsPerMinute > 10000 || len(c.Routes) < 1 || len(c.Routes) > 100 {
+	if c.Version != 1 || c.Generation < 1 || c.TimeoutSeconds < 5 || c.TimeoutSeconds > 180 || c.MaxConcurrentPerBranch < 1 || c.MaxConcurrentPerBranch > 16 || c.RequestsPerMinute < 1 || c.RequestsPerMinute > 10000 || len(c.Routes) > 100 {
 		return errors.New("invalid AI configuration bounds")
 	}
 	seen := map[string]bool{}

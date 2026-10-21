@@ -26,6 +26,8 @@ RUN test -n "$DEBIAN_SNAPSHOT" && \
     dpkg-query -W -f='${Package}\t${Version}\t${Architecture}\n' > /opt/neon/functions/guest-packages.txt && \
     rm -rf /var/lib/apt/lists/*
 COPY --from=supervisor /function-supervisor /usr/local/bin/function-supervisor
+COPY services/functions/package.json services/functions/package-lock.json /opt/neon/functions/
+RUN cd /opt/neon/functions && npm ci --omit=dev --omit=optional --ignore-scripts --no-audit --no-fund
 COPY services/functions/runtime /opt/neon/functions/runtime
 RUN chmod 0755 /usr/local/bin/function-supervisor && \
     chmod -R go-w /opt/neon/functions && \

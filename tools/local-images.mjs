@@ -92,7 +92,11 @@ if(command==='build' || command==='probe') {
  const imported=[];
  for(const [component,image] of Object.entries(report.images)) {
   if(!components.includes(component) || path.resolve(image.archive)!==path.join(output,component+'.oci.tar') || digest(readFileSync(image.archive))!==image.archive_sha256)throw new Error('Archive checksum or path mismatch');
-  run(ctr,['--address',containerd,'--namespace','k8s.io','images','import','--digests','--platform','linux/amd64',image.archive],path.join(output,component+'.'+importAttempt+'.import.private.log'));
+  // The transfer importer can register the archive wrapper as a runtime image.
+  // Synthetic unqualified digest aliases then become unusable CRI references
+  // after a daemon restart. Import named images directly and add the verified
+  // fully qualified digest reference below.
+  run(ctr,['--address',containerd,'--namespace','k8s.io','images','import','--local','--digests','--skip-digest-for-named','--platform','linux/amd64',image.archive],path.join(output,component+'.'+importAttempt+'.import.private.log'));
   // OCI exporters may publish an index plus one platform manifest. containerd
   // preserves the index on its tag without creating a repository@digest alias.
   // Check the exact tag target before creating that immutable alias.

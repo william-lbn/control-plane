@@ -5,7 +5,9 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 
 **发行状态：预览版本。已经验证的实验环境功能不等于生产认证，也不等于 Neon 官网全部 Backend 服务。**
 
-最新状态：[2026-10-17 目录重命名交付](docs/DELIVERY-2026-10-16-CURRENT.md)：UI 原请求恢复、真实 PG 原 OID/密码/数据/Owner 保留、Writer/原 Reader 冷醒及正常退休通过。API/Worker、Web 0.48.0 / migration 039 / Chart 0.9.40 / Helm revision 112。此前 [Functions UTC 定时触发器](docs/DELIVERY-2026-10-17-FUNCTION-SCHEDULES.md)等保留独立回执。[需求账本](docs/REMAINING-REQUIREMENTS-2026-10-16.md)仍有 28 组代码或独立验收缺口；继续逐项推进。
+功能进度与当前优先级见 [已验收/剩余清单](docs/FUNCTIONAL-STATUS-2026-10-21.md)：13 组基础已有回执；五组专项后置，17 组尚未整体闭环。后续优先业务功能，复用来源未变的既有验收。
+
+最新状态：[2026-10-21 当前目录身份展示](docs/DELIVERY-2026-10-21-CATALOG-CURRENT-INVENTORY.md)：持续身份与首次观察历史分开展示，普通创建/变更和分支继承的原 OID、Owner、代际及排除状态可读；已知身份再次首次记录拒绝，五项累计现场检查通过。API/Worker 0.69.0，Web 本轮重建，管理网关沿用 0.66.3，AI 沿用 0.58.0 / migration 057（本轮无新迁移）/ 控制面 Chart 0.9.66、Helm 149 / 管理网关 Chart 0.1.1、Helm 56。16 张目录表前后摘要一致，原有身份与数据保留，最终 VM 0；旧身份链衔接、完整系统漂移和 Backend 名称依赖继续，性能/可靠性专项后置。
 
 此前增量：[应用 TOTP 双重认证](docs/DELIVERY-2026-10-15-AUTH-TOTP.md)八项 UI 与[项目共享查询](docs/DELIVERY-2026-10-15-SHARED-QUERIES.md)六项 UI 均通过；该批基线为 API 0.33 / Chart 0.9.17 / migration 031。
 
@@ -37,15 +39,15 @@ S3 的 test-only `875e48b` 只修正选择器和原 checkpoint 续测，不改�
 | Console 邀请与受邀注册 | 账号绑定、一次性凭据、幂等/过期/撤销、事务审计、Go/React/PG 测试 | 手动安全交付邀请；Console 自助 TOTP/恢复码与会话撤销已验收；邀请邮件自动投递、OIDC/组织强制 MFA 仍缺，独立于 Managed Auth |
 | 项目、当前时间点分支、Writer、多个 Reader | 已实现，异步 Operation + SQL 就绪探针 | 单集群、单 Region、PG16；不支持所有项目/分支删除与恢复动作 |
 | PostgreSQL 连接与 SQL 工作台 | 通过独立 Neon Proxy 和 Endpoint selector | 应用不能直接连接控制 API；生产入口必须配置可信 TLS |
-| 数据库、角色与密码轮换 | 分支目录、Compute 原生配置、Proxy spec 调谐；原 OID/版本保护的自定义库 Owner 变更已通过实际 UI 和 Writer/Reader 冷醒 | 默认/系统 Owner 变更、rename、未知外部 DDL 恢复未完成；见 [Owner 回执](docs/DATABASE-OWNER.md) |
+| 数据库、角色与密码轮换 | 分支目录、Compute 原生配置、Proxy spec 调谐；自定义库 Owner 变更和受管理库/角色 rename 已通过实际 UI、原 OID/密码/数据及 Writer/Reader 冷醒 | 默认/系统身份和未知外部 DDL 恢复未完成；见 [Owner 合同](docs/DATABASE-OWNER.md)和[重命名回执](docs/DELIVERY-2026-10-17-CATALOG-RENAME.md) |
 | CPU / 内存边界、自动休眠、连接唤醒 | 已实现实验环境控制路径 | 整数 CPU 和实际 QEMU 250→500→250m、SQL/冷醒已验收；严格 Guest 隔离、完整物理内存归还、跨实例外部栅栏仍未通过 |
 | 监控、Operation 步骤、错误与重试 | 已实现 | 长期指标持久化、SLO 告警、完整审计导出未完成 |
 | 分支 Managed Auth | Go/TS/React、真实 PG 与 Neon UI 注册/会话/JWT/克隆隔离/RLS/自动缩零通过 | 密码/会话、真实本地邮件、OTP/Magic Link 与应用 TOTP 已独立验收；OAuth/完整身份管理、factor 分支重绑、密钥轮换、全链路 TLS/HA 仍缺；见对应交付 |
 | 时间点恢复到新分支 | 原生时间戳/LSN、存储保留租约、异步调谐、历史目录隔离、React UI | 默认禁用；仅受管理分支；原地恢复、Time Travel Assist、完整 Backend 一致性恢复未实现 |
-| 项目/分支保留删除与独立 Compute 删除 | 保护/依赖图、关闭 Proxy 和服务、正常 Runner 回收、held tombstone、项目恢复、原密码重建与 React UI | 物理 GC、TTL、失败创建回收与跨实例栅栏未开放；详见 [删除手册](docs/RETAINED-DELETION.md)和本版交付 |
+| 项目/分支保留删除与独立 Compute 删除 | 保护/依赖图、关闭 Proxy 和服务、正常 Runner 回收、held tombstone、项目恢复、原密码重建与 React UI | 分支 TTL 和唯一原失败创建保留清理已验收；物理 GC 与跨实例栅栏后置；详见 [删除手册](docs/RETAINED-DELETION.md)和本版交付 |
 | HA / DR | 部分租约与恢复工具 | 未通过独立故障域 HA/DR；历史新分支恢复不等于完整 DR |
-| 产品 Object Storage | Go REST Driver、独立受限 bucket、随分支目录、REST/S3、SigV4/signed chunks、统一密钥、上传下载 UI、条件写与预签名 | REST 与基础 S3 分别实际验收；multipart/COPY/bulk/CORS/大文件/GC/HA/TLS 仍未完成 |
-| Functions | Go Driver、隔离 Node guest、ZIP/环境、真实 SQL、停止/重部署/删除、监控与显式保留版本唤醒已通过实际 UI；默认关闭 | 公开 HTTP/SSE、自动休眠/一次冷醒已实际验收；WS、触发器与 Backend 分支复制仍缺 |
+| 产品 Object Storage | Go REST Driver、独立受限 bucket、分支目录、REST/S3、SigV4/signed chunks、统一密钥、条件写/预签名、COPY/bulk/CORS 与有界 multipart 已分别实际验收 | 当前单对象 8 MiB；大对象/完整 checksum、安全物理 GC、完整兼容矩阵、HA/TLS 仍有缺口 |
+| Functions | Go Driver、隔离 Node guest、ZIP/环境、真实 SQL、停止/重部署/删除、监控、版本冷醒、UTC 定时触发和客户异常 idle 回收已分别通过实际 UI；默认关闭 | 公开 HTTP/SSE/WebSocket、自动休眠/冷醒已验收；对象事件、客户 stdout/stderr、完整计量和 Backend 分支复制仍缺 |
 | AI Gateway 推理 | 独立 Go 网关、模型目录/Playground、文本 Chat/SSE、分支应用授权与用量，本地 Ollama 已真实 UI 验收 | 动态供应商管理、其他协议/预算、商业上游、HA/可信 TLS 尚有缺口 |
 | Data API | 原生 Go Driver、持久 Operation、React UI、分支 JWT Gateway 和固定 PostgREST 镜像 | 默认禁用；须显式 labHTTP，真实 Neon UI 验收独立于 PG CI；RPC/views 等不在首版范围 |
 | 分支应用凭据 | 一次性 Token、范围/到期、轮换/撤销、哈希存储、当前权限检查和 UI | ai_gateway:invoke、storage:read/write；加密 signing material、同 ID 轮换和即时撤销；不替代供应商/租户生产准入 |
