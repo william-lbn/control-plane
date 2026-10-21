@@ -223,6 +223,7 @@ func (s *server) routes() *http.ServeMux {
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/catalog-identities", s.auth(http.HandlerFunc(s.catalogIdentities), false))
 	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/catalog-identities", s.auth(http.HandlerFunc(s.catalogIdentities), true))
 	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/catalog-identities/{binding}/restore", s.auth(http.HandlerFunc(s.catalogIdentityRestore), true))
+	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/catalog-identities/{binding}/observe-current", s.auth(http.HandlerFunc(s.catalogObserveCurrent), true))
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/default-database-owner", s.auth(http.HandlerFunc(s.defaultDatabaseOwnerRead), false))
 	mux.Handle("PATCH /api/v1/projects/{project}/branches/{branch}/default-database-owner", s.auth(http.HandlerFunc(s.defaultDatabaseOwnerMutation), true))
 	mux.Handle("GET /api/v1/projects/{project}/endpoints", s.auth(http.HandlerFunc(s.endpoints), false))

@@ -289,13 +289,13 @@ func (s *server) catalogIdentities(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if input.Kind == "role" {
-		secret, e := s.kube.request(ctx, http.MethodGet, s.kube.path("secret", intent.Reference), nil)
-		if e != nil || !owned(secret, project, endpoint) || secret["immutable"] != true {
-			s.catalogIdentityFailure(w, r, errors.New("original immutable catalog credential unavailable"))
+		uid, e := s.catalogBaselineCredentialUID(ctx, project, branch, endpoint, input, intent)
+		if e != nil {
+			s.catalogIdentityFailure(w, r, e)
 			return
 		}
 		// Identity only: no customer password or SCRAM verifier is decoded.
-		proof.CredentialUID = stringVal(nested(secret, "metadata", "uid"))
+		proof.CredentialUID = uid
 	}
 	tx, err := s.db.Begin(ctx)
 	if err != nil {

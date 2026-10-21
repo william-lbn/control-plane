@@ -38,7 +38,7 @@ website 文档快照 `c0d49cbb6979b2ce79ea502d62dbc40780a923b0`（提交时间
 | A04 | Auth 分支 factor 重绑定 | 未完成；克隆账户不能等同复制可信第二因素 | secret 重封装/重绑、会话清除、恢复与用户可见状态 |
 | A05 | Auth 完整删除/恢复/隔离 | 独立门槛 | 原账号/会话/JWKS/密钥与分支生命周期一致性矩阵 |
 | C01 | 数据库/角色 rename | 自定义受管理非系统对象的异步 API/UI、原 OID/SCRAM/数据、所有现存配置/Proxy CAS、未知结果恢复和 Writer/原 Reader 冷醒基础通过 | [合同](CATALOG-RENAME.md)与[交付](DELIVERY-2026-10-17-CATALOG-RENAME.md)；默认身份、Backend 依赖迁移和未知外部 DDL 归 C02 |
-| C02 | 默认/系统身份与外部 DDL | 默认连接/Owner、目录原结果、冷目录保留及普通 CRUD 持续 OID/凭据代际基础通过；整组未完成 | [0.69.0 交付](DELIVERY-2026-10-21-CATALOG-CURRENT-INVENTORY.md)补齐当前身份/来源/排除展示和已知身份防覆盖，沿用已通过的首次启动继承；旧身份链衔接、系统漂移和 Backend 名称依赖继续 |
+| C02 | 默认/系统身份与外部 DDL | 默认连接/Owner、目录原结果、冷目录保留及普通 CRUD 持续 OID/凭据代际基础通过；整组未完成 | [0.70.0 交付](DELIVERY-2026-10-21-CATALOG-CURRENT-OBSERVATION.md)补齐有原证明的旧身份衔接、继承凭据背书及 Console；当前身份展示和首次启动继承沿用原验收；默认/系统漂移和 Backend 名称依赖继续 |
 | L01 | 失败创建清理、异常运行时回收与 TTL | 客户 Node 退出后的认证 idle 回收，以及独立 Compute、项目/分支唯一原失败创建的身份绑定清理、原失败/timeline 保留和重放已实现并验收；分支 TTL 设置/更新/取消、持久重放、自动退休及原数据/父分支保留基础已验收；节点分区后置 | [失败父资源交付](DELIVERY-2026-10-18-FAILED-PARENT-CLEANUP.md)、[失败 Compute 交付](DELIVERY-2026-10-18-FAILED-ENDPOINT-CLEANUP.md)、[异常 idle 交付](DELIVERY-2026-10-18-FUNCTION-UNHEALTHY-IDLE.md)；[TTL 交付](DELIVERY-2026-10-18-BRANCH-EXPIRATION.md)；后续节点分区/外部 fencing 归 X01，按用户要求后置 |
 | L02 | 原分支 reset / 原地 PITR | 未开发；恢复到新分支已有 | 备份分支、连接切换、GC/连接竞争、失败回退与 UI |
 | L03 | Time Travel Assist / Backend 一致恢复 | 未开发 | 查询时间点辅助、Auth/对象/函数分别描述恢复语义并校验 |
@@ -110,3 +110,5 @@ fixture、失败、日志、密码保护输入和所有业务字节。测试完�
 2026-10-21：C02 首次启动保留继承目录基础通过，API/Worker 0.68.0 / migration 057 / Chart 0.9.65 / Helm 148；8 个新增及 9 个受影响 Go 顶层测试、累计六项现场检查通过。5 份来源、4 份原观察/发布及 136 份初始化回执一致，原数据和既有身份保留，最终 VM 0。仍为 13 基础、22 继续；继续当前身份展示、旧身份链及系统/Backend 依赖，性能/可靠性专项后置。
 
 2026-10-21：C02 当前目录身份展示通过，API/Worker 0.69.0 / migration 057 保持 / Chart 0.9.66 / Helm 149；两项新增及五项受影响 Go 顶层测试、五项现场检查和 16 张目录表前后摘要一致。原夹具/身份/数据保留，最终 VM 0。仍为 13 基础、22 继续；继续旧身份链、系统/Backend 依赖，性能/可靠性专项后置。
+
+2026-10-21：[旧目录身份衔接](DELIVERY-2026-10-21-CATALOG-CURRENT-OBSERVATION.md)通过继承原凭据背书、原 OID 到当前代际的显式观察、控制台、改名/改密、原回执重放与冷目录数据保留。API/Worker 0.70.0 / migration 058 / Chart 0.9.67 / Helm 150；仍为 13 基础、22 继续，C02 默认/系统漂移及 Backend 名称依赖继续，性能/可靠性后置。

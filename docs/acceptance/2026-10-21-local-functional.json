@@ -1,33 +1,32 @@
 {
   "result": "pass",
-  "api_version": "0.69.0",
-  "schema": 57,
-  "new_migration": false,
-  "chart_version": "0.9.66",
-  "helm_revision": 149,
+  "api_version": "0.70.0",
+  "schema": 58,
+  "new_migration": true,
+  "chart_version": "0.9.67",
+  "helm_revision": 150,
   "gateway_version": "0.66.3",
   "gateway_helm_revision": 56,
-  "source_sha256": "205691f96a5c3b5e04f2c4d98e39231db7b960c2dfaedd20cbae5e870022cd2c",
-  "archive_sha256": "8ff7348681c2478c81f0666798c015ef3ab0cf1e3af368efad5d4f484acd4870",
-  "api_image": "neon.local/control-api@sha256:3d166d4cfa380d0e74b22561057e8ffdd73cef9ece46b5452fdd06f861f3f99f",
-  "web_image": "neon.local/control-web@sha256:b4e9ade4b4d4a4edbe2df9514d22ef63296fc4288f53d575adcc162f50a6b9cb",
-  "current_runtime_inputs_matched": 387,
-  "new_Go_functional_top_level_passes": 2,
-  "affected_Go_functional_top_level_passes": 5,
+  "source_sha256": "9b6b110b97b2914363c522bed4cc84781a0c6b1be7e51c5c8bc37e9dcdc8b537",
+  "archive_sha256": "36fcdd8bd81b6817aaee4aea893c1a9df226daaf4651cc49e76d783088a70b17",
+  "api_image": "neon.local/control-api@sha256:290b96415921fd5000ca7ab7fa551a0c0873b6cfabad09d2da6b4d212e47bd03",
+  "web_image": "neon.local/control-web@sha256:2c0efb67823d2c20eec639872524e0731bac1269324db9aa8c35d07ff7f77394",
+  "current_runtime_inputs_matched": 391,
+  "new_Go_functional_top_level_passes": 4,
+  "affected_Go_functional_top_level_passes": 4,
   "cumulative_live_checks": [
-    "current_create_generations_and_original_baselines_are_distinct",
-    "inherited_current_identity_is_visible_at_independent_child_generations",
-    "same_name_replacements_and_inherited_exclusions_cannot_reinitialize",
-    "console_current_identity_and_inherited_source_are_readable",
-    "all_original_identities_retained_and_observation_computes_zero"
+    "inherited_original_parent_credential_and_native_oid_first_observation",
+    "console_explicit_current_observation_and_owner_order",
+    "bound_inherited_rename_rotation_and_original_receipt_replay",
+    "child_writer_reader_cold_catalog_and_source_retained",
+    "retained_original_scopes_and_observation_computes_zero"
   ],
-  "catalog_tables_unchanged": 16,
   "migration_057_sha256": "1a7cb23f7e4e1f0eb308ca54e3be03a90c819325c198d200c60fbc87f4386dcd",
   "whole_C02_complete": false,
   "whole_product_complete": false,
   "performance_reliability_campaign": false,
   "credentials_exported": false,
-  "git_parent": "928eec95c034af8b8bd89fc1a88761d4e67ece07",
+  "git_parent": "69c611de9cdb5528c16c19e54d8c099c44f085f8",
   "nodes_ready": 3,
   "safekeepers_ready": 3,
   "virtual_machines": 0,
@@ -77,7 +76,8 @@
   "source_kind": "local immutable snapshot; Git publication is recorded separately",
   "private_evidence_exported": false,
   "failures_preserved": [
-    "ui-a",
-    "ui-b"
-  ]
+    "ui-a"
+  ],
+  "migration_058_sha256": "ef77ef8aa674bba9f5a75750d944ba3bb297d988b8aa9a689c1ad99dccdaf282",
+  "unaffected_catalog_scope_fingerprints_matched": 16
 }

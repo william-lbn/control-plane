@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from '../../api';
 import { newRequestKey } from '../../shared/requestKey';
 import { CatalogIdentityRestore } from './CatalogIdentityRestore';
+import { CatalogCurrentObservation } from './CatalogCurrentObservation';
 
 type NativeObject = {
   kind: 'role' | 'database';
@@ -72,6 +73,7 @@ const sourceNames: Record<string, string> = {
   rename_result: '重命名回执',
   rename_follower: 'Owner 名称同步',
   inherited_identity: '分支原身份继承',
+  current_observation: '当前身份显式观察',
 };
 
 export function CatalogIdentities({
@@ -314,6 +316,20 @@ export function CatalogIdentities({
                 </button>
               )}
             </form>
+          )}
+          {canAdmin && (
+            <CatalogCurrentObservation
+              path={path}
+              items={inventory.items}
+              objects={inventory.native_objects}
+              current={inventory.current_bindings || []}
+              disabled={disabled || busy}
+              onBusy={onBusy}
+              onComplete={async () => {
+                const value = await api<Inventory>(url);
+                if (active.current) setInventory(value);
+              }}
+            />
           )}
           {canAdmin && (
             <CatalogIdentityRestore
