@@ -2,9 +2,9 @@
 
 ## 1. 本轮约束
 
-当前 Linux 本地批次：[2026-10-21 旧目录身份衔接](DELIVERY-2026-10-21-CATALOG-CURRENT-OBSERVATION.md)：继承旧角色的原凭据背书、原 OID 到当前代际的显式衔接、控制台入口、改名/改密及原请求重放通过；五项实机功能检查、四项新增及四项受影响 Go 测试通过。API/Worker 0.70.0，Web 重建，migration 058 / Chart 0.9.67 / Core Helm 150；Gateway 0.66.3 / Helm 56、AI 0.58.0 保留。目标分支之外 16 张目录表范围摘要一致，最终 VM 0。C02 默认/系统漂移和 Backend 名称依赖继续，性能/可靠性专项后置。
+当前 Linux 本地批次：[2026-10-22 有界大对象、Range 与 checksum](DELIVERY-2026-10-22-STORAGE-LARGE-OBJECTS.md)：单对象 64 MiB、分片 8 MiB、分支可见对象 256 MiB；私有文件缓冲、浏览器分块哈希、17 MiB 真实 UI/SDK 上传和分片合并、Range/HEAD/SHA-256/CRC32C 拒绝路径通过。21 项 Go、3 项页面哈希检查通过，原目录摘要保留。API/Worker 0.71.0，Web 重建，schema 058 不变 / Chart 0.9.68 / Core Helm 152；Gateway 0.66.3 / Helm 56、AI 0.58.0 保留，最终 VM 0。S02 的 5 GiB 和完整扩展 checksum 仍有缺口，性能/可靠性专项后置。
 
-后续按 [当前功能清单](FUNCTIONAL-STATUS-2026-10-21.md) 推进剩余业务：先补齐 C02，再处理 S3 大对象/安全 GC、Auth 高级/生命周期、原地恢复和计量/预算。Functions 对象触发器和客户日志基础已有独立通过记录。性能、资源压力、可靠性、外部栅栏、HA/DR 和长期环境认证后置；复用来源未变的原验收，只验证新增及具体受影响路径。
+后续按 [当前功能清单](FUNCTIONAL-STATUS-2026-10-21.md) 推进剩余业务：本轮优先完成有界 S3 大对象；C02 剩余身份语义保留，继续处理完整大对象/安全 GC、Auth 高级/生命周期、原地恢复和计量/预算。Functions 对象触发器和客户日志基础已有独立通过记录。性能、资源压力、可靠性、外部栅栏、HA/DR 和长期环境认证后置；复用来源未变的原验收，只验证新增及具体受影响路径。
 2026-10-18 用户调整优先级：先补齐全部业务功能，加快逐项交付；性能压测、可靠性、HA/DR、节点分区及跨实例栅栏等专项验证后置。本轮只执行必要的构建、功能正反例、权限/数据隔离及新增 UI 验收，复用已通过路径。不得据此宣称后置门槛已经通过。
 下方带日期段落是历史增量，不覆盖本节当前状态。
 
@@ -139,6 +139,6 @@ Functions HTTP/SSE、自动零/一次冷醒、Auth 密码/会话、S3 基础 SDK
 找回、Email OTP/Magic Link 和管理流程；公网与外部送信后置。MFA 在官方 roadmap
 仍为 coming soon，本项目既定 MFA 也须独立实现，不能用当前会话安全代替。
 
-有界 multipart 已通过原用例 UI 续传和七类实际 SDK 操作，见[本次交付](DELIVERY-2026-10-16-CURRENT.md)与[合同](OBJECT-STORAGE-MULTIPART.md)。8 MiB 上限、大对象、GC、分片写入权接管及独立 Storage gateway 等门槛仍保留。
+有界 multipart 已通过原用例 UI 续传和七类实际 SDK 操作，见[本次交付](DELIVERY-2026-10-16-CURRENT.md)与[合同](OBJECT-STORAGE-MULTIPART.md)。64 MiB 有界大对象已通过新增验收；5 GiB、完整 checksum、GC、分片写入权接管及独立 Storage gateway 等门槛仍保留。
 
 0.43.0 已验收原失效凭据的管理员逻辑中止/审计恢复和 multipart 分组分页，详见[合同](MULTIPART-ADMINISTRATION.md)。后台自动续跑、写入权转让、GC 等仍按各自门槛；随后继续 Q03 SQL AI/计划建议。

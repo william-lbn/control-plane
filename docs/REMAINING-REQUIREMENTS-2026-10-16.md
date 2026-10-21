@@ -28,7 +28,7 @@ website 文档快照 `c0d49cbb6979b2ce79ea502d62dbc40780a923b0`（提交时间
 | F05 | Functions 分支复制及恢复 | 同项目显式复制、不可变来源/环境重封装、新 SQL 身份、无 Writer 延迟冻结继承、默认禁用触发器、历史 SQL 当前代码确认、实际隔离及原失败操作恢复基础已验收 | [合同](FUNCTION-BRANCHES.md)及[交付](DELIVERY-2026-10-19-FUNCTION-BRANCHES.md)；跨服务一致时间点归 L03，物理去重/跨项目共享另列 |
 | F06 | Functions 完整计量与独立 edge | 未完成；当前 public listener 同 API 进程 | 最小权限进程、实际资源/调用计量、长流与部署切换 |
 | S01 | S3 multipart | 有界基础已实现并验收：七类 S3 操作、身份隔离、原子发布/回执、UI 续传、中止、SDK 字节、目录分组分页、已撤销身份管理员中止/审计恢复；仍限 8 MiB | [当前交付](DELIVERY-2026-10-16-CURRENT.md)与[运维合同](MULTIPART-ADMINISTRATION.md)；完整 checksum/大对象、GC/自动回收和写入权转让仍有独立扩展门槛 |
-| S02 | 大对象与完整 checksum | 当前单对象 8 MiB；官网快照描述 5 GiB | 有界内存流式 I/O、Range/checksum、断线/配额和大文件 UI |
+| S02 | 大对象与完整 checksum | 64 MiB 有界流式、Range/基础 checksum、UI 已验收；官网快照 5 GiB 仍未满足 | 5 GiB 和完整扩展 checksum 等继续，见 [交付](DELIVERY-2026-10-22-STORAGE-LARGE-OBJECTS.md) |
 | S03 | 引用安全物理 GC | 未开发；删除只移除分支清单 | 分支/PITR/保留窗口引用证明、隔离清扫、失败恢复；不得删除历史业务字节 |
 | S04 | S3 兼容扩展 | anonymous public read、trailers、STS 等未完成 | 按官网支持矩阵分别实现；每项签名/负例/真实 SDK 验证 |
 | S05 | 独立 Storage gateway / 可信计量 | 当前 S3 同 API 进程；last_used_at 不等于计费 | 最小权限独立部署、配额/物理容量、租户并发与用量 |
@@ -112,3 +112,5 @@ fixture、失败、日志、密码保护输入和所有业务字节。测试完�
 2026-10-21：C02 当前目录身份展示通过，API/Worker 0.69.0 / migration 057 保持 / Chart 0.9.66 / Helm 149；两项新增及五项受影响 Go 顶层测试、五项现场检查和 16 张目录表前后摘要一致。原夹具/身份/数据保留，最终 VM 0。仍为 13 基础、22 继续；继续旧身份链、系统/Backend 依赖，性能/可靠性专项后置。
 
 2026-10-21：[旧目录身份衔接](DELIVERY-2026-10-21-CATALOG-CURRENT-OBSERVATION.md)通过继承原凭据背书、原 OID 到当前代际的显式观察、控制台、改名/改密、原回执重放与冷目录数据保留。API/Worker 0.70.0 / migration 058 / Chart 0.9.67 / Helm 150；仍为 13 基础、22 继续，C02 默认/系统漂移及 Backend 名称依赖继续，性能/可靠性后置。
+
+2026-10-22：[2026-10-22 有界大对象、Range 与 checksum](DELIVERY-2026-10-22-STORAGE-LARGE-OBJECTS.md)通过新增有界大对象功能；需求组数量保持 13 基础、22 继续，其中五组专项后置。

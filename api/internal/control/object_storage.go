@@ -1,7 +1,6 @@
 package control
 
 import (
-	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
@@ -9,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"mime"
 	"net/http"
 	"net/url"
@@ -64,10 +62,10 @@ func (s *server) objectStorageRead(w http.ResponseWriter, r *http.Request) {
 		item["s3_endpoint"] = s3Origin() + "/s3/" + r.PathValue("branch")
 	}
 	item["s3_region"] = s3Region()
-	item["s3_supported"] = []string{"ListBuckets", "CreateBucket", "DeleteBucket", "HeadBucket", "GetBucketLocation", "ListObjects", "ListObjectsV2", "Delimiter", "CopyObjectBasic", "PutObject", "GetObject", "HeadObject", "DeleteObject", "DeleteObjects", "PresignedGet", "PresignedPut", "BucketCORS", "UserMetadata", "CopyObjectMetadataReplace", "CopyObjectSourceConditions", "SignedChunksWithoutTrailers", "CreateMultipartUpload", "UploadPart", "UploadPartCopy", "CompleteMultipartUpload", "AbortMultipartUpload", "ListMultipartUploads", "ListParts", "MultipartDelimiter"}
+	item["s3_supported"] = []string{"ListBuckets", "CreateBucket", "DeleteBucket", "HeadBucket", "GetBucketLocation", "ListObjects", "ListObjectsV2", "Delimiter", "CopyObjectBasic", "PutObject", "GetObject", "HeadObject", "DeleteObject", "DeleteObjects", "PresignedGet", "PresignedPut", "BucketCORS", "UserMetadata", "CopyObjectMetadataReplace", "CopyObjectSourceConditions", "SignedChunksWithoutTrailers", "CreateMultipartUpload", "UploadPart", "UploadPartCopy", "CompleteMultipartUpload", "AbortMultipartUpload", "ListMultipartUploads", "ListParts", "MultipartDelimiter", "StreamedPutObject", "StreamedGetObject", "FullObjectSHA256", "PayloadChecksums", "ByteRanges"}
 	item["multipart_administration_enabled"] = s.storage != nil
-	item["s3_missing"] = []string{"advanced_checksums", "anonymous_public_read", "streaming_trailers", "large_objects", "physical_gc"}
-	item["limits"] = record{"object_bytes": storageObjectLimit, "branch_bytes": storageBranchLimit, "buckets": 32, "objects": 1000, "active_uploads": multipartActiveLimit, "parts_per_upload": multipartPartLimit, "multipart_minimum_nonfinal_part_bytes": multipartMinimumPart}
+	item["s3_missing"] = []string{"advanced_checksums", "anonymous_public_read", "streaming_trailers", "physical_gc"}
+	item["limits"] = record{"object_bytes": storageObjectLimit, "part_bytes": storagePartLimit, "branch_bytes": storageBranchLimit, "buckets": 32, "objects": 1000, "active_uploads": multipartActiveLimit, "parts_per_upload": multipartPartLimit, "multipart_minimum_nonfinal_part_bytes": multipartMinimumPart}
 	w.Header().Set("ETag", fmt.Sprintf(`"%d"`, item["generation"].(int64)))
 	jsonResponse(w, 200, item)
 }
@@ -474,9 +472,14 @@ func (s *server) storageObjects(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 422, "invalid_content_type", "Valid Content-Type required")
 		return
 	}
-	data, err := io.ReadAll(http.MaxBytesReader(w, r.Body, storageObjectLimit))
+	data, err := readStoragePayload(r.Context(), r.Body, storageObjectLimit)
 	if err != nil {
-		fail(w, r, 413, "object_too_large", "Objects are limited to 8 MiB")
+		s.storagePayloadFailure(w, r, err, false)
+		return
+	}
+	defer data.Close()
+	if err = validateStoragePayloadChecksums(r.Header, data); err != nil {
+		s.storagePayloadFailure(w, r, err, false)
 		return
 	}
 	var exists bool
@@ -494,7 +497,7 @@ func (s *server) storageObjects(w http.ResponseWriter, r *http.Request) {
 		s.storageFailure(w, r, err)
 		return
 	}
-	if (previous == "" && count >= 1000) || total-oldSize+int64(len(data)) > storageBranchLimit {
+	if (previous == "" && count >= 1000) || total-oldSize+data.Size > storageBranchLimit {
 		fail(w, r, 409, "object_quota_exhausted", "Branch object quota exhausted")
 		return
 	}
@@ -503,18 +506,23 @@ func (s *server) storageObjects(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 422, "invalid_object_metadata", "Metadata requires unique ASCII keys/values and at most 2 KiB")
 		return
 	}
-	digest := fmt.Sprintf("%x", sha256.Sum256(data))
+	digest := data.SHA256
 	blob := p.ProjectID + "/" + newID("blob_")
 	// Publish only after the immutable blob is durable. Interruption can leak
 	// an unreferenced blob, but never a catalog entry pointing at absent bytes.
 	// No immediate GC: other branches and historical LSNs may still reference it.
-	if err = s.storage.put(r.Context(), blob, contentType, data); err != nil {
+	source, err := data.Reader()
+	if err != nil {
 		s.storageFailure(w, r, err)
 		return
 	}
-	_, err = tx.Exec(r.Context(), `INSERT INTO neon_storage.objects(bucket,key,blob_key,sha256,size,content_type,metadata) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(bucket,key) DO UPDATE SET blob_key=$3,sha256=$4,size=$5,content_type=$6,metadata=$7,updated_at=now()`, bucket, key, blob, digest, len(data), contentType, metadata)
+	if err = s.storage.putReader(r.Context(), blob, contentType, source, data.Size); err != nil {
+		s.storageFailure(w, r, err)
+		return
+	}
+	_, err = tx.Exec(r.Context(), `INSERT INTO neon_storage.objects(bucket,key,blob_key,sha256,size,content_type,metadata) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(bucket,key) DO UPDATE SET blob_key=$3,sha256=$4,size=$5,content_type=$6,metadata=$7,updated_at=now()`, bucket, key, blob, digest, data.Size, contentType, metadata)
 	if err == nil {
-		err = s.publishStorageFunctionEvent(r.Context(), tx, p, bucket, key, digest, int64(len(data)))
+		err = s.publishStorageFunctionEvent(r.Context(), tx, p, bucket, key, digest, data.Size)
 	}
 	if err == nil {
 		err = tx.Commit(r.Context())
@@ -526,7 +534,7 @@ func (s *server) storageObjects(w http.ResponseWriter, r *http.Request) {
 	close()
 	s.audit(r.Context(), userFrom(r).ID, "put_object", "object_storage", p.BranchID, "succeeded", requestID(r))
 	w.Header().Set("ETag", `"`+digest+`"`)
-	jsonResponse(w, 200, record{"key": key, "sha256": digest, "size": len(data)})
+	jsonResponse(w, 200, record{"key": key, "sha256": digest, "size": data.Size})
 }
 func storageWriteCondition(w http.ResponseWriter, r *http.Request, previous string) bool {
 	if r.Header.Get("If-None-Match") == "*" && r.Method == http.MethodPut {
@@ -564,7 +572,13 @@ func (s *server) serveStorageObject(w http.ResponseWriter, r *http.Request, conn
 		fail(w, r, 404, "not_found", "Object not found")
 		return
 	}
-	data, err := s.storage.read(r.Context(), blob, digest, size)
+	data, err := s.storage.readPayload(r.Context(), blob, digest, size)
+	if err != nil {
+		s.storageFailure(w, r, err)
+		return
+	}
+	defer data.Close()
+	source, err := data.Reader()
 	if err != nil {
 		s.storageFailure(w, r, err)
 		return
@@ -577,7 +591,7 @@ func (s *server) serveStorageObject(w http.ResponseWriter, r *http.Request, conn
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Content-Security-Policy", "sandbox; default-src 'none'")
 	w.Header().Set("Cache-Control", "private, no-store")
-	http.ServeContent(w, r, "", modified, bytes.NewReader(data))
+	http.ServeContent(w, r, "", modified, source)
 }
 
 type storageDownload struct {

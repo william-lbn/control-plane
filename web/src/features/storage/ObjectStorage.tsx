@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import './storage.css';
-import { sha256 } from '@noble/hashes/sha2.js';
-import { bytesToHex } from '@noble/hashes/utils.js';
+import { storageBlobDigest } from './fileDigest';
 import { api, projectPath } from '../../api';
 import type { Branch, Operation } from '../../api';
 import { PageHeading, status } from '../../shared/ui';
@@ -18,6 +17,8 @@ type Instance = {
   s3_endpoint?: string;
   s3_region?: string;
   s3_missing?: string[];
+  s3_supported?: string[];
+  limits?: { object_bytes: number; branch_bytes: number; part_bytes?: number };
   spec: { database: string } | null;
 };
 type Bucket = {
@@ -33,7 +34,6 @@ type ObjectEntry = {
   content_type: string;
   updated_at: string;
 };
-const objectLimit = 8 * 1024 * 1024;
 
 export function ObjectStorage({
   projectId,
@@ -52,6 +52,8 @@ export function ObjectStorage({
     branches.find((b) => b.is_default)?.id || branches[0]?.id || '',
   );
   const [instance, setInstance] = useState<Instance | null>(null);
+  const objectLimit = instance?.limits?.object_bytes ?? 8 * 1024 * 1024;
+  const branchLimit = instance?.limits?.branch_bytes ?? 100 * 1024 * 1024;
   const [database, setDatabase] = useState('postgres');
   const [buckets, setBuckets] = useState<Bucket[]>([]);
   const [bucket, setBucket] = useState('');
@@ -304,15 +306,24 @@ export function ObjectStorage({
       return;
     }
     await run(async (current) => {
-      await api(`${bucketPath}/objects?${new URLSearchParams({ key })}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': file.type || 'application/octet-stream',
-          'X-Neon-Object-Metadata': JSON.stringify(JSON.parse(metadataJSON)),
-          ...(overwrite ? { 'If-Match': `"${existing!.sha256}"` } : { 'If-None-Match': '*' }),
+      setNotice('正在按块计算文件 SHA-256…');
+      const digest = await storageBlobDigest(file);
+      if (epoch.current !== current) return;
+      const receipt = await api<{ sha256: string; size: number }>(
+        `${bucketPath}/objects?${new URLSearchParams({ key })}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': file.type || 'application/octet-stream',
+            'X-Neon-Object-Metadata': JSON.stringify(JSON.parse(metadataJSON)),
+            'X-Amz-Checksum-Sha256': digest.base64,
+            ...(overwrite ? { 'If-Match': `"${existing!.sha256}"` } : { 'If-None-Match': '*' }),
+          },
+          body: file,
         },
-        body: file,
-      });
+      );
+      if (receipt.sha256 !== digest.hex || receipt.size !== file.size)
+        throw Error('上传回执与原文件不符，请保留原文件并读取对象状态。');
       if (epoch.current !== current) return;
       await loadObjects(current);
       await loadBuckets(current);
@@ -383,7 +394,8 @@ export function ObjectStorage({
   async function prepareUpload() {
     if (!file || !key || overwrite || file.size > objectLimit) return;
     await run(async (current) => {
-      const digest = bytesToHex(sha256(new Uint8Array(await file.arrayBuffer())));
+      const digest = (await storageBlobDigest(file)).hex;
+      if (epoch.current !== current) return;
       const value = await api<{ url: string; headers: Record<string, string>; expires_at: string }>(
         `${bucketPath}/presign-upload`,
         {
@@ -495,8 +507,8 @@ export function ObjectStorage({
           </label>
         </div>
         <p className="muted">
-          REST v1 · 单文件 8 MiB · 分支目录 100 MiB / 1000 个对象 ·
-          物理文件保留以保护分支和恢复历史。S3 基础兼容的部署状态与范围见下方。
+          REST v1 · 单文件 {objectLimit / 1024 / 1024} MiB · 分支目录 {branchLimit / 1024 / 1024}{' '}
+          MiB / 1000 个对象 · 物理文件保留以保护分支和恢复历史。S3 基础兼容的部署状态与范围见下方。
         </p>
         <section className="storage-s3-panel" data-testid="storage-s3-panel">
           <h3>S3 应用连接</h3>
@@ -517,7 +529,10 @@ export function ObjectStorage({
               </p>
               <a href={`#/projects/${projectId}/credentials`}>管理应用凭据 →</a>
               <p className="muted">
-                基础 SigV4 与预签名下载预览；单文件仍为 8 MiB。未支持：
+                SigV4 与预签名上传下载 · 单对象 {objectLimit / 1024 / 1024} MiB。
+                {instance.s3_supported?.includes('StreamedPutObject') &&
+                  '支持流式大对象与完整 SHA-256 校验。'}
+                未支持：
                 {(instance.s3_missing || []).join('、')}。
               </p>
             </>
@@ -726,6 +741,7 @@ export function ObjectStorage({
               <MultipartUpload
                 key={`${projectId}/${branch}/${bucket}`}
                 bucketPath={bucketPath}
+                objectBytes={objectLimit}
                 canEdit={canEdit}
                 showError={showError}
                 onPublished={async () => {
@@ -948,7 +964,9 @@ export function ObjectStorage({
                   )}
                 </div>
               )}
-              {file && file.size > objectLimit && <p role="alert">文件超过 8 MiB 上限</p>}
+              {file && file.size > objectLimit && (
+                <p role="alert">文件超过 {objectLimit / 1024 / 1024} MiB 上限</p>
+              )}
               {canEdit && (
                 <div className="storage-actions">
                   <button

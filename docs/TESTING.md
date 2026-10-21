@@ -558,3 +558,5 @@ See [the branch email/recovery contract](AUTH-EMAIL-RECOVERY.md). The protected 
 当前身份局部验收使用 `catalog-current-inventory.spec.ts`，续用 0.67/0.68 原保护夹具，检查当前/历史分离、独立继承代际、角色/数据库排除、禁止重新首次记录和 Console 展示；五项通过后核对 16 张目录表未变并正常缩零。见 [2026-10-21 当前目录身份展示](DELIVERY-2026-10-21-CATALOG-CURRENT-INVENTORY.md)。
 
 `catalog-current-observation.spec.ts` 复用原继承夹具，五项检查涵盖首次观察、Console 显式衔接、Owner 顺序、改名/改密、原请求重放、Writer/Reader 冷目录和原父数据保留；见 [2026-10-21 旧目录身份衔接](DELIVERY-2026-10-21-CATALOG-CURRENT-OBSERVATION.md)。只验证新增及受影响路径。
+
+`storage-large-objects.spec.ts` 使用既有数据分支、原存储数据库和新专用桶，验证 17 MiB UI/SDK 单次与 multipart、完整 SHA-256、Range、HEAD、CRC32C 拒绝、凭据清理和 Compute 归零。原子续传及 SDK 原操作检查点保存在 Linux 私有目录，不能盲目重发未知结果。见 [2026-10-22 有界大对象、Range 与 checksum](DELIVERY-2026-10-22-STORAGE-LARGE-OBJECTS.md)。

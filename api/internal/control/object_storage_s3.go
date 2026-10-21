@@ -1,14 +1,10 @@
 package control
 
 import (
-	"bytes"
 	"context"
-	"crypto/md5"
-	"crypto/sha256"
 	"encoding/base64"
 	"encoding/xml"
 	"errors"
-	"fmt"
 	"io"
 	"mime"
 	"net/http"
@@ -80,16 +76,34 @@ func (s *server) s3Invoke(w http.ResponseWriter, r *http.Request) {
 		s3Error(w, r, 403, "InvalidAccessKeyId")
 		return
 	}
-	wire, e := io.ReadAll(io.LimitReader(r.Body, storageObjectLimit+(1<<20)+1))
-	if e != nil || len(wire) > storageObjectLimit+(1<<20) {
-		s3Error(w, r, 413, "EntityTooLarge")
-		return
+	var data []byte
+	var payload *storagePayload
+	if s3StreamingObjectPUT(r) {
+		payload, e = buildStoragePayload(r.Context(), storageObjectLimit, func(dst io.Writer) error {
+			return signature.VerifyAndDecodeTo(r, r.Body, dst, storageSigningSecret(token), s3Region(), storageObjectLimit)
+		})
+		if e != nil {
+			if errors.Is(e, s3protocol.ErrSignature) {
+				s3Error(w, r, 403, "SignatureDoesNotMatch")
+			} else {
+				s.storagePayloadFailure(w, r, e, true)
+			}
+			return
+		}
+		defer payload.Close()
+	} else {
+		wire, err := io.ReadAll(io.LimitReader(r.Body, storagePartLimit+(1<<20)+1))
+		if err != nil || len(wire) > storagePartLimit+(1<<20) {
+			s3Error(w, r, 413, "EntityTooLarge")
+			return
+		}
+		data, e = signature.VerifyAndDecode(r, wire, storageSigningSecret(token), s3Region(), storagePartLimit)
+		if e != nil {
+			s3Error(w, r, 403, "SignatureDoesNotMatch")
+			return
+		}
 	}
-	data, e := signature.VerifyAndDecode(r, wire, storageSigningSecret(token), s3Region(), storageObjectLimit)
-	if e != nil {
-		s3Error(w, r, 403, "SignatureDoesNotMatch")
-		return
-	}
+
 	target, objectPath := anchor, strings.TrimPrefix(r.URL.Path, "/")
 	if strings.HasPrefix(objectPath, "s3/") {
 		pieces := strings.SplitN(strings.TrimPrefix(objectPath, "s3/"), "/", 2)
@@ -130,6 +144,12 @@ func (s *server) s3Invoke(w http.ResponseWriter, r *http.Request) {
 	if !s3QuerySupported(query) {
 		s3Error(w, r, 501, "NotImplemented")
 		return
+	}
+	if payload != nil {
+		if err := validateStoragePayloadChecksums(r.Header, payload); err != nil {
+			s.storagePayloadFailure(w, r, err, true)
+			return
+		}
 	}
 	conn, p, close, e := s.openObjectStorage(r, "", target)
 	if e != nil {
@@ -266,6 +286,10 @@ func (s *server) s3Invoke(w http.ResponseWriter, r *http.Request) {
 		}{XMLNS: s3XMLNamespace, ETag: "\"" + stringVal(item["sha256"]) + "\"", Modified: item["updated_at"].(time.Time).Format(time.RFC3339)})
 		return
 	}
+	if payload != nil {
+		s.s3WritePayload(w, r, conn, p, bucket, key, payload)
+		return
+	}
 	if !s.s3WriteObject(w, r, conn, p, bucket, key, data) {
 		return
 	}
@@ -284,10 +308,19 @@ func (s *server) serveS3Object(w http.ResponseWriter, r *http.Request, conn *pgx
 		s3Error(w, r, 503, "ServiceUnavailable")
 		return
 	}
-	data, e := s.storage.read(r.Context(), blob, digest, size)
+	data, e := s.storage.readPayload(r.Context(), blob, digest, size)
 	if e != nil {
 		s3Error(w, r, 503, "ServiceUnavailable")
 		return
+	}
+	defer data.Close()
+	source, e := data.Reader()
+	if e != nil {
+		s.storagePayloadFailure(w, r, e, true)
+		return
+	}
+	if r.Header.Get("X-Amz-Checksum-Mode") == "ENABLED" && r.Header.Get("Range") == "" {
+		writeStoragePayloadChecksums(w, r, data)
 	}
 	w.Header().Set("ETag", "\""+digest+"\"")
 	w.Header().Set("Content-Type", contentType)
@@ -297,7 +330,7 @@ func (s *server) serveS3Object(w http.ResponseWriter, r *http.Request, conn *pgx
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": key[strings.LastIndex(key, "/")+1:]}))
 	w.Header().Set("Cache-Control", "private, no-store")
-	http.ServeContent(w, r, "", modified, bytes.NewReader(data))
+	http.ServeContent(w, r, "", modified, source)
 }
 func (s *server) s3ListBuckets(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
 	rows, e := conn.Query(r.Context(), `SELECT name,created_at FROM neon_storage.buckets ORDER BY name`)
@@ -440,17 +473,24 @@ func (s *server) s3Bucket(w http.ResponseWriter, r *http.Request, conn *pgx.Conn
 	s.s3ListObjects(w, r, conn, p, bucket, q)
 }
 func (s *server) s3WriteObject(w http.ResponseWriter, r *http.Request, conn *pgx.Conn, p objectStoragePayload, bucket, key string, data []byte) bool {
+	payload, err := smallStoragePayload(data)
+	if err != nil {
+		s.storagePayloadFailure(w, r, err, true)
+		return false
+	}
+	defer payload.Close()
+	return s.s3WritePayload(w, r, conn, p, bucket, key, payload)
+}
+func (s *server) s3WritePayload(w http.ResponseWriter, r *http.Request, conn *pgx.Conn, p objectStoragePayload, bucket, key string, data *storagePayload) bool {
 	if r.Header.Get("X-Amz-Copy-Source") != "" || r.Header.Get("X-Amz-Server-Side-Encryption") != "" {
 		s3Error(w, r, 501, "NotImplemented")
 		return false
 	}
-	if v := r.Header.Get("Content-MD5"); v != "" {
-		sum := md5.Sum(data)
-		if v != base64.StdEncoding.EncodeToString(sum[:]) {
-			s3Error(w, r, 400, "BadDigest")
-			return false
-		}
+	if err := validateStoragePayloadChecksums(r.Header, data); err != nil {
+		s.storagePayloadFailure(w, r, err, true)
+		return false
 	}
+
 	tx, e := conn.Begin(r.Context())
 	if e != nil {
 		s3Error(w, r, 503, "ServiceUnavailable")
@@ -506,7 +546,7 @@ func (s *server) s3WriteObject(w http.ResponseWriter, r *http.Request, conn *pgx
 			s3Error(w, r, 503, "ServiceUnavailable")
 			return false
 		}
-		if previous == "" && count >= 1000 || total-oldSize+int64(len(data)) > storageBranchLimit {
+		if previous == "" && count >= 1000 || total-oldSize+data.Size > storageBranchLimit {
 			s3Error(w, r, 429, "QuotaExceeded")
 			return false
 		}
@@ -515,17 +555,23 @@ func (s *server) s3WriteObject(w http.ResponseWriter, r *http.Request, conn *pgx
 			s3Error(w, r, 400, "InvalidArgument")
 			return false
 		}
-		digest := fmt.Sprintf("%x", sha256.Sum256(data))
+		digest := data.SHA256
 		blob := p.ProjectID + "/" + newID("blob_")
-		if s.storage.put(r.Context(), blob, contentType, data) != nil {
+		source, err := data.Reader()
+		if err != nil {
+			s.storagePayloadFailure(w, r, err, true)
+			return false
+		}
+		if s.storage.putReader(r.Context(), blob, contentType, source, data.Size) != nil {
 			s3Error(w, r, 503, "ServiceUnavailable")
 			return false
 		}
-		_, e = tx.Exec(r.Context(), `INSERT INTO neon_storage.objects(bucket,key,blob_key,sha256,size,content_type,metadata) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(bucket,key) DO UPDATE SET blob_key=$3,sha256=$4,size=$5,content_type=$6,metadata=$7,updated_at=now()`, bucket, key, blob, digest, len(data), contentType, metadata)
+		_, e = tx.Exec(r.Context(), `INSERT INTO neon_storage.objects(bucket,key,blob_key,sha256,size,content_type,metadata) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(bucket,key) DO UPDATE SET blob_key=$3,sha256=$4,size=$5,content_type=$6,metadata=$7,updated_at=now()`, bucket, key, blob, digest, data.Size, contentType, metadata)
 		if e == nil {
-			e = s.publishStorageFunctionEvent(r.Context(), tx, p, bucket, key, digest, int64(len(data)))
+			e = s.publishStorageFunctionEvent(r.Context(), tx, p, bucket, key, digest, data.Size)
 		}
 		w.Header().Set("ETag", "\""+digest+"\"")
+		writeStoragePayloadChecksums(w, r, data)
 	}
 	if e == nil {
 		e = tx.Commit(r.Context())

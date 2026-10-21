@@ -1,5 +1,6 @@
 # 分段上传：分支事务、S3 协议与 Console
 
+当前新增容量与流式合同见 [STORAGE-LARGE-OBJECTS.md](STORAGE-LARGE-OBJECTS.md)及 [2026-10-22 有界大对象、Range 与 checksum](DELIVERY-2026-10-22-STORAGE-LARGE-OBJECTS.md)；下文早期版本的 8 MiB 边界属于历史合同。
 ## 1. 范围和边界
 
 本合同描述 API 0.43.0 / Chart 0.9.33 的分段上传实现。验收状态和实际运行摘要以

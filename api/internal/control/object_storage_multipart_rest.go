@@ -56,7 +56,7 @@ func (s *server) storageMultipart(w http.ResponseWriter, r *http.Request) {
 			multipartError(w, r, multipartFault(400, "InvalidArgument"), false)
 			return
 		}
-		data, e := io.ReadAll(http.MaxBytesReader(w, r.Body, storageObjectLimit))
+		data, e := io.ReadAll(http.MaxBytesReader(w, r.Body, storagePartLimit))
 		if e != nil {
 			multipartError(w, r, multipartFault(413, "EntityTooLarge"), false)
 			return

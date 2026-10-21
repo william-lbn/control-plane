@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.70.0",
+    "version": "0.71.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -2858,7 +2858,7 @@
           "size": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 8388608
+            "maximum": 67108864
           },
           "content_type": {
             "type": "string"
@@ -4973,7 +4973,7 @@
           "expected_size": {
             "type": "integer",
             "minimum": -1,
-            "maximum": 8388608
+            "maximum": 67108864
           },
           "state": {
             "type": "string",
@@ -5086,7 +5086,7 @@
           "size": {
             "type": "integer",
             "minimum": 0,
-            "maximum": 8388608
+            "maximum": 67108864
           }
         },
         "required": [
@@ -13863,7 +13863,7 @@
             }
           },
           "413": {
-            "description": "Authorization, lifecycle, quota, version or storage error",
+            "description": "Object, part or bounded control-request size exceeded",
             "content": {
               "application/json": {
                 "schema": {
@@ -14008,7 +14008,7 @@
             }
           },
           "413": {
-            "description": "Authorization, lifecycle, quota, version or storage error",
+            "description": "Object, part or bounded control-request size exceeded",
             "content": {
               "application/json": {
                 "schema": {
@@ -14203,7 +14203,7 @@
             }
           },
           "413": {
-            "description": "Authorization, lifecycle, quota, version or storage error",
+            "description": "Object, part or bounded control-request size exceeded",
             "content": {
               "application/json": {
                 "schema": {
@@ -14437,7 +14437,7 @@
             }
           },
           "413": {
-            "description": "Authorization, lifecycle, quota, version or storage error",
+            "description": "Object, part or bounded control-request size exceeded",
             "content": {
               "application/json": {
                 "schema": {
@@ -14616,7 +14616,7 @@
             }
           },
           "413": {
-            "description": "Authorization, lifecycle, quota, version or storage error",
+            "description": "Object, part or bounded control-request size exceeded",
             "content": {
               "application/json": {
                 "schema": {
@@ -14797,7 +14797,7 @@
             }
           },
           "413": {
-            "description": "Authorization, lifecycle, quota, version or storage error",
+            "description": "Object, part or bounded control-request size exceeded",
             "content": {
               "application/json": {
                 "schema": {
@@ -14854,7 +14854,7 @@
               "schema": {
                 "type": "string",
                 "format": "binary",
-                "maxLength": 8388608
+                "maxLength": 67108864
               }
             }
           }
@@ -14973,7 +14973,7 @@
             }
           },
           "413": {
-            "description": "Authorization, lifecycle, quota, version or storage error",
+            "description": "Object, part or bounded control-request size exceeded",
             "content": {
               "application/json": {
                 "schema": {
@@ -15150,7 +15150,7 @@
             }
           },
           "413": {
-            "description": "Authorization, lifecycle, quota, version or storage error",
+            "description": "Object, part or bounded control-request size exceeded",
             "content": {
               "application/json": {
                 "schema": {
@@ -15335,7 +15335,7 @@
             }
           },
           "413": {
-            "description": "Authorization, lifecycle, quota, version or storage error",
+            "description": "Object, part or bounded control-request size exceeded",
             "content": {
               "application/json": {
                 "schema": {
@@ -15492,7 +15492,7 @@
             }
           },
           "413": {
-            "description": "Authorization, lifecycle, quota, version or storage error",
+            "description": "Object, part or bounded control-request size exceeded",
             "content": {
               "application/json": {
                 "schema": {
@@ -15593,7 +15593,7 @@
               "schema": {
                 "type": "string",
                 "format": "binary",
-                "maxLength": 8388608
+                "maxLength": 67108864
               }
             }
           }
@@ -15612,7 +15612,7 @@
             "description": "Create-only target already exists"
           },
           "413": {
-            "description": "Object too large"
+            "description": "Object, part or bounded control-request size exceeded"
           }
         }
       }
@@ -18258,7 +18258,7 @@
             "description": "Target already exists"
           },
           "413": {
-            "description": "Authorization, lifecycle, quota, version or storage error",
+            "description": "Object, part or bounded control-request size exceeded",
             "content": {
               "application/json": {
                 "schema": {
@@ -18340,7 +18340,7 @@
                   "size": {
                     "type": "integer",
                     "minimum": 0,
-                    "maximum": 8388608
+                    "maximum": 67108864
                   },
                   "content_type": {
                     "type": "string",
@@ -20214,7 +20214,7 @@
             "description": "Object precondition failed"
           },
           "413": {
-            "description": "8 MiB bound exceeded"
+            "description": "Object, part or bounded control-request size exceeded"
           },
           "428": {
             "description": "Explicit publication condition required"
@@ -20308,7 +20308,7 @@
             "description": "Object precondition failed"
           },
           "413": {
-            "description": "8 MiB bound exceeded"
+            "description": "Object, part or bounded control-request size exceeded"
           },
           "428": {
             "description": "Explicit publication condition required"
@@ -20412,7 +20412,7 @@
             "description": "Object precondition failed"
           },
           "413": {
-            "description": "8 MiB bound exceeded"
+            "description": "Object, part or bounded control-request size exceeded"
           },
           "428": {
             "description": "Explicit publication condition required"
@@ -20497,7 +20497,7 @@
             "description": "Object precondition failed"
           },
           "413": {
-            "description": "8 MiB bound exceeded"
+            "description": "Object, part or bounded control-request size exceeded"
           },
           "428": {
             "description": "Explicit publication condition required"
@@ -20601,7 +20601,7 @@
             "description": "Object precondition failed"
           },
           "413": {
-            "description": "8 MiB bound exceeded"
+            "description": "Object, part or bounded control-request size exceeded"
           },
           "428": {
             "description": "Explicit publication condition required"
@@ -20724,7 +20724,7 @@
             "description": "Object precondition failed"
           },
           "413": {
-            "description": "8 MiB bound exceeded"
+            "description": "Object, part or bounded control-request size exceeded"
           },
           "428": {
             "description": "Explicit publication condition required"

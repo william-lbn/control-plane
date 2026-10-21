@@ -18,8 +18,9 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
-const storageObjectLimit = 8 << 20
-const storageBranchLimit = 100 << 20
+const storageObjectLimit = 64 << 20
+const storagePartLimit = 8 << 20
+const storageBranchLimit = 256 << 20
 
 // This credential must be provisioned with ListBucket/GetObject/PutObject only
 // on the product bucket. It must never be a Pageserver or MinIO root credential.
@@ -51,6 +52,9 @@ func loadStorageBlobs() (*storageBlobs, error) {
 	if decoder.Decode(&config) != nil {
 		return nil, errors.New("invalid product blob configuration")
 	}
+	if err = prepareStoragePayloadDirectory(); err != nil {
+		return nil, err
+	}
 	u, err := url.Parse(config.Endpoint)
 	if err != nil || u.Host == "" || u.User != nil || u.Path != "" || u.RawQuery != "" || u.Fragment != "" || (u.Scheme != "https" && !(u.Scheme == "http" && config.LabHTTP)) || !regexp.MustCompile(`^neon-product-[a-z0-9-]{1,40}$`).MatchString(config.Bucket) || config.Region == "" || len(config.AccessKey) < 8 || len(config.SecretKey) < 16 {
 		return nil, errors.New("product blob endpoint, dedicated bucket and restricted credentials are required")
@@ -73,14 +77,42 @@ func (b *storageBlobs) verify(ctx context.Context) error {
 	return nil
 }
 func (b *storageBlobs) put(ctx context.Context, key, contentType string, data []byte) error {
-	_, err := b.client.PutObject(ctx, b.bucket, key, bytes.NewReader(data), int64(len(data)), minio.PutObjectOptions{ContentType: contentType, DisableMultipart: true})
+	return b.putReader(ctx, key, contentType, bytes.NewReader(data), int64(len(data)))
+}
+func (b *storageBlobs) putReader(ctx context.Context, key, contentType string, source io.Reader, size int64) error {
+	if size < 0 || size > storageObjectLimit {
+		return errors.New("invalid object upload size")
+	}
+	info, err := b.client.PutObject(ctx, b.bucket, key, source, size, minio.PutObjectOptions{ContentType: contentType, DisableMultipart: true})
 	if err != nil {
 		return errors.New("product blob upload failed")
 	}
+	if info.Size != size {
+		return errors.New("product blob upload acknowledgment size differs")
+	}
 	return nil
 }
+func (b *storageBlobs) readPayload(ctx context.Context, key, digest string, size int64) (*storagePayload, error) {
+	if size < 0 || size > storageObjectLimit || !storageSHA256.MatchString(digest) {
+		return nil, errors.New("invalid stored object identity")
+	}
+	object, err := b.client.GetObject(ctx, b.bucket, key, minio.GetObjectOptions{})
+	if err != nil {
+		return nil, errors.New("product blob read failed")
+	}
+	defer object.Close()
+	p, err := readStoragePayload(ctx, object, size)
+	if err != nil {
+		return nil, err
+	}
+	if p.Size != size || p.SHA256 != digest {
+		p.Close()
+		return nil, errors.New("product blob integrity verification failed")
+	}
+	return p, nil
+}
 func (b *storageBlobs) read(ctx context.Context, key, digest string, size int64) ([]byte, error) {
-	if size < 0 || size > storageObjectLimit {
+	if size < 0 || size > storagePartLimit {
 		return nil, errors.New("invalid stored object size")
 	}
 	object, err := b.client.GetObject(ctx, b.bucket, key, minio.GetObjectOptions{})
@@ -88,7 +120,7 @@ func (b *storageBlobs) read(ctx context.Context, key, digest string, size int64)
 		return nil, errors.New("product blob read failed")
 	}
 	defer object.Close()
-	data, err := io.ReadAll(io.LimitReader(object, storageObjectLimit+1))
+	data, err := io.ReadAll(io.LimitReader(object, storagePartLimit+1))
 	if err != nil || int64(len(data)) != size || fmt.Sprintf("%x", sha256.Sum256(data)) != digest {
 		return nil, errors.New("product blob integrity verification failed")
 	}

@@ -1,5 +1,6 @@
 # Branch Object Storage v1
 
+当前新增容量与流式合同见 [STORAGE-LARGE-OBJECTS.md](STORAGE-LARGE-OBJECTS.md)及 [2026-10-22 有界大对象、Range 与 checksum](DELIVERY-2026-10-22-STORAGE-LARGE-OBJECTS.md)；下文早期版本的 8 MiB 边界属于历史合同。
 ## 1. Product contract and current boundary
 
 The implementation adds usable files to a Neon branch: Console configuration,

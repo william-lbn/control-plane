@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"mime"
 	"net/http"
 	"regexp"
@@ -156,7 +157,7 @@ func (s *server) createMultipart(ctx context.Context, conn *pgx.Conn, p objectSt
 }
 func (s *server) putMultipartPart(ctx context.Context, conn *pgx.Conn, p objectStoragePayload, principal, bucket, key, id string, number int, data []byte, contentMD5 string, copyHeaders http.Header) (multipartPart, error) {
 	var part multipartPart
-	if number < 1 || number > 10000 || len(data) > storageObjectLimit {
+	if number < 1 || number > 10000 || len(data) > storagePartLimit {
 		return part, multipartFault(400, "InvalidArgument")
 	}
 	tx, e := multipartTx(ctx, conn)
@@ -199,17 +200,33 @@ func (s *server) putMultipartPart(ctx context.Context, conn *pgx.Conn, p objectS
 		if !strings.HasPrefix(blob, p.ProjectID+"/") {
 			return part, multipartFault(409, "ObjectIdentityMismatch")
 		}
-		data, err = s.storage.read(ctx, blob, digest, size)
-		if err != nil {
-			return part, err
-		}
-		if v := copyHeaders.Get("X-Amz-Copy-Source-Range"); v != "" {
-			a, b, err := multipartCopyRange(v, int64(len(data)))
+		a, b := int64(0), size-1
+		if value := copyHeaders.Get("X-Amz-Copy-Source-Range"); value != "" {
+			a, b, err = multipartCopyRange(value, size)
 			if err != nil {
 				return part, err
 			}
-			data = data[a : b+1]
 		}
+		if b-a+1 > storagePartLimit {
+			return part, multipartFault(413, "EntityTooLarge")
+		}
+		source, err := s.storage.readPayload(ctx, blob, digest, size)
+		if err != nil {
+			return part, err
+		}
+		defer source.Close()
+		reader, err := source.Reader()
+		if err != nil {
+			return part, err
+		}
+		if _, err = reader.Seek(a, io.SeekStart); err != nil {
+			return part, err
+		}
+		data, err = io.ReadAll(io.LimitReader(reader, b-a+1))
+		if err != nil || int64(len(data)) != b-a+1 {
+			return part, errors.New("original part-copy range unavailable")
+		}
+
 	}
 	sum := md5.Sum(data)
 	if contentMD5 != "" && base64.StdEncoding.EncodeToString(sum[:]) != contentMD5 {
@@ -360,27 +377,39 @@ func (s *server) completeMultipart(ctx context.Context, conn *pgx.Conn, p object
 	if old == "" && count >= 1000 || total-oldSize+size > storageBranchLimit {
 		return u, multipartFault(429, "QuotaExceeded")
 	}
-	content := make([]byte, 0, int(size))
-	for _, v := range selection {
-		part := indexed[v.Number]
-		if !strings.HasPrefix(part.blob, p.ProjectID+"/") {
-			return u, multipartFault(409, "ObjectIdentityMismatch")
+	content, e := buildStoragePayload(ctx, size, func(dst io.Writer) error {
+		for _, v := range selection {
+			part := indexed[v.Number]
+			if !strings.HasPrefix(part.blob, p.ProjectID+"/") {
+				return multipartFault(409, "ObjectIdentityMismatch")
+			}
+			data, err := s.storage.read(ctx, part.blob, part.SHA256, part.Size)
+			if err != nil {
+				return err
+			}
+			if _, err = dst.Write(data); err != nil {
+				return err
+			}
 		}
-		data, e := s.storage.read(ctx, part.blob, part.SHA256, part.Size)
-		if e != nil {
-			return u, e
-		}
-		content = append(content, data...)
+		return nil
+	})
+	if e != nil {
+		return u, e
 	}
-	u.SHA256 = fmt.Sprintf("%x", sha256.Sum256(content))
-	u.Size = size
-	if u.ExpectedSHA256 != "" && u.ExpectedSHA256 != u.SHA256 {
+	defer content.Close()
+	u.SHA256, u.Size = content.SHA256, content.Size
+	if u.Size != size || u.ExpectedSHA256 != "" && u.ExpectedSHA256 != u.SHA256 {
 		return u, multipartFault(400, "BadDigest")
 	}
 	blob := p.ProjectID + "/" + newID("blob_")
-	if e = s.storage.put(ctx, blob, u.ContentType, content); e != nil {
+	reader, e := content.Reader()
+	if e != nil {
 		return u, e
 	}
+	if e = s.storage.putReader(ctx, blob, u.ContentType, reader, u.Size); e != nil {
+		return u, e
+	}
+
 	_, e = tx.Exec(ctx, `INSERT INTO neon_storage.objects(bucket,key,blob_key,sha256,size,content_type,metadata) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(bucket,key) DO UPDATE SET blob_key=$3,sha256=$4,size=$5,content_type=$6,metadata=$7,updated_at=now()`, bucket, u.Key, blob, u.SHA256, size, u.ContentType, u.Metadata)
 	if e != nil {
 		return u, e
