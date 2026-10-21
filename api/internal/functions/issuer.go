@@ -83,8 +83,8 @@ func NewGuestIssuer(caPEM, keyPEM []byte, now time.Time) (*GuestIssuer, error) {
 }
 
 // Issue creates a fresh P-256 leaf/key for exactly one immutable instance.
-// Expiry is bounded by both the root and a four-hour maximum. Expired guests
-// must be drained/replaced; this function never renews a running boot in place.
+// Expiry is bounded by both the root and a four-hour maximum. An existing boot
+// accepts a fresh leaf only through its TLS/HMAC identity update protocol.
 func (issuer *GuestIssuer) Issue(scope Scope, now time.Time, lifetime time.Duration) (GuestIdentity, error) {
 	var result GuestIdentity
 	if issuer == nil || issuer.certificate == nil || issuer.key == nil || scope.Validate() != nil || lifetime < 30*time.Minute || lifetime > 4*time.Hour || now.Before(issuer.certificate.NotBefore) || !issuer.certificate.NotAfter.After(now.Add(lifetime)) {

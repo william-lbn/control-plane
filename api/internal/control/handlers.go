@@ -47,12 +47,28 @@ func (s *server) many(ctx context.Context, query string, args ...any) ([]record,
 
 func (s *server) routes() *http.ServeMux {
 	mux := http.NewServeMux()
+	mux.Handle("GET /api/v1/platform/ai-providers/capabilities", s.auth(http.HandlerFunc(s.aiProviderCapabilities), false))
+	mux.Handle("GET /api/v1/platform/ai-providers", s.auth(http.HandlerFunc(s.aiProviderRead), false))
+	mux.Handle("POST /api/v1/platform/ai-providers", s.auth(http.HandlerFunc(s.aiProviderDraft), true))
+	mux.Handle("GET /api/v1/platform/ai-providers/{provider}", s.auth(http.HandlerFunc(s.aiProviderRead), false))
+	mux.Handle("POST /api/v1/platform/ai-providers/{provider}/revisions", s.auth(http.HandlerFunc(s.aiProviderDraft), true))
+	mux.Handle("POST /api/v1/platform/ai-providers/{provider}/publish", s.auth(http.HandlerFunc(s.aiProviderPublish), true))
+	mux.Handle("POST /api/v1/platform/ai-providers/{provider}/disable", s.auth(http.HandlerFunc(s.aiProviderDisable), true))
+	mux.Handle("DELETE /api/v1/platform/ai-providers/{provider}", s.auth(http.HandlerFunc(s.aiProviderDisable), true))
+	mux.Handle("GET /api/v1/platform/ai-provider-operations/{providerOperation}", s.auth(http.HandlerFunc(s.aiProviderOperation), false))
+	mux.Handle("POST /api/v1/platform/ai-provider-operations/{providerOperation}/retry", s.auth(http.HandlerFunc(s.aiProviderRetry), true))
+	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/functions-copy", s.auth(http.HandlerFunc(s.copyFunctionBranch), true))
+	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/function-copy-plans", s.auth(http.HandlerFunc(s.functionBranchCopyPlans), false))
+	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/functions/{slug}/output-policy", s.auth(http.HandlerFunc(s.functionOutputPolicy), false))
+	mux.Handle("PATCH /api/v1/projects/{project}/branches/{branch}/functions/{slug}/output-policy", s.auth(http.HandlerFunc(s.functionOutputPolicy), true))
+	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/functions/{slug}/output-logs", s.auth(http.HandlerFunc(s.functionOutputLogs), false))
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/functions-triggers", s.auth(http.HandlerFunc(s.functionTriggers), false))
 	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/functions-triggers", s.auth(http.HandlerFunc(s.functionTriggers), true))
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/functions-triggers/{trigger}", s.auth(http.HandlerFunc(s.functionTriggers), false))
 	mux.Handle("PATCH /api/v1/projects/{project}/branches/{branch}/functions-triggers/{trigger}", s.auth(http.HandlerFunc(s.functionTriggers), true))
 	mux.Handle("DELETE /api/v1/projects/{project}/branches/{branch}/functions-triggers/{trigger}", s.auth(http.HandlerFunc(s.functionTriggers), true))
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/functions-triggers/{trigger}/invocations", s.auth(http.HandlerFunc(s.functionTriggerInvocations), false))
+	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/functions-triggers/{trigger}/invocations/{invocation}/retry", s.auth(http.HandlerFunc(s.retryFunctionObjectEvent), true))
 	mux.Handle("PATCH /api/v1/projects/{project}/branches/{branch}/functions/{slug}/http-policy", s.auth(http.HandlerFunc(s.functionHTTPPolicy), true))
 	mux.Handle("GET /api/v1/projects/{project}/saved-queries", s.auth(http.HandlerFunc(s.savedQueries), false))
 	mux.Handle("POST /api/v1/projects/{project}/saved-queries", s.auth(http.HandlerFunc(s.savedQueries), true))
@@ -129,6 +145,7 @@ func (s *server) routes() *http.ServeMux {
 	mux.Handle("GET /api/v1/projects/{project}/branches", s.auth(http.HandlerFunc(s.branches), false))
 	mux.Handle("POST /api/v1/projects/{project}/branches", s.auth(http.HandlerFunc(s.createBranch), true))
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}", s.auth(http.HandlerFunc(s.branch), false))
+	mux.Handle("PATCH /api/v1/projects/{project}/branches/{branch}/expiration", s.auth(http.HandlerFunc(s.setBranchExpiration), true))
 	mux.Handle("DELETE /api/v1/projects/{project}/branches/{branch}", s.auth(http.HandlerFunc(s.deleteResource), true))
 	mux.Handle("PATCH /api/v1/projects/{project}/branches/{branch}/protection", s.auth(http.HandlerFunc(s.setResourceProtection), true))
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/restore-window", s.auth(http.HandlerFunc(s.readRestoreWindow), false))
@@ -201,6 +218,13 @@ func (s *server) routes() *http.ServeMux {
 	mux.Handle("PATCH /api/v1/projects/{project}/branches/{branch}/databases/{database}", s.auth(http.HandlerFunc(s.databaseOwnerMutation), true))
 	mux.Handle("DELETE /api/v1/projects/{project}/branches/{branch}/databases/{database}", s.auth(http.HandlerFunc(s.catalogMutation), true))
 	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/databases/{database}/rename", s.auth(http.HandlerFunc(s.catalogRenameMutation), true))
+	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/connection-defaults", s.auth(http.HandlerFunc(s.connectionDefaults), false))
+	mux.Handle("PATCH /api/v1/projects/{project}/branches/{branch}/connection-defaults", s.auth(http.HandlerFunc(s.connectionDefaults), true))
+	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/catalog-identities", s.auth(http.HandlerFunc(s.catalogIdentities), false))
+	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/catalog-identities", s.auth(http.HandlerFunc(s.catalogIdentities), true))
+	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/catalog-identities/{binding}/restore", s.auth(http.HandlerFunc(s.catalogIdentityRestore), true))
+	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/default-database-owner", s.auth(http.HandlerFunc(s.defaultDatabaseOwnerRead), false))
+	mux.Handle("PATCH /api/v1/projects/{project}/branches/{branch}/default-database-owner", s.auth(http.HandlerFunc(s.defaultDatabaseOwnerMutation), true))
 	mux.Handle("GET /api/v1/projects/{project}/endpoints", s.auth(http.HandlerFunc(s.endpoints), false))
 	mux.Handle("POST /api/v1/projects/{project}/endpoints", s.auth(http.HandlerFunc(s.createEndpoint), true))
 	mux.Handle("GET /api/v1/projects/{project}/endpoints/{endpoint}", s.auth(http.HandlerFunc(s.endpoint), false))
@@ -414,6 +438,12 @@ func (s *server) endpoints(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	for i := range items {
+		defaults, err := s.publicConnectionDefaults(r.Context(), items[i])
+		if err != nil {
+			fail(w, r, 503, "connection_defaults_unavailable", "Could not read customer connection defaults")
+			return
+		}
+		items[i]["connection_defaults"] = defaults
 		items[i] = s.decorateEndpoint(r.Context(), items[i])
 	}
 	jsonResponse(w, 200, page(items))
@@ -421,6 +451,12 @@ func (s *server) endpoints(w http.ResponseWriter, r *http.Request) {
 func (s *server) endpoint(w http.ResponseWriter, r *http.Request) {
 	item, ok := s.requireEndpoint(w, r)
 	if ok {
+		defaults, err := s.publicConnectionDefaults(r.Context(), item)
+		if err != nil {
+			fail(w, r, 503, "connection_defaults_unavailable", "Could not read customer connection defaults")
+			return
+		}
+		item["connection_defaults"] = defaults
 		jsonResponse(w, 200, s.decorateEndpoint(r.Context(), item))
 	}
 }
@@ -430,7 +466,12 @@ func (s *server) connectionInfo(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	selector, role, database := stringVal(item["selector"]), stringVal(item["role_name"]), stringVal(item["database_name"])
+	defaults, err := s.publicConnectionDefaults(r.Context(), item)
+	if err != nil {
+		fail(w, r, 503, "connection_defaults_unavailable", "Could not read customer connection defaults")
+		return
+	}
+	selector, role, database := stringVal(item["selector"]), stringVal(defaults["role"]), stringVal(defaults["database"])
 	// SQL uses the internal Proxy address; clients receive the public address.
 	host, port := env("NEON_PUBLIC_PROXY_HOST", s.proxyHost), env("NEON_PUBLIC_PROXY_PORT", s.proxyPort)
 	mode := "require"
@@ -672,11 +713,16 @@ func (s *server) querySQL(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	role, database := body.Role, body.Database
+	defaults, err := s.publicConnectionDefaults(r.Context(), item)
+	if err != nil {
+		fail(w, r, 503, "connection_defaults_unavailable", "SQL was not submitted because customer connection defaults could not be read")
+		return
+	}
 	if role == "" {
-		role = stringVal(item["role_name"])
+		role = stringVal(defaults["role"])
 	}
 	if database == "" {
-		database = stringVal(item["database_name"])
+		database = stringVal(defaults["database"])
 	}
 	if !validPGIdentifier(role) || !validPGIdentifier(database) ||
 		(role != "cloud_admin" && protectedPGRole(role)) {

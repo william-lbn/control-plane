@@ -56,6 +56,38 @@ export function CreateResource({
     null,
   );
   const [windowError, setWindowError] = useState('');
+  const [functionPolicy, setFunctionPolicy] = useState<'inherit_paused' | 'omit'>('inherit_paused');
+  const [functionConsent, setFunctionConsent] = useState(false);
+  const [historicalFunctionConsent, setHistoricalFunctionConsent] = useState(false);
+  const [parentFunctions, setParentFunctions] = useState<{
+    enabled: boolean;
+    count: number;
+  } | null>(null);
+  const [functionPolicyError, setFunctionPolicyError] = useState('');
+  useEffect(() => {
+    setParentFunctions(null);
+    setFunctionPolicyError('');
+    setFunctionConsent(false);
+    setHistoricalFunctionConsent(false);
+    if (kind !== 'branch' || !parent || !projectId) return;
+    const controller = new AbortController();
+    void api<{ branch_copy_enabled: boolean; items: { state: string }[] }>(
+      `${projectPath(projectId)}/branches/${encodeURIComponent(parent)}/functions?limit=100`,
+      { signal: controller.signal },
+    )
+      .then((value) => {
+        if (!controller.signal.aborted)
+          setParentFunctions({
+            enabled: value.branch_copy_enabled === true,
+            count: value.items.filter((f) => !['deleting', 'deleted'].includes(f.state)).length,
+          });
+      })
+      .catch((reason) => {
+        if (!controller.signal.aborted)
+          setFunctionPolicyError(reason instanceof Error ? reason.message : String(reason));
+      });
+    return () => controller.abort();
+  }, [kind, parent, projectId]);
   useEffect(() => {
     setWindow(null);
     setWindowError('');
@@ -140,6 +172,17 @@ export function CreateResource({
 
   async function submit(event: FormEvent) {
     event.preventDefault();
+    if (busy || operation) return;
+    if (
+      kind === 'branch' &&
+      (!parentFunctions ||
+        functionPolicyError ||
+        (parentFunctions.enabled &&
+          parentFunctions.count > 0 &&
+          functionPolicy === 'inherit_paused' &&
+          (!functionConsent || (pointKind !== 'current' && !historicalFunctionConsent))))
+    )
+      return;
     setBusy(true);
     setError('');
     const path =
@@ -163,6 +206,13 @@ export function CreateResource({
               name,
               parent_branch_id: parent,
               create_endpoint: withEndpoint,
+              ...(parentFunctions?.enabled
+                ? {
+                    function_copy_policy: functionPolicy,
+                    acknowledge_function_environment_copy: functionConsent,
+                    acknowledge_current_functions_for_historical_data: historicalFunctionConsent,
+                  }
+                : {}),
               ...(pointKind === 'timestamp'
                 ? { parent_timestamp: point }
                 : pointKind === 'lsn'
@@ -309,7 +359,7 @@ export function CreateResource({
                   }}
                 >
                   {branches
-                    .filter((b) => b.state === 'ready')
+                    .filter((b) => b.state === 'ready' && !b.expires_at)
                     .map((b) => (
                       <option key={b.id} value={b.id}>
                         {b.name} · {b.id}
@@ -359,6 +409,72 @@ export function CreateResource({
                             ? `可恢复 LSN：${window.min_readable_lsn} 至 ${window.latest_lsn}。提交时重新校验；恢复会创建独立分支和连接入口。`
                             : '正在读取存储历史边界…')}
                       </div>
+                    </>
+                  )}
+                </>
+              )}
+              {functionPolicyError && (
+                <p role="alert">
+                  无法读取父分支函数策略：{functionPolicyError}。请重新打开创建窗口后重试。
+                </p>
+              )}
+              {!parentFunctions && !functionPolicyError && (
+                <p role="status">正在读取父分支函数策略…</p>
+              )}
+              {parentFunctions?.enabled && (
+                <>
+                  <label className="create-field">
+                    函数策略
+                    <select
+                      aria-label="函数策略"
+                      value={functionPolicy}
+                      onChange={(e) => {
+                        setFunctionPolicy(e.target.value as typeof functionPolicy);
+                        setFunctionConsent(false);
+                        setHistoricalFunctionConsent(false);
+                        resetKey();
+                      }}
+                    >
+                      <option value="inherit_paused">继承父分支函数，准备后保持暂停</option>
+                      <option value="omit">仅创建数据库分支，不复制函数</option>
+                    </select>
+                  </label>
+                  {functionPolicy === 'inherit_paused' && (
+                    <>
+                      <p className="subtle-note">
+                        固定受理时的父分支函数版本。若暂不创建 Writer，函数等待此分支的 Writer
+                        准备；触发器默认停用，公开访问和日志采集需要另行授权。
+                      </p>
+                      {parentFunctions.count > 0 && (
+                        <label className="create-check">
+                          <input
+                            type="checkbox"
+                            aria-label="确认复制函数环境"
+                            checked={functionConsent}
+                            onChange={(e) => {
+                              setFunctionConsent(e.target.checked);
+                              resetKey();
+                            }}
+                          />
+                          确认将父分支 {parentFunctions.count}{' '}
+                          个函数的环境变量复制到独立的子分支环境。
+                        </label>
+                      )}
+                      {parentFunctions.count > 0 && pointKind !== 'current' && (
+                        <label className="create-check">
+                          <input
+                            type="checkbox"
+                            aria-label="确认历史 SQL 使用当前函数代码"
+                            checked={historicalFunctionConsent}
+                            onChange={(e) => {
+                              setHistoricalFunctionConsent(e.target.checked);
+                              resetKey();
+                            }}
+                          />
+                          确认历史 SQL
+                          数据点使用本次受理时的函数代码与环境；这不代表历史时间点的代码版本。
+                        </label>
+                      )}
                     </>
                   )}
                 </>
@@ -526,6 +642,14 @@ export function CreateResource({
               disabled={
                 busy ||
                 !!operation ||
+                (kind === 'branch' &&
+                  (!parentFunctions ||
+                    !!functionPolicyError ||
+                    (parentFunctions.enabled &&
+                      parentFunctions.count > 0 &&
+                      functionPolicy === 'inherit_paused' &&
+                      (!functionConsent ||
+                        (pointKind !== 'current' && !historicalFunctionConsent))))) ||
                 (kind === 'branch' &&
                   pointKind !== 'current' &&
                   (!window || !point || !!windowError))

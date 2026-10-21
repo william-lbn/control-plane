@@ -67,6 +67,8 @@ type Manager struct {
 	stopping     bool
 	stopped      bool
 	lastActivity time.Time
+	output       *OutputJournal
+	identity     *managerCertificate
 }
 
 // NewManager has a fixed loopback runtime destination. The destination is never
@@ -132,7 +134,15 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case r.Method == http.MethodGet && r.URL.Path == "/internal/v1/capabilities" && r.URL.RawQuery == "" && len(body) == 0:
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Cache-Control", "no-store")
-		_ = json.NewEncoder(w).Encode(InstanceCapabilities{Scope: m.scope, BootID: m.bootID, TriggerInvocations: true})
+		_ = json.NewEncoder(w).Encode(InstanceCapabilities{Scope: m.scope, BootID: m.bootID, TriggerInvocations: true, WebSockets: true, OutputLogs: m.output != nil, ManagerIdentityRenewal: m.identity != nil})
+	case (r.Method == http.MethodGet || r.Method == http.MethodPost) && r.URL.Path == "/internal/v1/manager-identity" && r.URL.RawQuery == "":
+		m.managerIdentity(w, r, body)
+	case r.Method == http.MethodPost && r.URL.Path == "/internal/v1/output" && r.URL.RawQuery == "":
+		m.outputPage(w, r, body)
+	case r.Method == http.MethodPost && r.URL.Path == "/internal/v1/shutdown-output" && r.URL.RawQuery == "":
+		m.shutdownOutput(w, r, body)
+	case r.Method == http.MethodPost && r.URL.Path == "/internal/v1/websocket" && r.URL.RawQuery == "":
+		m.websocket(w, r, body)
 	case r.Method == http.MethodPost && r.URL.Path == "/internal/v1/invoke" && r.URL.RawQuery == "":
 		m.invoke(w, r, body)
 	case r.Method == http.MethodPost && r.URL.Path == "/internal/v1/shutdown" && r.URL.RawQuery == "":
@@ -145,6 +155,9 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (m *Manager) status(w http.ResponseWriter, r *http.Request) {
 	m.mu.Lock()
 	state := map[string]any{"scope": m.scope, "boot_id": m.bootID, "active_invocations": m.active, "draining": m.draining, "last_activity": m.lastActivity.UTC().Format(time.RFC3339Nano), "runtime": Runtime, "background_counters_trusted": false}
+	if m.identity != nil {
+		state["manager_identity"] = m.identity.current()
+	}
 	m.mu.Unlock()
 	// Node health is observation, not a signed isolation/fencing assertion: user
 	// code shares that process and can tamper with its module-level counters.
@@ -262,6 +275,8 @@ func (m *Manager) invoke(w http.ResponseWriter, r *http.Request, body []byte) {
 	m.lastActivity = time.Now()
 	m.mu.Unlock()
 	defer func() { m.mu.Lock(); m.active--; m.lastActivity = time.Now(); m.mu.Unlock() }()
+	m.output.Platform("invoke begin")
+	defer m.output.Platform("invoke end")
 	ctx, cancel := context.WithTimeout(r.Context(), 15*time.Minute)
 	defer cancel()
 	request, _ := http.NewRequestWithContext(ctx, v.Method, m.origin+"/", bytes.NewReader(v.Body))

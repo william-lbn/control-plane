@@ -18,15 +18,20 @@ import (
 // Catalog payloads contain references, never passwords or verifiers. The
 // credential Secret is immutable per Operation and safe to replay after crash.
 type catalogPayload struct {
-	ProjectID       string `json:"project_id"`
-	BranchID        string `json:"branch_id"`
-	EndpointID      string `json:"endpoint_id"`
-	Name            string `json:"name"`
-	Owner           string `json:"owner,omitempty"`
-	CredentialRef   string `json:"credential_ref,omitempty"`
-	PreviousOwner   string `json:"previous_owner,omitempty"`
-	DatabaseOID     uint32 `json:"database_oid,omitempty"`
-	ExpectedVersion int64  `json:"expected_version,omitempty"`
+	ProjectID             string                   `json:"project_id"`
+	BranchID              string                   `json:"branch_id"`
+	EndpointID            string                   `json:"endpoint_id"`
+	Name                  string                   `json:"name"`
+	Owner                 string                   `json:"owner,omitempty"`
+	CredentialRef         string                   `json:"credential_ref,omitempty"`
+	PreviousOwner         string                   `json:"previous_owner,omitempty"`
+	DatabaseOID           uint32                   `json:"database_oid,omitempty"`
+	ExpectedVersion       int64                    `json:"expected_version,omitempty"`
+	PreviousCredentialRef string                   `json:"previous_credential_ref,omitempty"`
+	MutationCredentialUID string                   `json:"mutation_credential_uid,omitempty"`
+	NativeIdentity        *catalogMutationIdentity `json:"native_identity,omitempty"`
+	operationID           string
+	workerID              string
 }
 
 func validPGIdentifier(name string) bool {
@@ -116,6 +121,40 @@ func (s *server) catalogList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	byName := map[string]record{}
+	exclusions, err := readCatalogForkExclusions(ctx, s.db, project, branch)
+	if err != nil {
+		s.defaultOwnerFailure(w, r, err)
+		return
+	}
+	excludedNames := map[string]bool{}
+	for _, v := range exclusions {
+		excludedNames[v.Name] = true
+	}
+	inheritedExclusions, err := readCatalogInheritanceExclusionNames(ctx, s.db, project, branch)
+	if err != nil {
+		s.defaultOwnerFailure(w, r, err)
+		return
+	}
+	displayKind := "database"
+	if isRole {
+		displayKind = "role"
+	}
+	for key := range inheritedExclusions {
+		prefix := displayKind + "/"
+		if strings.HasPrefix(key, prefix) {
+			excludedNames[strings.TrimPrefix(key, prefix)] = true
+		}
+	}
+	defaultOwner, err := readDefaultOwnerBinding(ctx, s.db, project, branch)
+	if err != nil {
+		s.defaultOwnerFailure(w, r, err)
+		return
+	}
+	var originalDatabase string
+	if err = s.db.QueryRow(ctx, `SELECT database_name FROM endpoints WHERE id=$1 AND project_id=$2 AND branch_id=$3`, endpoint, project, branch).Scan(&originalDatabase); err != nil {
+		s.defaultOwnerFailure(w, r, err)
+		return
+	}
 	for _, v := range intents {
 		byName[stringVal(v["name"])] = v
 	}
@@ -132,13 +171,25 @@ func (s *server) catalogList(w http.ResponseWriter, r *http.Request) {
 		if isRole {
 			v["protected"] = protectedPGRole(n)
 		} else {
-			v["protected"] = protectedPGDatabase(n)
+			v["protected"] = protectedPGDatabase(n) || n == originalDatabase
+		}
+		v["default_owner_dependency"] = isRole && defaultOwner != nil && defaultOwner.Mode == "managed" && defaultOwner.Owner == n
+		if excludedNames[n] {
+			v["managed"] = false
+			v["state"] = "external_identity"
+			v["management_excluded"] = true
 		}
 	}
 	for _, v := range byName {
 		v["version_token"] = fmt.Sprint(v["version"])
 		v["managed"] = true
-		v["protected"] = false
+		v["protected"] = !isRole && stringVal(v["name"]) == originalDatabase
+		v["default_owner_dependency"] = isRole && defaultOwner != nil && defaultOwner.Mode == "managed" && defaultOwner.Owner == stringVal(v["name"])
+		if excludedNames[stringVal(v["name"])] {
+			v["managed"] = false
+			v["state"] = "external_identity"
+			v["management_excluded"] = true
+		}
 		items = append(items, v)
 	}
 	if items == nil {
@@ -149,11 +200,7 @@ func (s *server) catalogList(w http.ResponseWriter, r *http.Request) {
 
 func (s *server) catalogMutation(w http.ResponseWriter, r *http.Request) {
 	project, branch := r.PathValue("project"), r.PathValue("branch")
-	endpoint, err := s.catalogWriter(r.Context(), project, branch)
-	if err != nil {
-		fail(w, r, 404, "writer_not_found", "Ready branch writer required")
-		return
-	}
+	var err error
 	action, isRole := "create_database", false
 	name := r.PathValue("database")
 	if strings.Contains(r.URL.Path, "/roles") {
@@ -208,6 +255,29 @@ func (s *server) catalogMutation(w http.ResponseWriter, r *http.Request) {
 	if s.replayCatalog(w, r, key, hash) {
 		return
 	}
+	endpoint, err := s.catalogWriter(r.Context(), project, branch)
+	if err != nil {
+		fail(w, r, 404, "writer_not_found", "Ready branch writer required")
+		return
+	}
+	if err = checkDefaultOwnerReservation(r.Context(), s.db, project, branch); err != nil {
+		s.defaultOwnerFailure(w, r, err)
+		return
+	}
+	kind := "database"
+	if isRole {
+		kind = "role"
+	}
+	if err = checkCatalogForkExclusion(r.Context(), s.db, project, branch, kind, name); err != nil {
+		s.defaultOwnerFailure(w, r, err)
+		return
+	}
+	if !isRole && body.Owner != "" {
+		if err = checkCatalogForkExclusion(r.Context(), s.db, project, branch, "role", body.Owner); err != nil {
+			s.defaultOwnerFailure(w, r, err)
+			return
+		}
+	}
 	if r.Method == http.MethodPost {
 		ctx, cancel := context.WithTimeout(r.Context(), sqlTotalTimeout)
 		defer cancel()
@@ -251,6 +321,11 @@ func (s *server) catalogMutation(w http.ResponseWriter, r *http.Request) {
 		stored, e := secretText(secret, "verifier")
 		if e != nil || !scramMatches(body.Password, stored) {
 			fail(w, r, 409, "credential_conflict", "Credential reservation conflicts with request")
+			return
+		}
+		p.MutationCredentialUID = stringVal(nested(secret, "metadata", "uid"))
+		if secret["immutable"] != true || !functionResourceUID.MatchString(p.MutationCredentialUID) {
+			fail(w, r, 409, "credential_conflict", "Original immutable catalog credential identity required")
 			return
 		}
 	}
@@ -297,6 +372,20 @@ func (s *server) catalogMutation(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 409, "managed_resource_required", "A ready API-managed resource is required")
 		return
 	}
+	if r.Method == http.MethodDelete {
+		kind := "database"
+		if isRole {
+			kind = "role"
+		}
+		if err = checkConnectionDefaultDependency(r.Context(), tx, branch, kind, name); err != nil {
+			s.connectionDefaultsFailure(w, r, err)
+			return
+		}
+		if err = checkDefaultOwnerDependency(r.Context(), tx, project, branch, kind, name); err != nil {
+			s.defaultOwnerFailure(w, r, err)
+			return
+		}
+	}
 	if !isRole && r.Method == http.MethodDelete {
 		var functionsHeld bool
 		if err = tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM function_definitions f WHERE f.project_id=$1 AND f.branch_id=$2 AND f.database_name=$3
@@ -322,6 +411,10 @@ func (s *server) catalogMutation(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	if err = s.captureCatalogMutationIdentity(r.Context(), tx, &p, action); err != nil {
+		s.catalogRenameFailure(w, r, err)
+		return
+	}
 	if r.Method == http.MethodPost {
 		if isRole {
 			_, err = tx.Exec(r.Context(), `INSERT INTO branch_roles(branch_id,name,state,credential_ref) VALUES($1,$2,'creating',$3)
@@ -336,6 +429,12 @@ func (s *server) catalogMutation(w http.ResponseWriter, r *http.Request) {
 			intentState = "updating"
 		}
 		_, err = tx.Exec(r.Context(), "UPDATE "+table+" SET state=$3,updated_at=now() WHERE branch_id=$1 AND name=$2", branch, name, intentState)
+	}
+	if err == nil {
+		err = tx.QueryRow(r.Context(), "SELECT version FROM "+table+" WHERE branch_id=$1 AND name=$2", branch, name).Scan(&p.ExpectedVersion)
+	}
+	if err == nil && isRole && r.Method != http.MethodPost {
+		err = tx.QueryRow(r.Context(), "SELECT COALESCE(credential_ref,'') FROM branch_roles WHERE branch_id=$1 AND name=$2", branch, name).Scan(&p.PreviousCredentialRef)
 	}
 	opID := newID("op_")
 	payload, _ := json.Marshal(p)
@@ -413,31 +512,33 @@ func (s *server) applyCatalogSQL(ctx context.Context, p catalogPayload, action, 
 }
 
 func (s *server) applyCatalogSQLOnce(ctx context.Context, p catalogPayload, action, verifier string) error {
+	var createOID uint32
+	if p.NativeIdentity == nil {
+		return catalogIdentityRequired()
+	}
+	if strings.HasPrefix(action, "create_") {
+		var err error
+		createOID, err = s.catalogCreateObservation(ctx, p, action)
+		if err != nil {
+			return err
+		}
+	}
 	if action == "create_role" {
-		// The native privileged management API grants neon_superuser; the
-		// service probe is not granted global ADMIN on that protected role.
-		conn, err := s.catalogConnection(ctx, p)
+		before, err := s.catalogConnection(ctx, p)
 		if err != nil {
 			return err
 		}
-		var exists bool
-		var admin bool
-		err = conn.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM pg_roles WHERE rolname=$1)", p.Name).Scan(&exists)
-		if err == nil && exists {
-			err = conn.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pg_auth_members m
-			JOIN pg_roles role ON role.oid=m.roleid JOIN pg_roles member ON member.oid=m.member
-			WHERE role.rolname=$1 AND member.rolname='control_probe' AND m.admin_option)`, p.Name).Scan(&admin)
-		}
-		conn.Close(context.Background())
+		err = verifyCatalogNativeBinding(ctx, before, p, action, createOID, false)
+		before.Close(context.Background())
 		if err != nil {
 			return err
 		}
-		if !exists {
-			if err = s.nativeCreateRole(ctx, p, verifier); err != nil {
-				return err
-			}
-		} else if !admin {
-			return errors.New("existing role is not owned by catalog service")
+		if err = s.nativeCreateRole(ctx, p, verifier); err != nil {
+			return err
+		}
+		createOID, err = s.catalogCreateObservation(ctx, p, action)
+		if err != nil {
+			return err
 		}
 	}
 	conn, err := s.catalogConnection(ctx, p)
@@ -445,75 +546,20 @@ func (s *server) applyCatalogSQLOnce(ctx context.Context, p catalogPayload, acti
 		return err
 	}
 	defer conn.Close(context.Background())
-	name := pgQuote(p.Name)
-	escaped, err := conn.PgConn().EscapeString(verifier)
-	if err != nil {
+	if err = verifyCatalogNativeBinding(ctx, conn, p, action, createOID, false); err != nil {
 		return err
 	}
-	literal := "'" + escaped + "'"
+	name := pgQuote(p.Name)
 	marker := "neon-control/branch/" + p.BranchID
 	quotedMarker := "'" + strings.ReplaceAll(marker, "'", "''") + "'"
 	switch action {
 	case "update_database_owner":
 		return applyDatabaseOwnerSQL(ctx, conn, p)
 	case "create_role", "rotate_role_password":
-		// pgx identifier quoting and pgconn literal quoting prevent injection.
-		// The literal is an immutable SCRAM verifier, never the user's password.
-		tx, e := conn.Begin(ctx)
-		if e != nil {
-			return e
-		}
-		defer tx.Rollback(context.Background())
-		var comment string
-		e = tx.QueryRow(ctx, "SELECT COALESCE(shobj_description(oid,'pg_authid'),'') FROM pg_roles WHERE rolname=$1", p.Name).Scan(&comment)
-		if e != nil && !isNoRows(e) {
-			return e
-		}
-		if action == "create_role" && isNoRows(e) {
-			var count int
-			if err = tx.QueryRow(ctx, "SELECT count(*) FROM pg_roles WHERE rolcanlogin").Scan(&count); err != nil {
-				return err
-			}
-			if count >= 500 {
-				return errors.New("branch role quota exceeded")
-			}
-			_, err = tx.Exec(ctx, "CREATE ROLE "+name+" LOGIN INHERIT NOSUPERUSER CREATEROLE CREATEDB BYPASSRLS REPLICATION IN ROLE neon_superuser PASSWORD "+literal)
-			if err == nil {
-				_, err = tx.Exec(ctx, "COMMENT ON ROLE "+name+" IS "+quotedMarker)
-			}
-			if err == nil {
-				_, err = tx.Exec(ctx, "GRANT "+name+" TO control_probe")
-			}
-		} else {
-			if isNoRows(e) {
-				return errors.New("role no longer exists")
-			}
-			if comment != marker && !(action == "create_role" && comment == "") {
-				return errors.New("role ownership marker mismatch")
-			}
-			if comment == "" {
-				if _, err = tx.Exec(ctx, "COMMENT ON ROLE "+name+" IS "+quotedMarker); err != nil {
-					return sqlExecutionError{"query", err}
-				}
-			}
-			_, err = tx.Exec(ctx, "ALTER ROLE "+name+" LOGIN PASSWORD "+literal)
-			if err == nil && action == "create_role" {
-				_, err = tx.Exec(ctx, "GRANT "+name+" TO control_probe WITH INHERIT TRUE, SET TRUE")
-			}
-		}
-		if err == nil {
-			err = tx.Commit(ctx)
-		}
+		return applyBoundRolePasswordSQL(ctx, conn, p, action, verifier, createOID)
 	case "delete_role":
-		var comment string
-		e := conn.QueryRow(ctx, "SELECT COALESCE(shobj_description(oid,'pg_authid'),'') FROM pg_roles WHERE rolname=$1", p.Name).Scan(&comment)
-		if e != nil && !isNoRows(e) {
-			return e
-		}
-		if e == nil && comment != marker {
-			return errors.New("role ownership marker mismatch")
-		}
-		_, err = conn.Exec(ctx, "DROP ROLE IF EXISTS "+name)
+		return applyBoundRoleDeletionSQL(ctx, conn, p)
+
 	case "create_database":
 		if _, err = conn.Exec(ctx, "SET ROLE "+pgQuote(p.Owner)); err != nil {
 			return sqlExecutionError{"session", err}
@@ -523,12 +569,20 @@ func (s *server) applyCatalogSQLOnce(ctx context.Context, p catalogPayload, acti
 		if isNoRows(e) {
 			_, err = conn.Exec(ctx, "CREATE DATABASE "+name+" OWNER "+pgQuote(p.Owner))
 			if err == nil {
+				err = conn.QueryRow(ctx, `SELECT oid FROM pg_database WHERE datname=$1`, p.Name).Scan(&createOID)
+				if err == nil {
+					err = s.recordCatalogCreateObservation(ctx, p, action, createOID)
+				}
+			}
+			if err == nil {
 				_, err = conn.Exec(ctx, "COMMENT ON DATABASE "+name+" IS "+quotedMarker)
 			}
 		} else if e != nil {
 			err = e
-		} else if owner != p.Owner || comment != marker {
+		} else if owner != p.Owner || comment != marker && comment != "" {
 			err = errors.New("database ownership conflicts with intent; manual outcome verification required")
+		} else if comment == "" {
+			_, err = conn.Exec(ctx, "COMMENT ON DATABASE "+name+" IS "+quotedMarker)
 		}
 	case "delete_database":
 		var comment string
@@ -549,7 +603,7 @@ func (s *server) applyCatalogSQLOnce(ctx context.Context, p catalogPayload, acti
 	if err != nil {
 		return sqlExecutionError{"query", err}
 	}
-	return nil
+	return verifyCatalogNativeBinding(ctx, conn, p, action, createOID, true)
 }
 
 func catalogDelta(config map[string]any, p catalogPayload, action, verifier string) error {
@@ -716,10 +770,33 @@ func (s *server) reconcileCatalog(ctx context.Context, operation, worker, action
 	if !validPGIdentifier(p.Name) || p.ProjectID == "" || p.BranchID == "" || p.EndpointID == "" {
 		return errors.New("invalid catalog payload")
 	}
+	recovered, err := s.prepareCatalogMutation(ctx, operation, worker, action, p)
+	if err != nil || recovered {
+		return err
+	}
+	if p.NativeIdentity == nil {
+		return catalogIdentityRequired()
+	}
+	p.operationID, p.workerID = operation, worker
+	if err = s.verifyCatalogCredentialBindings(ctx, p); err != nil {
+		return err
+	}
+	kind := "database"
+	if strings.Contains(action, "role") {
+		kind = "role"
+	}
+	if err := checkCatalogForkExclusion(ctx, s.db, p.ProjectID, p.BranchID, kind, p.Name); err != nil {
+		return err
+	}
+	if p.Owner != "" {
+		if err := checkCatalogForkExclusion(ctx, s.db, p.ProjectID, p.BranchID, "role", p.Owner); err != nil {
+			return err
+		}
+	}
 	verifier := ""
 	if p.CredentialRef != "" {
 		secret, err := s.kube.request(ctx, http.MethodGet, s.kube.path("secret", p.CredentialRef), nil)
-		if err != nil || !owned(secret, p.ProjectID, p.EndpointID) {
+		if err != nil || !owned(secret, p.ProjectID, p.EndpointID) || secret["immutable"] != true || stringVal(nested(secret, "metadata", "uid")) != p.MutationCredentialUID || !functionResourceUID.MatchString(p.MutationCredentialUID) {
 			return errors.New("catalog credential missing or unowned")
 		}
 		verifier, err = secretText(secret, "verifier")
@@ -740,23 +817,7 @@ func (s *server) reconcileCatalog(ctx context.Context, operation, worker, action
 				return err
 			}
 			defer tx.Rollback(ctx)
-			if err = assertCreateLeaseTx(ctx, tx, operation, worker); err != nil {
-				return err
-			}
-			state := "ready"
-			if strings.HasPrefix(action, "delete_") {
-				state = "deleted"
-			}
-			if strings.Contains(action, "role") {
-				_, err = tx.Exec(ctx, `UPDATE branch_roles SET state=$3,credential_ref=NULLIF($4,''),version=version+1,updated_at=now() WHERE branch_id=$1 AND name=$2`, p.BranchID, p.Name, state, p.CredentialRef)
-			} else {
-				if action == "update_database_owner" {
-					err = commitDatabaseOwnerTx(ctx, tx, p)
-				} else {
-					_, err = tx.Exec(ctx, `UPDATE branch_databases SET state=$3,version=version+1,updated_at=now() WHERE branch_id=$1 AND name=$2`, p.BranchID, p.Name, state)
-				}
-			}
-			if err != nil {
+			if err = commitCatalogMutationResultTx(ctx, tx, operation, worker, action, p); err != nil {
 				return err
 			}
 			return tx.Commit(ctx)
@@ -773,6 +834,27 @@ func (s *server) reconcileCatalog(ctx context.Context, operation, worker, action
 // New writers/replicas and new data branches project the latest branch intent,
 // including tombstones. They must not start with the old two-role template.
 func (s *server) projectComputeCatalog(ctx context.Context, project, branch string) (string, error) {
+	exclusions, err := readCatalogForkExclusions(ctx, s.db, project, branch)
+	if err != nil {
+		return "", err
+	}
+	excludedNames := map[string]bool{}
+	for _, v := range exclusions {
+		excludedNames[v.Name] = true
+	}
+	inheritedExclusions, err := readCatalogInheritanceExclusionNames(ctx, s.db, project, branch)
+	if err != nil {
+		return "", err
+	}
+	for key := range inheritedExclusions {
+		if strings.HasPrefix(key, "role/") {
+			excludedNames[strings.TrimPrefix(key, "role/")] = true
+		}
+	}
+	defaultOwner, err := s.defaultOwnerCatalogProjection(ctx, project, branch)
+	if err != nil {
+		return "", err
+	}
 	roles, err := s.many(ctx, `SELECT r.name,r.state,r.credential_ref FROM branch_roles r
         JOIN branches b ON b.id=r.branch_id WHERE r.branch_id=$1 AND b.project_id=$2`, branch, project)
 	if err != nil {
@@ -786,6 +868,9 @@ func (s *server) projectComputeCatalog(ctx context.Context, project, branch stri
 	catalog := map[string]any{"roles": []any{}, "databases": []any{}, "delta_operations": []any{}}
 	for _, role := range roles {
 		name := stringVal(role["name"])
+		if excludedNames[name] {
+			continue
+		}
 		if role["state"] == "deleted" {
 			catalog["delta_operations"] = append(catalog["delta_operations"].([]any), map[string]any{"action": "delete_role", "name": name, "new_name": nil})
 			continue
@@ -806,6 +891,12 @@ func (s *server) projectComputeCatalog(ctx context.Context, project, branch stri
 	}
 	for _, database := range databases {
 		name := stringVal(database["name"])
+		if inheritedExclusions["database/"+name] || excludedNames[stringVal(database["owner_name"])] {
+			continue
+		}
+		if defaultOwner != nil && name == defaultOwner.Database {
+			continue
+		}
 		if database["state"] == "deleted" {
 			catalog["delta_operations"] = append(catalog["delta_operations"].([]any), map[string]any{"action": "delete_db", "name": name, "new_name": nil})
 			continue
@@ -815,17 +906,32 @@ func (s *server) projectComputeCatalog(ctx context.Context, project, branch stri
 		}
 		catalog["databases"] = append(catalog["databases"].([]any), map[string]any{"name": name, "owner": database["owner_name"], "options": nil})
 	}
+	if defaultOwner != nil {
+		catalog["databases"] = append(catalog["databases"].([]any), map[string]any{"name": defaultOwner.Database, "owner": defaultOwner.Owner, "options": nil})
+	}
 	b, err := json.Marshal(catalog)
 	return string(b), err
 }
 
 func (s *server) claimInheritedCatalog(ctx context.Context, p createPayload) error {
+	exclusions, e := readCatalogForkExclusions(ctx, s.db, p.ProjectID, p.BranchID)
+	if e != nil {
+		return e
+	}
+	excludedNames := map[string]bool{}
+	for _, v := range exclusions {
+		excludedNames[v.Name] = true
+	}
 	var parent *string
 	if err := s.db.QueryRow(ctx, "SELECT parent_branch_id FROM branches WHERE id=$1 AND project_id=$2", p.BranchID, p.ProjectID).Scan(&parent); err != nil {
 		return err
 	}
 	if parent == nil {
 		return nil
+	}
+	defaultOwner, err := s.defaultOwnerCatalogProjection(ctx, p.ProjectID, p.BranchID)
+	if err != nil {
+		return err
 	}
 	conn, err := s.catalogConnection(ctx, catalogPayload{ProjectID: p.ProjectID, BranchID: p.BranchID, EndpointID: p.EndpointID})
 	if err != nil {
@@ -846,6 +952,12 @@ func (s *server) claimInheritedCatalog(ctx context.Context, p createPayload) err
 			return err
 		}
 		for _, v := range names {
+			if kind == "role" && excludedNames[stringVal(v["name"])] {
+				continue
+			}
+			if kind == "database" && defaultOwner != nil && v["name"] == defaultOwner.Database {
+				continue
+			}
 			object := "pg_authid"
 			if kind == "database" {
 				object = "pg_database"
@@ -866,5 +978,5 @@ func (s *server) claimInheritedCatalog(ctx context.Context, p createPayload) err
 			}
 		}
 	}
-	return nil
+	return s.verifyInheritedDefaultOwner(ctx, p, defaultOwner)
 }

@@ -59,7 +59,16 @@ func functionBootstrapLabels(r functionBootstrapReference) map[string]string {
 }
 
 func functionBootstrapContent(key []byte, r functionBootstrapReference, b functions.Bootstrap) (string, []byte, error) {
-	if len(key) < 32 || !r.valid() || b.Validate() != nil || b.Scope != r.Scope || b.BundleDigest != r.BundleDigest || b.WriterEndpointID != r.WriterID {
+	if b.Validate() != nil {
+		return "", nil, errFunctionBootstrap
+	}
+	return functionBootstrapCanonicalContent(key, r, b)
+}
+
+// The caller separately verifies new admission at current time, or a retained
+// original leaf at issuance time. Canonical MAC/scope binding is identical.
+func functionBootstrapCanonicalContent(key []byte, r functionBootstrapReference, b functions.Bootstrap) (string, []byte, error) {
+	if len(key) < 32 || !r.valid() || b.Scope != r.Scope || b.BundleDigest != r.BundleDigest || b.WriterEndpointID != r.WriterID {
 		return "", nil, errFunctionBootstrap
 	}
 	u, err := url.Parse(b.DatabaseURL)
@@ -104,11 +113,11 @@ func verifyFunctionBootstrap(item map[string]any, key []byte, ref functionBootst
 	if err != nil || len(raw) == 0 || len(raw) > functions.MaxBootstrapBytes {
 		return empty, errFunctionBootstrap
 	}
-	config, err := functions.DecodeBootstrap(raw)
+	config, err := functions.DecodeRetainedBootstrap(raw)
 	if err != nil {
 		return empty, errFunctionBootstrap
 	}
-	mac, canonical, err := functionBootstrapContent(key, ref, config)
+	mac, canonical, err := functionBootstrapCanonicalContent(key, ref, config)
 	if err != nil || !bytes.Equal(raw, canonical) || !hmac.Equal([]byte(mac), []byte(stringVal(nested(item, "metadata", "annotations", "neon-control/bootstrap-mac")))) ||
 		(ref.MAC != "" && !hmac.Equal([]byte(mac), []byte(ref.MAC))) {
 		return empty, errFunctionBootstrap

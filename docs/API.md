@@ -1,7 +1,7 @@
 # 实际 API 合同
 
 OpenAPI 3 合同的权威源是 [openapi-v1.json](../contracts/openapi-v1.json)。
-版本 0.48.0，109 个路径、157 个操作，全部拥有稳定且唯一的 operationId。
+版本 0.69.0，127 个路径、181 个操作，全部拥有稳定且唯一的 operationId。
 运行 Swagger 位于 `/api/docs`，JSON 位于 `/api/openapi.json`。
 本合同是自托管 `/api/v1`，不声称兼容 Neon SaaS `/api/v2`。
 
@@ -181,6 +181,30 @@ request_id/operation_id/error_code，再由显式 retry 接口恢复可重试操
 | GET | `/api/v1/projects/{project}/branches/{branch}/functions-triggers/{trigger}/invocations` | `listFunctionTriggerInvocations` | 200 |
 | POST | `/api/v1/projects/{project}/branches/{branch}/roles/{role}/rename` | `renameBranchRole` | 202 |
 | POST | `/api/v1/projects/{project}/branches/{branch}/databases/{database}/rename` | `renameBranchDatabase` | 202 |
+| PATCH | `/api/v1/projects/{project}/branches/{branch}/expiration` | `setBranchExpiration` | 202 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/functions-triggers/{trigger}/invocations/{invocation}/retry` | `retryFunctionObjectInvocation` | 202 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/functions/{slug}/output-logs` | `listFunctionCustomerOutput` | 200 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/functions/{slug}/output-policy` | `getFunctionOutputPolicy` | 200 |
+| PATCH | `/api/v1/projects/{project}/branches/{branch}/functions/{slug}/output-policy` | `setFunctionOutputPolicy` | 200 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/functions-copy` | `copyFunctionBranch` | 202 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/function-copy-plans` | `listFunctionBranchCopyPlans` | 200 |
+| GET | `/api/v1/platform/ai-providers/capabilities` | `getAIProviderCapabilities` | 200 |
+| GET | `/api/v1/platform/ai-providers` | `listAIProviders` | 200 |
+| POST | `/api/v1/platform/ai-providers` | `createAIProvider` | 202 |
+| GET | `/api/v1/platform/ai-providers/{provider}` | `getAIProvider` | 200 |
+| DELETE | `/api/v1/platform/ai-providers/{provider}` | `deleteAIProvider` | 200 |
+| POST | `/api/v1/platform/ai-providers/{provider}/revisions` | `testAIProviderRevision` | 202 |
+| POST | `/api/v1/platform/ai-providers/{provider}/publish` | `publishAIProvider` | 200 |
+| POST | `/api/v1/platform/ai-providers/{provider}/disable` | `disableAIProvider` | 200 |
+| GET | `/api/v1/platform/ai-provider-operations/{providerOperation}` | `getAIProviderOperation` | 200 |
+| POST | `/api/v1/platform/ai-provider-operations/{providerOperation}/retry` | `retryAIProviderOperation` | 202 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/connection-defaults` | `getBranchConnectionDefaults` | 200 |
+| PATCH | `/api/v1/projects/{project}/branches/{branch}/connection-defaults` | `updateBranchConnectionDefaults` | 200 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/catalog-identities` | `getCatalogIdentityInventory` | 200 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/catalog-identities` | `initializeCatalogIdentity` | 200 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/catalog-identities/{binding}/restore` | `restoreOriginalCatalogIdentity` | 202 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/default-database-owner` | `getDefaultDatabaseOwner` | 200 |
+| PATCH | `/api/v1/projects/{project}/branches/{branch}/default-database-owner` | `updateDefaultDatabaseOwner` | 202 |
 
 ## 3. 实现映射与演进
 

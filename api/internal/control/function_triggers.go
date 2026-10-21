@@ -22,6 +22,11 @@ type functionTriggerSchedule struct {
 	Cron string `json:"cron"`
 }
 
+type functionTriggerStorage struct {
+	Bucket string `json:"bucket_name"`
+	Prefix string `json:"prefix"`
+}
+
 var functionTriggerID = regexp.MustCompile(`^ftr_[a-f0-9]{24}$`)
 
 type functionTriggerView struct {
@@ -30,7 +35,8 @@ type functionTriggerView struct {
 	Name      string                  `json:"name"`
 	Slug      string                  `json:"function_slug"`
 	Path      string                  `json:"function_path"`
-	Schedule  functionTriggerSchedule `json:"schedule"`
+	Schedule  functionTriggerSchedule `json:"schedule,omitzero"`
+	Storage   *functionTriggerStorage `json:"storage_object_created,omitempty"`
 	Enabled   bool                    `json:"enabled"`
 	Version   string                  `json:"version_token"`
 	Next      *time.Time              `json:"next_run_at"`
@@ -39,12 +45,14 @@ type functionTriggerView struct {
 	Updated   time.Time               `json:"updated_at"`
 }
 type functionTriggerInput struct {
-	Type     string                   `json:"type"`
-	Name     *string                  `json:"name,omitempty"`
-	Slug     *string                  `json:"function_slug,omitempty"`
-	Path     *string                  `json:"function_path,omitempty"`
-	Schedule *functionTriggerSchedule `json:"schedule,omitempty"`
-	Enabled  *bool                    `json:"enabled,omitempty"`
+	Type                   string                   `json:"type"`
+	Name                   *string                  `json:"name,omitempty"`
+	Slug                   *string                  `json:"function_slug,omitempty"`
+	Path                   *string                  `json:"function_path,omitempty"`
+	Schedule               *functionTriggerSchedule `json:"schedule,omitempty"`
+	Enabled                *bool                    `json:"enabled,omitempty"`
+	Storage                *functionTriggerStorage  `json:"storage_object_created,omitempty"`
+	AcknowledgeAtLeastOnce *bool                    `json:"acknowledge_at_least_once,omitempty"`
 }
 
 func (input *functionTriggerInput) UnmarshalJSON(raw []byte) error {
@@ -74,12 +82,16 @@ type triggerMutationReceipt struct {
 	Trigger *functionTriggerView `json:"trigger,omitempty"`
 }
 
-const functionTriggerColumns = `t.id,t.type,t.name,f.slug,t.function_path,t.cron,t.enabled,t.generation::text,t.next_run_at,(t.origin_branch_id<>t.branch_id),t.created_at,t.updated_at`
+const functionTriggerColumns = `t.id,t.type,t.name,f.slug,t.function_path,COALESCE(t.cron,''),t.enabled,t.generation::text,t.next_run_at,(t.origin_branch_id<>t.branch_id),t.created_at,t.updated_at,t.bucket_name,t.key_prefix`
 const functionTriggerFrom = ` FROM function_triggers t JOIN function_definitions f ON f.id=t.function_id AND f.project_id=t.project_id AND f.branch_id=t.branch_id WHERE t.project_id=$1 AND t.branch_id=$2`
 
 func scanFunctionTrigger(row pgx.Row) (functionTriggerView, error) {
 	var value functionTriggerView
-	err := row.Scan(&value.ID, &value.Type, &value.Name, &value.Slug, &value.Path, &value.Schedule.Cron, &value.Enabled, &value.Version, &value.Next, &value.Inherited, &value.Created, &value.Updated)
+	var bucket, prefix *string
+	err := row.Scan(&value.ID, &value.Type, &value.Name, &value.Slug, &value.Path, &value.Schedule.Cron, &value.Enabled, &value.Version, &value.Next, &value.Inherited, &value.Created, &value.Updated, &bucket, &prefix)
+	if bucket != nil && prefix != nil {
+		value.Storage = &functionTriggerStorage{Bucket: *bucket, Prefix: *prefix}
+	}
 	return value, err
 }
 func (s *server) functionSchedulesEnabled() bool {
@@ -143,7 +155,7 @@ func (s *server) functionTriggers(w http.ResponseWriter, r *http.Request) {
 		items = items[:limit]
 		next = items[len(items)-1].ID
 	}
-	jsonResponse(w, 200, record{"items": items, "next_after": next, "limit": limit, "scheduling_enabled": s.functionSchedulesEnabled()})
+	jsonResponse(w, 200, record{"items": items, "next_after": next, "limit": limit, "scheduling_enabled": s.functionSchedulesEnabled(), "object_events_enabled": s.functionObjectEventsEnabled()})
 }
 
 func writeTriggerReceipt(w http.ResponseWriter, value triggerMutationReceipt) {
@@ -178,8 +190,8 @@ func triggerVersion(w http.ResponseWriter, r *http.Request) (int64, bool) {
 func (s *server) mutateFunctionTrigger(w http.ResponseWriter, r *http.Request) {
 	project, branch, id, actor := r.PathValue("project"), r.PathValue("branch"), r.PathValue("trigger"), userFrom(r).ID
 	var input functionTriggerInput
-	if r.Method != http.MethodDelete && (readJSON(r, &input) != nil || input.Type != "schedule") {
-		fail(w, r, 422, "invalid_trigger", "Strict schedule trigger input required")
+	if r.Method != http.MethodDelete && (readJSON(r, &input) != nil || (input.Type != "schedule" && input.Type != "storage_object_created")) {
+		fail(w, r, 422, "invalid_trigger", "Strict schedule or storage_object_created trigger input required")
 		return
 	}
 	key, ok := creationKey(w, r)
@@ -246,7 +258,7 @@ func (s *server) mutateFunctionTrigger(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 503, "metadata_unavailable", "Could not read trigger receipt")
 		return
 	}
-	value := functionTriggerView{Type: "schedule", Path: "/", Enabled: true}
+	value := functionTriggerView{Type: input.Type, Path: "/", Enabled: true}
 	var functionID string
 	if id != "" {
 		value, err = scanFunctionTrigger(tx.QueryRow(r.Context(), `SELECT `+functionTriggerColumns+functionTriggerFrom+` AND t.id=$3 AND t.state='ready' FOR UPDATE OF t`, project, branch, id))
@@ -264,6 +276,10 @@ func (s *server) mutateFunctionTrigger(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	originalSlug := value.Slug
+	if r.Method != http.MethodDelete && value.Type != input.Type {
+		fail(w, r, 409, "trigger_type_immutable", "Create a new trigger to change type")
+		return
+	}
 	if input.Name != nil {
 		value.Name = *input.Name
 	}
@@ -279,19 +295,49 @@ func (s *server) mutateFunctionTrigger(w http.ResponseWriter, r *http.Request) {
 	if input.Schedule != nil {
 		value.Schedule = *input.Schedule
 	}
+	if input.Storage != nil {
+		copy := *input.Storage
+		value.Storage = &copy
+	}
 	if r.Method != http.MethodDelete {
 		if !triggers.ValidName(value.Name) || !functions.ValidSlug(value.Slug) || !triggers.ValidPath(value.Path) {
 			fail(w, r, 422, "invalid_trigger", "Valid name, target slug and application path required")
 			return
 		}
-		if _, err = triggers.ParseCron(value.Schedule.Cron); err != nil {
-			fail(w, r, 422, "invalid_cron", "Five-field numeric UTC cron required")
-			return
-		}
-		value.Schedule.Cron = strings.Join(strings.Fields(value.Schedule.Cron), " ")
-		if value.Enabled && !s.functionSchedulesEnabled() {
-			fail(w, r, 503, "function_schedules_disabled", "Operator must enable schedule execution")
-			return
+		if value.Type == "schedule" {
+			if input.Storage != nil {
+				fail(w, r, 422, "invalid_trigger", "Schedule cannot include a storage filter")
+				return
+			}
+			if _, err = triggers.ParseCron(value.Schedule.Cron); err != nil {
+				fail(w, r, 422, "invalid_cron", "Five-field numeric UTC cron required")
+				return
+			}
+			value.Schedule.Cron = strings.Join(strings.Fields(value.Schedule.Cron), " ")
+			if value.Enabled && !s.functionSchedulesEnabled() {
+				fail(w, r, 503, "function_schedules_disabled", "Operator must enable schedule execution")
+				return
+			}
+		} else {
+			if input.Schedule != nil || value.Storage == nil || !storageBucketName.MatchString(value.Storage.Bucket) || !validStorageEventPrefix(value.Storage.Prefix) {
+				fail(w, r, 422, "invalid_storage_filter", "Exact bucket name and case-sensitive relative prefix required")
+				return
+			}
+			if value.Enabled && (input.AcknowledgeAtLeastOnce == nil || !*input.AcknowledgeAtLeastOnce) {
+				fail(w, r, 422, "delivery_acknowledgment_required", "Acknowledge possible duplicate deliveries; deduplicate by invocation_id")
+				return
+			}
+			if value.Enabled && !s.functionObjectEventsEnabled() {
+				fail(w, r, 503, "function_object_events_disabled", "Operator must enable object event dispatch")
+				return
+			}
+			if value.Enabled {
+				var active bool
+				if tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM object_storage_instances WHERE branch_id=$1 AND project_id=$2 AND state='active')`, branch, project).Scan(&active) != nil || !active {
+					fail(w, r, 409, "object_storage_not_active", "Enable branch Object Storage before enabling upload triggers")
+					return
+				}
+			}
 		}
 		// Disabling an existing unchanged target must remain possible while its
 		// runtime is degraded. Creation/retarget/enable still require deployment.
@@ -341,13 +387,27 @@ func (s *server) mutateFunctionTrigger(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		id = "ftr_" + randomToken(12)
-		_, err = tx.Exec(r.Context(), `INSERT INTO function_triggers(branch_id,id,project_id,org_id,function_id,actor_id,origin_branch_id,type,name,function_path,cron,enabled,next_run_at) VALUES($1,$2,$3,$4,$5,$6,$1,'schedule',$7,$8,$9,$10,$11)`, branch, id, project, org, functionID, actor, value.Name, value.Path, value.Schedule.Cron, value.Enabled, triggerNext(value, now))
+		var cron, bucket, prefix any
+		if value.Type == "schedule" {
+			cron = value.Schedule.Cron
+		} else {
+			bucket = value.Storage.Bucket
+			prefix = value.Storage.Prefix
+		}
+		_, err = tx.Exec(r.Context(), `INSERT INTO function_triggers(branch_id,id,project_id,org_id,function_id,actor_id,origin_branch_id,type,name,function_path,cron,enabled,next_run_at,bucket_name,key_prefix) VALUES($1,$2,$3,$4,$5,$6,$1,$7,$8,$9,$10,$11,$12,$13,$14)`, branch, id, project, org, functionID, actor, value.Type, value.Name, value.Path, cron, value.Enabled, triggerNext(value, now), bucket, prefix)
 		receipt.Status = 201
 	} else if r.Method == http.MethodDelete {
 		err = tx.QueryRow(r.Context(), `UPDATE function_triggers SET state='deleted',enabled=false,next_run_at=NULL,generation=generation+1,deleted_at=clock_timestamp(),updated_at=clock_timestamp() WHERE branch_id=$1 AND id=$2 RETURNING generation::text`, branch, id).Scan(&receipt.Version)
 		receipt.Status = 204
 	} else {
-		_, err = tx.Exec(r.Context(), `UPDATE function_triggers SET function_id=$3,actor_id=$4,origin_branch_id=branch_id,name=$5,function_path=$6,cron=$7,enabled=$8,next_run_at=$9,generation=generation+1,updated_at=clock_timestamp() WHERE branch_id=$1 AND id=$2`, branch, id, functionID, actor, value.Name, value.Path, value.Schedule.Cron, value.Enabled, triggerNext(value, now))
+		var cron, bucket, prefix any
+		if value.Type == "schedule" {
+			cron = value.Schedule.Cron
+		} else {
+			bucket = value.Storage.Bucket
+			prefix = value.Storage.Prefix
+		}
+		_, err = tx.Exec(r.Context(), `UPDATE function_triggers SET function_id=$3,actor_id=$4,origin_branch_id=branch_id,name=$5,function_path=$6,cron=$7,enabled=$8,next_run_at=$9,bucket_name=$10,key_prefix=$11,generation=generation+1,updated_at=clock_timestamp() WHERE branch_id=$1 AND id=$2`, branch, id, functionID, actor, value.Name, value.Path, cron, value.Enabled, triggerNext(value, now), bucket, prefix)
 	}
 	if err != nil {
 		var pgerr *pgconn.PgError
@@ -381,7 +441,7 @@ func (s *server) mutateFunctionTrigger(w http.ResponseWriter, r *http.Request) {
 }
 
 func triggerNext(value functionTriggerView, now time.Time) *time.Time {
-	if !value.Enabled {
+	if !value.Enabled || (value.Type != "" && value.Type != "schedule") {
 		return nil
 	}
 	cron, err := triggers.ParseCron(value.Schedule.Cron)
@@ -429,7 +489,11 @@ func (s *server) functionTriggerInvocations(w http.ResponseWriter, r *http.Reque
 			return
 		}
 	}
-	items, err := s.many(r.Context(), `SELECT id,trigger_id,trigger_generation::text AS trigger_version_token,scheduled_at,state,attempts,request_event_id,application_status,response_bytes,error_code,admitted_at,started_at,finished_at FROM function_trigger_invocations WHERE project_id=$1 AND branch_id=$2 AND trigger_id=$3 AND (scheduled_at,id)<($4,$5) ORDER BY scheduled_at DESC,id DESC LIMIT $6`, project, branch, id, cursor.At, cursor.ID, limit+1)
+	items, err := s.many(r.Context(), `SELECT i.id,i.id AS version_token,i.trigger_id,i.trigger_generation::text AS trigger_version_token,i.scheduled_at,i.state,i.attempts,i.request_event_id,i.application_status,i.response_bytes,i.error_code,i.admitted_at,i.started_at,i.finished_at,COALESCE(i.snapshot->>'type','schedule') AS type,i.object_event_id,i.parent_invocation_id,COALESCE(i.snapshot->>'logical_invocation_id',i.id) AS logical_invocation_id,i.snapshot->'object' AS object,
+ EXISTS(SELECT 1 FROM function_trigger_invocations c WHERE c.parent_invocation_id=COALESCE(i.parent_invocation_id,i.id) AND c.state='succeeded') AS redrive_succeeded,
+ EXISTS(SELECT 1 FROM function_trigger_invocations c WHERE c.parent_invocation_id=COALESCE(i.parent_invocation_id,i.id) AND c.state IN ('queued','dispatching')) AS redrive_active,
+ (SELECT count(*) FROM function_trigger_invocations c WHERE c.parent_invocation_id=COALESCE(i.parent_invocation_id,i.id)) AS redrive_count
+ FROM function_trigger_invocations i WHERE i.project_id=$1 AND i.branch_id=$2 AND i.trigger_id=$3 AND (i.scheduled_at,i.id)<($4,$5) ORDER BY i.scheduled_at DESC,i.id DESC LIMIT $6`, project, branch, id, cursor.At, cursor.ID, limit+1)
 	if err != nil {
 		fail(w, r, 503, "metadata_unavailable", "Invocation journal unavailable")
 		return

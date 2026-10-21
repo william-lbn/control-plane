@@ -119,6 +119,9 @@ func copyStorageObjectWithConditions(ctx context.Context, conn *pgx.Conn, projec
 	if e != nil {
 		return nil, e
 	}
+	if e = publishStorageCopyEvent(ctx, tx, dstBucket, dstKey, digest, size); e != nil {
+		return nil, e
+	}
 	if e = tx.Commit(ctx); e != nil {
 		return nil, e
 	}
@@ -167,7 +170,7 @@ func (s *server) storageCopy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer close()
-	item, e := copyStorageObject(r.Context(), conn, p.ProjectID, input.SourceBucket, input.SourceKey, r.PathValue("bucket"), input.DestinationKey, "\""+input.SourceSHA256+"\"", r.Header.Get("If-Match"), r.Header.Get("If-None-Match"))
+	item, e := copyStorageObject(s.storagePublicationContext(r.Context(), p), conn, p.ProjectID, input.SourceBucket, input.SourceKey, r.PathValue("bucket"), input.DestinationKey, "\""+input.SourceSHA256+"\"", r.Header.Get("If-Match"), r.Header.Get("If-None-Match"))
 	if e != nil {
 		var fault *storageMutationFault
 		if errors.As(e, &fault) {

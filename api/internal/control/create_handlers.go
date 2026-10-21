@@ -101,6 +101,11 @@ func (s *server) finishCreateError(w http.ResponseWriter, r *http.Request, tx pg
 	if errors.As(err, &pgErr) && pgErr.Code == "23505" && s.replayCreate(w, r, key, hash, legacyHash, kind) {
 		return
 	}
+	var fault *catalogRenameFault
+	if errors.As(err, &fault) {
+		fail(w, r, fault.Status, fault.Code, fault.Message)
+		return
+	}
 	status, code, message := conflictCode(err)
 	fail(w, r, status, code, message)
 }
@@ -172,6 +177,9 @@ func addCreateOperation(ctx context.Context, tx pgx.Tx, action, resourceType, re
 }
 
 func insertEndpoint(ctx context.Context, tx pgx.Tx, p createPayload) error {
+	if err := checkDefaultOwnerReservation(ctx, tx, p.ProjectID, p.BranchID); err != nil {
+		return err
+	}
 	if err := endpointQuota(ctx, tx, p.ProjectID); err != nil {
 		return err
 	}
@@ -180,11 +188,19 @@ func insertEndpoint(ctx context.Context, tx pgx.Tx, p createPayload) error {
 	if endpointType == "" {
 		endpointType = "read_write"
 	}
+	var database string
+	if err := tx.QueryRow(ctx, `SELECT COALESCE((SELECT database_name FROM default_database_owners WHERE project_id=$1 AND branch_id=$2 AND state='ready'),
+ (SELECT database_name FROM endpoints WHERE project_id=$1 AND branch_id=$2 AND endpoint_type='read_write' AND deleted_at IS NULL LIMIT 1),'postgres')`, p.ProjectID, p.BranchID).Scan(&database); err != nil {
+		return err
+	}
+	if !validPGIdentifier(database) || protectedPGDatabase(database) && database != "postgres" {
+		return errors.New("original endpoint default database rejected")
+	}
 	_, err := tx.Exec(ctx, `INSERT INTO endpoints(id,project_id,branch_id,selector,workload_kind,workload_name,
 		service_name,state,role_name,database_name,min_cpu_milli,max_cpu_milli,min_memory_mib,max_memory_mib,
 		slot_size_mib,scale_to_zero,endpoint_type,created_at,updated_at)
-		VALUES($1,$2,$3,$4,'neonvm',$5,$5,'provisioning','cloud_admin','postgres',$6,$7,$8,$9,1024,false,$10,now(),now())`,
-		p.EndpointID, p.ProjectID, p.BranchID, selector(p.EndpointID), name, p.MinCPU, p.MaxCPU, p.MinMem, p.MaxMem, endpointType)
+		VALUES($1,$2,$3,$4,'neonvm',$5,$5,'provisioning','cloud_admin',$11,$6,$7,$8,$9,1024,false,$10,now(),now())`,
+		p.EndpointID, p.ProjectID, p.BranchID, selector(p.EndpointID), name, p.MinCPU, p.MaxCPU, p.MinMem, p.MaxMem, endpointType, database)
 	return err
 }
 
@@ -311,13 +327,16 @@ func (s *server) createBranch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Name            string        `json:"name"`
-		ParentBranchID  string        `json:"parent_branch_id"`
-		CreateEndpoint  *bool         `json:"create_endpoint"`
-		Password        string        `json:"password"`
-		Autoscaling     *createBounds `json:"autoscaling"`
-		ParentTimestamp string        `json:"parent_timestamp,omitempty"`
-		ParentLSN       string        `json:"parent_lsn,omitempty"`
+		Name                   string        `json:"name"`
+		ParentBranchID         string        `json:"parent_branch_id"`
+		CreateEndpoint         *bool         `json:"create_endpoint"`
+		Password               string        `json:"password"`
+		Autoscaling            *createBounds `json:"autoscaling"`
+		ParentTimestamp        string        `json:"parent_timestamp,omitempty"`
+		ParentLSN              string        `json:"parent_lsn,omitempty"`
+		FunctionCopyPolicy     string        `json:"function_copy_policy,omitempty"`
+		AcknowledgeFunctions   bool          `json:"acknowledge_function_environment_copy,omitempty"`
+		AcknowledgeCurrentCode bool          `json:"acknowledge_current_functions_for_historical_data,omitempty"`
 	}
 	if err := readJSON(r, &body); err != nil {
 		fail(w, r, 422, "invalid_request", "Invalid branch request")
@@ -349,7 +368,22 @@ func (s *server) createBranch(w http.ResponseWriter, r *http.Request) {
 	if s.replayCreate(w, r, key, hash, legacyHash, "branch") {
 		return
 	}
-	parent, err := s.one(r.Context(), `SELECT id,timeline_id,state FROM branches
+	copyPolicy := body.FunctionCopyPolicy
+	if copyPolicy == "" {
+		copyPolicy = "omit"
+		if s.functionBranchCopyEnabled() {
+			copyPolicy = "inherit_paused"
+		}
+	}
+	if copyPolicy != "omit" && copyPolicy != "inherit_paused" {
+		fail(w, r, 422, "invalid_function_copy_policy", "Choose inherit_paused or omit for branch Functions")
+		return
+	}
+	if copyPolicy == "inherit_paused" && !s.functionBranchCopyEnabled() {
+		fail(w, r, 503, "function_branch_copy_disabled", "Operator must enable verified branch Function preparation")
+		return
+	}
+	parent, err := s.one(r.Context(), `SELECT id,timeline_id,state,expires_at FROM branches
 		WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL`, body.ParentBranchID, r.PathValue("project"))
 	if err != nil {
 		fail(w, r, 404, "parent_not_found", "Parent branch not found")
@@ -357,6 +391,10 @@ func (s *server) createBranch(w http.ResponseWriter, r *http.Request) {
 	}
 	if parent["state"] != "ready" {
 		fail(w, r, 423, "parent_not_ready", "Parent branch is not ready")
+		return
+	}
+	if parent["expires_at"] != nil {
+		fail(w, r, 409, "parent_expiring", "An expiring branch cannot acquire child branches")
 		return
 	}
 	suffix := stableSuffix(userFrom(r).ID, scope, key)
@@ -367,6 +405,7 @@ func (s *server) createBranch(w http.ResponseWriter, r *http.Request) {
 	p := creationPayload(r.PathValue("project"), "br_"+suffix, endpointID,
 		stringVal(project["tenant_id"]), stableHex(suffix, "timeline"), bounds)
 	p.ParentTimelineID = stringVal(parent["timeline_id"])
+	p.CatalogPolicy = catalogPreserveInheritedSQL
 	tx, err := s.db.Begin(r.Context())
 	if err != nil {
 		fail(w, r, 503, "metadata_unavailable", "Transaction unavailable")
@@ -374,9 +413,23 @@ func (s *server) createBranch(w http.ResponseWriter, r *http.Request) {
 	}
 	defer tx.Rollback(r.Context())
 	var parentState string
-	err = tx.QueryRow(r.Context(), "SELECT state FROM branches WHERE id=$1 AND project_id=$2 FOR UPDATE", body.ParentBranchID, p.ProjectID).Scan(&parentState)
+	err = tx.QueryRow(r.Context(), "SELECT state FROM projects WHERE id=$1 AND source='managed' AND deleted_at IS NULL FOR UPDATE", p.ProjectID).Scan(&parentState)
+	if err != nil || parentState != "ready" {
+		fail(w, r, 409, "project_not_ready", "Ready managed parent project required")
+		return
+	}
+	var expiring bool
+	err = tx.QueryRow(r.Context(), "SELECT state,expires_at IS NOT NULL FROM branches WHERE id=$1 AND project_id=$2 FOR UPDATE", body.ParentBranchID, p.ProjectID).Scan(&parentState, &expiring)
 	if err != nil || parentState != "ready" {
 		fail(w, r, 409, "parent_not_ready", "Parent branch is not ready")
+		return
+	}
+	if expiring {
+		fail(w, r, 409, "parent_expiring", "An expiring branch cannot acquire child branches")
+		return
+	}
+	if err = checkDefaultOwnerReservation(r.Context(), tx, p.ProjectID, body.ParentBranchID); err != nil {
+		s.defaultOwnerFailure(w, r, err)
 		return
 	}
 	var catalogPending bool
@@ -389,6 +442,17 @@ func (s *server) createBranch(w http.ResponseWriter, r *http.Request) {
 	if catalogPending {
 		fail(w, r, 409, "branch_operation_in_progress", "Parent catalog operation is active")
 		return
+	}
+	if copyPolicy == "inherit_paused" {
+		var functionsExist bool
+		if tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM function_definitions WHERE project_id=$1 AND branch_id=$2 AND state NOT IN ('deleting','deleted'))`, p.ProjectID, body.ParentBranchID).Scan(&functionsExist) != nil {
+			fail(w, r, 503, "metadata_unavailable", "Could not inspect original Function policy")
+			return
+		}
+		if functionsExist && (!body.AcknowledgeFunctions || (historical && !body.AcknowledgeCurrentCode)) {
+			fail(w, r, 422, "function_copy_acknowledgment_required", "Confirm the branch environment copy; historical SQL restore additionally requires acknowledging current accepted Function code rather than historical code")
+			return
+		}
 	}
 	if historical {
 		p.ParentLSN, err = s.kube.resolveRestorePoint(r.Context(), p.TenantID, p.ParentTimelineID, body.ParentTimestamp, body.ParentLSN)
@@ -430,6 +494,17 @@ func (s *server) createBranch(w http.ResponseWriter, r *http.Request) {
 		_, err = tx.Exec(r.Context(), `INSERT INTO branch_databases(branch_id,name,owner_name,state)
 		SELECT $1,name,owner_name,'ready' FROM branch_databases WHERE branch_id=$2 AND state='ready'`, p.BranchID, body.ParentBranchID)
 	}
+	if err == nil && !historical {
+		// The live fork copies PostgreSQL OIDs and current catalog intent. A
+		// historical restore never receives today's connection identity defaults.
+		_, err = tx.Exec(r.Context(), `INSERT INTO branch_connection_defaults(branch_id,mode,role_name,database_name,role_oid,database_oid,tenant_id,timeline_id,version,updated_by)
+		SELECT $1,mode,role_name,database_name,role_oid,database_oid,
+		CASE WHEN mode='managed' THEN $3 END,CASE WHEN mode='managed' THEN $4 END,2,$5
+		FROM branch_connection_defaults WHERE branch_id=$2`, p.BranchID, body.ParentBranchID, p.TenantID, p.TimelineID, userFrom(r).ID)
+	}
+	if err == nil && !historical {
+		err = copyDefaultOwnerBindingTx(r.Context(), tx, p.ProjectID, body.ParentBranchID, p.BranchID, p.TenantID, p.TimelineID, userFrom(r).ID)
+	}
 	if err == nil && withEndpoint {
 		err = insertEndpoint(r.Context(), tx, p)
 	}
@@ -441,6 +516,12 @@ func (s *server) createBranch(w http.ResponseWriter, r *http.Request) {
 	if err == nil {
 		err = addCreateOperation(r.Context(), tx, "create_branch", "branch", p.BranchID, p.ProjectID,
 			opID, userFrom(r).ID, requestID(r), p, key, hash, branchCreationSteps(withEndpoint, historical))
+	}
+	if err == nil {
+		err = s.captureCatalogInheritanceTx(r.Context(), tx, opID, p, body.ParentBranchID, historical)
+	}
+	if err == nil && copyPolicy == "inherit_paused" {
+		err = s.snapshotFunctionBranchTx(r.Context(), tx, p.ProjectID, body.ParentBranchID, p.BranchID, opID, userFrom(r).ID)
 	}
 	if err == nil {
 		err = tx.Commit(r.Context())
@@ -496,7 +577,7 @@ func (s *server) createEndpoint(w http.ResponseWriter, r *http.Request) {
 	if s.replayCreate(w, r, key, hash, legacyHash, "endpoint") {
 		return
 	}
-	branch, err := s.one(r.Context(), `SELECT id,timeline_id,state FROM branches
+	branch, err := s.one(r.Context(), `SELECT id,timeline_id,state,expires_at FROM branches
 		WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL`, body.BranchID, r.PathValue("project"))
 	if err != nil {
 		fail(w, r, 404, "branch_not_found", "Branch not found")
@@ -506,10 +587,19 @@ func (s *server) createEndpoint(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 423, "branch_not_ready", "Branch is not ready")
 		return
 	}
+	if branch["expires_at"] != nil {
+		fail(w, r, 409, "branch_expiring", "Remove the future expiration before adding Compute")
+		return
+	}
+	if err = checkDefaultOwnerReservation(r.Context(), s.db, r.PathValue("project"), body.BranchID); err != nil {
+		s.defaultOwnerFailure(w, r, err)
+		return
+	}
 	suffix := stableSuffix(userFrom(r).ID, scope, key)
 	p := creationPayload(r.PathValue("project"), body.BranchID, "ep_"+suffix,
 		stringVal(project["tenant_id"]), stringVal(branch["timeline_id"]), bounds)
 	p.EndpointType = endpointType
+	p.CatalogPolicy = catalogPreserveInheritedSQL
 	var credentialErr error
 	if endpointType == "read_only" {
 		var writerID string
@@ -547,7 +637,12 @@ func (s *server) createEndpoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err == nil {
-		err = tx.QueryRow(r.Context(), "SELECT state FROM branches WHERE id=$1 AND project_id=$2 FOR UPDATE", p.BranchID, p.ProjectID).Scan(&ready)
+		var expiring bool
+		err = tx.QueryRow(r.Context(), "SELECT state,expires_at IS NOT NULL FROM branches WHERE id=$1 AND project_id=$2 FOR UPDATE", p.BranchID, p.ProjectID).Scan(&ready, &expiring)
+		if err == nil && expiring {
+			fail(w, r, 409, "branch_expiring", "Remove the future expiration before adding Compute")
+			return
+		}
 	}
 	if err == nil {
 		var pending bool
@@ -563,12 +658,18 @@ func (s *server) createEndpoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err == nil {
+		err = checkDefaultOwnerReservation(r.Context(), tx, p.ProjectID, p.BranchID)
+	}
+	if err == nil {
 		err = insertEndpoint(r.Context(), tx, p)
 	}
 	opID := newID("op_")
 	if err == nil {
 		err = addCreateOperation(r.Context(), tx, "create_endpoint", "endpoint", p.EndpointID, p.ProjectID,
 			opID, userFrom(r).ID, requestID(r), p, key, hash, createSteps("create_endpoint", true))
+	}
+	if err == nil {
+		err = s.captureCatalogInheritanceTx(r.Context(), tx, opID, p, p.BranchID, false)
 	}
 	if err == nil {
 		err = tx.Commit(r.Context())

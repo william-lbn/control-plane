@@ -44,11 +44,16 @@ spec:
           ports: [{name: http, containerPort: 8791}]
           resources: {{ toYaml .Values.aiGateway.resources | nindent 12 }}
           env:
+            {{- if .Values.aiProviderManagement.enabled }}
+            - {name: NEON_KUBE_NAMESPACE, value: {{ .Release.Namespace | quote }}}
+            {{- end }}
+            {{- include "neonControl.providerEnv" (dict "root" . "private" true) | nindent 12 }}
             - {name: NEON_AI_BIND, value: ':8791'}
             - {name: NEON_AI_CONFIG_FILE, value: /run/ai-config/config.json}
             - {name: NEON_AI_DATABASE_URL_FILE, value: /run/ai-database/database-url}
             - {name: NEON_BACKEND_CREDENTIAL_KEYS_FILE, value: /run/backend-keys/keyring.json}
           volumeMounts:
+            {{- include "neonControl.providerMounts" (dict "root" . "private" true) | nindent 12 }}
             - {name: ai-config, mountPath: /run/ai-config, readOnly: true}
             - {name: ai-database, mountPath: /run/ai-database, readOnly: true}
             - {name: backend-keys, mountPath: /run/backend-keys, readOnly: true}
@@ -56,6 +61,7 @@ spec:
           readinessProbe: {httpGet: {path: /readyz, port: http}, periodSeconds: 10, timeoutSeconds: 3}
           livenessProbe: {httpGet: {path: /healthz, port: http}, periodSeconds: 15}
       volumes:
+        {{- include "neonControl.providerVolumes" (dict "root" . "private" true) | nindent 8 }}
         - name: ai-config
           secret: {secretName: {{ required "aiGateway.existingConfigSecret required" .Values.aiGateway.existingConfigSecret }}, defaultMode: 0440}
         - name: ai-database

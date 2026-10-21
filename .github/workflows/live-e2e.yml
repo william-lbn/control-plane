@@ -15,8 +15,17 @@ on:
       product_suite:
         description: Product UI suites (overrides other suite selectors when selected)
         type: choice
-        options: [none, sql-assistant.spec.ts, sql-ai-repair.spec.ts, history-names.spec.ts, functions-schedules.spec.ts, functions-runtime-recovery.spec.ts, functions-schedules-finalize.spec.ts, catalog-rename.spec.ts]
+        options: [none, sql-assistant.spec.ts, sql-ai-repair.spec.ts, history-names.spec.ts, functions-schedules.spec.ts, functions-runtime-recovery.spec.ts, functions-schedules-finalize.spec.ts, catalog-rename.spec.ts, functions-unhealthy-idle.spec.ts, failed-endpoint-cleanup.spec.ts, failed-parent-cleanup.spec.ts, branch-expiration.spec.ts, functions-websocket.spec.ts, functions-object-events.spec.ts, functions-output.spec.ts, functions-branches.spec.ts, functions-manager-identity.spec.ts, ai-providers.spec.ts, connection-defaults.spec.ts, catalog-identities.spec.ts, catalog-identity-restore.spec.ts, default-database-owner.spec.ts, catalog-mutation-results.spec.ts, catalog-rename-results.spec.ts, compute-catalog-bootstrap.spec.ts]
         default: none
+      catalog_suite:
+        description: Catalog identity acceptance
+        type: choice
+        options: [none, catalog-object-bindings.spec.ts, catalog-inheritance.spec.ts, catalog-current-inventory.spec.ts]
+        default: none
+      failed_parent_kind:
+        description: Exact parent create failure to validate (branch or project)
+        type: string
+        default: branch
       poll_fault:
         description: Inject transient read failures for native/Data API observation recovery
         type: boolean
@@ -38,9 +47,14 @@ jobs:
       NEON_E2E_ATTEMPT: run-${{ github.run_id }}-${{ github.run_attempt }}
       NEON_E2E_EXPECT_SPLIT: 'true'
       NEON_E2E_POLL_FAULT: ${{ inputs.poll_fault && 'true' || 'false' }}
-      NEON_E2E_SUITE: ${{ inputs.product_suite != 'none' && inputs.product_suite || inputs.additional_suite != 'none' && inputs.additional_suite || inputs.suite }}
+      NEON_E2E_SUITE: ${{ inputs.catalog_suite != 'none' && inputs.catalog_suite || inputs.product_suite != 'none' && inputs.product_suite || inputs.additional_suite != 'none' && inputs.additional_suite || inputs.suite }}
+      NEON_E2E_AI_PROVIDER_FIXTURE: ${{ vars.NEON_E2E_AI_PROVIDER_FIXTURE }}
+      NEON_E2E_AI_PROVIDER_KEY_FILE: ${{ vars.NEON_E2E_AI_PROVIDER_KEY_FILE }}
+      NEON_E2E_CONNECTION_DEFAULTS_FIXTURE: ${{ vars.NEON_E2E_CONNECTION_DEFAULTS_FIXTURE }}
       NEON_E2E_CREDENTIAL_PROJECT: ${{ inputs.credential_project }}
       NEON_E2E_FUNCTIONS_MONITOR_FIXTURE: ${{ vars.NEON_E2E_FUNCTIONS_MONITOR_FIXTURE }}
+      NEON_E2E_KUBE_API_SERVERS: ${{ vars.NEON_E2E_KUBE_API_SERVERS }}
+      NEON_E2E_FAILED_PARENT_KIND: ${{ inputs.failed_parent_kind }}
       NEON_E2E_CATALOG_RENAME_FIXTURE: ${{ vars.NEON_E2E_CATALOG_RENAME_FIXTURE }}
       NEON_E2E_CATALOG_OWNER_FIXTURE: ${{ vars.NEON_E2E_CATALOG_OWNER_FIXTURE }}
       NEON_E2E_SQL_SCRIPT_FIXTURE: ${{ vars.NEON_E2E_SQL_SCRIPT_FIXTURE }}
@@ -66,9 +80,11 @@ jobs:
           test -n "$NEON_E2E_BASE_URL"
           test -n "$ADMIN_PASSWORD"
           case "$NEON_E2E_SUITE" in
+            catalog-current-inventory.spec.ts|catalog-inheritance.spec.ts|catalog-object-bindings.spec.ts|compute-catalog-bootstrap.spec.ts|catalog-rename-results.spec.ts|catalog-mutation-results.spec.ts|default-database-owner.spec.ts|catalog-identity-restore.spec.ts|catalog-identities.spec.ts|connection-defaults.spec.ts) test -f "$NEON_E2E_CONNECTION_DEFAULTS_FIXTURE" ;;
+            ai-providers.spec.ts) test -f "$NEON_E2E_AI_PROVIDER_FIXTURE"; test -f "$NEON_E2E_AI_PROVIDER_KEY_FILE" ;;
             console-session-feedback.spec.ts|history-policy.spec.ts) test -f "$NEON_E2E_CONSOLE_ACCOUNT_FIXTURE" ;;
             native-product.spec.ts|restore.spec.ts|lifecycle.spec.ts|endpoint-deletion.spec.ts|data-api.spec.ts|console-invitations.spec.ts|console-mfa.spec.ts|console-sessions.spec.ts|managed-auth.spec.ts|object-storage.spec.ts|functions-native.spec.ts) ;;
-            functions-schedules-finalize.spec.ts|functions-runtime-recovery.spec.ts|functions-schedules.spec.ts|functions-request-logs.spec.ts|functions-http.spec.ts|functions-observation.spec.ts|functions-wake.spec.ts|functions-rollback.spec.ts) test -f "$NEON_E2E_FUNCTIONS_MONITOR_FIXTURE" ;;
+            functions-manager-identity.spec.ts|functions-branches.spec.ts|functions-output.spec.ts|functions-object-events.spec.ts|functions-websocket.spec.ts|branch-expiration.spec.ts|failed-parent-cleanup.spec.ts|failed-endpoint-cleanup.spec.ts|functions-unhealthy-idle.spec.ts|functions-schedules-finalize.spec.ts|functions-runtime-recovery.spec.ts|functions-schedules.spec.ts|functions-request-logs.spec.ts|functions-http.spec.ts|functions-observation.spec.ts|functions-wake.spec.ts|functions-rollback.spec.ts) test -f "$NEON_E2E_FUNCTIONS_MONITOR_FIXTURE" ;;
             catalog-rename.spec.ts) test -f "$NEON_E2E_CATALOG_RENAME_FIXTURE" ;;
             database-owner.spec.ts) test -f "$NEON_E2E_CATALOG_OWNER_FIXTURE" ;;
             history-sharing.spec.ts) test -f "$NEON_E2E_SQL_SCRIPT_FIXTURE"; test -f "$NEON_E2E_CONSOLE_ACCOUNT_FIXTURE" ;;
@@ -83,9 +99,19 @@ jobs:
       - run: npm ci --no-audit --fund=false
         working-directory: web
       - run: npx playwright install --with-deps chromium
-        working-directory: web
+      - name: Package native customer-output example
+        if: env.NEON_E2E_SUITE == 'functions-output.spec.ts'
+        run: |
+          node tools/package-function-example.mjs examples/functions/output "$NEON_E2E_PRIVATE_DIR/function-output.zip"
+          echo "NEON_E2E_FUNCTION_ZIP=$NEON_E2E_PRIVATE_DIR/function-output.zip" >> "$GITHUB_ENV"
+      - name: Package native WebSocket example
+        if: env.NEON_E2E_SUITE == 'functions-websocket.spec.ts'
+        run: |
+          node tools/package-function-example.mjs examples/functions/websocket "$NEON_E2E_PRIVATE_DIR/function-websocket.zip"
+          echo "NEON_E2E_FUNCTION_ZIP=$NEON_E2E_PRIVATE_DIR/function-websocket.zip" >> "$GITHUB_ENV"
+        working-directory: .
       - name: Package pinned Functions example outside the checkout
-        if: env.NEON_E2E_SUITE == 'functions-schedules.spec.ts' || env.NEON_E2E_SUITE == 'functions-http.spec.ts' || env.NEON_E2E_SUITE == 'functions-request-logs.spec.ts' || env.NEON_E2E_SUITE == 'functions-native.spec.ts' || env.NEON_E2E_SUITE == 'functions-observation.spec.ts' || env.NEON_E2E_SUITE == 'functions-wake.spec.ts' || env.NEON_E2E_SUITE == 'functions-rollback.spec.ts'
+        if: env.NEON_E2E_SUITE == 'functions-manager-identity.spec.ts' || env.NEON_E2E_SUITE == 'functions-branches.spec.ts' || env.NEON_E2E_SUITE == 'functions-object-events.spec.ts' || env.NEON_E2E_SUITE == 'functions-unhealthy-idle.spec.ts' || env.NEON_E2E_SUITE == 'functions-schedules.spec.ts' || env.NEON_E2E_SUITE == 'functions-http.spec.ts' || env.NEON_E2E_SUITE == 'functions-request-logs.spec.ts' || env.NEON_E2E_SUITE == 'functions-native.spec.ts' || env.NEON_E2E_SUITE == 'functions-observation.spec.ts' || env.NEON_E2E_SUITE == 'functions-wake.spec.ts' || env.NEON_E2E_SUITE == 'functions-rollback.spec.ts'
         run: |
           npm ci --prefix examples/functions/postgres --ignore-scripts --no-audit --fund=false
           node tools/package-function-example.mjs examples/functions/postgres "$NEON_E2E_PRIVATE_DIR/function-example.zip"
@@ -94,9 +120,28 @@ jobs:
             node tools/rebundle-function-example.mjs "$NEON_E2E_PRIVATE_DIR/function-example.zip" examples/functions/http/index.mjs "$NEON_E2E_PRIVATE_DIR/function-http.zip"
             echo "NEON_E2E_FUNCTION_ZIP=$NEON_E2E_PRIVATE_DIR/function-http.zip" >> "$GITHUB_ENV"
           fi
+          if [ "$NEON_E2E_SUITE" = functions-manager-identity.spec.ts ]; then
+            node tools/rebundle-function-example.mjs "$NEON_E2E_PRIVATE_DIR/function-example.zip" examples/functions/branches/index.mjs "$NEON_E2E_PRIVATE_DIR/function-manager-identity.zip"
+            echo "NEON_E2E_FUNCTION_ZIP=$NEON_E2E_PRIVATE_DIR/function-manager-identity.zip" >> "$GITHUB_ENV"
+          fi
+          if [ "$NEON_E2E_SUITE" = functions-branches.spec.ts ]; then
+            node tools/rebundle-function-example.mjs "$NEON_E2E_PRIVATE_DIR/function-example.zip" examples/functions/branches/index.mjs "$NEON_E2E_PRIVATE_DIR/function-branches.zip"
+            node tools/branch-example-variant.mjs examples/functions/branches/index.mjs "$NEON_E2E_PRIVATE_DIR/function-branches-v2.mjs"
+            node tools/rebundle-function-example.mjs "$NEON_E2E_PRIVATE_DIR/function-example.zip" "$NEON_E2E_PRIVATE_DIR/function-branches-v2.mjs" "$NEON_E2E_PRIVATE_DIR/function-branches-v2.zip"
+            echo "NEON_E2E_FUNCTION_ZIP=$NEON_E2E_PRIVATE_DIR/function-branches.zip" >> "$GITHUB_ENV"
+            echo "NEON_E2E_FUNCTION_REPLACEMENT_ZIP=$NEON_E2E_PRIVATE_DIR/function-branches-v2.zip" >> "$GITHUB_ENV"
+          fi
+          if [ "$NEON_E2E_SUITE" = functions-object-events.spec.ts ]; then
+            node tools/rebundle-function-example.mjs "$NEON_E2E_PRIVATE_DIR/function-example.zip" examples/functions/object-events/index.mjs "$NEON_E2E_PRIVATE_DIR/function-object-events.zip"
+            echo "NEON_E2E_FUNCTION_ZIP=$NEON_E2E_PRIVATE_DIR/function-object-events.zip" >> "$GITHUB_ENV"
+          fi
           if [ "$NEON_E2E_SUITE" = functions-schedules.spec.ts ]; then
             node tools/rebundle-function-example.mjs "$NEON_E2E_PRIVATE_DIR/function-example.zip" examples/functions/schedule/index.mjs "$NEON_E2E_PRIVATE_DIR/function-schedule.zip"
             echo "NEON_E2E_FUNCTION_ZIP=$NEON_E2E_PRIVATE_DIR/function-schedule.zip" >> "$GITHUB_ENV"
+          fi
+          if [ "$NEON_E2E_SUITE" = functions-unhealthy-idle.spec.ts ]; then
+            node tools/rebundle-function-example.mjs "$NEON_E2E_PRIVATE_DIR/function-example.zip" examples/functions/unhealthy-idle/index.mjs "$NEON_E2E_PRIVATE_DIR/function-unhealthy.zip"
+            echo "NEON_E2E_FUNCTION_ZIP=$NEON_E2E_PRIVATE_DIR/function-unhealthy.zip" >> "$GITHUB_ENV"
           fi
           if [ "$NEON_E2E_SUITE" = functions-rollback.spec.ts ]; then
             node tools/package-function-example.mjs examples/functions/replacement "$NEON_E2E_PRIVATE_DIR/function-replacement.zip"
@@ -105,6 +150,41 @@ jobs:
       - name: Run one serial UI slice with optional read-only resource observer
         shell: bash
         run: |
+          if [ "$NEON_E2E_SUITE" = branch-expiration.spec.ts ]; then
+            command -v kubectl >/dev/null
+            test -n "$NEON_E2E_KUBE_API_SERVERS"
+            export NEON_E2E_KUBE_SERVER="${NEON_E2E_KUBE_API_SERVERS%%,*}"
+            node tools/observe-branch-expiration.mjs --fixture-dir "$NEON_E2E_PRIVATE_DIR" --evidence-dir "$NEON_E2E_PRIVATE_DIR/expiration-observer" --scope "$NEON_E2E_FUNCTIONS_MONITOR_FIXTURE" > "$NEON_E2E_PRIVATE_DIR/expiration-observer.log" 2>&1 &
+            task_observer_pid=$!
+            task_expiration_cleanup() {
+              node -e 'require("node:fs").writeFileSync(process.env.NEON_E2E_PRIVATE_DIR+"/branch-expiration-abort.json",JSON.stringify({abort:true}),{mode:0o600})'
+              wait "$task_observer_pid" || true
+            }
+            trap task_expiration_cleanup EXIT
+            npm --prefix web run test:e2e -- "$NEON_E2E_SUITE"
+            wait "$task_observer_pid"
+            cp "$NEON_E2E_PRIVATE_DIR/expiration-observer/result.json" "$NEON_E2E_ARTIFACTS/expiration-observer.json"
+            trap - EXIT
+            exit 0
+          fi
+          if [ "$NEON_E2E_SUITE" = failed-endpoint-cleanup.spec.ts ] || [ "$NEON_E2E_SUITE" = failed-parent-cleanup.spec.ts ]; then
+            command -v kubectl >/dev/null
+            test -n "$NEON_E2E_KUBE_API_SERVERS"
+            task_creation_kind=endpoint
+            if [ "$NEON_E2E_SUITE" = failed-parent-cleanup.spec.ts ]; then task_creation_kind="$NEON_E2E_FAILED_PARENT_KIND"; fi
+            node tools/failed-endpoint-create-fault.mjs --resource-kind "$task_creation_kind" --fixture-dir "$NEON_E2E_PRIVATE_DIR" --evidence-dir "$NEON_E2E_PRIVATE_DIR/native-create-fault" --scope "$NEON_E2E_FUNCTIONS_MONITOR_FIXTURE" --api-servers "$NEON_E2E_KUBE_API_SERVERS" > "$NEON_E2E_PRIVATE_DIR/native-create-fault.log" 2>&1 &
+            task_fault_pid=$!
+            task_fault_cleanup() {
+              node -e 'require("node:fs").writeFileSync(process.env.NEON_E2E_PRIVATE_DIR+"/failed-endpoint-abort.json",JSON.stringify({abort:true}),{mode:0o600})'
+              wait "$task_fault_pid" || true
+            }
+            trap task_fault_cleanup EXIT
+            npm --prefix web run test:e2e -- "$NEON_E2E_SUITE"
+            wait "$task_fault_pid"
+            cp "$NEON_E2E_PRIVATE_DIR/native-create-fault/result.json" "$NEON_E2E_ARTIFACTS/native-create-fault.json"
+            trap - EXIT
+            exit 0
+          fi
           if [ "$NEON_E2E_SUITE" != fractional-cpu.spec.ts ]; then
             npm --prefix web run test:e2e -- "$NEON_E2E_SUITE"
             exit 0
@@ -125,5 +205,5 @@ jobs:
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         # MFA DOM/trace failures may contain one-time setup/recovery material.
         # Retain that evidence only on the protected Linux runner.
-        if: always() && env.NEON_E2E_SUITE != 'console-mfa.spec.ts' && env.NEON_E2E_SUITE != 'history-policy.spec.ts' && env.NEON_E2E_SUITE != 'history-sharing.spec.ts' && env.NEON_E2E_SUITE != 'storage-multipart.spec.ts' && env.NEON_E2E_SUITE != 'storage-multipart-administration.spec.ts' && env.NEON_E2E_SUITE != 'sql-assistant.spec.ts' && env.NEON_E2E_SUITE != 'sql-ai-repair.spec.ts' && env.NEON_E2E_SUITE != 'history-names.spec.ts' && env.NEON_E2E_SUITE != 'functions-schedules.spec.ts' && env.NEON_E2E_SUITE != 'functions-runtime-recovery.spec.ts' && env.NEON_E2E_SUITE != 'functions-schedules-finalize.spec.ts'
+        if: always() && env.NEON_E2E_SUITE != 'branch-expiration.spec.ts' && env.NEON_E2E_SUITE != 'failed-parent-cleanup.spec.ts' && env.NEON_E2E_SUITE != 'failed-endpoint-cleanup.spec.ts' && env.NEON_E2E_SUITE != 'console-mfa.spec.ts' && env.NEON_E2E_SUITE != 'history-policy.spec.ts' && env.NEON_E2E_SUITE != 'history-sharing.spec.ts' && env.NEON_E2E_SUITE != 'storage-multipart.spec.ts' && env.NEON_E2E_SUITE != 'storage-multipart-administration.spec.ts' && env.NEON_E2E_SUITE != 'sql-assistant.spec.ts' && env.NEON_E2E_SUITE != 'sql-ai-repair.spec.ts' && env.NEON_E2E_SUITE != 'history-names.spec.ts' && env.NEON_E2E_SUITE != 'functions-schedules.spec.ts' && env.NEON_E2E_SUITE != 'functions-runtime-recovery.spec.ts' && env.NEON_E2E_SUITE != 'functions-schedules-finalize.spec.ts'
         with: {name: live-ui-evidence, path: '${{ env.NEON_E2E_ARTIFACTS }}', retention-days: 30}

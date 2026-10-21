@@ -35,6 +35,14 @@ func (s *server) databaseOwnerMutation(w http.ResponseWriter, r *http.Request) {
 	if s.replayCatalog(w, r, key, hash) {
 		return
 	}
+	if err = checkDefaultOwnerDependency(r.Context(), s.db, project, branch, "database", name); err != nil {
+		s.defaultOwnerFailure(w, r, err)
+		return
+	}
+	if err = checkCatalogForkExclusion(r.Context(), s.db, project, branch, "role", body.Owner); err != nil {
+		s.defaultOwnerFailure(w, r, err)
+		return
+	}
 	endpoint, err := s.catalogWriter(r.Context(), project, branch)
 	if isNoRows(err) {
 		fail(w, r, 404, "writer_not_found", "Ready branch writer required")
@@ -125,6 +133,14 @@ func (s *server) databaseOwnerMutation(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 409, "branch_operation_in_progress", "Another branch Operation is active")
 		return
 	}
+	if err = s.captureCatalogMutationIdentity(r.Context(), tx, &p, "update_database_owner"); err != nil {
+		s.catalogRenameFailure(w, r, err)
+		return
+	}
+	if p.NativeIdentity.Object.OID != p.DatabaseOID {
+		fail(w, r, 409, "catalog_identity_conflict", "Database was replaced before admission")
+		return
+	}
 	tag, err := tx.Exec(r.Context(), `UPDATE branch_databases SET state='updating',updated_at=now() WHERE branch_id=$1 AND name=$2 AND state='ready' AND version=$3 AND owner_name=$4`, branch, name, version, previous)
 	if err != nil {
 		fail(w, r, 503, "metadata_unavailable", "Could not reserve catalog transition")
@@ -174,6 +190,11 @@ func applyDatabaseOwnerSQL(ctx context.Context, conn *pgx.Conn, p catalogPayload
 		return err
 	}
 	defer tx.Rollback(context.Background())
+	if p.NativeIdentity != nil {
+		if err = verifyCatalogNativeBinding(ctx, tx, p, "update_database_owner", 0, false); err != nil {
+			return err
+		}
+	}
 	var oid uint32
 	var owner, marker string
 	err = tx.QueryRow(ctx, `SELECT oid,pg_get_userbyid(datdba),COALESCE(shobj_description(oid,'pg_database'),'') FROM pg_database WHERE datname=$1`, p.Name).Scan(&oid, &owner, &marker)
@@ -191,6 +212,11 @@ func applyDatabaseOwnerSQL(ctx context.Context, conn *pgx.Conn, p catalogPayload
 	if owner != p.Owner {
 		if _, err = tx.Exec(ctx, "ALTER DATABASE "+pgQuote(p.Name)+" OWNER TO "+pgQuote(p.Owner)); err != nil {
 			return sqlExecutionError{"query", err}
+		}
+	}
+	if p.NativeIdentity != nil {
+		if err = verifyCatalogNativeBinding(ctx, tx, p, "update_database_owner", 0, true); err != nil {
+			return err
 		}
 	}
 	return tx.Commit(ctx)

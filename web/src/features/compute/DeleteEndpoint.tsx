@@ -123,6 +123,12 @@ export function DeleteEndpoint({
           请先停止使用此地址的应用。若 Data API、Auth 或 Object Storage 仍依赖此 Compute，
           需要先在对应页面停用服务。此操作不会自动迁移应用连接。
         </p>
+        {target.state === 'error' && (
+          <p>
+            仅可清理能核对原失败创建记录的独立 Compute。清理后原创建不能再重试，失败记录和
+            凭据继续保留；正在创建的资源不能清理。
+          </p>
+        )}
         <label>
           输入完整 Endpoint Selector 确认
           <input

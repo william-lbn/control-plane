@@ -544,3 +544,15 @@ See [the branch email/recovery contract](AUTH-EMAIL-RECOVERY.md). The protected 
 ## Multipart administration and grouped listing
 
 `storage-multipart-administration.spec.ts` creates three real SDK uploads, revokes their original credential in UI, then exercises administrator logical abort, deliberately lost response and exact original receipt replay. Its narrow continuation reuses the confirmed upload/intent IDs and revoked credential, verifies local read-error recovery, and creates no replacement SDK mutations. See [the administration contract](MULTIPART-ADMINISTRATION.md). New `TestMultipartAdministration*` covers real metadata audit rollback/recovery/authorization and isolated branch directory grouping/quota. Keep protected checkpoints and all failed attempts; only retire terminal owned resources by UID.
+
+## Functions object upload events
+
+`functions-object-events.spec.ts` uses the protected retained owner fixture, existing pinned Guest and cached Linux pg bundle. It uploads real bytes, validates prefix filtering, automatic 503 retry, restricted SQL deduplication, three-attempt terminal failure and a deliberately lost 202 with exact key/version/body replay. Normal cleanup preserves object/SQL/event data and retires the original Function and Writer runtime. The separate post-UI rollback patch is covered by a disposable native PG catalog test; accepted UI paths were reused. See [delivery](DELIVERY-2026-10-18-FUNCTION-OBJECT-EVENTS.md).
+
+## Functions customer output
+
+`functions-output.spec.ts` uses the retained owner and the precise new Guest. It verifies explicit sensitive-output consent, deliberately lost 200 exact replay, actual Node levels/stdout/stderr, known-value replacement, scope isolation, browser filtering/download, disabled-window exclusion and final SIGINT output returned in the same authenticated shutdown response. All original histories remain, the Function and Writer retire normally, and separate read-only metadata checks verify ciphertext/consent windows. See [delivery](DELIVERY-2026-10-18-FUNCTION-OUTPUT.md).
+
+继承目录局部验收使用 `catalog-inheritance.spec.ts`：保护的原连接默认 checkpoint 与上一批目录身份 checkpoint 只在 Linux 提供，失败后续用同一操作和检查点。覆盖新分支首次启动、父凭据 UID rename、子分支改密/Owner、Reader 冷醒、无 Compute 分支原代际及替换 Writer；不重复旧套件。实际六项结果见 [2026-10-21 首次启动保留继承目录](DELIVERY-2026-10-21-CATALOG-INHERITANCE.md)。
+
+当前身份局部验收使用 `catalog-current-inventory.spec.ts`，续用 0.67/0.68 原保护夹具，检查当前/历史分离、独立继承代际、角色/数据库排除、禁止重新首次记录和 Console 展示；五项通过后核对 16 张目录表未变并正常缩零。见 [2026-10-21 当前目录身份展示](DELIVERY-2026-10-21-CATALOG-CURRENT-INVENTORY.md)。

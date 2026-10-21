@@ -41,6 +41,7 @@ type server struct {
 	storage           *storageBlobs
 	functions         *functionsPlatform
 	ai                *aigateway.Config
+	aiProviders       *aiProviderSettings
 	functionSlotsOnce sync.Once
 	functionSlots     chan struct{}
 }
@@ -165,6 +166,10 @@ func runProcess(ctx context.Context, role processRole) error {
 		return err
 	}
 	s.ai, err = loadAIConfig()
+	if err != nil {
+		return err
+	}
+	s.aiProviders, err = loadAIProviderSettings(role != roleAPI)
 	if err != nil {
 		return err
 	}
@@ -318,7 +323,7 @@ func (s *server) middleware(next http.Handler) http.Handler {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		w.Header().Set("X-Frame-Options", "DENY")
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; object-src 'none'; frame-ancestors 'none'")
+		w.Header().Set("Content-Security-Policy", functionConsoleCSP())
 		next.ServeHTTP(w, r)
 	})
 }

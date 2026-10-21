@@ -118,6 +118,24 @@ func (s *server) authorizeRoute(w http.ResponseWriter, r *http.Request, u user) 
 		if strings.Contains(r.URL.Path, "/roles") || strings.Contains(r.URL.Path, "/databases") {
 			required = 2 // Live catalog reads may cold wake a compute.
 		}
+		if strings.HasSuffix(r.URL.Path, "/connection-defaults") {
+			required = 2
+			if r.Method != http.MethodGet {
+				required = 3
+			}
+		}
+		if strings.Contains(r.URL.Path, "/catalog-identities") {
+			required = 2
+			if r.Method != http.MethodGet {
+				required = 3
+			}
+		}
+		if strings.HasSuffix(r.URL.Path, "/default-database-owner") {
+			required = 2
+			if r.Method != http.MethodGet {
+				required = 3
+			}
+		}
 		if strings.Contains(r.URL.Path, "/saved-queries") || strings.Contains(r.URL.Path, "/query-history") || strings.Contains(r.URL.Path, "/shared-query-history") {
 			required = 2
 		}
@@ -181,6 +199,9 @@ func (s *server) authorizeRoute(w http.ResponseWriter, r *http.Request, u user) 
 	}
 	if a.Level < required {
 		fail(w, r, 403, "forbidden", "Insufficient resource permission")
+		return r, false
+	}
+	if project != "" && !s.branchExpirationRouteAllowed(w, r) {
 		return r, false
 	}
 	return r.WithContext(context.WithValue(r.Context(), resourceAccessKey{}, a)), true

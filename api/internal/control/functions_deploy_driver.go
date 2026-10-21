@@ -240,6 +240,13 @@ func (s *server) reconcileFunctionDeployment(ctx context.Context, op, worker str
 	if s.functions == nil || s.functions.issuer == nil || s.processRole != roleWorker || !p.valid() {
 		return errFunctionsPlatform
 	}
+	var copied bool
+	if err := s.db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM function_copy_sources WHERE deployment_id=$1 AND function_id=$2 AND project_id=$3 AND branch_id=$4)`, p.DeploymentID, p.FunctionID, p.ProjectID, p.BranchID).Scan(&copied); err != nil {
+		return errFunctionCopy
+	}
+	if copied {
+		return s.reconcileFunctionBranchCopy(ctx, op, worker, p)
+	}
 	// A prior atomic publication may have committed before its reply was lost.
 	// Confirm only that saved commit, not a new guest-health observation. Never
 	// allocate another candidate or downgrade its completed deployment on replay.

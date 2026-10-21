@@ -86,10 +86,15 @@ spec:
             {{- end }}
           resources: {{ toYaml .Values.worker.resources | nindent 12 }}
           env:
+            {{- include "neonControl.providerEnv" (dict "root" . "private" true) | nindent 12 }}
             - {name: NEON_CONTROL_PROCESS_ROLE, value: worker}
             - {name: NEON_WORKER_BIND, value: ':8789'}
+            {{- if .Values.backendCredentials.enabled }}
+            - {name: NEON_BACKEND_CREDENTIAL_KEYS_FILE, value: /run/backend-keys/keyring.json}
+            {{- end }}
             {{- include "neonControl.runtimeEnv" . | nindent 12 }}
           volumeMounts:
+            {{- include "neonControl.providerMounts" (dict "root" . "private" true) | nindent 12 }}
             {{- include "neonControl.functionsMounts" . | nindent 12 }}
             {{- if .Values.functions.enabled }}
             - {name: functions-issuer, mountPath: /run/functions-issuer, readOnly: true}
@@ -98,6 +103,9 @@ spec:
             - {name: product-storage, mountPath: /run/product-storage, readOnly: true}
             {{- end }}
             - {name: credentials, mountPath: /run/neon-secrets, readOnly: true}
+            {{- if .Values.backendCredentials.enabled }}
+            - {name: backend-keys, mountPath: /run/backend-keys, readOnly: true}
+            {{- end }}
             {{- if .Values.api.pgCASecret }}
             - {name: pg-ca, mountPath: /run/pg-ca, readOnly: true}
             {{- end }}
@@ -105,6 +113,7 @@ spec:
           readinessProbe: {httpGet: {path: /readyz, port: health}, periodSeconds: 5, timeoutSeconds: 4, failureThreshold: 3}
           livenessProbe: {httpGet: {path: /healthz, port: health}, periodSeconds: 15, timeoutSeconds: 3, failureThreshold: 3}
       volumes:
+        {{- include "neonControl.providerVolumes" (dict "root" . "private" true) | nindent 8 }}
         {{- include "neonControl.functionsVolumes" . | nindent 8 }}
         {{- if .Values.functions.enabled }}
         - name: functions-issuer
@@ -128,6 +137,13 @@ spec:
             secretName: {{ .Values.api.existingSecret }}
             defaultMode: 0440
             items: [{key: idempotency-key, path: idempotency-key}]
+        {{- if .Values.backendCredentials.enabled }}
+        - name: backend-keys
+          secret:
+            secretName: {{ required "backendCredentials.existingSecret is required" .Values.backendCredentials.existingSecret }}
+            defaultMode: 0440
+            items: [{key: keyring.json, path: keyring.json}]
+        {{- end }}
         {{- if .Values.api.pgCASecret }}
         - name: pg-ca
           secret: {secretName: {{ .Values.api.pgCASecret }}, defaultMode: 0440}

@@ -1,4 +1,7 @@
 import { startRuntime } from './server.mjs';
+import { installOutputConsole } from './output.mjs';
+
+installOutputConsole();
 
 const entry = process.argv[2] || '/srv/function/index.mjs';
 if (!['/srv/function/index.mjs', '/srv/function/index.js'].includes(entry)) throw new Error('Invalid installed runtime entry');

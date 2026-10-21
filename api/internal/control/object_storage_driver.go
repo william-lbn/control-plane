@@ -17,6 +17,9 @@ var objectStorageSchema string
 //go:embed assets/storage-multipart.sql
 var objectMultipartSchema string
 
+//go:embed assets/storage-object-events.sql
+var objectEventsSchema string
+
 type ObjectStorageSpec struct {
 	Database string `json:"database"`
 }
@@ -62,6 +65,9 @@ func applyObjectStorageSQLTx(ctx context.Context, tx pgx.Tx, p objectStoragePayl
 		return err
 	}
 	if _, err = tx.Exec(ctx, objectMultipartSchema, pgx.QueryExecModeSimpleProtocol); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(ctx, objectEventsSchema, pgx.QueryExecModeSimpleProtocol); err != nil {
 		return err
 	}
 	// The marker and immutable database identity preserve inherited manifests.

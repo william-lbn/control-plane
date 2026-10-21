@@ -23,23 +23,27 @@ func ValidTriggerInvocationID(id string) bool { return triggerInvocationPattern.
 // with older control clients. An old guest returns 404: triggers fail closed
 // before dispatch instead of silently losing privileged header attestation.
 type InstanceCapabilities struct {
-	Scope              Scope  `json:"scope"`
-	BootID             string `json:"boot_id"`
-	TriggerInvocations bool   `json:"trigger_invocations"`
+	Scope                  Scope  `json:"scope"`
+	BootID                 string `json:"boot_id"`
+	TriggerInvocations     bool   `json:"trigger_invocations"`
+	WebSockets             bool   `json:"websockets,omitempty"`
+	OutputLogs             bool   `json:"output_logs,omitempty"`
+	ManagerIdentityRenewal bool   `json:"manager_identity_renewal,omitempty"`
 }
 
 // InstanceStatus contains privileged supervisor observations. NodeObservation
 // belongs to customer code and must never authorize retirement or resource use.
 type InstanceStatus struct {
-	Scope                     Scope           `json:"scope"`
-	BootID                    string          `json:"boot_id"`
-	ActiveInvocations         int             `json:"active_invocations"`
-	Draining                  bool            `json:"draining"`
-	LastActivity              time.Time       `json:"last_activity"`
-	Runtime                   string          `json:"runtime"`
-	BackgroundCountersTrusted bool            `json:"background_counters_trusted"`
-	NodeReady                 bool            `json:"node_ready"`
-	NodeObservation           json.RawMessage `json:"node_observation,omitempty"`
+	Scope                     Scope            `json:"scope"`
+	BootID                    string           `json:"boot_id"`
+	ActiveInvocations         int              `json:"active_invocations"`
+	Draining                  bool             `json:"draining"`
+	LastActivity              time.Time        `json:"last_activity"`
+	Runtime                   string           `json:"runtime"`
+	BackgroundCountersTrusted bool             `json:"background_counters_trusted"`
+	NodeReady                 bool             `json:"node_ready"`
+	NodeObservation           json.RawMessage  `json:"node_observation,omitempty"`
+	ManagerIdentity           *ManagerIdentity `json:"manager_identity,omitempty"`
 }
 
 // InstanceClient is fixed to one admitted instance and private Service IP. The
@@ -111,6 +115,9 @@ func (c *InstanceClient) Status(ctx context.Context) (InstanceStatus, error) {
 	var status InstanceStatus
 	if err != nil || response.StatusCode != 200 || len(body) > 16<<10 || strictJSON(body, &status) != nil || status.Scope != c.scope || !bootPattern.MatchString(status.BootID) || status.Runtime != Runtime || status.LastActivity.IsZero() || status.ActiveInvocations < 0 || status.ActiveInvocations > MaxInvocations || status.BackgroundCountersTrusted {
 		return InstanceStatus{}, errors.New("Functions manager identity or status rejected")
+	}
+	if v := status.ManagerIdentity; v != nil && (v.Scope != c.scope || v.BootID != status.BootID || !digestPattern.MatchString(v.Fingerprint) || v.Renewals < 0 || !v.NotAfter.After(v.NotBefore)) {
+		return InstanceStatus{}, errors.New("manager identity scope rejected")
 	}
 	return status, nil
 }

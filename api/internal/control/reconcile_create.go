@@ -71,7 +71,23 @@ func (s *server) reconcileCreate(ctx context.Context, operationID, workerID, act
 	if p.ProjectID == "" || p.BranchID == "" || p.TenantID == "" || p.TimelineID == "" || (p.EndpointID == "" && action != "create_branch") {
 		return errors.New("incomplete create operation payload")
 	}
+	if p.CatalogPolicy != "" {
+		if p.CatalogPolicy != catalogPreserveInheritedSQL {
+			return errors.New("unknown native catalog initialization policy")
+		}
+		source, err := readCatalogInheritanceSource(ctx, s.db, operationID, p)
+		if err != nil {
+			return err
+		}
+		p.CatalogInitializePlatform = source.InitializePlatform
+	}
+	if err := s.ensureCatalogForkInspection(ctx, operationID, workerID, action, p); err != nil {
+		return err
+	}
 	if p.EndpointID != "" {
+		if err := s.resumeComputeCatalogBootstrap(ctx, p); err != nil {
+			return err
+		}
 		var err error
 		p.CatalogSpec, err = s.projectComputeCatalog(ctx, p.ProjectID, p.BranchID)
 		if err != nil {
@@ -191,10 +207,18 @@ func (s *server) reconcileCreate(ctx context.Context, operationID, workerID, act
 				valid = len(result.Rows[0]) == 1 && fmt.Sprint(result.Rows[0][0]) == "1"
 			}
 			if valid {
-				if p.EndpointType != "read_only" {
-					return s.claimInheritedCatalog(ctx, p)
+				if p.CatalogPolicy == catalogPreserveInheritedSQL {
+					return s.finishCatalogInheritance(ctx, operationID, workerID, p)
 				}
-				return nil
+				if p.EndpointType != "read_only" {
+					if err = s.confirmCatalogForkExclusionBackings(ctx, operationID, workerID, p); err != nil {
+						return err
+					}
+					if err = s.claimInheritedCatalog(ctx, p); err != nil {
+						return err
+					}
+				}
+				return s.sealComputeCatalogBootstrap(ctx, operationID, workerID, p, false)
 			}
 			probeErr = err
 			if probeErr == nil {

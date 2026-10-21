@@ -63,14 +63,19 @@ export function Workbench({
     setQueryAction('query');
     const target =
       historyTarget.current?.endpoint_id === endpoint?.id ? historyTarget.current : null;
-    setRole(target?.role_name || endpoint?.role_name || '');
-    setDatabase(target?.database_name || endpoint?.database_name || '');
+    setRole(target?.role_name || endpoint?.connection_defaults?.role || endpoint?.role_name || '');
+    setDatabase(
+      target?.database_name ||
+        endpoint?.connection_defaults?.database ||
+        endpoint?.database_name ||
+        '',
+    );
     historyTarget.current = null;
     setBusy(false);
     return () => {
       scopeEpoch.current++;
     };
-  }, [projectId, endpoint?.id]);
+  }, [projectId, endpoint?.id, endpoint?.connection_defaults?.version_token]);
   useEffect(() => {
     scopeEpoch.current++;
     setPassword('');

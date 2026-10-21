@@ -209,7 +209,29 @@ func ProvisionTx(ctx context.Context, tx pgx.Tx, s Scope, verifier string) error
 			return err
 		}
 	}
-	return verifyRole(ctx, tx, s)
+	if err := verifyRole(ctx, tx, s); err != nil {
+		return err
+	}
+	// PostgreSQL may report an ungrantable GRANT as a warning and still return
+	// success. Verify the effective result inside this transaction, before a
+	// partial role can commit or be advertised as ready to the SQL Proxy.
+	var complete bool
+	err = tx.QueryRow(ctx, `SELECT has_database_privilege($1,current_database(),'CONNECT')
+ AND has_schema_privilege($1,$2,'USAGE')
+ AND NOT EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+  WHERE n.nspname=$2 AND c.relkind='r' AND NOT (
+   has_table_privilege($1,c.oid,'SELECT') AND has_table_privilege($1,c.oid,'INSERT')
+   AND has_table_privilege($1,c.oid,'UPDATE') AND has_table_privilege($1,c.oid,'DELETE')))
+ AND NOT EXISTS(SELECT 1 FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+  WHERE n.nspname=$2 AND c.relkind='S' AND NOT (
+   has_sequence_privilege($1,c.oid,'USAGE') AND has_sequence_privilege($1,c.oid,'SELECT')))`, role, s.Schema).Scan(&complete)
+	if err != nil {
+		return err
+	}
+	if !complete {
+		return errors.New("Functions SQL grants incomplete; database owner must authorize CONNECT/schema/table/sequence grant options")
+	}
+	return nil
 }
 
 func verifyRole(ctx context.Context, tx pgx.Tx, s Scope) error {

@@ -14,6 +14,8 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/william-lbn/control-plane/api/internal/functionsql"
 )
 
 var computeWorkloadPattern = regexp.MustCompile(`^cp-[a-f0-9]{16}$`)
@@ -187,7 +189,7 @@ func (g *computeGateway) configure(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var requested map[string]any
-	if json.Unmarshal(body, &requested) != nil || !sameComputeIdentity(stored, requested) {
+	if json.Unmarshal(body, &requested) != nil || !validComputeCatalogRequest(stored, requested) {
 		http.Error(w, "Configuration identity mismatch", 403)
 		return
 	}
@@ -226,6 +228,50 @@ func (g *computeGateway) configure(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
 	w.Write(result)
+}
+
+// Preserve the complete non-catalog identity rule. The sole extra shape is the
+// exact transient single-role projection produced by the leased catalog Worker;
+// it cannot smuggle databases, tombstones, other roles or startup overrides.
+func validComputeCatalogRequest(stored, requested map[string]any) bool {
+	if sameComputeIdentity(stored, requested) {
+		return true
+	}
+	if nested(stored, "spec", "skip_pg_catalog_updates") != true || nested(requested, "spec", "skip_pg_catalog_updates") != false {
+		return false
+	}
+	requestedSpec, ok := requested["spec"].(map[string]any)
+	if !ok {
+		return false
+	}
+	comparable := map[string]any{}
+	for key, value := range requested {
+		comparable[key] = value
+	}
+	specCopy := map[string]any{}
+	for key, value := range requestedSpec {
+		specCopy[key] = value
+	}
+	specCopy["skip_pg_catalog_updates"] = true
+	comparable["spec"] = specCopy
+	if !sameComputeIdentity(stored, comparable) {
+		return false
+	}
+	roles, ok := nested(requested, "spec", "cluster", "roles").([]any)
+	if !ok || len(roles) != 1 {
+		return false
+	}
+	role, ok := roles[0].(map[string]any)
+	if !ok {
+		return false
+	}
+	verifier := stringVal(role["encrypted_password"])
+	if !functionsql.ValidVerifier(verifier) {
+		return false
+	}
+	p := catalogPayload{ProjectID: stringVal(nested(stored, "spec", "cluster", "cluster_id")), Name: stringVal(role["name"])}
+	apply, _, err := computeCatalogBootstrapNativeRoleConfigs(stored, p, verifier)
+	return err == nil && reflect.DeepEqual(apply, requested)
 }
 
 func sameComputeIdentity(stored, requested map[string]any) bool {

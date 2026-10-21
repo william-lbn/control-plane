@@ -385,6 +385,9 @@ func (s *server) completeMultipart(ctx context.Context, conn *pgx.Conn, p object
 	if e != nil {
 		return u, e
 	}
+	if e = s.publishStorageFunctionEvent(ctx, tx, p, bucket, u.Key, u.SHA256, size); e != nil {
+		return u, e
+	}
 	_, e = tx.Exec(ctx, `UPDATE neon_storage.multipart_uploads SET state='completed',completion_hash=$2,result_sha256=$3,result_size=$4,updated_at=now() WHERE id=$1`, id, hash, u.SHA256, size)
 	if e != nil {
 		return u, e
