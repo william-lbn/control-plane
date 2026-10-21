@@ -1,7 +1,9 @@
 # DSGA 创建执行器与持久身份恢复
 
 2026-10-21，V3增量。当前模块实现可信Driver的typed API创建执行器与恢复协议，
-**版本化Operation生产者、真实数据库UID绑定和安全配置Renderer尚待接线**。
+真实数据库UID绑定模块已补充，详见
+[创建身份元数据绑定](DSGA-创建身份元数据绑定与Mac验证.md)；
+**版本化Operation生产者、安全配置Renderer及实际worker调度尚待接线**。
 公开创建仍为原PG16流程且拒绝收养DSGA；本模块没有启用该公开入口，不代表
 完整Driver、R02预算或最终VM执行链已经完成。不构建镜像、不部署、不合主分支。
 
@@ -72,8 +74,10 @@ Linux/amd64 CGO0 cmd交叉编译通过，非Linux运行认证。
 
 实际生产者要持久化可信模式/PG版本/不可变镜像/显式预算/随机身份/确定性配置
 元数据，使用旧worker不会按PG16执行的版本化action；新增migration保留历史文件。
-真实Bind/BindConfig必须在原Operation行锁/有效worker lease下核对作用域，原值
-存在时比较后只读确认，不覆盖其他UID，也不把数据库成功当跨对象原子执行权。
+真实Bind/BindConfig现由`dsga_creation_binding.go`在原Operation行锁/有效worker
+lease下核对作用域，原值存在时比较后只读确认，不覆盖其他UID；追加058迁移
+固定原意图与UID、保留新主线失败清理/TTL约束。实际生产者/worker必须把这两个
+回调和已持久原UID接入本执行器，不把数据库成功当跨对象原子执行权。
 
 原Driver用户密码就是cloud_admin verifier，而Compute会以SUPERUSER创建该角色。
 新的DSGA Renderer必须隔离内部管理/普通租户密码与路由，核对实际角色权限及
