@@ -18,13 +18,7 @@ import (
 // 不将payload转成map/float64后重写；绑定事实独立存表，原意图始终保持原样。
 type dsgaCreationEnvelope struct {
 	createPayload
-	Creation struct {
-		ProtocolVersion   uint32 `json:"protocol_version"`
-		PostgresVersion   uint32 `json:"postgres_version"`
-		Namespace         string `json:"namespace"`
-		Incarnation       string `json:"incarnation"`
-		ComputeInstanceID string `json:"compute_instance_id"`
-	} `json:"dsga_creation"`
+	Creation dsgaCreationIdentity `json:"dsga_creation"`
 }
 
 type dsgaCreationBinding struct {

@@ -160,7 +160,13 @@ func addCreateOperation(ctx context.Context, tx pgx.Tx, action, resourceType, re
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, `INSERT INTO operations(id,project_id,resource_type,resource_id,action,state,actor_id,request_id,payload)
+	return addCreateOperationJSON(ctx, tx, action, resourceType, resourceID, projectID, operationID, actor, requestID, b, key, hash, steps)
+}
+
+// 原PG16与版本化DSGA生产者共享写入/步骤/idempotency事务；只接受各自已经
+// 校验并编码的完整payload，不在此解释模式或把未知字段解码成float64后重写。
+func addCreateOperationJSON(ctx context.Context, tx pgx.Tx, action, resourceType, resourceID, projectID, operationID, actor, requestID string, b []byte, key, hash string, steps []string) error {
+	_, err := tx.Exec(ctx, `INSERT INTO operations(id,project_id,resource_type,resource_id,action,state,actor_id,request_id,payload)
 		VALUES($1,$2,$3,$4,$5,'queued',$6,$7,$8)`, operationID, projectID, resourceType, resourceID, action, actor, requestID, b)
 	if err != nil {
 		return err
