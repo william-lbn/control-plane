@@ -103,15 +103,63 @@ control-plane-broker-{dedicated-negative.log,dedicated-restored.jsonl,dedicated-
 control-plane-guest-boundary-linux-compile.log。最早网络直连下载失败后按依赖
 分流使用原Go代理和own-fork固定SHA，不降级依赖；源码与sum以实际Git为准。
 
-## 下一段真实链与目标验收
+## 2026-10-21：实际Agent消费者与六路由代理已接线
 
-现有Compute管理HTTP仍监听普通3080，已有TLS gateway只代理configure。本批只
-新增凭据路由，没有把DSGA操作HTTP代理或Agent消费包装为已完成。Agent还需要
-可信CA/固定目标启动链，不能由普通请求提供URL/CA，也不能分发中心签名私钥。
-独立DSGA TLS入口/管理域证书已在本批代码接入，兼顾原configure；后续还须
-接Agent可信CA文件消费与DSGA操作代理的固定SNI路由，
-再接长期Go SDK、持久owner与受控首次boot发现，保留全部未知意图。Agent还应在
-正常TLS验证之外拒绝无管理域wildcard的对端身份，防止误把Guest CA作为签发信任。
+Autoscaling自有功能分支`f60ff588b4dba403885dcd371caa412079ae87a5`已推送并
+核对远程；本仓固定使用该精确模块，不从官方同名模块意外取得另一份实现。
+`credential.Client`使用可信CA/固定目标/SNI、投影SA文件、有界并发刷新，
+标准TLS验证后仍拒绝Guest旧叶身份。真实Agent入口先核对固定VM UID及受管标记，
+再使用真实Lease owner Session和长期PGWorker；受控首次boot只适用于完整空日志。
+
+独立:8444的实际生产mux增加`GET /dsg/v1/{capabilities,memory}`及
+`POST /dsg/v1/{resize,resize/status,resize/cancel,issuer/fence}`。仅允许这些
+方法/准确路径，无query/编码别名/GET body。POST body最多16KiB，10秒读期限；
+响应最多1MiB，JSON有效才透传。不转发调用方的重试/连接/目标头或上游cookie/
+Location；不跟随redirect，也不透明重试POST，失败保留未知原意图。
+
+入口从TLS SNI确定Compute，核对同一owned配置的专用Ed25519 JWT及实际VM UID/
+CIID。严格匹配原生Rust的aud/scope、规范字符串epoch和整数秒nbf/exp；拒绝
+重复/未知成员、重复kid及过长有效期。每次派发前重读完整journal、Lease→journal
+→Lease核验当前epoch/holder、保守续约新鲜度和可派发生命周期，不能只看缓存JWT。
+最后一次读取仍不是跨对象原子票据，PG issuer floor及最终Runner fence继续必需。
+
+内部目标只取同project/endpoint的owned ClusterIP Service，固定3080，严格
+selector/端口/协议/UID/RV及未删除；原生Compute仍独立验签。执行70秒、观察/
+查询/取消15秒分别使用有限连接池；总期限90秒、监听器写期限100秒，凭据路由
+自己的10秒期限不变。Agent将凭据1..30秒与Compute90..120秒配置分开，兼容
+原生PG最多60秒等待；超时不是取消已发送SQL，更不是成功/VM许可。
+
+最终Mac全API race：**956个pass事件（255顶层/701子）、9个测试包通过，
+10个无测试文件包单列，0用例fail/skip**。官方Darwin PostgREST16.4的实际RLS、
+一次性SCRAM PG均执行，结束后自有临时PG已关闭。68个DSGA事件覆盖真实TLS
+签发/六个代理路由、原样字节/最大uint64、旧owner/Lease/VM重建、错误Service、
+双池长执行期间查询/取消、未知响应/redirect/限body及请求边界。
+
+新增实际连接测试使用生产owner Elector/Session→credential.Client→中心TokenReview
+及完整journal→Compute SDK→同一个生产代理mux→本机原生端协议夹具；固定PG
+boot在返回SDK前绑定。这里最后的native响应仍是协议夹具，不能说已经覆盖真实
+Rust/PG全链。独立真实Go→Rust Compute→SQL→PG17门禁9.24秒通过，但不能将
+两条分别通过的链拼称中心网关到真实PG的端到端已全部通过。
+
+连接测试最初10秒期限小于夹具旧Lease30秒观察期而超时；修正为等待真实短旧
+Lease后UID/RV接管，生产选主规则没有放宽。三项实际生产故障注入分别去掉最后
+owner核验、签名核验、重复claims拒绝，均被对应业务断言捕获；首次签名变异
+因变量未使用编译失败，不计反向成功，修正后取得真实断言失败。finally逐字节
+恢复，核对source-sha256清单后重新执行上述完整956项事件的最终回归。
+
+日志：工作区`build/control-plane-proxy-mac-final2/`、
+`control-proxy-chain-{focused,final-focused}.jsonl`、`control-proxy-negative/`及
+`control-proxy-vet-final.log`（全仓vet通过）。新增源码的Linux/amd64 CGO0全部
+cmd交叉编译通过，Autoscaling实际Agent Linux/amd64也编译通过，日志分别为
+`control-proxy-linux-cli.log`、`autoscaling-agent-linux-compile.log`；沙箱只读
+模块缓存出现一次非致命stat-cache写入警告，命令退出0。没有Linux运行验收。
+
+## 后续完整业务与目标验收
+
+现有原生HTTP仍监听内部普通3080；原:8443 configure、独立:8444的凭据及DSGA
+操作代理已分别接线。管理域私钥只挂中心、投影令牌/可信CA接Agent、内部Service
+网络隔离仍须在真实平台验收；不能因为Mac协议夹具通过就宣称RBAC/网络部署正确。
+跨owner/boot的完整受控关闭、中心网关到真实Rust/PG整链仍须继续完成。
 
 Driver必须在Runner启动前完成真实VM UID、安全Compute spec与完整journal，
 持久屏障解除采用UID/RV；当前缺口仍是代码工作，不能归为Linux待测。预算/quiesce/

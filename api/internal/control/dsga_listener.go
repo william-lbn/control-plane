@@ -81,6 +81,8 @@ func (gateway *computeGateway) dsgaServer(config dsgaListenerConfig) (*http.Serv
 		return nil, err
 	}
 	return &http.Server{Addr: config.Bind, Handler: routes, ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 10 * time.Second,
-		WriteTimeout: 15 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 16384,
+		// 执行代理独立总期限90秒，包含最多60秒PG等待；凭据路由仍有自己
+		// 的10秒期限。不得复用旧15秒写期限截断已经执行的PG请求。
+		WriteTimeout: 100 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 16384,
 		TLSConfig: &tls.Config{MinVersion: tls.VersionTLS12, GetCertificate: certificate}}, nil
 }

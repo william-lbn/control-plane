@@ -21,6 +21,7 @@ import (
 	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	coordclient "k8s.io/client-go/kubernetes/typed/coordination/v1"
 	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/util/flowcontrol"
@@ -33,6 +34,7 @@ type dsgaCredentialBroker struct {
 	kube     *kubeClient
 	vms      vmclient.Interface
 	core     coreclient.CoreV1Interface
+	coord    coordclient.CoordinationV1Interface
 	verifier *owner.PodVerifier
 }
 
@@ -66,7 +68,7 @@ func newDSGACredentialBroker(kube *kubeClient, agentNamespace, account string) (
 	if err != nil {
 		return nil, err
 	}
-	return &dsgaCredentialBroker{kube: kube, vms: vms, core: clients.CoreV1(), verifier: verifier}, nil
+	return &dsgaCredentialBroker{kube: kube, vms: vms, core: clients.CoreV1(), coord: clients.CoordinationV1(), verifier: verifier}, nil
 }
 
 // 只读取本入口的身份字段；完整启动预算由生产Compute的同一Rust/PG契约校验。

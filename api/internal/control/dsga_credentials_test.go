@@ -38,16 +38,19 @@ const brokerTestWorkload = "cp-0123456789abcdef"
 // 本机TLS协议夹具，不是apiserver/RBAC认证。journal的创建/读取/条件更新走
 // 自有生产Store及真正生成的typed客户端，不手写压缩日志或放置owner镜像。
 type brokerTestAPI struct {
-	mu           sync.Mutex
-	vm           *vmv1.VirtualMachine
-	lease        *coordination.Lease
-	config       *core.Secret
-	credentials  *core.Secret
-	validAPIAuth bool
-	secretWrites int
-	afterKeyRead func()
-	kube         *kubeClient
-	listener     dsgaListenerConfig
+	mu               sync.Mutex
+	vm               *vmv1.VirtualMachine
+	lease            *coordination.Lease
+	config           *core.Secret
+	credentials      *core.Secret
+	validAPIAuth     bool
+	secretWrites     int
+	afterKeyRead     func()
+	kube             *kubeClient
+	listener         dsgaListenerConfig
+	proxy            *dsgaProxy
+	service          *core.Service
+	managementCAFile string
 }
 
 func brokerDedicatedCertificate(t *testing.T) ([]byte, tls.Certificate, string, string) {
@@ -126,6 +129,16 @@ func (f *brokerTestAPI) serve(w http.ResponseWriter, r *http.Request) {
 		}
 		output = f.vm
 	case "/apis/coordination.k8s.io/v1/namespaces/neon/leases/" + owner.LeaseName(journal.Binding{Namespace: "neon", Name: brokerTestWorkload, VMUID: "vm-uid", Incarnation: strings.Repeat("a", 32)}):
+		if r.Method == http.MethodPut {
+			var updated coordination.Lease
+			if json.NewDecoder(r.Body).Decode(&updated) != nil || updated.UID != f.lease.UID || updated.ResourceVersion != f.lease.ResourceVersion {
+				http.Error(w, "lease condition failed", http.StatusConflict)
+				return
+			}
+			version, _ := strconv.Atoi(updated.ResourceVersion)
+			updated.ResourceVersion = strconv.Itoa(version + 1)
+			f.lease = updated.DeepCopy()
+		}
 		output = f.lease
 	case "/apis/authentication.k8s.io/v1/tokenreviews":
 		var request authentication.TokenReview
@@ -145,6 +158,8 @@ func (f *brokerTestAPI) serve(w http.ResponseWriter, r *http.Request) {
 			Spec: core.PodSpec{NodeName: "node-a", ServiceAccountName: "autoscaler"}, Status: core.PodStatus{Phase: core.PodRunning}}
 	case "/api/v1/namespaces/neon/secrets/" + brokerTestWorkload + "-config":
 		output = f.config
+	case "/api/v1/namespaces/neon/services/" + brokerTestWorkload + "-management":
+		output = f.service
 	case "/api/v1/namespaces/neon/secrets/" + brokerTestWorkload + "-credentials":
 		if r.Method != http.MethodGet {
 			f.secretWrites++
@@ -210,11 +225,22 @@ func newBrokerTest(t *testing.T) (*brokerTestAPI, *journal.Store, owner.Ownershi
 	f.mu.Unlock()
 	claim := owner.Ownership{Namespace: "neon", VMName: brokerTestWorkload, VMUID: "vm-uid", Incarnation: binding.Incarnation, LeaseUID: "lease-uid", HolderID: holder, IssuerEpoch: 1}
 	ca, pair, certFile, keyFile := brokerDedicatedCertificate(t)
+	f.managementCAFile = filepath.Join(t.TempDir(), "management-ca.crt")
+	if os.WriteFile(f.managementCAFile, ca, 0600) != nil {
+		t.Fatal("cannot write test management CA")
+	}
 	gateway := &computeGateway{kube: kube}
 	f.listener = dsgaListenerConfig{Bind: "127.0.0.1:0", AgentNamespace: "agents", AgentAccount: "autoscaler", CertFile: certFile, KeyFile: keyFile}
 	production, err := gateway.dsgaServer(f.listener)
 	if err != nil {
 		t.Fatal(err)
+	}
+	probe, _ := http.NewRequest(http.MethodGet, "/dsg/v1/capabilities", nil)
+	handler, _ := production.Handler.(*http.ServeMux).Handler(probe)
+	var ok bool
+	f.proxy, ok = handler.(*dsgaProxy)
+	if !ok {
+		t.Fatal("production dedicated listener did not mount DSGA proxy")
 	}
 	server := httptest.NewUnstartedServer(production.Handler)
 	server.TLS = production.TLSConfig.Clone()
