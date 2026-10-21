@@ -38,6 +38,29 @@ CREATE held→实际VM UID/安全原生spec/owned Secret/完整日志→UID/RV�
 必须先隔离租户角色与管理角色、覆盖已有连接的新SQL/后台工作及恢复后准入。
 这是代码缺口，不能写成只待Linux验收，亦不能靠单独改PG_VERSION为17完成。
 
+## 2026-10-21：旧Driver拒绝收养DSGA现场
+
+真实旧`createCompute`在读取凭据或进行配置/Service写入前直接预读VM及配置，
+仅404视为未创建；API故障、权限/取消中断，外来对象拒绝。bootstrap字段存在，
+或任一mode/journal标记存在（包括空、null、坏值），均拒绝；动态配置字段存在
+或JSON损坏亦拒绝。使用RawMessage探测，不将预算数字经过float64转换。
+
+`createOwned`冲突读回的实际配置/VM再次检查；`waitCompute`及`publishRoute`也
+独立拒绝受管VM，防止原PG16恢复/路由入口把cloud_admin发布成DSGA租户登录。
+这是混部/恢复的保护，**不是已经完成DSGA创建Driver**，也不替代UID/RV屏障或
+最终执行fence。旧worker不可忽略的版本化DSGA操作及全部创建角色接线仍继续。
+
+13类实际入口拒绝场景验证没有读取凭据或写入资源；新建对象404和原静态配置
+2类正向兼容场景通过。真实生产反向移除VM字段检查、配置字段检查及route检查，
+均触发对应业务断言，逐字节恢复后完整API回归：**983个pass事件（258顶层/
+725子）、9测试包通过、10无测试包单列、0用例fail/skip**。真实PG/SCRAM及官方
+Darwin PostgREST16.4已执行，临时数据库关闭；全仓vet及全部Linux/amd64 cmd
+交叉编译通过，非Linux运行。关键代码含中文职责/不变量/时序/错误恢复注释。
+
+日志：`build/control-plane-legacy-guard-mac-final/`（含源码hash）、
+`control-legacy-guard-focused.jsonl`、`control-legacy-guard-negative/`、
+`control-legacy-guard-{vet,linux-cli}.log`。此批不构建镜像、不准备部署、不合主分支。
+
 ## 依赖与实际入口
 
 复用自有Autoscaling提交3eeafd997c8cc9079fcf90ffd0df27aa32c13ce5：

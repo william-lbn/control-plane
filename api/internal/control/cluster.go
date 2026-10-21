@@ -353,6 +353,9 @@ func (e vmWaitError) Error() string {
 func (e vmWaitError) Unwrap() error { return e.cause }
 
 func (k *kubeClient) createCompute(ctx context.Context, p createPayload) (map[string]any, error) {
+	if err := k.legacyComputePreflight(ctx, p); err != nil {
+		return nil, err
+	}
 	name := kubeName(p.EndpointID)
 	credential, err := k.request(ctx, http.MethodGet, k.path("secret", name+"-credentials"), nil)
 	if err != nil || !owned(credential, p.ProjectID, p.EndpointID) {
@@ -463,6 +466,9 @@ func (k *kubeClient) createCompute(ctx context.Context, p createPayload) (map[st
 	if err != nil {
 		return nil, err
 	}
+	if err := requireLegacyConfig(configSecret); err != nil {
+		return nil, err
+	}
 	var persisted map[string]any
 	if err := json.Unmarshal([]byte(storedConfig), &persisted); err != nil {
 		return nil, err
@@ -516,6 +522,9 @@ func (k *kubeClient) createCompute(ctx context.Context, p createPayload) (map[st
 	if err != nil {
 		return nil, err
 	}
+	if err := requireLegacyVM(created); err != nil {
+		return nil, err
+	}
 	return map[string]any{"vm": created, "roles": roles, "probe_password": probePassword}, nil
 }
 
@@ -528,6 +537,9 @@ func (k *kubeClient) waitCompute(ctx context.Context, projectID, endpointID stri
 		if err == nil {
 			if !owned(vm, projectID, endpointID) {
 				return nil, errors.New("VM ownership mismatch")
+			}
+			if err := requireLegacyVM(vm); err != nil {
+				return nil, err
 			}
 			lastPhase = stringVal(nested(vm, "status", "phase"))
 			if lastPhase == "Running" {
@@ -576,6 +588,9 @@ func vmTemplate(vm map[string]any) map[string]any {
 }
 
 func (k *kubeClient) publishRoute(ctx context.Context, p createPayload, vm map[string]any, roles map[string]string) error {
+	if err := requireLegacyVM(vm); err != nil {
+		return err
+	}
 	if !owned(vm, p.ProjectID, p.EndpointID) {
 		return errors.New("route VM ownership mismatch")
 	}
