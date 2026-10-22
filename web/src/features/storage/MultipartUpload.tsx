@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { sha256 } from '@noble/hashes/sha2.js';
-import { bytesToHex } from '@noble/hashes/utils.js';
+import { storageBlobDigest } from './fileDigest';
 import { api } from '../../api';
 import { newRequestKey } from '../../shared/requestKey';
 
@@ -15,15 +14,16 @@ type Upload = {
 };
 type Part = { part_number: number; etag: string; sha256: string; size: number };
 const partBytes = 5 * 1024 * 1024;
-const objectBytes = 8 * 1024 * 1024;
 
 export function MultipartUpload({
   bucketPath,
+  objectBytes = 8 * 1024 * 1024,
   canEdit,
   showError,
   onPublished,
 }: {
   bucketPath: string;
+  objectBytes?: number;
   canEdit: boolean;
   showError: (error: unknown) => void;
   onPublished: () => Promise<void>;
@@ -71,9 +71,7 @@ export function MultipartUpload({
   }
   async function upload(resume: boolean, signal: AbortSignal) {
     if (!file || file.size > objectBytes || (!resume && !key)) return;
-    const bytes = new Uint8Array(await file.arrayBuffer());
-    signal.throwIfAborted();
-    const digest = bytesToHex(sha256(bytes));
+    const digest = (await storageBlobDigest(file, signal)).hex;
     let id = selected;
     if (!resume) {
       const input = {
@@ -106,14 +104,14 @@ export function MultipartUpload({
     }
     if (detail.upload.state !== 'uploading') throw new Error('上传已经中止，请显式创建新的上传。');
     const manifest: { part_number: number; etag: string }[] = [];
-    const count = Math.max(1, Math.ceil(bytes.length / partBytes));
+    const count = Math.max(1, Math.ceil(file.size / partBytes));
     setProgress(0);
     for (let i = 0; i < count; i++) {
       signal.throwIfAborted();
-      const chunk = bytes.slice(i * partBytes, (i + 1) * partBytes);
-      const expected = bytesToHex(sha256(chunk));
+      const chunk = file.slice(i * partBytes, (i + 1) * partBytes);
+      const expected = (await storageBlobDigest(chunk, signal)).hex;
       let part = detail.parts.find((item) => item.part_number === i + 1);
-      if (!part || part.sha256 !== expected || part.size !== chunk.length) {
+      if (!part || part.sha256 !== expected || part.size !== chunk.size) {
         part = await api<Part>(`${path}/${id}/parts/${i + 1}`, {
           method: 'PUT',
           signal,
@@ -121,7 +119,7 @@ export function MultipartUpload({
           body: chunk,
         });
       }
-      if (part.sha256 !== expected || part.size !== chunk.length)
+      if (part.sha256 !== expected || part.size !== chunk.size)
         throw new Error('分片校验不一致；上传未发布。');
       manifest.push({ part_number: part.part_number, etag: part.etag });
       if (alive.current) setProgress(i + 1);
@@ -143,7 +141,7 @@ export function MultipartUpload({
     <section className="backend-panel" data-testid="storage-multipart-panel">
       <h3>分段上传与续传</h3>
       <p>
-        当前文件上限 8 MiB，每片最多 5
+        当前文件上限 {objectBytes / 1024 / 1024} MiB，控制台每片 5
         MiB，串行发送。完成前对象不可见；续传须重新选择原文件。这里只创建新对象，已有同名对象会保留。
       </p>
       <button
@@ -200,7 +198,7 @@ export function MultipartUpload({
         />
       </label>
       {file && file.size > objectBytes && (
-        <p role="alert">当前文件超过 8 MiB；大对象流式支持尚未完成。</p>
+        <p role="alert">当前文件超过 {objectBytes / 1024 / 1024} MiB 上限。</p>
       )}
       <div className="storage-actions">
         <button

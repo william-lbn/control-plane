@@ -20,7 +20,7 @@ on:
       catalog_suite:
         description: Catalog identity acceptance
         type: choice
-        options: [none, catalog-object-bindings.spec.ts, catalog-inheritance.spec.ts, catalog-current-observation.spec.ts, catalog-current-inventory.spec.ts]
+        options: [none, storage-large-objects.spec.ts, catalog-object-bindings.spec.ts, catalog-inheritance.spec.ts, catalog-current-observation.spec.ts, catalog-current-inventory.spec.ts]
         default: none
       failed_parent_kind:
         description: Exact parent create failure to validate (branch or project)
@@ -88,7 +88,7 @@ jobs:
             catalog-rename.spec.ts) test -f "$NEON_E2E_CATALOG_RENAME_FIXTURE" ;;
             database-owner.spec.ts) test -f "$NEON_E2E_CATALOG_OWNER_FIXTURE" ;;
             history-sharing.spec.ts) test -f "$NEON_E2E_SQL_SCRIPT_FIXTURE"; test -f "$NEON_E2E_CONSOLE_ACCOUNT_FIXTURE" ;;
-            history-names.spec.ts|sql-ai-repair.spec.ts|sql-assistant.spec.ts|storage-multipart-administration.spec.ts|storage-multipart.spec.ts|plan-comparison.spec.ts|history-delete.spec.ts|auth-security.spec.ts|s3-storage.spec.ts|storage-directory.spec.ts|sql-plan-tree.spec.ts|sql-xlsx.spec.ts|storage-copy-conditions.spec.ts|storage-copy.spec.ts|storage-metadata-edit.spec.ts|storage-browser-metadata.spec.ts|storage-presigned-upload.spec.ts|storage-bulk-delete.spec.ts|sql-script.spec.ts|sql-tools.spec.ts) test -f "$NEON_E2E_SQL_SCRIPT_FIXTURE" ;;
+            storage-large-objects.spec.ts|history-names.spec.ts|sql-ai-repair.spec.ts|sql-assistant.spec.ts|storage-multipart-administration.spec.ts|storage-multipart.spec.ts|plan-comparison.spec.ts|history-delete.spec.ts|auth-security.spec.ts|s3-storage.spec.ts|storage-directory.spec.ts|sql-plan-tree.spec.ts|sql-xlsx.spec.ts|storage-copy-conditions.spec.ts|storage-copy.spec.ts|storage-metadata-edit.spec.ts|storage-browser-metadata.spec.ts|storage-presigned-upload.spec.ts|storage-bulk-delete.spec.ts|sql-script.spec.ts|sql-tools.spec.ts) test -f "$NEON_E2E_SQL_SCRIPT_FIXTURE" ;;
             fractional-admission.spec.ts|fractional-cpu.spec.ts|query-history.spec.ts|shared-queries.spec.ts|auth-totp.spec.ts) test -f "$NEON_E2E_SQL_SCRIPT_FIXTURE" ;;
             auth-magic-link.spec.ts|auth-otp.spec.ts|auth-mail.spec.ts) test -f "$NEON_E2E_SQL_SCRIPT_FIXTURE"; test -f "$NEON_E2E_MAILBOX_FIXTURE" ;;
             backend-credentials.spec.ts|functions-metadata.spec.ts|ai-gateway.spec.ts|saved-queries.spec.ts) [[ "$NEON_E2E_CREDENTIAL_PROJECT" =~ ^prj_[a-f0-9]{16}$ ]] ;;

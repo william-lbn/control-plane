@@ -8,8 +8,10 @@ import { ResultExports } from './ResultExports';
 import { SavedQueries } from './SavedQueries';
 import { QueryHistory } from './QueryHistory';
 import { QueryPlan } from './QueryPlan';
-import { PlanComparison } from './PlanComparison';
-import { SQLAssistant } from './SQLAssistant';
+// Mac 默认文件系统忽略大小写；省略扩展名会先命中同目录的纯逻辑 .ts 文件。
+// 显式指定组件 .tsx，保留两套原有文件名及跨平台语义，避免错误导出和隐式 any。
+import { PlanComparison } from './PlanComparison.tsx';
+import { SQLAssistant } from './SQLAssistant.tsx';
 import { ASSISTANT_SCHEMA_SQL, assistantSchemaSnapshot } from './sqlAssistant';
 
 export function Workbench({

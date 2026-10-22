@@ -78,7 +78,11 @@ func main() {
 	if e != nil || endpoint.Scheme != "http" || (endpoint.Hostname() != "192.168.146.100" && endpoint.Hostname() != "192.168.146.101" && endpoint.Hostname() != "192.168.146.102") || endpoint.Port() != "30893" || endpoint.Path != "" || endpoint.User != nil || endpoint.RawQuery != "" || !strings.HasPrefix(c.Bucket, "ci-s3-") {
 		os.Exit(2)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 180*time.Second)
+	budget := 180 * time.Second
+	if c.Mode == "large-objects" {
+		budget = 600 * time.Second
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), budget)
 	defer cancel()
 	inner := &http.Transport{Proxy: nil, MaxIdleConns: 2, ResponseHeaderTimeout: 120 * time.Second}
 	defer inner.CloseIdleConnections()
@@ -94,6 +98,8 @@ func main() {
 		key := "folder/中文 file.bin"
 		payload := []byte("Neon real S3 SDK bytes 中文\n")
 		switch c.Mode {
+		case "large-objects":
+			return probeLargeObjects(ctx, client, c, transport, func(value string) { stage = value }, func(check string) { checks = append(checks, check) })
 		case "multipart-administration":
 			stage = "actual_signed_multipart_grouping_and_administration_fixture"
 			return probeMultipartAdministration(ctx, client, c, func(check string) { checks = append(checks, check) })

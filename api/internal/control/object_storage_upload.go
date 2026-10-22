@@ -6,8 +6,6 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
-	"io"
 	"mime"
 	"net/http"
 	"net/url"
@@ -120,13 +118,18 @@ func (s *server) storagePublicUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Invalid or changed bytes are rejected before opening/waking a compute.
-	data, e := io.ReadAll(http.MaxBytesReader(w, r.Body, storageObjectLimit))
+	data, e := readStoragePayload(r.Context(), r.Body, storageObjectLimit)
 	if e != nil {
-		fail(w, r, 413, "object_too_large", "Objects are limited to 8 MiB")
+		s.storagePayloadFailure(w, r, e, false)
 		return
 	}
-	if int64(len(data)) != v.Size || fmt.Sprintf("%x", sha256.Sum256(data)) != v.SHA256 {
+	defer data.Close()
+	if data.Size != v.Size || data.SHA256 != v.SHA256 {
 		fail(w, r, 400, "upload_digest_mismatch", "Upload bytes differ from the authorized file")
+		return
+	}
+	if e = validateStoragePayloadChecksums(r.Header, data); e != nil {
+		s.storagePayloadFailure(w, r, e, false)
 		return
 	}
 	r, done, ok := storageAdmit(w, r)
@@ -151,7 +154,7 @@ func (s *server) storagePublicUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	r = r.WithContext(context.WithValue(r.Context(), userKey, user{ID: v.Actor}))
-	if s.s3WriteObject(w, r, conn, p, v.Bucket, v.Key, data) {
+	if s.s3WritePayload(w, r, conn, p, v.Bucket, v.Key, data) {
 		close()
 		s.audit(r.Context(), v.Actor, "presigned_put_object", "object_storage", v.Branch, "succeeded", requestID(r))
 	}
