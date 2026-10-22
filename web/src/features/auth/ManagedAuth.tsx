@@ -27,7 +27,13 @@ type Instance = {
     magic_link_expires_in?: number;
     magic_link_allow_registration?: boolean;
     two_factor_enabled?: boolean;
+    inherit_two_factor?: boolean;
   } | null;
+  factor_migration?: {
+    migrated_factors: number;
+    pending_enrollments_removed: number;
+    recovery_codes_reset: boolean;
+  };
   mail_operator_enabled?: boolean;
   mail_runtime_enabled?: boolean;
   runtime?: Runtime;
@@ -66,6 +72,7 @@ export function ManagedAuth({
   const [requireEmailVerification, setRequireEmailVerification] = useState(false);
   const [emailOTPEnabled, setEmailOTPEnabled] = useState(false);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  const [inheritTwoFactor, setInheritTwoFactor] = useState(false);
   const [magicLinkEnabled, setMagicLinkEnabled] = useState(false);
   const [magicLinkExpiresIn, setMagicLinkExpiresIn] = useState(300);
   const [magicLinkAllowRegistration, setMagicLinkAllowRegistration] = useState(false);
@@ -95,6 +102,7 @@ export function ManagedAuth({
       setRequireEmailVerification(value.spec.require_email_verification ?? false);
       setEmailOTPEnabled(value.spec.email_otp_enabled ?? false);
       setTwoFactorEnabled(value.spec.two_factor_enabled ?? false);
+      setInheritTwoFactor(value.spec.inherit_two_factor ?? false);
       setMagicLinkEnabled(value.spec.magic_link_enabled ?? false);
       setMagicLinkExpiresIn(value.spec.magic_link_expires_in || 300);
       setMagicLinkAllowRegistration(value.spec.magic_link_allow_registration ?? false);
@@ -117,6 +125,7 @@ export function ManagedAuth({
     setRequireEmailVerification(false);
     setEmailOTPEnabled(false);
     setTwoFactorEnabled(false);
+    setInheritTwoFactor(false);
     setMagicLinkEnabled(false);
     setMagicLinkExpiresIn(300);
     setMagicLinkAllowRegistration(false);
@@ -139,6 +148,7 @@ export function ManagedAuth({
           ...(requireEmailVerification ? { require_email_verification: true } : {}),
           ...(emailOTPEnabled ? { email_otp_enabled: true } : {}),
           ...(twoFactorEnabled ? { two_factor_enabled: true } : {}),
+          ...(twoFactorEnabled && inheritTwoFactor ? { inherit_two_factor: true } : {}),
           ...(magicLinkEnabled
             ? {
                 magic_link_enabled: true,
@@ -382,6 +392,18 @@ export function ManagedAuth({
             />
             允许密码账户绑定 TOTP 验证器与一次性恢复码
           </label>
+          {twoFactorEnabled && branches.find((b) => b.id === branch)?.parent_branch_id && (
+            <label className="auth-mail-policy backend-wide">
+              <input
+                aria-label="迁移父分支双重认证"
+                type="checkbox"
+                checked={inheritTwoFactor}
+                disabled={busy || active}
+                onChange={(e) => setInheritTwoFactor(e.target.checked)}
+              />
+              保留从父分支复制的已绑定验证器。用户须重新登录并输入验证码；原恢复码不在此分支生效，登录后需生成新恢复码。尚未确认的绑定须重新开始。
+            </label>
+          )}
           <label className="auth-mail-policy backend-wide">
             <input
               aria-label="启用应用 Magic Link"
@@ -454,6 +476,13 @@ export function ManagedAuth({
               <p>请在操作记录中修复前置条件后重试原 Operation；无需创建新的服务意图。</p>
             )}
           </div>
+        )}
+        {instance?.factor_migration && (
+          <p role="status" data-testid="auth-factor-migration">
+            已迁移 {instance.factor_migration.migrated_factors} 个验证器，已清除{' '}
+            {instance.factor_migration.pending_enrollments_removed}{' '}
+            个未完成绑定。原恢复码已停用；用户验证登录后须生成此分支的新恢复码。
+          </p>
         )}
         {instance && (
           <dl>

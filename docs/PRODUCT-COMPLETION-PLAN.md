@@ -2,7 +2,7 @@
 
 ## 1. 本轮约束
 
-当前 Linux 本地批次：[2026-10-22 有界大对象、Range 与 checksum](DELIVERY-2026-10-22-STORAGE-LARGE-OBJECTS.md)：单对象 64 MiB、分片 8 MiB、分支可见对象 256 MiB；私有文件缓冲、浏览器分块哈希、17 MiB 真实 UI/SDK 上传和分片合并、Range/HEAD/SHA-256/CRC32C 拒绝路径通过。21 项 Go、3 项页面哈希检查通过，原目录摘要保留。API/Worker 0.71.0，Web 重建，schema 058 不变 / Chart 0.9.68 / Core Helm 152；Gateway 0.66.3 / Helm 56、AI 0.58.0 保留，最终 VM 0。S02 的 5 GiB 和完整扩展 checksum 仍有缺口，性能/可靠性专项后置。
+当前 Linux 本地批次：[2026-10-22 Auth 分支双重认证迁移](DELIVERY-2026-10-22-AUTH-FACTOR-MIGRATION.md)：显式物理分支 TOTP 迁移、独立密钥重封装、复制会话/JWKS/链接清除、复制 SQL 登录禁用、未完成绑定清除、父子恢复码隔离及验证器恢复通过。4 项新增 Go、3 项受影响 Go、固定 Better Auth 的真实 PostgreSQL 互通、累计 11 项实机检查通过。API/Worker 0.72.0，Web 重建，schema 059 / Chart 0.9.69 / Core Helm 153；Auth 运行镜像、Gateway 0.66.3 / Helm 56、AI 0.58.0 保留。最终三节点、三个 Safekeeper Ready，VM 0。A04 基础闭环完成，其余 13 个业务组继续；性能/可靠性专项后置。
 
 后续按 [当前功能清单](FUNCTIONAL-STATUS-2026-10-21.md) 推进剩余业务：本轮优先完成有界 S3 大对象；C02 剩余身份语义保留，继续处理完整大对象/安全 GC、Auth 高级/生命周期、原地恢复和计量/预算。Functions 对象触发器和客户日志基础已有独立通过记录。性能、资源压力、可靠性、外部栅栏、HA/DR 和长期环境认证后置；复用来源未变的原验收，只验证新增及具体受影响路径。
 2026-10-18 用户调整优先级：先补齐全部业务功能，加快逐项交付；性能压测、可靠性、HA/DR、节点分区及跨实例栅栏等专项验证后置。本轮只执行必要的构建、功能正反例、权限/数据隔离及新增 UI 验收，复用已通过路径。不得据此宣称后置门槛已经通过。

@@ -22,14 +22,17 @@ type ManagedAuthSpec struct {
 	MagicLinkExpiresIn         int  `json:"magic_link_expires_in,omitempty"`
 	MagicLinkAllowRegistration bool `json:"magic_link_allow_registration,omitempty"`
 	TwoFactorEnabled           bool `json:"two_factor_enabled,omitempty"`
+	InheritTwoFactor           bool `json:"inherit_two_factor,omitempty"`
 }
 type managedAuthPayload struct {
-	ProjectID  string          `json:"project_id"`
-	BranchID   string          `json:"branch_id"`
-	EndpointID string          `json:"endpoint_id"`
-	Generation int64           `json:"generation"`
-	SecretRef  string          `json:"secret_ref"`
-	Spec       ManagedAuthSpec `json:"spec"`
+	FactorSourceBranchID string          `json:"factor_source_branch_id,omitempty"`
+	FactorOperationID    string          `json:"factor_operation_id,omitempty"`
+	ProjectID            string          `json:"project_id"`
+	BranchID             string          `json:"branch_id"`
+	EndpointID           string          `json:"endpoint_id"`
+	Generation           int64           `json:"generation"`
+	SecretRef            string          `json:"secret_ref"`
+	Spec                 ManagedAuthSpec `json:"spec"`
 }
 
 func managedAuthName(branch string) string { return "neon-auth-" + strings.TrimPrefix(branch, "br_") }
@@ -59,6 +62,9 @@ func validAuthOrigin(origin string) bool {
 	return e == nil && u.Host != "" && !strings.Contains(u.Host, "*") && u.User == nil && u.Path == "" && u.RawQuery == "" && u.Fragment == "" && (u.Scheme == "https" || (os.Getenv("NEON_AUTH_LAB_HTTP") == "true" && u.Scheme == "http"))
 }
 func validateManagedAuth(p managedAuthPayload) error {
+	if p.Spec.InheritTwoFactor && !p.Spec.TwoFactorEnabled {
+		return errors.New("factor inheritance requires TOTP to remain enabled")
+	}
 	if (p.Spec.RequireEmailVerification || p.Spec.EmailOTPEnabled || p.Spec.MagicLinkEnabled) && !managedAuthMailConfigured() {
 		return errors.New("email authentication requires the operator mail transport")
 	}
@@ -98,6 +104,21 @@ func (s *server) managedAuthRead(w http.ResponseWriter, r *http.Request) {
 		item = record{"branch_id": branch["id"], "generation": int64(0), "state": "disabled", "spec": nil}
 	} else if err != nil {
 		fail(w, r, 503, "metadata_unavailable", "Could not read Managed Auth")
+		return
+	}
+
+	var factorRaw []byte
+	var factorMAC string
+	factorErr := s.db.QueryRow(r.Context(), `SELECT proof,mac FROM managed_auth_factor_results WHERE branch_id=$1 AND project_id=$2 ORDER BY created_at LIMIT 1`, branch["id"], r.PathValue("project")).Scan(&factorRaw, &factorMAC)
+	if factorErr == nil {
+		var proof managedAuthFactorProof
+		if json.Unmarshal(factorRaw, &proof) != nil || !s.validManagedAuthFactorProof(proof, factorMAC, managedAuthPayload{ProjectID: r.PathValue("project"), BranchID: stringVal(branch["id"]), Generation: item["generation"].(int64), FactorSourceBranchID: proof.SourceBranchID, Spec: ManagedAuthSpec{Database: proof.Database}}) {
+			fail(w, r, 503, "metadata_unavailable", "Auth factor migration result is invalid")
+			return
+		}
+		item["factor_migration"] = record{"source_branch_id": proof.SourceBranchID, "operation_id": proof.OperationID, "migrated_factors": proof.Migrated, "pending_enrollments_removed": proof.PendingRemoved, "recovery_codes_reset": proof.RecoveryCodesReset}
+	} else if !isNoRows(factorErr) {
+		fail(w, r, 503, "metadata_unavailable", "Could not read Auth factor migration")
 		return
 	}
 	item["driver_enabled"] = managedAuthEnabled()
@@ -187,11 +208,18 @@ func (s *server) managedAuthMutate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer tx.Rollback(r.Context())
-	var branchState string
-	err = tx.QueryRow(r.Context(), `SELECT state FROM branches WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL FOR UPDATE`, p.BranchID, p.ProjectID).Scan(&branchState)
+	var branchState, parentBranchID string
+	err = tx.QueryRow(r.Context(), `SELECT state,COALESCE(parent_branch_id,'') FROM branches WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL FOR UPDATE`, p.BranchID, p.ProjectID).Scan(&branchState, &parentBranchID)
 	if err != nil || branchState != "ready" {
 		fail(w, r, 409, "branch_not_ready", "Ready branch required")
 		return
+	}
+	if action == "enable_managed_auth" && p.Spec.InheritTwoFactor {
+		if !dataBranchID.MatchString(parentBranchID) {
+			fail(w, r, 422, "auth_factor_parent_required", "Factor inheritance requires a physical parent branch")
+			return
+		}
+		p.FactorSourceBranchID = parentBranchID
 	}
 	var previous int64
 	var state string
@@ -260,6 +288,9 @@ func (s *server) managedAuthMutate(w http.ResponseWriter, r *http.Request) {
 	_, err = tx.Exec(r.Context(), `INSERT INTO managed_auth_instances(branch_id,project_id,endpoint_id,generation,state,spec,secret_ref) VALUES($1,$2,$3,$4,$5,$6,$7)
         ON CONFLICT(branch_id) DO UPDATE SET generation=$4,state=$5,spec=$6,secret_ref=$7,endpoint_id=$3,updated_at=now()`, p.BranchID, p.ProjectID, p.EndpointID, p.Generation, state, spec, p.SecretRef)
 	id := newID("op_")
+	if action == "enable_managed_auth" && p.Spec.InheritTwoFactor {
+		p.FactorOperationID = id
+	}
 	payload, _ := json.Marshal(p)
 	if err == nil {
 		_, err = tx.Exec(r.Context(), `INSERT INTO operations(id,project_id,resource_type,resource_id,action,state,actor_id,request_id,payload) VALUES($1,$2,'managed_auth',$3,$4,'queued',$5,$6,$7)`, id, p.ProjectID, p.BranchID, action, userFrom(r).ID, requestID(r), payload)

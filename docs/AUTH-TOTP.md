@@ -10,7 +10,7 @@ Neon 官方 Auth 的分支身份目标参考 [官方概览](https://neon.com/doc
 
 控制面启用请求在原 `ManagedAuthSpec` 中增加 `two_factor_enabled: true`。省略或 false 不加载插件。使用现有异步 Operation、分支/项目授权和启停流程；不增加独立部署或监听端口。
 
-所有下列应用接口均位于 `/auth/v1/{branch_id}`，POST JSON，使用分支 HttpOnly Cookie；不得传控制台 Token。完整结构见 `contracts/application-auth-v1.json`（0.25.0）。
+所有下列应用接口均位于 `/auth/v1/{branch_id}`，POST JSON，使用分支 HttpOnly Cookie；不得传控制台 Token。完整结构见 `contracts/application-auth-v1.json`（0.25.1）。
 
 | 路径 | 输入 | 作用 |
 | --- | --- | --- |
@@ -54,7 +54,7 @@ TOTP 的密文必须在同分支 Auth 启停后可解密。选择启用 TOTP 时
 
 停用 Auth 会撤销运行服务，重启会按原流程清除旧会话/JWKS/待用链接并保留用户和 factor 密文。已有已绑定用户时，不允许改成无 MFA 插件的分支策略。先让用户按密码停用自己的 factor，或实现专门的安全迁移；不可直接编辑数据库绕过。
 
-克隆分支包含已绑定 factor 时，由于分支密钥不同，当前拒绝直接启用这些凭据，返回 `auth_factor_migration_required`。跨分支重新加密、恢复密钥托管与完整用户迁移仍是独立开发门槛。此保护不等于已完成分支 MFA 克隆。
+克隆分支包含已绑定 factor 时，默认仍返回 `auth_factor_migration_required`。0.72 可在实际物理子分支显式开启 `inherit_two_factor`，通过来源验证后原子重封装、清除复制会话与未完成绑定、重置子分支恢复码。详见 [迁移合同](AUTH-FACTOR-MIGRATION.md)和 [真实验收](DELIVERY-2026-10-22-AUTH-FACTOR-MIGRATION.md)。完整生命周期恢复、在线根密钥轮换继续单列。
 
 ## 5. 真实本地验收
 
@@ -64,4 +64,4 @@ TOTP 的密文必须在同分支 Auth 启停后可解密。选择启用 TOTP 时
 
 ## 6. 当前限制
 
-密码登录的第二因子与 Email OTP/Magic Link 免密登录是不同策略：本插件默认不拦截免密登录，不宣称所有登录方式强制 MFA。控制台管理员 MFA、OAuth/SSO、短信、可信设备、分支克隆重新加密、根密钥轮换、全链路可信 TLS、生产攻击矩阵与 HA 仍需独立实现或验收。
+密码登录的第二因子与 Email OTP/Magic Link 免密登录是不同策略：本插件默认不拦截免密登录，不宣称所有登录方式强制 MFA。Console 自助 MFA 已有独立验收；OAuth/SSO、短信、可信设备、在线根密钥轮换、全链路可信 TLS、生产攻击矩阵与 HA 仍有独立实现或验收门槛。

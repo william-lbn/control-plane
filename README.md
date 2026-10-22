@@ -7,7 +7,7 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 
 功能进度与当前优先级见 [已验收/剩余清单](docs/FUNCTIONAL-STATUS-2026-10-21.md)：13 组基础已有回执；五组专项后置，17 组尚未整体闭环。后续优先业务功能，复用来源未变的既有验收。
 
-最新状态：[2026-10-22 有界大对象、Range 与 checksum](docs/DELIVERY-2026-10-22-STORAGE-LARGE-OBJECTS.md)：单对象 64 MiB、分片 8 MiB、分支可见对象 256 MiB；私有文件缓冲、浏览器分块哈希、17 MiB 真实 UI/SDK 上传和分片合并、Range/HEAD/SHA-256/CRC32C 拒绝路径通过。21 项 Go、3 项页面哈希检查通过，原目录摘要保留。API/Worker 0.71.0，Web 重建，schema 058 不变 / Chart 0.9.68 / Core Helm 152；Gateway 0.66.3 / Helm 56、AI 0.58.0 保留，最终 VM 0。S02 的 5 GiB 和完整扩展 checksum 仍有缺口，性能/可靠性专项后置。
+最新状态：[2026-10-22 Auth 分支双重认证迁移](docs/DELIVERY-2026-10-22-AUTH-FACTOR-MIGRATION.md)：显式物理分支 TOTP 迁移、独立密钥重封装、复制会话/JWKS/链接清除、复制 SQL 登录禁用、未完成绑定清除、父子恢复码隔离及验证器恢复通过。4 项新增 Go、3 项受影响 Go、固定 Better Auth 的真实 PostgreSQL 互通、累计 11 项实机检查通过。API/Worker 0.72.0，Web 重建，schema 059 / Chart 0.9.69 / Core Helm 153；Auth 运行镜像、Gateway 0.66.3 / Helm 56、AI 0.58.0 保留。最终三节点、三个 Safekeeper Ready，VM 0。A04 基础闭环完成，其余 13 个业务组继续；性能/可靠性专项后置。
 
 此前增量：[应用 TOTP 双重认证](docs/DELIVERY-2026-10-15-AUTH-TOTP.md)八项 UI 与[项目共享查询](docs/DELIVERY-2026-10-15-SHARED-QUERIES.md)六项 UI 均通过；该批基线为 API 0.33 / Chart 0.9.17 / migration 031。
 

@@ -1,0 +1,59 @@
+{
+  "verified_at": "2026-10-23T05:23:14.764715+08:00",
+  "platform": "Mac development validation, not Linux runtime certification",
+  "merged_main": "c8767714fa91fb5836d1b7da2d3e5e31f37dc78e",
+  "api": {
+    "exit_code": 0,
+    "pass_events": 1369,
+    "fail_events": 0,
+    "skip_events": 0,
+    "packages_passed": [
+      "github.com/william-lbn/control-plane/api/cmd/ai-provider-keygen",
+      "github.com/william-lbn/control-plane/api/cmd/ai-provider-relay",
+      "github.com/william-lbn/control-plane/api/internal/aigateway",
+      "github.com/william-lbn/control-plane/api/internal/adapter",
+      "github.com/william-lbn/control-plane/api/internal/dataapi",
+      "github.com/william-lbn/control-plane/api/internal/functions",
+      "github.com/william-lbn/control-plane/api/internal/functionsql",
+      "github.com/william-lbn/control-plane/api/internal/recovery",
+      "github.com/william-lbn/control-plane/api/internal/s3protocol",
+      "github.com/william-lbn/control-plane/api/internal/triggers",
+      "github.com/william-lbn/control-plane/api/internal/control"
+    ],
+    "postgres_version": "postgres (PostgreSQL) 17.11 (0edff73d4779ee2f26d2394017370008e16ca132)",
+    "source_files": 462,
+    "source_unchanged": true
+  },
+  "api_top_level_passes": 380,
+  "api_subtest_passes": 989,
+  "packages_without_tests": 9,
+  "auth_service": {
+    "exit_code": 0,
+    "tests": 13,
+    "pass": 13,
+    "fail": 0,
+    "skipped": 0,
+    "cancelled": 0,
+    "source_unchanged": true,
+    "postgres_version": "postgres (PostgreSQL) 17.11 (0edff73d4779ee2f26d2394017370008e16ca132)"
+  },
+  "web": {
+    "unit_pass": 43,
+    "fail": 0,
+    "skip": 0,
+    "typescript_vite_build": "passed",
+    "browser_e2e": "not_run"
+  },
+  "go_vet": "passed",
+  "linux_amd64_cgo0_all_cmd": "compiled_not_executed",
+  "evidence_sha256": {
+    "build/control-plane-mainc876-auth-mac-fixed/tests.jsonl": "b60e862602d2a2aba0ddeff69b995cace1707bd692fb6cff6e332198ad52af8d",
+    "build/control-plane-mainc876-auth-mac-fixed/source-sha256.json": "eed7b69d9ff31d7d67d2b14bf7303f5a523d9fb84c731b9f97ca4b027057277c",
+    "build/control-plane-mainc876-auth-service-mac-final/tests.tap": "2c1a9c4fd31a30c8cf3d944140f0411e84951e4f850a155eb4416a535e97bec3",
+    "build/control-mainc876-web-test.log": "fd2c64f1873e10a95e5fc2bca835ce2741e3a7675934bd4c55ea59a04a0c46cc",
+    "build/control-mainc876-web-build.log": "680e3ff46c4751ef7d6a8ad4a3b546bf72adce8ce1003e56f6fb256318dd50ea",
+    "build/control-mainc876-auth-typecheck.log": "4cf2658028464899e8b1382b7221ac31641f3d482d3216a39b72152dd0793925",
+    "build/control-mainc876-vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "build/control-mainc876-linux-cli.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.71.0",
+    "version": "0.72.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -2590,6 +2590,11 @@
             "type": "boolean",
             "default": false,
             "description": "Allow maintained TOTP/password-login MFA enrollment and one-use recovery codes for application accounts; distinct from Console administrator MFA"
+          },
+          "inherit_two_factor": {
+            "type": "boolean",
+            "default": false,
+            "description": "Explicitly rewrap inherited verified TOTP factors for the physical child branch. Requires two_factor_enabled. Copied sessions and pending enrollments are cleared; inherited recovery codes are reset."
           }
         }
       },
@@ -2660,6 +2665,36 @@
           "mail_runtime_enabled": {
             "type": "boolean",
             "description": "Operator configuration / observed owned runtime mount respectively; does not certify SMTP delivery or production TLS."
+          },
+          "factor_migration": {
+            "type": "object",
+            "description": "Authenticated result of explicit physical branch factor migration. Metadata-only; does not wake SQL.",
+            "required": [
+              "source_branch_id",
+              "operation_id",
+              "migrated_factors",
+              "pending_enrollments_removed",
+              "recovery_codes_reset"
+            ],
+            "properties": {
+              "source_branch_id": {
+                "type": "string"
+              },
+              "operation_id": {
+                "type": "string"
+              },
+              "migrated_factors": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "pending_enrollments_removed": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "recovery_codes_reset": {
+                "const": true
+              }
+            }
           }
         }
       },
