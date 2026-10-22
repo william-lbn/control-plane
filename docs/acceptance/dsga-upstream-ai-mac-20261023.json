@@ -1,0 +1,41 @@
+{
+  "verified_at": "2026-10-23T06:17:29.546262+08:00",
+  "merged_main": "c2e79cdc4f11a0df29e36f48c77ab5a162a828a0",
+  "api": {
+    "exit_code": 0,
+    "pass_events": 1400,
+    "fail_events": 0,
+    "skip_events": 0,
+    "packages_passed": [
+      "github.com/william-lbn/control-plane/api/cmd/ai-provider-keygen",
+      "github.com/william-lbn/control-plane/api/cmd/ai-provider-relay",
+      "github.com/william-lbn/control-plane/api/internal/adapter",
+      "github.com/william-lbn/control-plane/api/internal/aigateway",
+      "github.com/william-lbn/control-plane/api/internal/dataapi",
+      "github.com/william-lbn/control-plane/api/internal/functions",
+      "github.com/william-lbn/control-plane/api/internal/functionsql",
+      "github.com/william-lbn/control-plane/api/internal/recovery",
+      "github.com/william-lbn/control-plane/api/internal/s3protocol",
+      "github.com/william-lbn/control-plane/api/internal/triggers",
+      "github.com/william-lbn/control-plane/api/internal/control"
+    ],
+    "postgres_version": "postgres (PostgreSQL) 17.11 (9cf674a53bcadaef7b3faecacf61af3c1cf59aac)",
+    "source_files": 472,
+    "source_unchanged": true
+  },
+  "top_level": 395,
+  "subtests": 1005,
+  "packages_without_tests": 9,
+  "web_unit_passed": 47,
+  "web_build": "TypeScript/Vite passed",
+  "go_vet": "passed",
+  "linux_amd64_all_cmd": "cross compiled, not run",
+  "evidence_sha256": {
+    "build/control-plane-mainc2e-ai-mac-final/tests.jsonl": "d4c63d0a184cdc76cdbd773fb496b106196b138288de7037195585e8196090d8",
+    "build/control-plane-mainc2e-ai-mac-final/source-sha256.json": "e2992233619446db214989be99521afb0f5b4027b11aac9c327173662c369d78",
+    "build/control-mainc2e-web-test.log": "ef61330449673df68185b20090554005e9c14ba81c197b46382dc2fcc6ee93f1",
+    "build/control-mainc2e-web-build.log": "af53d2345efe83d61c7381a63a1f7b91c87e2064f2b8300cd5dcb29074cae4df",
+    "build/control-mainc2e-vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "build/control-mainc2e-linux-cli.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

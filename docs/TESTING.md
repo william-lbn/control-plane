@@ -1,5 +1,7 @@
 # 测试与交付标准
 
+新增 AI 原生协议/预算入口为 `ai-native-protocols.spec.ts`：9 组实机检查一次通过，15 项新增 Go/PG、4 项受影响 Go 和 4 项前端检查通过。合成上游与真实 Ollama 回执分别留证，详情见[本批交付](DELIVERY-2026-10-22-AI-NATIVE-BUDGETS.md)。80 个可选实机入口不代表 80 套均为本批重跑。
+
 当前新功能与原 fixture 续测入口见 [Auth/S3 交付](DELIVERY-2026-10-14-AUTH-S3.md)
 和 [Functions HTTP](DELIVERY-2026-10-14-FUNCTIONS-HTTP.md)。所有业务/浏览器测试在 Linux，
 单集群串行、retries=0。新套件 selector/action/response 等待须单独有界；

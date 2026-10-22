@@ -77,7 +77,7 @@ func (s *server) aiCatalog(ctx context.Context, open bool) (aiCatalogSnapshot, e
 				return snapshot, errors.New("catalog aliases conflict")
 			}
 			seen[model.ID] = true
-			route := aigateway.Route{ID: model.ID, Name: model.Name, Provider: "openai_compatible", BaseURL: base, UpstreamModel: model.UpstreamModel, AllowedIPs: append([]string(nil), network.AllowedIPs...), LabHTTP: network.LabHTTP, MaxOutputTokens: model.MaxOutputTokens}
+			route := aigateway.Route{ID: model.ID, Name: model.Name, Provider: "openai_compatible", BaseURL: base, UpstreamModel: model.UpstreamModel, AllowedIPs: append([]string(nil), network.AllowedIPs...), LabHTTP: network.LabHTTP, MaxOutputTokens: model.MaxOutputTokens, Protocols: append([]string(nil), model.Protocols...), Price: model.Price}
 			if !unavailable {
 				route, err = s.aiProviders.network.ConfigureRoute(network, route, secret)
 				if err != nil {

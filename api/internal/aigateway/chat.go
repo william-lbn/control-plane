@@ -9,8 +9,10 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptrace"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -22,6 +24,8 @@ type Message struct {
 	Content string `json:"content"`
 }
 type ChatRequest struct {
+	Protocol    string    `json:"-"`
+	RequestID   string    `json:"-"`
 	Model       string    `json:"model"`
 	Messages    []Message `json:"messages"`
 	Stream      bool      `json:"stream,omitempty"`
@@ -32,12 +36,15 @@ type Usage struct {
 	PromptTokens     int64 `json:"prompt_tokens"`
 	CompletionTokens int64 `json:"completion_tokens"`
 	TotalTokens      int64 `json:"total_tokens"`
+	CacheReadTokens  int64 `json:"cache_read_tokens,omitempty"`
+	CacheWriteTokens int64 `json:"cache_write_tokens,omitempty"`
 }
 type Outcome struct {
 	Status           string
 	Usage            *Usage
 	UpstreamStatus   int
 	FirstTokenMillis *int64
+	Dispatched       bool
 }
 
 // This first protocol slice accepts text chat only. Reject unsupported fields
@@ -50,7 +57,7 @@ func Decode(raw []byte, c *Config) (ChatRequest, Route, error) {
 		return q, Route{}, errors.New("invalid chat request")
 	}
 	r, ok := c.Find(q.Model)
-	if !ok {
+	if !ok || !r.Supports("chat_completions") {
 		return q, r, errors.New("model unavailable")
 	}
 	if len(q.Messages) < 1 || len(q.Messages) > 32 || q.MaxTokens < 1 || q.MaxTokens > r.MaxOutputTokens || q.Temperature != nil && (*q.Temperature < 0 || *q.Temperature > 2) {
@@ -121,8 +128,26 @@ func usageFrom(v map[string]any) *Usage {
 	}
 	b, _ := json.Marshal(raw)
 	var u Usage
-	if json.Unmarshal(b, &u) != nil || u.PromptTokens < 0 || u.CompletionTokens < 0 || u.TotalTokens != u.PromptTokens+u.CompletionTokens || u.TotalTokens > 10000000 {
+	if json.Unmarshal(b, &u) != nil || u.PromptTokens < 0 || u.PromptTokens > 10000000 || u.CompletionTokens < 0 || u.CompletionTokens > 10000000 || u.TotalTokens < 0 || u.TotalTokens != u.PromptTokens+u.CompletionTokens || u.TotalTokens > 10000000 {
 		return nil
+	}
+	var fields map[string]json.RawMessage
+	if json.Unmarshal(b, &fields) != nil {
+		return nil
+	}
+	for _, field := range []string{"prompt_tokens", "completion_tokens", "total_tokens"} {
+		if len(fields[field]) == 0 || string(fields[field]) == "null" {
+			return nil
+		}
+	}
+	var details struct {
+		Cached int64 `json:"cached_tokens"`
+	}
+	if raw := fields["prompt_tokens_details"]; len(raw) > 0 && string(raw) != "null" {
+		if json.Unmarshal(raw, &details) != nil || details.Cached < 0 || details.Cached > u.PromptTokens {
+			return nil
+		}
+		u.CacheReadTokens = details.Cached
 	}
 	return &u
 }
@@ -161,17 +186,24 @@ func Forward(ctx context.Context, w http.ResponseWriter, q ChatRequest, r Route,
 	u, _ := url.Parse(strings.TrimRight(r.BaseURL, "/") + "/chat/completions")
 	request, _ := http.NewRequestWithContext(ctx, http.MethodPost, u.String(), bytes.NewReader(payload))
 	request.Header.Set("Content-Type", "application/json")
+	if q.RequestID != "" {
+		request.Header.Set("X-Client-Request-Id", q.RequestID)
+	}
 	if r.key != "" {
 		request.Header.Set("Authorization", "Bearer "+r.key)
 	}
 	client := Client(r, timeout)
 	defer client.CloseIdleConnections()
+	var dispatched atomic.Bool
+	request = request.WithContext(httptrace.WithClientTrace(request.Context(), &httptrace.ClientTrace{WroteHeaders: func() { dispatched.Store(true) }}))
 	response, err := client.Do(request)
+	outcome.Dispatched = dispatched.Load()
 	if err != nil {
 		writeError(w, 502, "provider_unavailable")
 		return outcome
 	}
 	defer response.Body.Close()
+	outcome.Dispatched = true
 	outcome.UpstreamStatus = response.StatusCode
 	if response.StatusCode != 200 {
 		status := 502
@@ -193,6 +225,7 @@ func Forward(ctx context.Context, w http.ResponseWriter, q ChatRequest, r Route,
 			return outcome
 		}
 		w.Header().Set("Content-Type", "application/json")
+		outcome.Usage = usage
 		if _, e = w.Write(out); e != nil {
 			outcome.Status = "cancelled"
 			return outcome
