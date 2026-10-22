@@ -4,9 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/hmac"
-	"crypto/sha256"
 	"encoding/base64"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
@@ -30,6 +28,7 @@ type aiTicket struct {
 	Version    string `json:"version"`
 	Expires    int64  `json:"expires"`
 	Generation int    `json:"generation,omitempty"`
+	Protocol   string `json:"protocol,omitempty"`
 }
 
 func (s *server) aiEnabled() bool {
@@ -45,13 +44,16 @@ func (s *server) aiRelay(w http.ResponseWriter, r *http.Request) {
 	path := "/models"
 	if r.Method == http.MethodPost {
 		path = "/chat/completions"
+		if protocol, model, stream := aiNativeRequestRoute(r); protocol != "" {
+			path = aiNativePath(protocol, model, stream)
+		}
 	}
-	request, e := http.NewRequestWithContext(r.Context(), r.Method, strings.TrimRight(base, "/")+"/ai/v1/"+url.PathEscape(r.PathValue("aiBranch"))+"/v1"+path, io.LimitReader(r.Body, aigateway.MaxBodyBytes+1))
+	request, e := http.NewRequestWithContext(r.Context(), r.Method, strings.TrimRight(base, "/")+"/ai/v1/"+url.PathEscape(r.PathValue("aiBranch"))+pathWithVersion(path), io.LimitReader(r.Body, aigateway.MaxBodyBytes+1))
 	if e != nil {
 		aigateway.Error(w, 503, "ai_gateway_disabled")
 		return
 	}
-	request.Header.Set("Authorization", r.Header.Get("Authorization"))
+	request.Header.Set("Authorization", aiAuthorization(r))
 	request.Header.Set("Content-Type", "application/json")
 	transport := &http.Transport{Proxy: nil, ResponseHeaderTimeout: time.Duration(s.ai.TimeoutSeconds) * time.Second}
 	defer transport.CloseIdleConnections()
@@ -90,7 +92,11 @@ func (s *server) signAITicket(actor, branch, model string, raw []byte) string {
 	return s.signAITicketFor(actor, branch, model, raw, s.ai.Generation)
 }
 func (s *server) signAITicketFor(actor, branch, model string, raw []byte, generation int) string {
+	return s.signAIProtocolTicket(actor, branch, model, raw, generation, "")
+}
+func (s *server) signAIProtocolTicket(actor, branch, model string, raw []byte, generation int, protocol string) string {
 	t := aiTicket{Actor: actor, Branch: branch, Model: model, ID: newID("air_"), Hash: digest(string(raw)), Version: s.backendKeys.Active, Expires: time.Now().Add(30 * time.Second).Unix(), Generation: generation}
+	t.Protocol = protocol
 	b, _ := json.Marshal(t)
 	value := base64.RawURLEncoding.EncodeToString(b)
 	return value + "." + s.backendHash("ai-console-ticket", value, t.Version)
@@ -125,7 +131,7 @@ func (s *server) aiRead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if strings.HasSuffix(r.URL.Path, "/usage") {
-		items, e := s.many(r.Context(), `SELECT id,model_id,streaming,state,started_at,finished_at,prompt_tokens,completion_tokens,total_tokens,duration_ms,first_token_ms FROM ai_gateway_requests WHERE project_id=$1 AND branch_id=$2 ORDER BY started_at DESC LIMIT 50`, project, branch)
+		items, e := s.many(r.Context(), `SELECT id,model_id,protocol,streaming,state,started_at,finished_at,prompt_tokens,completion_tokens,total_tokens,cache_read_tokens,cache_write_tokens,duration_ms,first_token_ms FROM ai_gateway_requests WHERE project_id=$1 AND branch_id=$2 ORDER BY started_at DESC LIMIT 50`, project, branch)
 		if e != nil {
 			fail(w, r, 503, "metadata_unavailable", "Could not read AI usage")
 			return
@@ -148,7 +154,17 @@ func (s *server) aiRead(w http.ResponseWriter, r *http.Request) {
 		}
 		models = snapshot.Config.PublicModels()
 	}
-	jsonResponse(w, 200, record{"enabled": enabled, "models": models, "public_endpoint": "/ai/v1/" + branch + "/v1", "supported_protocols": []string{"chat_completions"}, "billing_enabled": false, "reason": "operator_routes_text_chat_preview"})
+	protocols := []string{}
+	seen := map[string]bool{}
+	for _, m := range models {
+		for _, p := range m["protocols"].([]string) {
+			if !seen[p] {
+				seen[p] = true
+				protocols = append(protocols, p)
+			}
+		}
+	}
+	jsonResponse(w, 200, record{"enabled": enabled, "models": models, "public_endpoint": "/ai/v1/" + branch + "/v1", "supported_protocols": protocols, "billing_enabled": false, "budget_controls": true, "reason": "operator_approved_native_protocols"})
 }
 func (s *server) aiConsoleRequest(w http.ResponseWriter, r *http.Request) {
 	if s.ai == nil || s.backendKeys == nil || os.Getenv("NEON_AI_GATEWAY_URL") == "" {
@@ -169,7 +185,18 @@ func (s *server) aiConsoleRequest(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 503, "provider_catalog_unavailable", "Could not read published model routes")
 		return
 	}
+	protocol, _, _ := aiNativeRequestRoute(r)
 	q, _, e := aigateway.Decode(raw, snapshot.Config)
+	if protocol == "" && e != nil {
+		native, _, err := aigateway.DecodeNative(raw, snapshot.Config, "chat_completions", "", false)
+		q = aigateway.ChatRequest{Model: native.Model, Stream: native.Stream, MaxTokens: native.MaxTokens}
+		e = err
+	}
+	if protocol != "" {
+		native, _, err := aigateway.DecodeNative(raw, snapshot.Config, protocol, "", false)
+		q = aigateway.ChatRequest{Model: native.Model, Stream: native.Stream, MaxTokens: native.MaxTokens, Protocol: protocol}
+		e = err
+	}
 	if e != nil {
 		fail(w, r, 422, "invalid_request", e.Error())
 		return
@@ -184,13 +211,17 @@ func (s *server) aiConsoleRequest(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 503, "ai_gateway_disabled", "Invalid gateway configuration")
 		return
 	}
-	upstream, e := http.NewRequestWithContext(r.Context(), "POST", strings.TrimRight(base.String(), "/")+"/ai/v1/"+url.PathEscape(branch)+"/v1/chat/completions", bytes.NewReader(raw))
+	path := "/v1/chat/completions"
+	if protocol != "" {
+		path = pathWithVersion(aiNativePath(protocol, q.Model, q.Stream))
+	}
+	upstream, e := http.NewRequestWithContext(r.Context(), "POST", strings.TrimRight(base.String(), "/")+"/ai/v1/"+url.PathEscape(branch)+path, bytes.NewReader(raw))
 	if e != nil {
 		fail(w, r, 503, "ai_gateway_disabled", "Invalid gateway configuration")
 		return
 	}
 	upstream.Header.Set("Content-Type", "application/json")
-	upstream.Header.Set("X-Neon-Console-Ticket", s.signAITicketFor(userFrom(r).ID, branch, q.Model, raw, snapshot.Config.Generation))
+	upstream.Header.Set("X-Neon-Console-Ticket", s.signAIProtocolTicket(userFrom(r).ID, branch, q.Model, raw, snapshot.Config.Generation, protocol))
 	transport := &http.Transport{Proxy: nil, ResponseHeaderTimeout: time.Duration(s.ai.TimeoutSeconds) * time.Second}
 	defer transport.CloseIdleConnections()
 	client := &http.Client{Transport: transport, Timeout: time.Duration(s.ai.TimeoutSeconds+5) * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
@@ -278,6 +309,7 @@ func RunAIGateway(ctx context.Context) error {
 	})
 	mux.HandleFunc("GET /ai/v1/{branch}/v1/models", s.aiPublic)
 	mux.HandleFunc("POST /ai/v1/{branch}/v1/chat/completions", s.aiPublic)
+	registerAINativePublic(mux, "branch", s.aiPublic)
 	httpServer := &http.Server{Addr: env("NEON_AI_BIND", ":8791"), Handler: mux, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: time.Duration(cfg.TimeoutSeconds+10) * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 16384}
 	done := make(chan error, 1)
 	go func() { done <- httpServer.ListenAndServe() }()
@@ -306,6 +338,8 @@ func (s *server) aiPublic(w http.ResponseWriter, r *http.Request) {
 	branch := r.PathValue("branch")
 	model := ""
 	var q aigateway.ChatRequest
+	var native aigateway.NativeRequest
+	protocol, pathModel, pathStream := aiNativeRequestRoute(r)
 	var route aigateway.Route
 	raw := []byte{}
 	var e error
@@ -316,6 +350,14 @@ func (s *server) aiPublic(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		q, route, e = aigateway.Decode(raw, cfg)
+		if protocol == "" && e != nil {
+			native, route, e = aigateway.DecodeNative(raw, cfg, "chat_completions", "", false)
+			q = aigateway.ChatRequest{Model: native.Model, Stream: native.Stream, MaxTokens: native.MaxTokens}
+		}
+		if protocol != "" {
+			native, route, e = aigateway.DecodeNative(raw, cfg, protocol, pathModel, pathStream)
+			q = aigateway.ChatRequest{Model: native.Model, Stream: native.Stream, MaxTokens: native.MaxTokens, Protocol: protocol}
+		}
 		if e != nil {
 			aigateway.Error(w, 400, "invalid_request")
 			return
@@ -327,7 +369,7 @@ func (s *server) aiPublic(w http.ResponseWriter, r *http.Request) {
 	models := []string{}
 	if ticket := r.Header.Get("X-Neon-Console-Ticket"); ticket != "" && r.Method == http.MethodPost && r.Header.Get("Authorization") == "" {
 		t, e := s.verifyAITicket(ticket, raw, branch, model)
-		if e != nil {
+		if e != nil || t.Protocol != protocol {
 			aigateway.Error(w, 401, "invalid_console_ticket")
 			return
 		}
@@ -344,7 +386,7 @@ func (s *server) aiPublic(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else {
-		header := r.Header.Get("Authorization")
+		header := aiAuthorization(r)
 		if !strings.HasPrefix(header, "Bearer ") {
 			aigateway.Error(w, 401, "invalid_backend_credential")
 			return
@@ -393,6 +435,14 @@ func (s *server) aiPublic(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	admitted, e := s.reserveAIRequestFor(ctx, requestID, project, branch, actor, credential, q, cfg)
 	if e != nil {
+		if errors.Is(e, errAIBudgetExceeded) || errors.Is(e, errAIBudgetPrice) {
+			code := "budget_exceeded"
+			if errors.Is(e, errAIBudgetPrice) {
+				code = "budget_model_price_unavailable"
+			}
+			aigateway.Error(w, 429, code)
+			return
+		}
 		if errors.Is(e, errAIProviderCatalogChanged) {
 			aigateway.Error(w, 409, "provider_catalog_changed")
 			return
@@ -407,18 +457,19 @@ func (s *server) aiPublic(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("X-Request-ID", requestID)
 	started := time.Now()
-	outcome := aigateway.Forward(ctx, w, q, route, time.Duration(cfg.TimeoutSeconds)*time.Second)
+	q.RequestID = requestID
+	native.RequestID = requestID
+	var outcome aigateway.Outcome
+	if native.Protocol != "" {
+		outcome = aigateway.ForwardNative(ctx, w, native, route, time.Duration(cfg.TimeoutSeconds)*time.Second)
+	} else {
+		outcome = aigateway.Forward(ctx, w, q, route, time.Duration(cfg.TimeoutSeconds)*time.Second)
+	}
 	// A disconnected caller must not cancel settlement. On DB failure, preserve
 	// the running reservation for operator recovery; never infer zero token usage.
 	settle, close := context.WithTimeout(context.Background(), 5*time.Second)
 	defer close()
-	var prompt, completion, total any
-	if outcome.Usage != nil {
-		prompt = outcome.Usage.PromptTokens
-		completion = outcome.Usage.CompletionTokens
-		total = outcome.Usage.TotalTokens
-	}
-	if _, err := s.db.Exec(settle, `UPDATE ai_gateway_requests SET state=$2,finished_at=clock_timestamp(),prompt_tokens=$3,completion_tokens=$4,total_tokens=$5,duration_ms=$6,first_token_ms=$7,upstream_status=$8 WHERE id=$1 AND state='running'`, requestID, outcome.Status, prompt, completion, total, time.Since(started).Milliseconds(), outcome.FirstTokenMillis, outcome.UpstreamStatus); err != nil {
+	if err := s.settleAIRequest(settle, requestID, branch, outcome, time.Since(started)); err != nil {
 		slog.Warn("AI request settlement unavailable; preserve reservation", "request_id", requestID)
 	}
 }
@@ -443,9 +494,7 @@ func (s *server) reserveAIRequestFor(ctx context.Context, id, project, branch, a
 			return false, errAIProviderCatalogChanged
 		}
 	}
-	hash := sha256.Sum256([]byte("ai-branch:" + branch))
-	lock := hex.EncodeToString(hash[:])
-	if _, e = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,0))`, lock); e != nil {
+	if e = aiBranchLock(ctx, tx, branch); e != nil {
 		return false, e
 	}
 	var active, recent int
@@ -459,8 +508,16 @@ func (s *server) reserveAIRequestFor(ctx context.Context, id, project, branch, a
 	if credential != "" {
 		cid = credential
 	}
-	_, e = tx.Exec(ctx, `INSERT INTO ai_gateway_requests(id,project_id,branch_id,actor_id,credential_id,model_id,route_generation,streaming,state,expires_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'running',clock_timestamp()+make_interval(secs=>$9))`, id, project, branch, actor, cid, q.Model, cfg.Generation, q.Stream, cfg.TimeoutSeconds+10)
+	protocol := q.Protocol
+	if protocol == "" {
+		protocol = "chat_completions"
+	}
+	_, e = tx.Exec(ctx, `INSERT INTO ai_gateway_requests(id,project_id,branch_id,actor_id,credential_id,model_id,route_generation,streaming,state,expires_at,protocol) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'running',clock_timestamp()+make_interval(secs=>$9),$10)`, id, project, branch, actor, cid, q.Model, cfg.Generation, q.Stream, cfg.TimeoutSeconds+10, protocol)
 	if e != nil {
+		return false, e
+	}
+	route, _ := cfg.Find(q.Model)
+	if e = reserveAIBudget(ctx, tx, id, branch, route, q.MaxTokens); e != nil {
 		return false, e
 	}
 	return true, tx.Commit(ctx)

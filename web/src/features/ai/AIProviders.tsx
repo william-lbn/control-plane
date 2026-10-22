@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../../api';
 import { Empty, fmt, PageHeading, status } from '../../shared/ui';
 import { newRequestKey } from '../../shared/requestKey';
+import { protocolNames } from './protocols';
+import type { AIPrice } from './protocols';
 
 export type ProviderCapabilities = {
   enabled: boolean;
@@ -32,7 +34,14 @@ type Revision = {
   retryable: boolean;
   error_code: string | null;
 };
-type Model = { id: string; name: string; upstream_model: string; max_output_tokens: number };
+type Model = {
+  id: string;
+  name: string;
+  upstream_model: string;
+  max_output_tokens: number;
+  protocols?: string[];
+  price?: AIPrice;
+};
 type Detail = {
   provider: Provider;
   revisions: Revision[];
@@ -410,7 +419,7 @@ export function AIProviders({ capabilities }: { capabilities: ProviderCapabiliti
               </p>
               <p>
                 {target.state === 'tested'
-                  ? `已发现 ${target.models?.length || 0} 个模型；需选择聊天模型并发布。模型列表不代表推理健康检查。`
+                  ? `已发现 ${target.models?.length || 0} 个模型；需选择模型、明确协议后发布。模型列表不代表推理健康检查。`
                   : testing
                     ? '正在读取模型列表…'
                     : `测试失败：${target.error_code || '请刷新原操作'}`}
@@ -490,6 +499,110 @@ export function AIProviders({ capabilities }: { capabilities: ProviderCapabiliti
                         }
                       />
                     </label>
+                    <fieldset>
+                      <legend>已批准的协议 {index + 1}</legend>
+                      {Object.entries(protocolNames).map(([p, label]) => (
+                        <label key={p}>
+                          <input
+                            type="checkbox"
+                            aria-label={`协议 ${label} ${index + 1}`}
+                            checked={(model.protocols || ['chat_completions']).includes(p)}
+                            onChange={(e) => {
+                              const current = model.protocols || ['chat_completions'];
+                              const next = e.target.checked
+                                ? [...current, p]
+                                : current.filter((v) => v !== p);
+                              updateModel(index, {
+                                protocols: next.length ? next : ['chat_completions'],
+                              });
+                            }}
+                          />
+                          {label}
+                        </label>
+                      ))}
+                    </fieldset>
+                    <label>
+                      <input
+                        aria-label={`显式计价 ${index + 1}`}
+                        type="checkbox"
+                        checked={Boolean(model.price)}
+                        onChange={(e) =>
+                          updateModel(index, {
+                            price: e.target.checked
+                              ? {
+                                  version: 'manual-v1',
+                                  currency: 'USD',
+                                  max_input_tokens: 32000,
+                                  input_microusd_per_million_tokens: 0,
+                                  output_microusd_per_million_tokens: 0,
+                                  cache_read_microusd_per_million_tokens: 0,
+                                  cache_write_microusd_per_million_tokens: 0,
+                                }
+                              : undefined,
+                          })
+                        }
+                      />
+                      显式计价（含免费模型；未配置时不能使用金额预算）
+                    </label>
+                    {model.price && (
+                      <div>
+                        <label>
+                          价格版本
+                          <input
+                            aria-label={`价格版本 ${index + 1}`}
+                            value={model.price.version}
+                            maxLength={128}
+                            onChange={(e) =>
+                              updateModel(index, {
+                                price: { ...model.price!, version: e.target.value },
+                              })
+                            }
+                          />
+                        </label>
+                        <label>
+                          输入 Token 上界
+                          <input
+                            aria-label={`输入 Token 上界 ${index + 1}`}
+                            type="number"
+                            min={1}
+                            max={1000000}
+                            value={model.price.max_input_tokens}
+                            onChange={(e) =>
+                              updateModel(index, {
+                                price: {
+                                  ...model.price!,
+                                  max_input_tokens: Number(e.target.value),
+                                },
+                              })
+                            }
+                          />
+                        </label>
+                        {(
+                          [
+                            ['input_microusd_per_million_tokens', '输入'],
+                            ['output_microusd_per_million_tokens', '输出'],
+                            ['cache_read_microusd_per_million_tokens', '缓存读取'],
+                            ['cache_write_microusd_per_million_tokens', '缓存写入'],
+                          ] as const
+                        ).map(([field, label]) => (
+                          <label key={field}>
+                            {label}费率（微美元 / 百万 Token）
+                            <input
+                              aria-label={`${label}费率 ${index + 1}`}
+                              type="number"
+                              min={0}
+                              max={1000000000}
+                              value={model.price![field]}
+                              onChange={(e) =>
+                                updateModel(index, {
+                                  price: { ...model.price!, [field]: Number(e.target.value) },
+                                })
+                              }
+                            />
+                          </label>
+                        ))}
+                      </div>
+                    )}
                     {models.length > 1 && (
                       <button
                         onClick={() => setModels((rows) => rows.filter((_, at) => at !== index))}

@@ -147,10 +147,12 @@ type aiProviderDraftInput struct {
 	Credential aiProviderCredentialInput `json:"credential"`
 }
 type aiProviderModel struct {
-	ID              string `json:"id"`
-	Name            string `json:"name"`
-	UpstreamModel   string `json:"upstream_model"`
-	MaxOutputTokens int    `json:"max_output_tokens"`
+	ID              string           `json:"id"`
+	Name            string           `json:"name"`
+	UpstreamModel   string           `json:"upstream_model"`
+	MaxOutputTokens int              `json:"max_output_tokens"`
+	Protocols       []string         `json:"protocols,omitempty"`
+	Price           *aigateway.Price `json:"price,omitempty"`
 }
 type aiProviderPublishInput struct {
 	Version    int64             `json:"version"`
@@ -452,6 +454,12 @@ func validateProviderPublication(entries []aiProviderModel, discovered []string,
 		available[id] = true
 	}
 	for _, entry := range entries {
+		if entry.Price != nil && entry.Price.Validate() != nil {
+			return providerProblem(422, "invalid_models", "Model pricing requires a versioned integer USD tariff")
+		}
+		if aigateway.ValidateProtocols(entry.Protocols) != nil {
+			return providerProblem(422, "invalid_models", "Publish only supported explicit native protocols")
+		}
 		if !aiProviderAliasID.MatchString(entry.ID) || !providerNameValid(entry.Name) || !available[entry.UpstreamModel] || entry.MaxOutputTokens < 1 || entry.MaxOutputTokens > 4096 {
 			return providerProblem(422, "invalid_models", "Aliases, names, discovered model IDs and output limits are required")
 		}

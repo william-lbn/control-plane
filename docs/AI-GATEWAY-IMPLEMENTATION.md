@@ -1,6 +1,8 @@
-# AI Gateway: local real inference, protocol v1
+# AI Gateway: current implementation and historical protocol v1
 
-## Contract and scope
+Current implementation: API/Worker/AI 0.73.0, schema 060. Native Responses, Embeddings, Messages, Gemini and Chat extensions, native streaming, explicit versioned tariffs and cumulative branch budgets are accepted within the [current contract](AI-NATIVE-PROTOCOLS-BUDGETS.md) and [delivery receipt](DELIVERY-2026-10-22-AI-NATIVE-BUDGETS.md). Dynamic provider management has its separate [I01 receipt](AI-PROVIDERS.md). Commercial accounts, native vendor discovery, full multimodal/persistent references, credits and BYOK remain open. The text below records the original text-only v1 baseline; its future-gate descriptions do not supersede these later receipts.
+
+## Original protocol v1 contract and scope
 
 This implementation adds an independent Go inference process, React model catalog,
 Playground, application credential authentication and durable PostgreSQL request

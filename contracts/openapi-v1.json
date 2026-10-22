@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.72.0",
+    "version": "0.73.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -3572,8 +3572,7 @@
         "additionalProperties": false,
         "required": [
           "model",
-          "messages",
-          "max_tokens"
+          "messages"
         ],
         "properties": {
           "model": {
@@ -3589,8 +3588,7 @@
               "type": "object",
               "additionalProperties": false,
               "required": [
-                "role",
-                "content"
+                "role"
               ],
               "properties": {
                 "role": {
@@ -3598,12 +3596,54 @@
                   "enum": [
                     "user",
                     "assistant",
-                    "system"
+                    "system",
+                    "developer",
+                    "tool"
                   ]
                 },
                 "content": {
-                  "type": "string",
-                  "maxLength": 16000
+                  "oneOf": [
+                    {
+                      "type": "string",
+                      "maxLength": 16000
+                    },
+                    {
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 32,
+                      "items": {
+                        "type": "object"
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "tool_call_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "refusal": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "tool_calls": {
+                  "type": "array",
+                  "maxItems": 32,
+                  "items": {
+                    "type": "object"
+                  }
                 }
               }
             }
@@ -3622,8 +3662,63 @@
             "type": "number",
             "minimum": 0,
             "maximum": 2
+          },
+          "max_completion_tokens": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4096,
+            "description": "Also bounded by the selected approved route."
+          },
+          "top_p": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "tools": {
+            "type": "array",
+            "maxItems": 32,
+            "items": {
+              "type": "object"
+            }
+          },
+          "tool_choice": {},
+          "parallel_tool_calls": {
+            "type": "boolean"
+          },
+          "response_format": {
+            "type": "object"
+          },
+          "seed": {
+            "type": "integer"
+          },
+          "stop": {},
+          "stream_options": {
+            "type": "object"
           }
-        }
+        },
+        "oneOf": [
+          {
+            "required": [
+              "max_tokens"
+            ],
+            "not": {
+              "required": [
+                "max_completion_tokens"
+              ]
+            }
+          },
+          {
+            "required": [
+              "max_completion_tokens"
+            ],
+            "not": {
+              "required": [
+                "max_tokens"
+              ]
+            }
+          }
+        ],
+        "description": "Bounded native Chat Completions: text, inline image data URLs and custom function tools; 32 KiB body, 16 KiB message content, 1-32 messages, explicit bounded max_tokens or max_completion_tokens. No hosted tools or provider-owned file/conversation handles."
       },
       "AIModel": {
         "type": "object",
@@ -3650,12 +3745,26 @@
             "items": {
               "type": "string",
               "enum": [
-                "chat_completions"
+                "chat_completions",
+                "responses",
+                "embeddings",
+                "messages",
+                "gemini"
               ]
             }
           },
           "max_output_tokens": {
             "type": "integer"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AIPrice"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -6159,6 +6268,32 @@
             "type": "integer",
             "minimum": 1,
             "maximum": 4096
+          },
+          "protocols": {
+            "type": "array",
+            "maxItems": 5,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "enum": [
+                "chat_completions",
+                "responses",
+                "embeddings",
+                "messages",
+                "gemini"
+              ]
+            },
+            "description": "Omitted means legacy text chat only. Explicit operator-approved native wire protocols; discovery does not prove inference compatibility."
+          },
+          "price": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AIPrice"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -7211,6 +7346,371 @@
             "const": "not_recorded"
           }
         }
+      },
+      "AIResponsesRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "model",
+          "input",
+          "max_output_tokens"
+        ],
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "stream": {
+            "type": "boolean"
+          },
+          "input": {
+            "oneOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 16000
+              },
+              {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 32,
+                "items": {}
+              }
+            ]
+          },
+          "instructions": {
+            "type": "string"
+          },
+          "max_output_tokens": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4096
+          },
+          "temperature": {
+            "type": "number"
+          },
+          "top_p": {
+            "type": "number"
+          },
+          "tools": {
+            "type": "array",
+            "maxItems": 32,
+            "items": {
+              "type": "object"
+            }
+          },
+          "tool_choice": {},
+          "parallel_tool_calls": {
+            "type": "boolean"
+          },
+          "text": {
+            "type": "object"
+          },
+          "reasoning": {
+            "type": "object"
+          },
+          "store": {
+            "const": false
+          },
+          "background": {
+            "const": false
+          },
+          "include": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "truncation": {
+            "type": "string"
+          }
+        },
+        "description": "Stateless bounded native request, at most 32768 bytes. No provider-owned file/conversation handles or hosted tools; inline images and custom function tools only."
+      },
+      "AIEmbeddingsRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "model",
+          "input"
+        ],
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "input": {
+            "oneOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 16000
+              },
+              {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 32,
+                "items": {}
+              }
+            ]
+          },
+          "encoding_format": {
+            "enum": [
+              "float",
+              "base64"
+            ]
+          },
+          "dimensions": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 65536
+          }
+        },
+        "description": "Stateless bounded native request, at most 32768 bytes. No provider-owned file/conversation handles or hosted tools; inline images and custom function tools only."
+      },
+      "AIMessagesRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "model",
+          "messages",
+          "max_tokens"
+        ],
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "stream": {
+            "type": "boolean"
+          },
+          "messages": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 32,
+            "items": {}
+          },
+          "system": {},
+          "max_tokens": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4096
+          },
+          "temperature": {
+            "type": "number"
+          },
+          "top_p": {
+            "type": "number"
+          },
+          "top_k": {
+            "type": "integer"
+          },
+          "stop_sequences": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tools": {
+            "type": "array",
+            "maxItems": 32,
+            "items": {
+              "type": "object"
+            }
+          },
+          "tool_choice": {
+            "type": "object"
+          },
+          "thinking": {
+            "type": "object"
+          },
+          "output_config": {
+            "type": "object"
+          }
+        },
+        "description": "Stateless bounded native request, at most 32768 bytes. No provider-owned file/conversation handles or hosted tools; inline images and custom function tools only."
+      },
+      "AIGeminiRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "contents",
+          "generationConfig"
+        ],
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "contents": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 32,
+            "items": {}
+          },
+          "systemInstruction": {
+            "type": "object"
+          },
+          "tools": {
+            "type": "array",
+            "maxItems": 32,
+            "items": {
+              "type": "object"
+            }
+          },
+          "toolConfig": {
+            "type": "object"
+          },
+          "generationConfig": {
+            "type": "object",
+            "required": [
+              "maxOutputTokens"
+            ],
+            "properties": {
+              "maxOutputTokens": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 4096
+              }
+            }
+          },
+          "safetySettings": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          }
+        },
+        "description": "Stateless bounded native request, at most 32768 bytes. No provider-owned file/conversation handles or hosted tools; inline images and custom function tools only."
+      },
+      "AIPrice": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "currency",
+          "max_input_tokens",
+          "input_microusd_per_million_tokens",
+          "output_microusd_per_million_tokens",
+          "cache_read_microusd_per_million_tokens",
+          "cache_write_microusd_per_million_tokens"
+        ],
+        "properties": {
+          "version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "currency": {
+            "const": "USD"
+          },
+          "max_input_tokens": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000
+          },
+          "input_microusd_per_million_tokens": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000000
+          },
+          "output_microusd_per_million_tokens": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000000
+          },
+          "cache_read_microusd_per_million_tokens": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000000
+          },
+          "cache_write_microusd_per_million_tokens": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000000
+          }
+        }
+      },
+      "AIBudgetPolicyInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "enabled",
+          "limit_micros"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "limit_micros": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000000000
+          }
+        }
+      },
+      "AIBudgetReconciliation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "confirmed_not_accepted",
+          "evidence_sha256"
+        ],
+        "properties": {
+          "usage": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "prompt_tokens",
+              "completion_tokens",
+              "total_tokens"
+            ],
+            "properties": {
+              "prompt_tokens": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000000
+              },
+              "completion_tokens": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000000
+              },
+              "total_tokens": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000000
+              },
+              "cache_read_tokens": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000000
+              },
+              "cache_write_tokens": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000000
+              }
+            }
+          },
+          "confirmed_not_accepted": {
+            "type": "boolean"
+          },
+          "evidence_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "description": "Operator-only confirmed supplier statement. Exactly one of usage or confirmed_not_accepted=true. Pending calls must have expired; uncertain funds never expire automatically."
       }
     },
     "responses": {
@@ -24020,6 +24520,895 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/CatalogCurrentObservationInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/ai-gateway/request/{protocol}": {
+      "post": {
+        "operationId": "invokeAINativeProtocol",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "protocol",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "responses",
+                "embeddings",
+                "messages",
+                "gemini"
+              ]
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Native JSON or native SSE events. Gemini Console input includes model; public Gemini selects it in the path. No automatic replay.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/AIResponsesRequest"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AIEmbeddingsRequest"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AIMessagesRequest"
+                  },
+                  {
+                    "$ref": "#/components/schemas/AIGeminiRequest"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai/v1/{aiBranch}/v1/responses": {
+      "post": {
+        "operationId": "createAINativeResponses",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "aiBranch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "backendCredential": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Native bounded responses response; preserves custom function tool/multimodal objects and vendor SSE event names. Requires published capability; no automatic replay.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIResponsesRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai/v1/{aiBranch}/openai/v1/responses": {
+      "post": {
+        "operationId": "createAINativeResponsesAlias",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "aiBranch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "backendCredential": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Native bounded responses response; preserves custom function tool/multimodal objects and vendor SSE event names. Requires published capability; no automatic replay.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIResponsesRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai/v1/{aiBranch}/v1/embeddings": {
+      "post": {
+        "operationId": "createAINativeEmbeddings",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "aiBranch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "backendCredential": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Native bounded embeddings response; preserves custom function tool/multimodal objects and vendor SSE event names. Requires published capability; no automatic replay.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIEmbeddingsRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai/v1/{aiBranch}/openai/v1/embeddings": {
+      "post": {
+        "operationId": "createAINativeEmbeddingsAlias",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "aiBranch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "backendCredential": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Native bounded embeddings response; preserves custom function tool/multimodal objects and vendor SSE event names. Requires published capability; no automatic replay.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIEmbeddingsRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai/v1/{aiBranch}/v1/messages": {
+      "post": {
+        "operationId": "createAINativeMessages",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "aiBranch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "backendCredential": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Native bounded messages response; preserves custom function tool/multimodal objects and vendor SSE event names. Requires published capability; no automatic replay.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIMessagesRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai/v1/{aiBranch}/anthropic/v1/messages": {
+      "post": {
+        "operationId": "createAINativeMessagesAlias",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "aiBranch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "backendCredential": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Native bounded messages response; preserves custom function tool/multimodal objects and vendor SSE event names. Requires published capability; no automatic replay.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIMessagesRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai/v1/{aiBranch}/gemini/v1beta/models/{aiModelAction}": {
+      "post": {
+        "operationId": "createAINativeGemini",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "aiBranch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "aiModelAction",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Published alias followed by :generateContent or :streamGenerateContent"
+          },
+          {
+            "name": "alt",
+            "in": "query",
+            "schema": {
+              "enum": [
+                "sse"
+              ]
+            }
+          }
+        ],
+        "security": [
+          {
+            "backendCredential": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Native bounded gemini response; preserves custom function tool/multimodal objects and vendor SSE event names. Requires published capability; no automatic replay.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              },
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIGeminiRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/ai-gateway/budget": {
+      "get": {
+        "operationId": "getAIBudget",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateAIBudget",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Metadata-only durable budget receipt. Policy edits never reset spent or held funds.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIBudgetPolicyInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/ai-gateway/requests/{aiRequest}/reconcile": {
+      "post": {
+        "operationId": "reconcileAIBudget",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "aiRequest",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Metadata-only durable budget receipt. Policy edits never reset spent or held funds.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIBudgetReconciliation"
               }
             }
           }

@@ -23,6 +23,8 @@ type Route struct {
 	AllowedIPs      []string `json:"allowed_ips"`
 	LabHTTP         bool     `json:"lab_allow_http"`
 	MaxOutputTokens int      `json:"max_output_tokens"`
+	Protocols       []string `json:"protocols,omitempty"`
+	Price           *Price   `json:"price,omitempty"`
 	key             string
 	egressProxy     string
 }
@@ -99,6 +101,12 @@ func (c *Config) Validate() error {
 			}
 		}
 		seen[r.ID] = true
+		if err := ValidateProtocols(r.Protocols); err != nil {
+			return err
+		}
+		if r.Price != nil && r.Price.Validate() != nil {
+			return errors.New("invalid AI route tariff")
+		}
 	}
 	return nil
 }
@@ -113,7 +121,7 @@ func (c *Config) Find(id string) (Route, bool) {
 func (c *Config) PublicModels() []map[string]any {
 	items := []map[string]any{}
 	for _, r := range c.Routes {
-		items = append(items, map[string]any{"id": r.ID, "object": "model", "name": r.Name, "owned_by": r.Provider, "protocols": []string{"chat_completions"}, "max_output_tokens": r.MaxOutputTokens})
+		items = append(items, map[string]any{"id": r.ID, "object": "model", "name": r.Name, "owned_by": r.Provider, "protocols": r.SupportedProtocols(), "max_output_tokens": r.MaxOutputTokens, "price": r.Price})
 	}
 	return items
 }
