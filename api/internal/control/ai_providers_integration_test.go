@@ -389,6 +389,11 @@ func TestAIProviderCatalogRestrictedRoleAndPublicationFence(t *testing.T) {
 	f.exec("GRANT SELECT ON ai_provider_catalog_state,ai_provider_runtime,ai_gateway_requests TO " + role)
 	f.exec("GRANT INSERT ON ai_gateway_requests TO " + role)
 	f.exec("GRANT SELECT ON ai_budget_policies TO " + role)
+	f.exec("GRANT SELECT ON ai_credit_accounts,ai_credit_reservations TO " + role)
+	f.exec("GRANT SELECT(id,project_id) ON branches TO " + role)
+	f.exec("GRANT SELECT(id,org_id) ON projects TO " + role)
+	f.exec("GRANT UPDATE(spent_micros,reserved_micros) ON ai_credit_accounts TO " + role)
+	f.exec("GRANT UPDATE(state,actual_micros,usage,settled_at) ON ai_credit_reservations TO " + role)
 	f.exec("GRANT UPDATE(reserved_micros) ON ai_budget_policies TO " + role)
 	cfg, err := pgxpool.ParseConfig(os.Getenv("NEON_V2_TEST_DATABASE_URL"))
 	if err != nil {

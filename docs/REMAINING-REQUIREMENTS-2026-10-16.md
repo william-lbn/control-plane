@@ -46,7 +46,7 @@ website 文档快照 `c0d49cbb6979b2ce79ea502d62dbc40780a923b0`（提交时间
 | Q02 | 项目共享 SQL 历史 | 基础已实现并验收：逐条确认、密文引用、撤回、当前作者/读者授权、删除/到期失效、分页与多账号 UI | [共享合同](SHARED-SQL-HISTORY.md)与[当前交付](DELIVERY-2026-10-16-CURRENT.md)；不含外部公开链接/已复制内容召回 |
 | Q03 | SQL AI、计划比较/建议 | 计划比较、受控 Schema/SQL AI 草稿、真实本地模型与人工执行、计划建议通路已验收；AI 修错及个人加密名称/显式 AI 命名也已验收；默认自动命名/长期授权和建议准确性仍有扩展门槛 | [比较合同](SQL-PLAN-COMPARISON.md)、[助手合同](SQL-ASSISTANT.md)；模型建议准确性独立，[修错合同](SQL-AI-REPAIR.md)、[命名合同](SQL-HISTORY-NAMES.md)；默认自动授权/全自动命名另验 |
 | I01 | AI 动态供应商配置 UI | 明确 operator、密文/固定 UID 来源、原幂等操作、受限模型发现、显式别名发布、失败更新保留旧版、有效凭据更新、停用及实际 Console/本地模型基础已验收 | [合同](AI-PROVIDERS.md)及[交付](DELIVERY-2026-10-20-AI-PROVIDERS.md)；商业供应商正式输入、其他协议/预算和生产 TLS 独立继续 |
-| I02 | AI 更多协议/预算 | 原生 Responses/Embeddings/Messages/Gemini、SSE、累计预算/取消/对账已验收 | Anthropic/Gemini 发现发布已通过[0.74 交付](DELIVERY-2026-10-23-AI-NATIVE-PROVIDERS.md)；完整多模态/持久引用、credit/账单/BYOK 等继续；[本批交付](DELIVERY-2026-10-22-AI-NATIVE-BUDGETS.md) |
+| I02 | AI 更多协议/预算 | 原生 Responses/Embeddings/Messages/Gemini、SSE、累计预算/取消/对账已验收 | Anthropic/Gemini 发现发布已通过[0.74 交付](DELIVERY-2026-10-23-AI-NATIVE-PROVIDERS.md)；组织手工额度已通过[0.75 交付](DELIVERY-2026-10-23-AI-ORGANIZATION-CREDITS.md)；完整多模态/持久引用、外部账单/支付、BYOK 等继续；[本批交付](DELIVERY-2026-10-22-AI-NATIVE-BUDGETS.md) |
 | R01 | 严格 Guest 小数 CPU | QEMU 实际 250/500m 已验收；四倍预算保留 | Guest 隔离、公平性/计量；公开修复 runner 及统一锁待发行 |
 | R02 | 完整物理内存归还 | VM status 缩回已有；物理 RAM/OOM 未通过 | Guest/宿主联合采样、压力与 SQL/coldboot；硬件压力后置单列 |
 | X01 | 跨实例缩零栅栏 | 缺完整短连接 ledger / 外部 epoch fence | 多 API/Proxy、旧 Worker、分区、新连接/删除竞争；不能用 DB 租约代替 |
@@ -120,3 +120,5 @@ fixture、失败、日志、密码保护输入和所有业务字节。测试完�
 2026-10-22 AI 增量已通过，完整 I02 仍开放；需求组计数以[当前清单](FUNCTIONAL-STATUS-2026-10-21.md)为准：14 组基础通过、13 个业务组未完整闭环、另三组及五组后置专项。
 
 2026-10-23：[2026-10-23 原生供应商发现与发布](DELIVERY-2026-10-23-AI-NATIVE-PROVIDERS.md)：Anthropic/Gemini 原生目录、分页、不可变类型、匹配协议发布、Console 调用及跨类型凭据隔离通过。5 组新增 Go/PG、1 组受影响检查、累计 8 个实机检查点通过；原协议/预算与真实 Ollama 回执复用。API/Worker/AI 0.74.0、Web 重建，schema 061 / Chart 0.9.71 / Core Helm 158；Auth 和 Gateway 保留。17 张目录表、9 PVC、916 个原 Secret 身份保留，最终三节点、三个 Safekeeper Ready，VM 0。完整 I02 及其余业务组继续，性能/可靠性专项后置。
+
+2026-10-23 组织额度增量：[2026-10-23 组织 AI 额度](DELIVERY-2026-10-23-AI-ORGANIZATION-CREDITS.md)：手工授信/更正、原键恢复、双账本原子准入/结算、未知用量保留及凭证对账通过。9 组新增 Go/PG、3 组受影响检查、8 个实际页面检查通过，原功能回执复用。API/Worker/AI 0.75.0、Web 重建，schema 062 / Chart 0.9.72 / Core Helm 160；Auth 和 Gateway 保留。17 张目录表、9 PVC、916 个原 Secret 身份保留，最终三节点、三个 Safekeeper Ready，VM 0。合成授信未接入真实支付；BYOK、完整多模态及其余业务继续，性能/可靠性专项后置。

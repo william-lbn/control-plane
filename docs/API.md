@@ -1,7 +1,7 @@
 # 实际 API 合同
 
 OpenAPI 3 合同的权威源是 [openapi-v1.json](../contracts/openapi-v1.json)。
-版本 0.74.0，138 个路径、193 个操作，全部拥有稳定且唯一的 operationId。
+版本 0.75.0，146 个路径、202 个操作，全部拥有稳定且唯一的 operationId。
 运行 Swagger 位于 `/api/docs`，JSON 位于 `/api/openapi.json`。
 本合同是自托管 `/api/v1`，不声称兼容 Neon SaaS `/api/v2`。
 
@@ -217,6 +217,15 @@ request_id/operation_id/error_code，再由显式 retry 接口恢复可重试操
 | GET | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/budget` | `getAIBudget` | 200 |
 | PUT | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/budget` | `updateAIBudget` | 200 |
 | POST | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/requests/{aiRequest}/reconcile` | `reconcileAIBudget` | 200 |
+| GET | `/api/v1/organizations/{org}/ai-credits` | `getOrganizationCredits` | 200 |
+| GET | `/api/v1/organizations/{org}/ai-credits/ledger` | `listOrganizationCreditLedger` | 200 |
+| GET | `/api/v1/organizations/{org}/ai-credits/requests` | `listOrganizationPendingCredits` | 200 |
+| GET | `/api/v1/platform/ai-credits/organizations/{creditOrg}` | `getPlatformOrganizationCredits` | 200 |
+| PUT | `/api/v1/platform/ai-credits/organizations/{creditOrg}` | `updateOrganizationCreditPolicy` | 200 |
+| GET | `/api/v1/platform/ai-credits/organizations/{creditOrg}/ledger` | `listPlatformCreditLedger` | 200 |
+| GET | `/api/v1/platform/ai-credits/organizations/{creditOrg}/requests` | `listPlatformPendingCredits` | 200 |
+| POST | `/api/v1/platform/ai-credits/organizations/{creditOrg}/entries` | `createOrganizationCreditEntry` | 200 |
+| POST | `/api/v1/platform/ai-credits/requests/{creditRequest}/reconcile` | `reconcileOrganizationCreditRequest` | 200 |
 
 ## 3. 实现映射与演进
 

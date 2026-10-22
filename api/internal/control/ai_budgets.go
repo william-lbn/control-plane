@@ -18,8 +18,18 @@ var errAIBudgetExceeded = errors.New("AI budget exceeded")
 var errAIBudgetPrice = errors.New("AI budget requires versioned model pricing")
 
 func aiBranchLock(ctx context.Context, tx pgx.Tx, branch string) error {
+	var org string
+	err := tx.QueryRow(ctx, `SELECT p.org_id FROM branches b JOIN projects p ON p.id=b.project_id WHERE b.id=$1`, branch).Scan(&org)
+	if err != nil && !isNoRows(err) {
+		return err
+	}
+	if org != "" {
+		if err = aiCreditOrgLock(ctx, tx, org); err != nil {
+			return err
+		}
+	}
 	h := sha256.Sum256([]byte("ai-branch:" + branch))
-	_, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,0))`, hex.EncodeToString(h[:]))
+	_, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,0))`, hex.EncodeToString(h[:]))
 	return err
 }
 
@@ -133,6 +143,9 @@ func (s *server) settleAIRequest(ctx context.Context, id, branch string, outcome
 		return err
 	}
 	if err = settleAIBudget(ctx, tx, id, outcome, "", "", false); err != nil {
+		return err
+	}
+	if err = settleAICredits(ctx, tx, id, outcome, "", "", false); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)
@@ -301,6 +314,9 @@ func (s *server) aiBudgetReconcile(w http.ResponseWriter, r *http.Request) {
 		}
 		outcome := aigateway.Outcome{Usage: confirmed, Dispatched: !input.NotAccepted}
 		if err = settleAIBudget(r.Context(), tx, id, outcome, userFrom(r).ID, input.Evidence, true); err != nil {
+			return nil, err
+		}
+		if err = settleAICredits(r.Context(), tx, id, outcome, userFrom(r).ID, input.Evidence, true); err != nil {
 			return nil, err
 		}
 		var prompt, completion, total, read, write any
