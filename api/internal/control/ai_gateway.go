@@ -435,6 +435,17 @@ func (s *server) aiPublic(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	admitted, e := s.reserveAIRequestFor(ctx, requestID, project, branch, actor, credential, q, cfg)
 	if e != nil {
+		if errors.Is(e, errAICreditsExceeded) || errors.Is(e, errAICreditsPrice) || errors.Is(e, errAICreditsPending) {
+			code := "organization_credits_exhausted"
+			if errors.Is(e, errAICreditsPrice) {
+				code = "organization_credit_model_price_unavailable"
+			}
+			if errors.Is(e, errAICreditsPending) {
+				code = "organization_credit_pending_limit"
+			}
+			aigateway.Error(w, 429, code)
+			return
+		}
 		if errors.Is(e, errAIBudgetExceeded) || errors.Is(e, errAIBudgetPrice) {
 			code := "budget_exceeded"
 			if errors.Is(e, errAIBudgetPrice) {
@@ -518,6 +529,9 @@ func (s *server) reserveAIRequestFor(ctx context.Context, id, project, branch, a
 	}
 	route, _ := cfg.Find(q.Model)
 	if e = reserveAIBudget(ctx, tx, id, branch, route, q.MaxTokens); e != nil {
+		return false, e
+	}
+	if e = reserveAICredits(ctx, tx, id, branch, route, q.MaxTokens); e != nil {
 		return false, e
 	}
 	return true, tx.Commit(ctx)

@@ -7,6 +7,7 @@ import { api, projectPath } from '../../api';
 import type { Organization, Page, Project } from '../../api';
 import { Empty, PageHeading } from '../../shared/ui';
 import { Invitations } from './Invitations';
+import { AICredits } from '../ai/AICredits';
 
 type Member = { user_id: string; username: string; role: string };
 type Key = {
@@ -107,6 +108,9 @@ export function Organizations({
       <ConsoleSessions />
       <ConsoleMFA />
       <HistoryPolicy />
+      {organization && isAdmin && (
+        <AICredits key={organization.id} organizationId={organization.id} />
+      )}
       <section className="panel identity-panel">
         <h2>创建组织</h2>
         <form className="identity-form" onSubmit={create}>

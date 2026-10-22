@@ -1,0 +1,50 @@
+{
+  "exit_code": 0,
+  "pass_events": 1426,
+  "fail_events": 0,
+  "skip_events": 0,
+  "packages_passed": [
+    "github.com/william-lbn/control-plane/api/cmd/ai-provider-keygen",
+    "github.com/william-lbn/control-plane/api/cmd/ai-provider-relay",
+    "github.com/william-lbn/control-plane/api/internal/adapter",
+    "github.com/william-lbn/control-plane/api/internal/aigateway",
+    "github.com/william-lbn/control-plane/api/internal/dataapi",
+    "github.com/william-lbn/control-plane/api/internal/functions",
+    "github.com/william-lbn/control-plane/api/internal/functionsql",
+    "github.com/william-lbn/control-plane/api/internal/recovery",
+    "github.com/william-lbn/control-plane/api/internal/s3protocol",
+    "github.com/william-lbn/control-plane/api/internal/triggers",
+    "github.com/william-lbn/control-plane/api/internal/control"
+  ],
+  "postgres_version": "postgres (PostgreSQL) 17.11 (9cf674a53bcadaef7b3faecacf61af3c1cf59aac)",
+  "source_files": 479,
+  "source_unchanged": true,
+  "top_level_pass": 409,
+  "subtest_pass": 1017,
+  "packages_without_tests": 9,
+  "synced_main": "6db7bd74732d1a8000e210e006ab97226831d7ca",
+  "base_feature": "e85767cfd6ca6f5f17fdf12c072f9be413acbef4",
+  "web": {
+    "passed": 47,
+    "failed": 0,
+    "skipped": 0,
+    "typecheck_and_vite_build": "passed"
+  },
+  "vet": "passed",
+  "linux_amd64_cli_cross_compile": "passed; not Linux runtime",
+  "not_run": [
+    "new AI browser E2E",
+    "Linux/K8s/NeonVM runtime",
+    "production deployment",
+    "DSGA complete Renderer/worker/budget/Runner end-to-end"
+  ],
+  "evidence_sha256": {
+    "build/control-plane-main6db-credits-mac-final/tests.jsonl": "6d3b9809fa981780ba7e2ecd0130ebe3336a21bab22e0c3e2015b67963a7e693",
+    "build/control-plane-main6db-credits-mac-final/source-sha256.json": "8fec47f83f557cb3062d44a60350b3fde31f9cd4cea68df19c88290e5cf1dfcc",
+    "build/control-plane-main6db-credits-mac-final/summary.json": "47f53552767ad8c8ee5a7f5a1b90ee99ed1dc49b567d4bdafbf7cc6452127020",
+    "build/control-main6db-web-test.log": "7dd926f6db7181191c8009b66b73c045736569de777fdf12db1ab357b83a74af",
+    "build/control-main6db-web-build.log": "7a183c7529be765e25fba3904e104caad0471d1e2d01c002de7236ba564b84b9",
+    "build/control-main6db-vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "build/control-main6db-linux-cli.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}

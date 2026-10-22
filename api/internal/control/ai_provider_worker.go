@@ -12,6 +12,7 @@ import (
 )
 
 type aiProviderWork struct {
+	ProviderType                                                    string
 	ID, ProviderID, RevisionID, ActorID, Lease                      string
 	BaseURL, EndpointSHA256, Mode, SourceID, Previous, PolicySHA256 string
 	Box                                                             *aigateway.SealedProviderCredential
@@ -45,7 +46,7 @@ func (s *server) aiProviderWorkOnce(ctx context.Context) (bool, error) {
 		return false, err
 	}
 	var work aiProviderWork
-	err = tx.QueryRow(ctx, `SELECT o.id,o.provider_id,o.revision_id,o.actor_id,r.base_url,r.endpoint_sha256,r.credential_mode,COALESCE(r.credential_source_id,''),COALESCE(r.previous_revision_id,''),r.policy_sha256,r.credential_box FROM ai_provider_operations o JOIN ai_provider_revisions r ON r.id=o.revision_id AND r.provider_id=o.provider_id WHERE o.state='queued' OR o.state='running' AND o.lease_expires_at<clock_timestamp() ORDER BY o.created_at FOR UPDATE OF o SKIP LOCKED LIMIT 1`).Scan(&work.ID, &work.ProviderID, &work.RevisionID, &work.ActorID, &work.BaseURL, &work.EndpointSHA256, &work.Mode, &work.SourceID, &work.Previous, &work.PolicySHA256, &work.Box)
+	err = tx.QueryRow(ctx, `SELECT o.id,o.provider_id,o.revision_id,o.actor_id,r.base_url,r.endpoint_sha256,r.credential_mode,COALESCE(r.credential_source_id,''),COALESCE(r.previous_revision_id,''),r.policy_sha256,r.credential_box,r.provider_type FROM ai_provider_operations o JOIN ai_provider_revisions r ON r.id=o.revision_id AND r.provider_id=o.provider_id WHERE o.state='queued' OR o.state='running' AND o.lease_expires_at<clock_timestamp() ORDER BY o.created_at FOR UPDATE OF o SKIP LOCKED LIMIT 1`).Scan(&work.ID, &work.ProviderID, &work.RevisionID, &work.ActorID, &work.BaseURL, &work.EndpointSHA256, &work.Mode, &work.SourceID, &work.Previous, &work.PolicySHA256, &work.Box, &work.ProviderType)
 	if isNoRows(err) {
 		return false, nil
 	}
@@ -108,7 +109,7 @@ func (s *server) aiProviderProbe(ctx context.Context, work *aiProviderWork) (aig
 			case "reuse":
 				var box *aigateway.SealedProviderCredential
 				var hash string
-				err = s.db.QueryRow(ctx, `SELECT credential_box,endpoint_sha256 FROM ai_provider_revisions WHERE id=$1 AND provider_id=$2 AND base_url=$3 AND state='tested' AND credential_box IS NOT NULL AND policy_sha256=$4`, work.Previous, work.ProviderID, work.BaseURL, s.aiProviders.policySHA256).Scan(&box, &hash)
+				err = s.db.QueryRow(ctx, `SELECT credential_box,endpoint_sha256 FROM ai_provider_revisions WHERE id=$1 AND provider_id=$2 AND base_url=$3 AND state='tested' AND credential_box IS NOT NULL AND policy_sha256=$4 AND provider_type=$5`, work.Previous, work.ProviderID, work.BaseURL, s.aiProviders.policySHA256, aigateway.ProviderType(work.ProviderType)).Scan(&box, &hash)
 				if err == nil && box != nil && hash == work.EndpointSHA256 {
 					secret, err = s.aiProviders.opener.Open(aigateway.ProviderCredentialScope{ProviderID: work.ProviderID, RevisionID: work.Previous, EndpointSHA256: hash}, *box)
 				} else {
@@ -136,7 +137,7 @@ func (s *server) aiProviderProbe(ctx context.Context, work *aiProviderWork) (aig
 			return empty, nil, aigateway.ProviderProbeError{Code: "provider_credential_unavailable"}
 		}
 	}
-	models, err := s.aiProviders.network.DiscoverModels(ctx, network, secret, 25*time.Second)
+	models, err := s.aiProviders.network.DiscoverProviderModels(ctx, network, secret, 25*time.Second, work.ProviderType)
 	secret = ""
 	return network, models, err
 }

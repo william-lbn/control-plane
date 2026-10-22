@@ -37,7 +37,7 @@ func (s *server) aiCatalog(ctx context.Context, open bool) (aiCatalogSnapshot, e
 		return snapshot, errors.New("catalog generation exhausted")
 	}
 	copyConfig.Generation += snapshot.Revision
-	rows, err := tx.Query(ctx, `SELECT provider_id,revision_id,base_url,endpoint_sha256,credential_mode,credential_box,network,policy_sha256,models FROM ai_provider_runtime ORDER BY provider_id`)
+	rows, err := tx.Query(ctx, `SELECT provider_id,revision_id,base_url,endpoint_sha256,credential_mode,credential_box,network,policy_sha256,models,provider_type FROM ai_provider_runtime ORDER BY provider_id`)
 	if err != nil {
 		return snapshot, err
 	}
@@ -46,11 +46,11 @@ func (s *server) aiCatalog(ctx context.Context, open bool) (aiCatalogSnapshot, e
 		seen[route.ID] = true
 	}
 	for rows.Next() {
-		var provider, revision, base, hash, mode, policy string
+		var provider, revision, base, hash, mode, policy, kind string
 		var box *aigateway.SealedProviderCredential
 		var network aigateway.ResolvedProviderEndpoint
 		var models []aiProviderModel
-		if err = rows.Scan(&provider, &revision, &base, &hash, &mode, &box, &network, &policy, &models); err != nil {
+		if err = rows.Scan(&provider, &revision, &base, &hash, &mode, &box, &network, &policy, &models, &kind); err != nil {
 			break
 		}
 		// An operator policy change immediately withdraws older approvals; it never
@@ -77,7 +77,7 @@ func (s *server) aiCatalog(ctx context.Context, open bool) (aiCatalogSnapshot, e
 				return snapshot, errors.New("catalog aliases conflict")
 			}
 			seen[model.ID] = true
-			route := aigateway.Route{ID: model.ID, Name: model.Name, Provider: "openai_compatible", BaseURL: base, UpstreamModel: model.UpstreamModel, AllowedIPs: append([]string(nil), network.AllowedIPs...), LabHTTP: network.LabHTTP, MaxOutputTokens: model.MaxOutputTokens, Protocols: append([]string(nil), model.Protocols...), Price: model.Price}
+			route := aigateway.Route{ID: model.ID, Name: model.Name, Provider: "openai_compatible", ProviderType: kind, BaseURL: base, UpstreamModel: model.UpstreamModel, AllowedIPs: append([]string(nil), network.AllowedIPs...), LabHTTP: network.LabHTTP, MaxOutputTokens: model.MaxOutputTokens, Protocols: append([]string(nil), model.Protocols...), Price: model.Price}
 			if !unavailable {
 				route, err = s.aiProviders.network.ConfigureRoute(network, route, secret)
 				if err != nil {

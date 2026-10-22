@@ -56,7 +56,7 @@ func (s *server) aiProviderCapabilities(w http.ResponseWriter, r *http.Request) 
 			sources = append(sources, record{"id": source.ID, "name": source.Name, "allowed_base_urls": p.sources[source.ID].AllowedBaseURLs})
 		}
 	}
-	jsonResponse(w, 200, record{"enabled": enabled, "can_manage": allowed, "credential_sources": sources, "raw_secret_input": enabled && s.secureCookies && r.TLS != nil && r.TLS.HandshakeComplete, "lab_secret_input": allowed && p.policy.AllowLabSecretInput, "protocols": []string{"openai_compatible"}, "discovery_performs_inference": false})
+	jsonResponse(w, 200, record{"enabled": enabled, "can_manage": allowed, "credential_sources": sources, "raw_secret_input": enabled && s.secureCookies && r.TLS != nil && r.TLS.HandshakeComplete, "lab_secret_input": allowed && p.policy.AllowLabSecretInput, "protocols": []string{"openai_compatible", "anthropic", "gemini"}, "discovery_performs_inference": false})
 }
 
 // All mutations lock the catalog singleton, then replay the actor-scoped keyed
@@ -141,10 +141,11 @@ type aiProviderCredentialInput struct {
 	LabAcknowledged bool   `json:"lab_secret_acknowledged,omitempty"`
 }
 type aiProviderDraftInput struct {
-	Version    int64                     `json:"version"`
-	Name       string                    `json:"name"`
-	BaseURL    string                    `json:"base_url"`
-	Credential aiProviderCredentialInput `json:"credential"`
+	ProviderType string                    `json:"provider_type,omitempty"`
+	Version      int64                     `json:"version"`
+	Name         string                    `json:"name"`
+	BaseURL      string                    `json:"base_url"`
+	Credential   aiProviderCredentialInput `json:"credential"`
 }
 type aiProviderModel struct {
 	ID              string           `json:"id"`
@@ -220,6 +221,10 @@ func (s *server) aiProviderDraft(w http.ResponseWriter, r *http.Request) {
 		} else if _, err := providerLocked(r.Context(), tx, id, input.Version); err != nil {
 			return nil, 0, err
 		}
+		kind := aigateway.ProviderType(input.ProviderType)
+		if kind == "" || kind != "openai_compatible" && input.Credential.Mode == "none" {
+			return nil, 0, providerProblem(422, "provider_type_rejected", "Choose a supported provider type and native provider credential")
+		}
 		ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 		defer cancel()
 		network, err := s.aiProviders.network.Resolve(ctx, input.BaseURL)
@@ -260,7 +265,7 @@ func (s *server) aiProviderDraft(w http.ResponseWriter, r *http.Request) {
 				return nil, 0, providerProblem(422, "invalid_credential", "Select a tested revision of this provider")
 			}
 			var valid bool
-			err := tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM ai_provider_revisions WHERE id=$1 AND provider_id=$2 AND state='tested' AND credential_box IS NOT NULL AND base_url=$3 AND endpoint_sha256=$4 AND policy_sha256=$5)`, credential.ReuseRevisionID, id, network.BaseURL, network.EndpointSHA256, s.aiProviders.policySHA256).Scan(&valid)
+			err := tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM ai_provider_revisions WHERE id=$1 AND provider_id=$2 AND state='tested' AND credential_box IS NOT NULL AND base_url=$3 AND endpoint_sha256=$4 AND policy_sha256=$5 AND provider_type=$6)`, credential.ReuseRevisionID, id, network.BaseURL, network.EndpointSHA256, s.aiProviders.policySHA256, kind).Scan(&valid)
 			if err != nil {
 				return nil, 0, err
 			}
@@ -277,7 +282,7 @@ func (s *server) aiProviderDraft(w http.ResponseWriter, r *http.Request) {
 				return nil, 0, err
 			}
 		}
-		_, err = tx.Exec(r.Context(), `INSERT INTO ai_provider_revisions(id,provider_id,base_url,endpoint_sha256,credential_mode,credential_source_id,previous_revision_id,credential_box,policy_sha256,created_by) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, revision, id, network.BaseURL, network.EndpointSHA256, credential.Mode, source, previous, sealed, s.aiProviders.policySHA256, userFrom(r).ID)
+		_, err = tx.Exec(r.Context(), `INSERT INTO ai_provider_revisions(id,provider_id,base_url,endpoint_sha256,credential_mode,credential_source_id,previous_revision_id,credential_box,policy_sha256,created_by,provider_type) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`, revision, id, network.BaseURL, network.EndpointSHA256, credential.Mode, source, previous, sealed, s.aiProviders.policySHA256, userFrom(r).ID, kind)
 		if err == nil {
 			_, err = tx.Exec(r.Context(), `INSERT INTO ai_provider_operations(id,provider_id,revision_id,actor_id) VALUES($1,$2,$3,$4)`, operation, id, revision, userFrom(r).ID)
 		}
@@ -321,7 +326,7 @@ func (s *server) aiProviderRead(w http.ResponseWriter, r *http.Request) {
 		aiProviderFailure(w, r, err)
 		return
 	}
-	revisions, err := s.many(r.Context(), `SELECT r.id,r.provider_id,r.base_url,r.credential_mode,r.credential_source_id,(r.credential_mode<>'none') AS has_credential,r.state,r.models,r.tested_at,r.created_at,o.id AS operation_id,o.state AS operation_state,o.attempts,o.retryable,o.error_code FROM ai_provider_revisions r JOIN ai_provider_operations o ON o.revision_id=r.id WHERE r.provider_id=$1 ORDER BY r.created_at DESC LIMIT 50`, id)
+	revisions, err := s.many(r.Context(), `SELECT r.id,r.provider_id,r.base_url,r.provider_type,r.credential_mode,r.credential_source_id,(r.credential_mode<>'none') AS has_credential,r.state,r.models,r.tested_at,r.created_at,o.id AS operation_id,o.state AS operation_state,o.attempts,o.retryable,o.error_code FROM ai_provider_revisions r JOIN ai_provider_operations o ON o.revision_id=r.id WHERE r.provider_id=$1 ORDER BY r.created_at DESC LIMIT 50`, id)
 	if err != nil {
 		aiProviderFailure(w, r, err)
 		return
@@ -391,8 +396,8 @@ func (s *server) aiProviderPublish(w http.ResponseWriter, r *http.Request) {
 		}
 		var models []string
 		var network aigateway.ResolvedProviderEndpoint
-		var policy string
-		err := tx.QueryRow(r.Context(), `SELECT r.models,r.network,r.policy_sha256 FROM ai_provider_revisions r JOIN ai_providers p ON p.id=r.provider_id AND p.target_revision_id=r.id WHERE r.id=$1 AND r.provider_id=$2 AND r.state='tested'`, input.RevisionID, id).Scan(&models, &network, &policy)
+		var policy, kind string
+		err := tx.QueryRow(r.Context(), `SELECT r.models,r.network,r.policy_sha256,r.provider_type FROM ai_provider_revisions r JOIN ai_providers p ON p.id=r.provider_id AND p.target_revision_id=r.id WHERE r.id=$1 AND r.provider_id=$2 AND r.state='tested'`, input.RevisionID, id).Scan(&models, &network, &policy, &kind)
 		if isNoRows(err) {
 			return nil, 0, providerProblem(409, "provider_revision_not_tested", "Publish only the current successfully tested revision")
 		}
@@ -430,6 +435,11 @@ func (s *server) aiProviderPublish(w http.ResponseWriter, r *http.Request) {
 		}
 		if err = validateProviderPublication(input.Models, models, existing); err != nil {
 			return nil, 0, err
+		}
+		for _, model := range input.Models {
+			if !aigateway.ProviderProtocolsValid(kind, model.Protocols) {
+				return nil, 0, providerProblem(422, "provider_protocol_mismatch", "Publish only explicitly selected protocols supported by the provider type")
+			}
 		}
 		publication := newID("app_")
 		_, err = tx.Exec(r.Context(), `INSERT INTO ai_provider_publications(id,provider_id,revision_id,models,created_by) VALUES($1,$2,$3,$4,$5)`, publication, id, input.RevisionID, input.Models, userFrom(r).ID)

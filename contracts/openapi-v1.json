@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.73.0",
+    "version": "0.75.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -6239,6 +6239,15 @@
           },
           "credential": {
             "$ref": "#/components/schemas/AIProviderCredentialInput"
+          },
+          "provider_type": {
+            "type": "string",
+            "enum": [
+              "openai_compatible",
+              "anthropic",
+              "gemini"
+            ],
+            "description": "Immutable provider discovery/authentication profile; omitted means historical OpenAI-compatible behavior. API root remains canonical /v1; Gemini discovery uses the fixed native /v1beta/models path."
           }
         },
         "required": [
@@ -6475,6 +6484,15 @@
               "string",
               "null"
             ]
+          },
+          "provider_type": {
+            "type": "string",
+            "enum": [
+              "openai_compatible",
+              "anthropic",
+              "gemini"
+            ],
+            "description": "Immutable provider discovery/authentication profile; omitted means historical OpenAI-compatible behavior. API root remains canonical /v1; Gemini discovery uses the fixed native /v1beta/models path."
           }
         },
         "required": [
@@ -7711,6 +7729,442 @@
           }
         },
         "description": "Operator-only confirmed supplier statement. Exactly one of usage or confirmed_not_accepted=true. Pending calls must have expired; uncertain funds never expire automatically."
+      },
+      "AICreditAccount": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "org_id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000000000
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "currency": {
+            "const": "USD"
+          },
+          "credited_micros": {
+            "type": "integer"
+          },
+          "spent_micros": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "reserved_micros": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "balance_micros": {
+            "type": "integer"
+          },
+          "available_micros": {
+            "type": "integer"
+          },
+          "updated_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "org_id",
+          "version",
+          "enabled",
+          "currency",
+          "credited_micros",
+          "spent_micros",
+          "reserved_micros",
+          "balance_micros",
+          "available_micros",
+          "updated_at"
+        ]
+      },
+      "AICreditReadResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "account": {
+            "$ref": "#/components/schemas/AICreditAccount"
+          },
+          "can_manage": {
+            "type": "boolean"
+          },
+          "credit_issuance": {
+            "const": "self_hosted_operator_grants"
+          },
+          "payment_processor": {
+            "const": false
+          }
+        },
+        "required": [
+          "account",
+          "can_manage",
+          "credit_issuance",
+          "payment_processor"
+        ]
+      },
+      "AICreditLedgerItem": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "grant",
+              "adjustment",
+              "reserve",
+              "settle",
+              "release",
+              "uncertain",
+              "reconcile"
+            ]
+          },
+          "credit_delta": {
+            "type": "integer"
+          },
+          "spent_delta": {
+            "type": "integer"
+          },
+          "reserved_delta": {
+            "type": "integer"
+          },
+          "source_event_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "actor_id": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "evidence_sha256": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "request_id",
+          "kind",
+          "credit_delta",
+          "spent_delta",
+          "reserved_delta",
+          "source_event_id",
+          "reason",
+          "actor_id",
+          "evidence_sha256",
+          "created_at"
+        ]
+      },
+      "AICreditPendingRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "request_id": {
+            "type": "string"
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "branch_id": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "reserved",
+              "uncertain"
+            ]
+          },
+          "reserved_micros": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "model_id": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "needs_reconciliation": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "request_id",
+          "project_id",
+          "branch_id",
+          "state",
+          "reserved_micros",
+          "created_at",
+          "model_id",
+          "expires_at",
+          "needs_reconciliation"
+        ]
+      },
+      "AICreditLedgerPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "org_id": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/AICreditLedgerItem"
+            }
+          },
+          "limit": {
+            "const": 100
+          },
+          "next_cursor": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "org_id",
+          "items",
+          "limit",
+          "next_cursor"
+        ]
+      },
+      "AICreditPendingPage": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "org_id": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/AICreditPendingRequest"
+            }
+          },
+          "limit": {
+            "const": 100
+          },
+          "next_cursor": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "org_id",
+          "items",
+          "limit",
+          "next_cursor"
+        ]
+      },
+      "AICreditPolicyInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 999999999999
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "version",
+          "enabled"
+        ]
+      },
+      "AICreditPolicyResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "org_id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "org_id",
+          "version",
+          "enabled"
+        ]
+      },
+      "AICreditEntryInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 999999999999
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "grant",
+              "adjustment"
+            ]
+          },
+          "amount_micros": {
+            "type": "integer",
+            "minimum": -1000000000000,
+            "maximum": 1000000000000,
+            "not": {
+              "const": 0
+            }
+          },
+          "source_event_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:/-]{7,127}$"
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 500
+          },
+          "evidence_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "version",
+          "kind",
+          "amount_micros",
+          "source_event_id",
+          "reason",
+          "evidence_sha256"
+        ],
+        "if": {
+          "properties": {
+            "kind": {
+              "const": "grant"
+            }
+          }
+        },
+        "then": {
+          "properties": {
+            "amount_micros": {
+              "exclusiveMinimum": 0
+            }
+          }
+        }
+      },
+      "AICreditEntryResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "entry_id": {
+            "type": "string"
+          },
+          "org_id": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "grant",
+              "adjustment"
+            ]
+          },
+          "amount_micros": {
+            "type": "integer"
+          },
+          "source_event_id": {
+            "type": "string"
+          },
+          "currency": {
+            "const": "USD"
+          }
+        },
+        "required": [
+          "entry_id",
+          "org_id",
+          "version",
+          "kind",
+          "amount_micros",
+          "source_event_id",
+          "currency"
+        ]
+      },
+      "AICreditReconcileResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "request_id": {
+            "type": "string"
+          },
+          "org_id": {
+            "type": "string"
+          },
+          "reconciled": {
+            "const": true
+          },
+          "evidence_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "reconciled_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "request_id",
+          "org_id",
+          "reconciled",
+          "evidence_sha256",
+          "reconciled_at"
+        ]
       }
     },
     "responses": {
@@ -25413,6 +25867,668 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/organizations/{org}/ai-credits": {
+      "get": {
+        "operationId": "getOrganizationCredits",
+        "tags": [
+          "AI organization credits"
+        ],
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable metadata receipt or current organization-scoped credit state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AICreditReadResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "getOrganizationCredits",
+        "description": "Opt-in self-hosted operator credit accounting. Grants are not payment processing. Confirmed settlement may overdraw and unknown accepted requests retain funds."
+      }
+    },
+    "/api/v1/organizations/{org}/ai-credits/ledger": {
+      "get": {
+        "operationId": "listOrganizationCreditLedger",
+        "tags": [
+          "AI organization credits"
+        ],
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 512
+            },
+            "description": "Opaque next_cursor from the prior page, scoped to this organization."
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable metadata receipt or current organization-scoped credit state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AICreditLedgerPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "listOrganizationCreditLedger",
+        "description": "Opt-in self-hosted operator credit accounting. Grants are not payment processing. Confirmed settlement may overdraw and unknown accepted requests retain funds."
+      }
+    },
+    "/api/v1/organizations/{org}/ai-credits/requests": {
+      "get": {
+        "operationId": "listOrganizationPendingCredits",
+        "tags": [
+          "AI organization credits"
+        ],
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 512
+            },
+            "description": "Opaque next_cursor from the prior page, scoped to this organization."
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable metadata receipt or current organization-scoped credit state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AICreditPendingPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "listOrganizationPendingCredits",
+        "description": "Opt-in self-hosted operator credit accounting. Grants are not payment processing. Confirmed settlement may overdraw and unknown accepted requests retain funds."
+      }
+    },
+    "/api/v1/platform/ai-credits/organizations/{creditOrg}": {
+      "get": {
+        "operationId": "getPlatformOrganizationCredits",
+        "tags": [
+          "AI organization credits"
+        ],
+        "parameters": [
+          {
+            "name": "creditOrg",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable metadata receipt or current organization-scoped credit state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AICreditReadResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "getPlatformOrganizationCredits",
+        "description": "Opt-in self-hosted operator credit accounting. Grants are not payment processing. Confirmed settlement may overdraw and unknown accepted requests retain funds."
+      },
+      "put": {
+        "operationId": "updateOrganizationCreditPolicy",
+        "tags": [
+          "AI organization credits"
+        ],
+        "parameters": [
+          {
+            "name": "creditOrg",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable metadata receipt or current organization-scoped credit state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AICreditPolicyResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AICreditPolicyInput"
+              }
+            }
+          }
+        },
+        "summary": "updateOrganizationCreditPolicy",
+        "description": "Opt-in self-hosted operator credit accounting. Grants are not payment processing. Confirmed settlement may overdraw and unknown accepted requests retain funds."
+      }
+    },
+    "/api/v1/platform/ai-credits/organizations/{creditOrg}/ledger": {
+      "get": {
+        "operationId": "listPlatformCreditLedger",
+        "tags": [
+          "AI organization credits"
+        ],
+        "parameters": [
+          {
+            "name": "creditOrg",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 512
+            },
+            "description": "Opaque next_cursor from the prior page, scoped to this organization."
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable metadata receipt or current organization-scoped credit state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AICreditLedgerPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "listPlatformCreditLedger",
+        "description": "Opt-in self-hosted operator credit accounting. Grants are not payment processing. Confirmed settlement may overdraw and unknown accepted requests retain funds."
+      }
+    },
+    "/api/v1/platform/ai-credits/organizations/{creditOrg}/requests": {
+      "get": {
+        "operationId": "listPlatformPendingCredits",
+        "tags": [
+          "AI organization credits"
+        ],
+        "parameters": [
+          {
+            "name": "creditOrg",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 512
+            },
+            "description": "Opaque next_cursor from the prior page, scoped to this organization."
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable metadata receipt or current organization-scoped credit state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AICreditPendingPage"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "listPlatformPendingCredits",
+        "description": "Opt-in self-hosted operator credit accounting. Grants are not payment processing. Confirmed settlement may overdraw and unknown accepted requests retain funds."
+      }
+    },
+    "/api/v1/platform/ai-credits/organizations/{creditOrg}/entries": {
+      "post": {
+        "operationId": "createOrganizationCreditEntry",
+        "tags": [
+          "AI organization credits"
+        ],
+        "parameters": [
+          {
+            "name": "creditOrg",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable metadata receipt or current organization-scoped credit state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AICreditEntryResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AICreditEntryInput"
+              }
+            }
+          }
+        },
+        "summary": "createOrganizationCreditEntry",
+        "description": "Opt-in self-hosted operator credit accounting. Grants are not payment processing. Confirmed settlement may overdraw and unknown accepted requests retain funds."
+      }
+    },
+    "/api/v1/platform/ai-credits/requests/{creditRequest}/reconcile": {
+      "post": {
+        "operationId": "reconcileOrganizationCreditRequest",
+        "tags": [
+          "AI organization credits"
+        ],
+        "parameters": [
+          {
+            "name": "creditRequest",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Durable metadata receipt or current organization-scoped credit state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AICreditReconcileResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIBudgetReconciliation"
+              }
+            }
+          }
+        },
+        "summary": "reconcileOrganizationCreditRequest",
+        "description": "Opt-in self-hosted operator credit accounting. Grants are not payment processing. Confirmed settlement may overdraw and unknown accepted requests retain funds."
       }
     }
   }

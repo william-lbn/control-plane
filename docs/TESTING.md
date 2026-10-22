@@ -1,5 +1,9 @@
 # 测试与交付标准
 
+新增 `ai-credits.spec.ts` 八个唯一实机检查点一次通过，仅两次合成推理；9 组新增 Go/PG、3 组受影响检查和当前源码/前端门槛见[0.75 交付](DELIVERY-2026-10-23-AI-ORGANIZATION-CREDITS.md)。82 个可选入口不是本批全量重跑。
+
+新增 `ai-native-providers.spec.ts` 累计八个唯一实机检查点通过；原供应商/发布及已完成发现从受保护检查点续验，不重复推理。5 组新增 Go/PG、1 组受影响检查及当前编译/vet/OpenAPI、前端门槛见[0.74 交付](DELIVERY-2026-10-23-AI-NATIVE-PROVIDERS.md)。当前 81 个可选入口不是本批全量重跑。
+
 新增 AI 原生协议/预算入口为 `ai-native-protocols.spec.ts`：9 组实机检查一次通过，15 项新增 Go/PG、4 项受影响 Go 和 4 项前端检查通过。合成上游与真实 Ollama 回执分别留证，详情见[本批交付](DELIVERY-2026-10-22-AI-NATIVE-BUDGETS.md)。80 个可选实机入口不代表 80 套均为本批重跑。
 
 当前新功能与原 fixture 续测入口见 [Auth/S3 交付](DELIVERY-2026-10-14-AUTH-S3.md)

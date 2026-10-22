@@ -1,6 +1,6 @@
 # 生产门槛与官网对齐
 
-当前增量：[2026-10-22 AI 原生协议与累计预算](DELIVERY-2026-10-22-AI-NATIVE-BUDGETS.md)：Responses、Embeddings、Messages、Gemini、原生 SSE、Chat 工具/内联图片、不可变价格、预算预留/结算、取消与证据对账通过。15 项新增 Go/PG、4 项受影响 Go、4 项前端检查及 9 组实机检查通过；原有真实 Ollama 回执复用。本次多协议实机上游明确为合成协议服务，未冒充商业模型验收。API/Worker/AI 0.73.0、Web 重建，schema 060 / Chart 0.9.70 / Core Helm 155。最终三节点、三个 Safekeeper Ready，VM 0；17 张目录表和原数据身份保留。完整 I02 仍开放，其余业务缺口继续，性能/可靠性专项后置。
+当前增量：[2026-10-23 组织 AI 额度](DELIVERY-2026-10-23-AI-ORGANIZATION-CREDITS.md)：手工授信/更正、原键恢复、双账本原子准入/结算、未知用量保留及凭证对账通过。9 组新增 Go/PG、3 组受影响检查、8 个实际页面检查通过，原功能回执复用。API/Worker/AI 0.75.0、Web 重建，schema 062 / Chart 0.9.72 / Core Helm 160；Auth 和 Gateway 保留。17 张目录表、9 PVC、916 个原 Secret 身份保留，最终三节点、三个 Safekeeper Ready，VM 0。合成授信未接入真实支付；BYOK、完整多模态及其余业务继续，性能/可靠性专项后置。
 
 状态截至 2026-10-17；API/Worker、Web 0.48.0 / migration 039 / Chart 0.9.40 / Helm revision 112。Console MFA、个人 SQL 历史采集/保留策略和单条删除已有 Linux Go/PG 与真实 UI 回执，见[当前交付](DELIVERY-2026-10-16-CURRENT.md)。[剩余需求账本](REMAINING-REQUIREMENTS-2026-10-16.md)区分未开发、部分实现和独立验收门槛。运行镜像按本地快照留证；公开统一 Helm 0.1.31 源码候选仍锁 0.23.0 公共控制镜像，不能冒充本地 0.48.0 发行。
 前一版本 `be04cb4` 的真实 Linux/React 闭环见 [Auth/S3 交付](DELIVERY-2026-10-14-AUTH-S3.md)：

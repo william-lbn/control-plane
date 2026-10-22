@@ -23,6 +23,7 @@ type Provider = {
 type Revision = {
   id: string;
   base_url: string;
+  provider_type: string;
   credential_mode: string;
   credential_source_id: string | null;
   has_credential: boolean;
@@ -49,7 +50,17 @@ type Detail = {
 };
 type Pending = { path: string; method: string; body: string; key: string };
 const prefix = '/api/v1/platform/ai-providers';
-const blankModel = (): Model => ({ id: '', name: '', upstream_model: '', max_output_tokens: 256 });
+const blankModel = (kind = 'openai_compatible'): Model => ({
+  id: '',
+  name: '',
+  upstream_model: '',
+  max_output_tokens: 256,
+  ...(kind === 'anthropic'
+    ? { protocols: ['messages'] }
+    : kind === 'gemini'
+      ? { protocols: ['gemini'] }
+      : {}),
+});
 
 export function AIProviders({ capabilities }: { capabilities: ProviderCapabilities | null }) {
   const [items, setItems] = useState<Provider[]>([]);
@@ -57,6 +68,7 @@ export function AIProviders({ capabilities }: { capabilities: ProviderCapabiliti
   const [detail, setDetail] = useState<Detail | null>(null);
   const [name, setName] = useState('');
   const [base, setBase] = useState('');
+  const [providerType, setProviderType] = useState('openai_compatible');
   const [mode, setMode] = useState('operator_reference');
   const [source, setSource] = useState('');
   const [reuse, setReuse] = useState('');
@@ -112,6 +124,7 @@ export function AIProviders({ capabilities }: { capabilities: ProviderCapabiliti
     if (!id) {
       setName('');
       setBase('');
+      setProviderType('openai_compatible');
       setMode('operator_reference');
       setReuse('');
       setSource('');
@@ -124,6 +137,7 @@ export function AIProviders({ capabilities }: { capabilities: ProviderCapabiliti
       setName(value.provider.name);
       const current = value.revisions.find((r) => r.id === value.provider.target_revision_id);
       setBase(current?.base_url || '');
+      setProviderType(current?.provider_type || 'openai_compatible');
       const tested = value.revisions.find((r) => r.state === 'tested' && r.has_credential);
       setReuse(tested?.id || '');
       setSource(current?.credential_source_id || '');
@@ -131,7 +145,18 @@ export function AIProviders({ capabilities }: { capabilities: ProviderCapabiliti
       const published = value.publications.find(
         (p) => p.id === value.provider.active_publication_id,
       );
-      setModels(published?.models.map((m) => ({ ...m })) || [blankModel()]);
+      setModels(
+        published?.models.map((m) => ({ ...m })) || [
+          {
+            ...blankModel(),
+            ...(current?.provider_type === 'anthropic'
+              ? { protocols: ['messages'] }
+              : current?.provider_type === 'gemini'
+                ? { protocols: ['gemini'] }
+                : {}),
+          },
+        ],
+      );
     } catch (e) {
       setError(String(e));
     }
@@ -206,6 +231,7 @@ export function AIProviders({ capabilities }: { capabilities: ProviderCapabiliti
       version: detail?.provider.version || 0,
       name,
       base_url: base,
+      ...(providerType !== 'openai_compatible' ? { provider_type: providerType } : {}),
       credential,
     });
   }
@@ -293,6 +319,27 @@ export function AIProviders({ capabilities }: { capabilities: ProviderCapabiliti
                   />
                 </label>
                 <label>
+                  供应商类型
+                  <select
+                    aria-label="供应商类型"
+                    value={providerType}
+                    onChange={(e) => {
+                      const kind = e.target.value;
+                      setProviderType(kind);
+                      setMode(kind === 'openai_compatible' ? 'none' : 'operator_reference');
+                      setSecret('');
+                      setLabAck(false);
+                      setReuse('');
+                      setModels([blankModel(kind)]);
+                    }}
+                  >
+                    <option value="openai_compatible">OpenAI compatible</option>
+                    <option value="anthropic">Anthropic Messages</option>
+                    <option value="gemini">Google Gemini</option>
+                  </select>
+                </label>
+                <p>API 根地址统一使用 /v1；系统按供应商类型读取原生模型目录，不发起推理。</p>
+                <label>
                   兼容接口地址
                   <input
                     aria-label="兼容接口地址"
@@ -316,7 +363,9 @@ export function AIProviders({ capabilities }: { capabilities: ProviderCapabiliti
                     }}
                   >
                     <option value="operator_reference">使用平台已批准的凭据</option>
-                    <option value="none">无需认证</option>
+                    <option value="none" disabled={providerType !== 'openai_compatible'}>
+                      无需认证
+                    </option>
                     <option
                       value="sealed"
                       disabled={!capabilities.raw_secret_input && !capabilities.lab_secret_input}
@@ -445,7 +494,7 @@ export function AIProviders({ capabilities }: { capabilities: ProviderCapabiliti
           {target?.state === 'tested' && (
             <section className="panel provider-editor">
               <h2>发布模型别名</h2>
-              <p>选择已发现的文本聊天模型；公开别名在整个目录中必须唯一。模型能力由供应商提供。</p>
+              <p>选择已发现的模型；公开别名在整个目录中必须唯一。模型能力由供应商提供。</p>
               <fieldset disabled={busy || uncertain}>
                 {models.map((model, index) => (
                   <div className="provider-model-row" key={index}>
@@ -501,25 +550,37 @@ export function AIProviders({ capabilities }: { capabilities: ProviderCapabiliti
                     </label>
                     <fieldset>
                       <legend>已批准的协议 {index + 1}</legend>
-                      {Object.entries(protocolNames).map(([p, label]) => (
-                        <label key={p}>
-                          <input
-                            type="checkbox"
-                            aria-label={`协议 ${label} ${index + 1}`}
-                            checked={(model.protocols || ['chat_completions']).includes(p)}
-                            onChange={(e) => {
-                              const current = model.protocols || ['chat_completions'];
-                              const next = e.target.checked
-                                ? [...current, p]
-                                : current.filter((v) => v !== p);
-                              updateModel(index, {
-                                protocols: next.length ? next : ['chat_completions'],
-                              });
-                            }}
-                          />
-                          {label}
-                        </label>
-                      ))}
+                      {Object.entries(protocolNames)
+                        .filter(
+                          ([p]) =>
+                            (target?.provider_type || providerType) === 'openai_compatible' ||
+                            p ===
+                              ((target?.provider_type || providerType) === 'anthropic'
+                                ? 'messages'
+                                : 'gemini'),
+                        )
+                        .map(([p, label]) => (
+                          <label key={p}>
+                            <input
+                              type="checkbox"
+                              aria-label={`协议 ${label} ${index + 1}`}
+                              disabled={
+                                (target?.provider_type || providerType) !== 'openai_compatible'
+                              }
+                              checked={(model.protocols || ['chat_completions']).includes(p)}
+                              onChange={(e) => {
+                                const current = model.protocols || ['chat_completions'];
+                                const next = e.target.checked
+                                  ? [...current, p]
+                                  : current.filter((v) => v !== p);
+                                updateModel(index, {
+                                  protocols: next.length ? next : ['chat_completions'],
+                                });
+                              }}
+                            />
+                            {label}
+                          </label>
+                        ))}
                     </fieldset>
                     <label>
                       <input
@@ -614,7 +675,12 @@ export function AIProviders({ capabilities }: { capabilities: ProviderCapabiliti
                 ))}
                 <button
                   disabled={models.length >= 16}
-                  onClick={() => setModels((values) => [...values, blankModel()])}
+                  onClick={() =>
+                    setModels((values) => [
+                      ...values,
+                      blankModel(target?.provider_type || providerType),
+                    ])
+                  }
                 >
                   增加模型别名
                 </button>
