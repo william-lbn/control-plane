@@ -14,6 +14,7 @@ import (
 )
 
 type Route struct {
+	ProviderType    string   `json:"provider_type,omitempty"`
 	ID              string   `json:"id"`
 	Name            string   `json:"name"`
 	Provider        string   `json:"provider"`
@@ -101,6 +102,9 @@ func (c *Config) Validate() error {
 			}
 		}
 		seen[r.ID] = true
+		if !ProviderProtocolsValid(r.ProviderType, r.Protocols) {
+			return errors.New("AI route provider type or protocols rejected")
+		}
 		if err := ValidateProtocols(r.Protocols); err != nil {
 			return err
 		}
@@ -121,7 +125,7 @@ func (c *Config) Find(id string) (Route, bool) {
 func (c *Config) PublicModels() []map[string]any {
 	items := []map[string]any{}
 	for _, r := range c.Routes {
-		items = append(items, map[string]any{"id": r.ID, "object": "model", "name": r.Name, "owned_by": r.Provider, "protocols": r.SupportedProtocols(), "max_output_tokens": r.MaxOutputTokens, "price": r.Price})
+		items = append(items, map[string]any{"id": r.ID, "object": "model", "name": r.Name, "owned_by": ProviderType(r.ProviderType), "protocols": r.SupportedProtocols(), "max_output_tokens": r.MaxOutputTokens, "price": r.Price})
 	}
 	return items
 }

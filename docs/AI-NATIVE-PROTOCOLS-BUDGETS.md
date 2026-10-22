@@ -22,7 +22,7 @@
 
 请求上限 32 KiB，回复上限 1 MiB，输出上限由模型目录约束且不超过 4096。输入数组/消息为有界集合；内联图片也计入请求大小。这是明确的有界协议合同，不能声明完整厂商 API 覆盖。供应商自有 file/conversation/cachedContent 等引用、Responses 存取和后台执行、远程图片 URL、供应商托管工具保持拒绝，防止共享上游账号的跨分支引用。Responses 强制 `store=false`、`background=false`。工具结果由应用执行，Console 只展示。
 
-Console 可选择已发布协议并编辑原生请求 JSON；Responses/Messages/Chat 可流式显示，Gemini 与 Embeddings 的 Console 表单使用非流式调用，公开 Gemini SSE 已验证。供应商目录的发现仍采用现有 OpenAI-compatible `/v1/models`；原生厂商发现注册表和商业账号接入仍需独立完成。
+Console 可选择已发布协议并编辑原生请求 JSON；Responses/Messages/Chat 可流式显示，Gemini 与 Embeddings 的 Console 表单使用非流式调用，公开 Gemini SSE 已验证。0.73 的供应商发现采用 OpenAI-compatible `/v1/models`；后续 0.74 已独立验收[Anthropic/Gemini 原生发现与发布](AI-NATIVE-PROVIDERS.md)。商业账号和其余完整能力仍分别留证。
 
 ## 价格与预算
 

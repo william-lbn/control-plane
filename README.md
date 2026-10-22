@@ -7,7 +7,7 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 
 功能进度与当前优先级见 [已验收/剩余清单](docs/FUNCTIONAL-STATUS-2026-10-21.md)：14 组基础已有回执；五组专项后置，16 组尚未整体闭环。后续优先业务功能，复用来源未变的既有验收。
 
-最新状态：[2026-10-22 AI 原生协议与累计预算](docs/DELIVERY-2026-10-22-AI-NATIVE-BUDGETS.md)：Responses、Embeddings、Messages、Gemini、原生 SSE、Chat 工具/内联图片、不可变价格、预算预留/结算、取消与证据对账通过。15 项新增 Go/PG、4 项受影响 Go、4 项前端检查及 9 组实机检查通过；原有真实 Ollama 回执复用。本次多协议实机上游明确为合成协议服务，未冒充商业模型验收。API/Worker/AI 0.73.0、Web 重建，schema 060 / Chart 0.9.70 / Core Helm 155。最终三节点、三个 Safekeeper Ready，VM 0；17 张目录表和原数据身份保留。完整 I02 仍开放，其余业务缺口继续，性能/可靠性专项后置。
+最新状态：[2026-10-23 原生供应商发现与发布](docs/DELIVERY-2026-10-23-AI-NATIVE-PROVIDERS.md)：Anthropic/Gemini 原生目录、分页、不可变类型、匹配协议发布、Console 调用及跨类型凭据隔离通过。5 组新增 Go/PG、1 组受影响检查、累计 8 个实机检查点通过；原协议/预算与真实 Ollama 回执复用。API/Worker/AI 0.74.0、Web 重建，schema 061 / Chart 0.9.71 / Core Helm 158；Auth 和 Gateway 保留。17 张目录表、9 PVC、916 个原 Secret 身份保留，最终三节点、三个 Safekeeper Ready，VM 0。完整 I02 及其余业务组继续，性能/可靠性专项后置。
 
 此前增量：[应用 TOTP 双重认证](docs/DELIVERY-2026-10-15-AUTH-TOTP.md)八项 UI 与[项目共享查询](docs/DELIVERY-2026-10-15-SHARED-QUERIES.md)六项 UI 均通过；该批基线为 API 0.33 / Chart 0.9.17 / migration 031。
 

@@ -1,6 +1,6 @@
 # 动态 AI 供应商与模型目录
 
-当前 0.73.0 已允许发布时显式声明协议与不可变价格，并通过原生协议和累计预算验收，见[当前合同](AI-NATIVE-PROTOCOLS-BUDGETS.md)和[交付](DELIVERY-2026-10-22-AI-NATIVE-BUDGETS.md)。供应商发现仍是 OpenAI-compatible `/v1/models`；不能将声明协议等同于真实厂商原生发现或商业账号认证。下文记录原 I01 基础合同与其 0.58.0 历史基线。
+当前 0.74.0 已验收显式 Anthropic/Gemini 类型、原生模型发现/分页、不可变修订、协议发布与 Console 调用，见[原生供应商合同](AI-NATIVE-PROVIDERS.md)和[交付](DELIVERY-2026-10-23-AI-NATIVE-PROVIDERS.md)。0.73 的显式协议/价格及累计预算回执继续保留；真实商业账号、完整多模态、credit/BYOK 等仍开放。下文记录原 I01 基础合同与其 0.58.0 历史基线。
 
 I01 本地基础业务已验收并启用，见[精确交付](DELIVERY-2026-10-20-AI-PROVIDERS.md)。当前 API/Worker/Web/独立 AI Gateway 0.58.0 / migration 047 / Chart 0.9.50 / Helm 133。平台操作员、加密凭据、原操作状态机、连接测试、模型选择/发布、失败更新保留旧版、有效凭据更新和停用均通过；其他协议、预算和生产 TLS 单列。
 

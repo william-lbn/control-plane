@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.73.0",
+    "version": "0.74.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -6239,6 +6239,15 @@
           },
           "credential": {
             "$ref": "#/components/schemas/AIProviderCredentialInput"
+          },
+          "provider_type": {
+            "type": "string",
+            "enum": [
+              "openai_compatible",
+              "anthropic",
+              "gemini"
+            ],
+            "description": "Immutable provider discovery/authentication profile; omitted means historical OpenAI-compatible behavior. API root remains canonical /v1; Gemini discovery uses the fixed native /v1beta/models path."
           }
         },
         "required": [
@@ -6475,6 +6484,15 @@
               "string",
               "null"
             ]
+          },
+          "provider_type": {
+            "type": "string",
+            "enum": [
+              "openai_compatible",
+              "anthropic",
+              "gemini"
+            ],
+            "description": "Immutable provider discovery/authentication profile; omitted means historical OpenAI-compatible behavior. API root remains canonical /v1; Gemini discovery uses the fixed native /v1beta/models path."
           }
         },
         "required": [
