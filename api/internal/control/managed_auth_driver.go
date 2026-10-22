@@ -68,6 +68,9 @@ func (s *server) managedAuthSecret(ctx context.Context, p managedAuthPayload) (m
 }
 
 func applyManagedAuthSQLTx(ctx context.Context, tx pgx.Tx, p managedAuthPayload, verifier string) error {
+	return applyManagedAuthSQLWithFactorsTx(ctx, tx, p, verifier, false)
+}
+func applyManagedAuthSQLWithFactorsTx(ctx context.Context, tx pgx.Tx, p managedAuthPayload, verifier string, migrated bool) error {
 	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,922742))`, p.BranchID); err != nil {
 		return err
 	}
@@ -116,7 +119,7 @@ func applyManagedAuthSQLTx(ctx context.Context, tx pgx.Tx, p managedAuthPayload,
 		if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM neon_auth."user" WHERE "twoFactorEnabled" IS TRUE)`).Scan(&enrolled); err != nil {
 			return err
 		}
-		if enrolled && (!p.Spec.TwoFactorEnabled || generation == 0) {
+		if enrolled && (!p.Spec.TwoFactorEnabled || (generation == 0 && !migrated)) {
 			return dataAPIPrerequisiteError{"auth_factor_migration_required", "Enrolled factors require the original branch TOTP policy and key; clone re-encryption or user removal of factors is required"}
 		}
 	}
@@ -211,10 +214,23 @@ func (s *server) applyManagedAuthSQL(ctx context.Context, p managedAuthPayload) 
 		return err
 	}
 	defer tx.Rollback(ctx)
-	if err = applyManagedAuthSQLTx(ctx, tx, p, verifier); err != nil {
+	var proof *managedAuthFactorProof
+	if p.Spec.InheritTwoFactor {
+		proof, err = s.rebindManagedAuthFactorsTx(ctx, tx, p)
+		if err != nil {
+			return err
+		}
+	}
+	if err = applyManagedAuthSQLWithFactorsTx(ctx, tx, p, verifier, proof != nil); err != nil {
 		return err
 	}
-	return tx.Commit(ctx)
+	if err = tx.Commit(ctx); err != nil {
+		return err
+	}
+	if proof != nil {
+		return s.publishManagedAuthFactorProof(ctx, p, proof)
+	}
+	return nil
 }
 
 func managedAuthDeployment(p managedAuthPayload, namespace string, enable bool) map[string]any {
@@ -413,6 +429,8 @@ func (s *server) queueInheritedManagedAuthTx(ctx context.Context, tx pgx.Tx, cre
 	if err = json.Unmarshal(raw, &auth.Spec); err != nil {
 		return err
 	}
+	// A copied migration opt-in is not authorization for a subsequent branch.
+	auth.Spec.InheritTwoFactor = false
 	spec, _ := json.Marshal(auth.Spec)
 	payload, _ := json.Marshal(auth)
 	if _, err = tx.Exec(ctx, `INSERT INTO managed_auth_instances(branch_id,project_id,endpoint_id,generation,state,spec,secret_ref) VALUES($1,$2,$3,1,'provisioning',$4,$5)`, p.BranchID, p.ProjectID, p.EndpointID, spec, auth.SecretRef); err != nil {

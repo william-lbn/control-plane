@@ -560,3 +560,5 @@ See [the branch email/recovery contract](AUTH-EMAIL-RECOVERY.md). The protected 
 `catalog-current-observation.spec.ts` 复用原继承夹具，五项检查涵盖首次观察、Console 显式衔接、Owner 顺序、改名/改密、原请求重放、Writer/Reader 冷目录和原父数据保留；见 [2026-10-21 旧目录身份衔接](DELIVERY-2026-10-21-CATALOG-CURRENT-OBSERVATION.md)。只验证新增及受影响路径。
 
 `storage-large-objects.spec.ts` 使用既有数据分支、原存储数据库和新专用桶，验证 17 MiB UI/SDK 单次与 multipart、完整 SHA-256、Range、HEAD、CRC32C 拒绝、凭据清理和 Compute 归零。原子续传及 SDK 原操作检查点保存在 Linux 私有目录，不能盲目重发未知结果。见 [2026-10-22 有界大对象、Range 与 checksum](DELIVERY-2026-10-22-STORAGE-LARGE-OBJECTS.md)。
+
+`auth-factor-rebind.spec.ts` 使用专用物理父子分支，覆盖 MFA 迁移、原子结果、父子 Cookie/恢复码/SQL 登录隔离、验证器恢复、启停及最终归零。未知结果沿用原 Operation 与 Linux 私有检查点，不重建用户或迁移意图；只续跑未完成项。见 [2026-10-22 Auth 分支双重认证迁移](DELIVERY-2026-10-22-AUTH-FACTOR-MIGRATION.md)。

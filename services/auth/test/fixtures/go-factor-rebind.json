@@ -1,0 +1,9 @@
+{
+  "synthetic_only": true,
+  "producer": "Go managed Auth factor rebind functional test",
+  "vector": {
+    "ciphertext": "16d6d294d05d65773376af8158e69c193b5fa5f64056c49d3a7fd26b9aa35999a129b91a8374a2b0df556c05bb58d0a7720e8dd0fab6f34b",
+    "plaintext": "KRUGS4ZANFZSAYJA",
+    "secret": "GEX4o3eZOWOd-ZvR7T57MfQfP-OKnuGjk0yUvXRndoA"
+  }
+}

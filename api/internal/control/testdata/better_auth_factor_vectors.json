@@ -1,0 +1,30 @@
+{
+  "provider": "better-auth-1.7.7",
+  "synthetic_only": true,
+  "vectors": [
+    {
+      "secret": "synthetic-factor-compatibility-key-20261022-not-a-customer-secret",
+      "plaintext": "JBSWY3DPEHPK3PXP",
+      "ciphertext": "05c06c989f5cb31e48ba7265b381d07c589f1b881c22ea122ffa93ebc6cf2a316cfae82d8affdc95c8de9c7b75fc52b9a24cf68f03044529",
+      "envelope": false
+    },
+    {
+      "secret": "synthetic-factor-compatibility-key-20261022-not-a-customer-secret",
+      "plaintext": "JBSWY3DPEHPK3PXP",
+      "ciphertext": "$ba$0$54dab3d8e93b30ba6db4b39af01f800372a7b074bdd2d1fce568c5830347b64e5cca3610085f4bd1f43fffabca34806507ea0bf17f9fa191",
+      "envelope": true
+    },
+    {
+      "secret": "synthetic-factor-compatibility-key-20261022-not-a-customer-secret",
+      "plaintext": "[\"synthetic-recovery-one\",\"synthetic-recovery-two\"]",
+      "ciphertext": "3c1e889872011d9af015866e87574e63308a2b36f41ea542ded02758b1ef3a549aef84faff7bb611abc6104a43367aba55cf92719599aa8d71b5b0c02b0d83321a0c2be0067c2b797ec45c4c6ec3e6664168095760847be840fca1",
+      "envelope": false
+    },
+    {
+      "secret": "synthetic-factor-compatibility-key-20261022-not-a-customer-secret",
+      "plaintext": "[\"synthetic-recovery-one\",\"synthetic-recovery-two\"]",
+      "ciphertext": "$ba$0$f37dc0c344aa90cb83c0f1262823c241a6078198278aae293c01c0fb3051c1ef1acfc65e2ffbf14a1532c8b066cea74074103b51fca5d4f1ef2d99c7d585727c04d0a658488812a091062e344c62340ac8961d4f9a733127b3b2c2",
+      "envelope": true
+    }
+  ]
+}

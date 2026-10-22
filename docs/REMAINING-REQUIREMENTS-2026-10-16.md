@@ -35,7 +35,7 @@ website 文档快照 `c0d49cbb6979b2ce79ea502d62dbc40780a923b0`（提交时间
 | A01 | Console MFA | 基础自助已完成：标准 TOTP、恢复码、密码/重放、启用/关闭的其他会话撤销及 UI/PG 已验收 | [当前交付](DELIVERY-2026-10-16-CURRENT.md)；组织强制/WebAuthn/正式恢复流程仍是扩展门槛 |
 | A02 | Console OIDC/SSO | 未开发；外部 IdP 可后置，本地协议可先做 | state/nonce/PKCE、绑定、组织策略、本地 IdP 与 UI |
 | A03 | 应用 Auth OAuth/Admin/组织/手机号/事件 | 邮件密码/OTP/Magic/TOTP 已有；其余非完整官网能力 | 标准插件、配置隔离、用户管理、webhooks、真实本地服务和 UI |
-| A04 | Auth 分支 factor 重绑定 | 未完成；克隆账户不能等同复制可信第二因素 | secret 重封装/重绑、会话清除、恢复与用户可见状态 |
+| A04 | Auth 分支第二因素 | 显式物理迁移、独立重封装、会话/绑定清除、恢复码隔离和验证器恢复基础已验收 | [交付](DELIVERY-2026-10-22-AUTH-FACTOR-MIGRATION.md)；生命周期恢复与在线根密钥轮换保留独立门槛 |
 | A05 | Auth 完整删除/恢复/隔离 | 独立门槛 | 原账号/会话/JWKS/密钥与分支生命周期一致性矩阵 |
 | C01 | 数据库/角色 rename | 自定义受管理非系统对象的异步 API/UI、原 OID/SCRAM/数据、所有现存配置/Proxy CAS、未知结果恢复和 Writer/原 Reader 冷醒基础通过 | [合同](CATALOG-RENAME.md)与[交付](DELIVERY-2026-10-17-CATALOG-RENAME.md)；默认身份、Backend 依赖迁移和未知外部 DDL 归 C02 |
 | C02 | 默认/系统身份与外部 DDL | 默认连接/Owner、目录原结果、冷目录保留及普通 CRUD 持续 OID/凭据代际基础通过；整组未完成 | [0.70.0 交付](DELIVERY-2026-10-21-CATALOG-CURRENT-OBSERVATION.md)补齐有原证明的旧身份衔接、继承凭据背书及 Console；当前身份展示和首次启动继承沿用原验收；默认/系统漂移和 Backend 名称依赖继续 |
@@ -114,3 +114,5 @@ fixture、失败、日志、密码保护输入和所有业务字节。测试完�
 2026-10-21：[旧目录身份衔接](DELIVERY-2026-10-21-CATALOG-CURRENT-OBSERVATION.md)通过继承原凭据背书、原 OID 到当前代际的显式观察、控制台、改名/改密、原回执重放与冷目录数据保留。API/Worker 0.70.0 / migration 058 / Chart 0.9.67 / Helm 150；仍为 13 基础、22 继续，C02 默认/系统漂移及 Backend 名称依赖继续，性能/可靠性后置。
 
 2026-10-22：[2026-10-22 有界大对象、Range 与 checksum](DELIVERY-2026-10-22-STORAGE-LARGE-OBJECTS.md)通过新增有界大对象功能；需求组数量保持 13 基础、22 继续，其中五组专项后置。
+
+2026-10-22：A04 基础闭环通过，14 组有基础回执、21 组继续；后者含 13 个业务组、运维/TLS/发行三组及五组后置专项。性能/可靠性专项继续后置。
