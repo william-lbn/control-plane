@@ -27,13 +27,13 @@ GET 的 `ETag` 在响应头中。PUT 必须提交完整 `settings`、`If-Match` 
 | `?lifecycle` | 有界类型化规则保存、读取、删除；兼容 SDK `withUpdatedAt=true` 读取 |
 | `?object-lock` | 保存 Enabled 与默认保留声明 |
 | `?publicAccessBlock` | 四个标准标志的 GET/PUT/DELETE |
-| `?attributes` | ETag、ObjectSize、SHA-256 FULL_OBJECT、StorageClass 的选择读取 |
+| `?attributes` | ETag、ObjectSize、SHA-256 FULL_OBJECT、StorageClass、当前 ObjectParts；见[分片快照合同](OBJECT-STORAGE-ATTRIBUTES.md) |
 | PUT/COPY/multipart | 对象标签及两项响应头；标签 COPY/REPLACE 与 metadata COPY/REPLACE 独立 |
 | 匿名读取 | 仅显式 `/s3/{branch}/{bucket}/{key}` 的 GET/HEAD，要求公开桶且阻断规则允许 |
 | 浏览器 POST | SigV4 策略、单文件表单、成功状态 200/201/204、元数据/标签及有界校验字段 |
 | aws-chunked 尾部 | 签名与非签名数据块模式；SHA-256、SHA-1、CRC32、CRC32C 校验和 |
 
-**版本、生命周期和 Object Lock 仅保存配置，不执行对象多版本、自动到期或 WORM 保留。** 这与应用页面的声明一致，不能把配置读取成功当作保留策略执行证明。ObjectParts、完整扩展 checksum、大于 64 MiB 的对象和物理 GC 继续列在缺口中。没有宣称实现 AWS STS。
+**版本、生命周期和 Object Lock 仅保存配置，不执行对象多版本、自动到期或 WORM 保留。** 这与应用页面的声明一致，不能把配置读取成功当作保留策略执行证明。历史分片布局回填、完整扩展 checksum、大于 64 MiB 的对象和物理 GC 继续列在缺口中。没有宣称实现 AWS STS。
 
 `BlockPublicAcls`/`BlockPublicPolicy` 阻止新增公开授权；`IgnorePublicAcls`/`RestrictPublicBuckets` 阻止已有公开桶的匿名读取。解除新增授权阻断需要先保存，再开放公开读取。任何失败或畸形的签名请求都不会降级为匿名请求。
 
@@ -53,4 +53,4 @@ GET 的 `ETag` 在响应头中。PUT 必须提交完整 `settings`、`If-Match` 
 
 ## 数据保留
 
-原生目录格式增至 3，新增配置列与不可变回执表；控制面 metadata schema 064 不变。升级不删除旧对象、分片、WAL、历史引用或物理文件。克隆与恢复沿原生 PostgreSQL 时间线继承配置，回执仍保持确切分支隔离。GC 需要独立的历史引用证明，本增量不执行物理清理。
+0.78 原生目录格式 3 新增配置列与不可变回执表；0.79 格式 4 追加对象代际的分片快照；控制面 metadata schema 064 不变。升级不删除旧对象、分片、WAL、历史引用或物理文件。克隆与恢复沿原生 PostgreSQL 时间线继承配置，回执仍保持确切分支隔离。GC 需要独立的历史引用证明，本增量不执行物理清理。

@@ -26,6 +26,9 @@ var objectLargeSchema string
 //go:embed assets/storage-s3-settings.sql
 var objectS3SettingsSchema string
 
+//go:embed assets/storage-object-attributes.sql
+var objectAttributesSchema string
+
 type ObjectStorageSpec struct {
 	Database string `json:"database"`
 }
@@ -82,6 +85,9 @@ func applyObjectStorageSQLTx(ctx context.Context, tx pgx.Tx, p objectStoragePayl
 	if _, err = tx.Exec(ctx, objectS3SettingsSchema, pgx.QueryExecModeSimpleProtocol); err != nil {
 		return err
 	}
+	if _, err = tx.Exec(ctx, objectAttributesSchema, pgx.QueryExecModeSimpleProtocol); err != nil {
+		return err
+	}
 	// The marker and immutable database identity preserve inherited manifests.
 	// Re-enabling and companion replay never truncate objects or clone bytes.
 	var generation int64
@@ -92,7 +98,7 @@ func applyObjectStorageSQLTx(ctx context.Context, tx pgx.Tx, p objectStoragePayl
 	if generation > p.Generation {
 		return errors.New("Object Storage SQL generation advanced")
 	}
-	_, err = tx.Exec(ctx, `INSERT INTO neon_storage.installations(branch_id,generation,format_version) VALUES($1,$2,3) ON CONFLICT(branch_id) DO UPDATE SET generation=$2,format_version=3`, p.BranchID, p.Generation)
+	_, err = tx.Exec(ctx, `INSERT INTO neon_storage.installations(branch_id,generation,format_version) VALUES($1,$2,4) ON CONFLICT(branch_id) DO UPDATE SET generation=$2,format_version=4`, p.BranchID, p.Generation)
 	return err
 }
 func (s *server) installObjectStorage(ctx context.Context, p objectStoragePayload) error {
@@ -270,7 +276,7 @@ func (s *server) openObjectStorage(r *http.Request, project, branch string) (*pg
 		return nil, p, nil, err
 	}
 	var safe, evolved bool
-	err = conn.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM pg_namespace n JOIN neon_storage.installations i ON i.branch_id=$1 AND i.generation=$2 WHERE n.nspname='neon_storage' AND obj_description(n.oid,'pg_namespace')=$3),(SELECT count(*)=2 FROM information_schema.columns WHERE table_schema='neon_storage' AND ((table_name='objects' AND column_name='metadata') OR (table_name='buckets' AND column_name='cors'))) AND to_regclass('neon_storage.multipart_parts') IS NOT NULL AND EXISTS(SELECT 1 FROM neon_storage.installations i WHERE i.branch_id=$1 AND COALESCE((to_jsonb(i)->>'format_version')::int,1)>=3)`, p.BranchID, p.Generation, "neon-control:object-storage:"+p.ProjectID).Scan(&safe, &evolved)
+	err = conn.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM pg_namespace n JOIN neon_storage.installations i ON i.branch_id=$1 AND i.generation=$2 WHERE n.nspname='neon_storage' AND obj_description(n.oid,'pg_namespace')=$3),(SELECT count(*)=2 FROM information_schema.columns WHERE table_schema='neon_storage' AND ((table_name='objects' AND column_name='metadata') OR (table_name='buckets' AND column_name='cors'))) AND to_regclass('neon_storage.multipart_parts') IS NOT NULL AND EXISTS(SELECT 1 FROM neon_storage.installations i WHERE i.branch_id=$1 AND COALESCE((to_jsonb(i)->>'format_version')::int,1)>=4)`, p.BranchID, p.Generation, "neon-control:object-storage:"+p.ProjectID).Scan(&safe, &evolved)
 	if err != nil || !safe {
 		_ = conn.Close(context.Background())
 		cleanup()

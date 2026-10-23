@@ -653,7 +653,7 @@ func (s *server) s3WritePayload(w http.ResponseWriter, r *http.Request, conn *pg
 			s3Error(w, r, 503, "ServiceUnavailable")
 			return false
 		}
-		_, e = tx.Exec(r.Context(), `INSERT INTO neon_storage.objects(bucket,key,blob_key,sha256,size,content_type,metadata,tags,response_headers) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(bucket,key) DO UPDATE SET blob_key=$3,sha256=$4,size=$5,content_type=$6,metadata=$7,tags=$8,response_headers=$9,updated_at=now()`, bucket, key, blob, digest, data.Size, contentType, metadata, tags, responseHeaders)
+		_, e = tx.Exec(r.Context(), `INSERT INTO neon_storage.objects(bucket,key,blob_key,sha256,size,content_type,metadata,tags,response_headers) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(bucket,key) DO UPDATE SET blob_key=$3,sha256=$4,size=$5,content_type=$6,metadata=$7,tags=$8,response_headers=$9,part_layout='[]'::jsonb,updated_at=now()`, bucket, key, blob, digest, data.Size, contentType, metadata, tags, responseHeaders)
 		if e == nil {
 			e = s.publishStorageFunctionEvent(r.Context(), tx, p, bucket, key, digest, data.Size)
 		}

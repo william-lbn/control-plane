@@ -116,12 +116,13 @@ func normalizeStorageTags(tags []storageTag, limit int) ([]storageTag, error) {
 	sort.Slice(result, func(i, j int) bool { return result[i].Key < result[j].Key })
 	return result, nil
 }
+func storageUTCOffset(t time.Time) int { _, offset := t.Zone(); return offset }
 func storageDateValid(value *string) bool {
 	if value == nil {
 		return false
 	}
 	t, e := time.Parse(time.RFC3339, *value)
-	return e == nil && t.Year() >= 2000 && t.Hour() == 0 && t.Minute() == 0 && t.Second() == 0 && t.Nanosecond() == 0 && t.Location() == time.UTC
+	return e == nil && t.Year() >= 2000 && t.Hour() == 0 && t.Minute() == 0 && t.Second() == 0 && t.Nanosecond() == 0 && storageUTCOffset(t) == 0
 }
 func normalizeStorageSettings(v storageBucketSettings) (storageBucketSettings, error) {
 	var e error

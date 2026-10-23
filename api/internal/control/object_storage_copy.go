@@ -139,7 +139,7 @@ func copyStorageObjectWithConditions(ctx context.Context, conn *pgx.Conn, projec
 	}
 	var modified time.Time
 	e = tx.QueryRow(ctx, `INSERT INTO neon_storage.objects(bucket,key,blob_key,sha256,size,content_type,metadata,tags,response_headers) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)
- ON CONFLICT(bucket,key) DO UPDATE SET blob_key=$3,sha256=$4,size=$5,content_type=$6,metadata=$7,tags=$8,response_headers=$9,updated_at=now() RETURNING updated_at`, dstBucket, dstKey, blob, digest, size, contentType, metadata, tags, responseHeaders).Scan(&modified)
+ ON CONFLICT(bucket,key) DO UPDATE SET blob_key=$3,sha256=$4,size=$5,content_type=$6,metadata=$7,tags=$8,response_headers=$9,part_layout='[]'::jsonb,updated_at=now() RETURNING updated_at`, dstBucket, dstKey, blob, digest, size, contentType, metadata, tags, responseHeaders).Scan(&modified)
 	if e != nil {
 		return nil, e
 	}

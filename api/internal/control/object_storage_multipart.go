@@ -356,6 +356,7 @@ func (s *server) completeMultipart(ctx context.Context, conn *pgx.Conn, p object
 		indexed[v.Number] = v
 	}
 	var size int64
+	layout := make([]storageObjectPart, 0, len(selection))
 	for i, v := range selection {
 		part, found := indexed[v.Number]
 		if !found || part.ETag != v.ETag {
@@ -365,6 +366,7 @@ func (s *server) completeMultipart(ctx context.Context, conn *pgx.Conn, p object
 			return u, multipartFault(400, "EntityTooSmall")
 		}
 		size += part.Size
+		layout = append(layout, storageObjectPart{part.Number, part.Size, part.SHA256})
 	}
 	if size > storageObjectLimit {
 		return u, multipartFault(413, "EntityTooLarge")
@@ -427,7 +429,7 @@ func (s *server) completeMultipart(ctx context.Context, conn *pgx.Conn, p object
 		return u, e
 	}
 
-	_, e = tx.Exec(ctx, `INSERT INTO neon_storage.objects(bucket,key,blob_key,sha256,size,content_type,metadata,tags,response_headers) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(bucket,key) DO UPDATE SET blob_key=$3,sha256=$4,size=$5,content_type=$6,metadata=$7,tags=$8,response_headers=$9,updated_at=now()`, bucket, u.Key, blob, u.SHA256, size, u.ContentType, u.Metadata, u.Tags, u.ResponseHeaders)
+	_, e = tx.Exec(ctx, `INSERT INTO neon_storage.objects(bucket,key,blob_key,sha256,size,content_type,metadata,tags,response_headers,part_layout) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(bucket,key) DO UPDATE SET blob_key=$3,sha256=$4,size=$5,content_type=$6,metadata=$7,tags=$8,response_headers=$9,part_layout=$10,updated_at=now()`, bucket, u.Key, blob, u.SHA256, size, u.ContentType, u.Metadata, u.Tags, u.ResponseHeaders, layout)
 	if e != nil {
 		return u, e
 	}

@@ -14,7 +14,7 @@ S3 服务为目标，[认证](https://neon.com/docs/storage/authentication) 使�
 GetBucketLocation、ListObjects/V2（flat/grouped delimiter、fetch-owner、分页）、Put/Get/Head/DeleteObject、单 Range、
 条件写、basic CopyObject、SigV4 Header 和预签名 GET。目录与复制的实际 UI/SDK 验收见
 [目录](OBJECT-STORAGE-DIRECTORIES.md)和[复制](DELIVERY-2026-10-15-OBJECT-COPY.md)。
-批量删除、CORS、ASCII 用户 metadata、metadata REPLACE、预签名 PUT 和 COPY 源 ETag/时间条件已有实现，具体实际验收以各自交付记录为准。源条件合同见 [COPY 条件](OBJECT-STORAGE-COPY-CONDITIONS.md)。当前 multipart、匿名公开读/阻断和签名/非签名校验尾部已验收；单对象 64 MiB、分片 8 MiB、分支可见字节 256 MiB。完整 checksum、ObjectParts 和物理 GC 仍缺；不提供 STS。
+批量删除、CORS、ASCII 用户 metadata、metadata REPLACE、预签名 PUT 和 COPY 源 ETag/时间条件已有实现，具体实际验收以各自交付记录为准。源条件合同见 [COPY 条件](OBJECT-STORAGE-COPY-CONDITIONS.md)。当前 multipart、匿名公开读/阻断和签名/非签名校验尾部已验收；单对象 64 MiB、分片 8 MiB、分支可见字节 256 MiB。完整 checksum、历史分片布局回填和物理 GC 仍缺；不提供 STS。
 官网最大单对象 5 GiB，不能用当前实验室配额声称等价。物理 GC/HA/DR/TLS 另行准入。
 
 ## 2. 组件、密钥与模型

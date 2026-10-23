@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -320,23 +321,27 @@ func (s *server) s3ObjectAttributes(w http.ResponseWriter, r *http.Request, conn
 	for _, v := range strings.Split(r.Header.Get("X-Amz-Object-Attributes"), ",") {
 		v = strings.TrimSpace(v)
 		switch v {
-		case "ETag", "ObjectSize", "Checksum", "StorageClass":
+		case "ETag", "ObjectSize", "Checksum", "StorageClass", "ObjectParts":
 			if requested[v] {
 				s3Error(w, r, 400, "InvalidArgument")
 				return
 			}
 			requested[v] = true
-		case "ObjectParts":
-			s3Error(w, r, 501, "NotImplemented")
-			return
 		default:
 			s3Error(w, r, 400, "InvalidArgument")
 			return
 		}
 	}
+	max, marker, e := storageAttributePagination(r.Header)
+	if e != nil {
+		s3Error(w, r, 400, "InvalidArgument")
+		return
+	}
 	var blob, digest string
 	var size int64
-	e := conn.QueryRow(r.Context(), `SELECT blob_key,sha256,size FROM neon_storage.objects WHERE bucket=$1 AND key=$2`, bucket, key).Scan(&blob, &digest, &size)
+	var modified time.Time
+	var layout []storageObjectPart
+	e = conn.QueryRow(r.Context(), `SELECT blob_key,sha256,size,updated_at,part_layout FROM neon_storage.objects WHERE bucket=$1 AND key=$2`, bucket, key).Scan(&blob, &digest, &size, &modified, &layout)
 	if isNoRows(e) {
 		s3Error(w, r, 404, "NoSuchKey")
 		return
@@ -350,13 +355,21 @@ func (s *server) s3ObjectAttributes(w http.ResponseWriter, r *http.Request, conn
 		Type   string `xml:"ChecksumType"`
 	}
 	v := struct {
-		XMLName      xml.Name  `xml:"GetObjectAttributesOutput"`
-		XMLNS        string    `xml:"xmlns,attr"`
-		ETag         *string   `xml:"ETag,omitempty"`
-		Size         *int64    `xml:"ObjectSize,omitempty"`
-		Checksum     *checksum `xml:"Checksum,omitempty"`
-		StorageClass *string   `xml:"StorageClass,omitempty"`
+		XMLName      xml.Name               `xml:"GetObjectAttributesResponse"`
+		XMLNS        string                 `xml:"xmlns,attr"`
+		ETag         *string                `xml:"ETag,omitempty"`
+		Size         *int64                 `xml:"ObjectSize,omitempty"`
+		Checksum     *checksum              `xml:"Checksum,omitempty"`
+		StorageClass *string                `xml:"StorageClass,omitempty"`
+		Parts        *storageAttributeParts `xml:"ObjectParts,omitempty"`
 	}{XMLNS: s3XMLNamespace}
+	if requested["ObjectParts"] {
+		v.Parts, e = storagePaginateObjectParts(layout, size, max, marker)
+		if e != nil {
+			s3Error(w, r, 503, "ServiceUnavailable")
+			return
+		}
+	}
 	if requested["ETag"] {
 		v.ETag = &digest
 	}
@@ -375,6 +388,7 @@ func (s *server) s3ObjectAttributes(w http.ResponseWriter, r *http.Request, conn
 		}
 		v.Checksum = &checksum{SHA256: base64.StdEncoding.EncodeToString(raw), Type: "FULL_OBJECT"}
 	}
+	w.Header().Set("Last-Modified", modified.UTC().Format(http.TimeFormat))
 	w.Header().Set("X-Amz-Version-Id", "null")
 	s3XML(w, 200, v)
 }
