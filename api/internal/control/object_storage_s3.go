@@ -66,6 +66,9 @@ func (s *server) s3Invoke(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer done()
+	if rejectUnsupportedS3Headers(w, r) {
+		return
+	}
 	if s.s3BrowserPost(w, r) {
 		return
 	}
@@ -427,6 +430,9 @@ func (s *server) s3ListBuckets(w http.ResponseWriter, r *http.Request, conn *pgx
 	s3XML(w, 200, out)
 }
 func (s *server) s3Bucket(w http.ResponseWriter, r *http.Request, conn *pgx.Conn, p objectStoragePayload, bucket string, data []byte, q url.Values) {
+	if rejectUnsupportedS3Headers(w, r) {
+		return
+	}
 	if r.Method == http.MethodPut {
 		if len(data) > 4096 {
 			s3Error(w, r, 400, "InvalidArgument")
@@ -544,6 +550,9 @@ func (s *server) s3WriteObject(w http.ResponseWriter, r *http.Request, conn *pgx
 	return s.s3WritePayload(w, r, conn, p, bucket, key, payload)
 }
 func (s *server) s3WritePayload(w http.ResponseWriter, r *http.Request, conn *pgx.Conn, p objectStoragePayload, bucket, key string, data *storagePayload) bool {
+	if rejectUnsupportedS3Headers(w, r) {
+		return false
+	}
 	if r.Header.Get("X-Amz-Copy-Source") != "" || r.Header.Get("X-Amz-Server-Side-Encryption") != "" {
 		s3Error(w, r, 501, "NotImplemented")
 		return false

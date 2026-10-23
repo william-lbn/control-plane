@@ -98,6 +98,8 @@ func main() {
 		key := "folder/中文 file.bin"
 		payload := []byte("Neon real S3 SDK bytes 中文\n")
 		switch c.Mode {
+		case "s3-capabilities":
+			return probeS3Capabilities(ctx, client, c, transport, func(v string) { stage = v }, func(v string) { checks = append(checks, v) })
 		case "s3-attributes":
 			return probeS3Attributes(ctx, client, c, func(v string) { stage = v }, func(v string) { checks = append(checks, v) })
 		case "s3-settings":
