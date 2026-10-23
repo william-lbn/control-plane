@@ -1,19 +1,15 @@
 package control
 
 import (
-	"bytes"
 	"context"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
-	"io"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
-	dsgapi "github.com/neondatabase/autoscaling/pkg/api/dsga"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 )
 
@@ -56,6 +52,13 @@ func (binding *dsgaCreationBinding) tenantIdentity(ctx context.Context, confirm 
 // 不能自动重建空Tenant。首次POST未知结果只交下一次原意图GET，不透明重发。
 // 先读可信controller，再SQL确认；SQL锁不跨网络，丢COMMIT也只读原事实恢复。
 func (binding *dsgaCreationBinding) prepareTenant(ctx context.Context) error {
+	return binding.prepareTenantWithStorage(ctx, nil)
+}
+
+// 私有入口允许模块测试提供同原计划绑定的专用TLS客户端；生产入口始终由可信
+// Kube快照构造。这里不接受request函数/调用方URL，也不沿用SA服务代理作为原生
+// 存储JWT。任何路径都重载原Operation及lease，HTTP期间不持元数据库锁。
+func (binding *dsgaCreationBinding) prepareTenantWithStorage(ctx context.Context, storage *dsgaStorageClient) error {
 	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	current, err := binding.server.loadDSGACreationBinding(ctx, binding.operationID, binding.workerID)
@@ -67,66 +70,44 @@ func (binding *dsgaCreationBinding) prepareTenant(ctx context.Context) error {
 	if err != nil || current.action != "create_project_dsga_v1" || plan.validate(p) != nil || p.EndpointType != "read_write" || p.ParentTimelineID != "" || p.RestoreSource != "" {
 		return errDSGACreationIdentity
 	}
+	if plan.Storage.validate(plan.Namespace) != nil {
+		return errDSGAStorageManagement
+	}
 	known, err := current.tenantIdentity(ctx, false)
 	if err != nil {
 		return err
 	}
-	clients, _, err := newDSGAKubeClients(current.server.kube)
-	if err != nil {
-		return err
-	}
-	request := func(path, method string, body any) (map[string]any, error) {
-		// 固定HTTPS apiserver/轮转SA及内部storage-controller服务；不接受外部
-		// host/URL或转发凭据。Namespace与tenant都已由原计划核验，路径不可注入。
-		path = fmt.Sprintf("/api/v1/namespaces/%s/services/http:storage-controller:1234/proxy/%s", plan.Namespace, path)
-		req := clients.CoreV1().RESTClient().Verb(method).AbsPath(path).MaxRetries(0)
-		if body != nil {
-			raw, err := json.Marshal(body)
-			if err != nil {
-				return nil, err
-			}
-			req = req.Body(raw).SetHeader("Content-Type", "application/json")
-		}
-		stream, err := req.Stream(ctx)
+	if storage == nil {
+		storage, err = newDSGAStorageClient(ctx, current.server.kube, plan.Storage)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		defer stream.Close()
-		raw, err := io.ReadAll(io.LimitReader(stream, (1<<20)+1))
-		// 原始JSON先拒绝重复键/非法UTF-8及过深/超大对象；不能让map的最后
-		// 一个同名成员覆盖另一个身份。只需要存在证明，1MiB已显式有界。
-		if err != nil || dsgapi.ValidateJSON(raw, 1<<20, 65536) != nil {
-			return nil, errDSGACreationIdentity
-		}
-		decoder := json.NewDecoder(bytes.NewReader(raw))
-		decoder.UseNumber()
-		var fact map[string]any
-		if decoder.Decode(&fact) != nil || decoder.Decode(new(any)) != io.EOF || fact == nil {
-			return nil, errDSGACreationIdentity
-		}
-		return fact, nil
+		defer storage.CloseIdleConnections()
+	}
+	if storage.profile != plan.Storage || storage.namespace != plan.Namespace {
+		return errDSGAStorageManagement
 	}
 	path := "control/v1/tenant/" + p.TenantID
-	fact, err := request(path, http.MethodGet, nil)
+	fact, err := storage.request(ctx, http.MethodGet, path, nil)
 	if apierrors.IsNotFound(err) {
 		if known {
-			// 404也可能来自代理/服务依赖，不擅自宣称数据已丢失；无论哪种
+			// 404也可能来自服务依赖，不擅自宣称数据已丢失；无论哪种
 			// 情况都只能保留原事实等待原目标恢复，绝不重建同ID空Tenant。
 			return errDSGATenantUnconfirmed
 		}
-		_, err = request("v1/tenant", http.MethodPost, struct {
+		_, err = storage.request(ctx, http.MethodPost, "v1/tenant", struct {
 			TenantID string `json:"new_tenant_id"`
 		}{p.TenantID})
 		if err != nil {
-			// 内部controller不是Kube资源，服务代理可能将原409归为另一种
-			// StatusReason。只按有类型的实际409进入GET对账；此处从不把409
-			// 本身当成功，仍必须核对同一tenant及完整shard集合。
+			// controller的409只表示冲突，不能证明原创建意图已成功。
+			// 只按有类型的实际409进入GET对账；即使返回409，也必须
+			// 核对同一tenant及完整shard集合，不靠错误正文猜测执行结果。
 			var status apierrors.APIStatus
 			if !errors.As(err, &status) || status.Status().Code != http.StatusConflict {
 				return err
 			}
 		}
-		fact, err = request(path, http.MethodGet, nil)
+		fact, err = storage.request(ctx, http.MethodGet, path, nil)
 	}
 	if err != nil {
 		return err

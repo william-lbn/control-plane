@@ -16,7 +16,7 @@ import (
 func dsgaPlanFixture(t *testing.T) (createPayload, dsgaCreationPolicy, dsgaCreationPlan) {
 	t.Helper()
 	p := createPayload{ProjectID: "prj_test", BranchID: "br_test", EndpointID: "ep_test", EndpointType: "read_write", TenantID: strings.Repeat("a", 32), TimelineID: strings.Repeat("b", 32), MinCPU: 500, MaxCPU: 2000, MinMem: 1024, MaxMem: 4096}
-	policy := dsgaCreationPolicy{Namespace: "neon", Image: "ghcr.io/william-lbn/neon-compute@sha256:" + strings.Repeat("a", 64), MemorySlotBytes: 1 << 30, Budget: dsgaBootstrapBudget{64 << 20, 2 << 30, 1 << 30, 512 << 20}}
+	policy := dsgaCreationPolicy{Storage: dsgaStorageProfileFixture(), Namespace: "neon", Image: "ghcr.io/william-lbn/neon-compute@sha256:" + strings.Repeat("a", 64), MemorySlotBytes: 1 << 30, Budget: dsgaBootstrapBudget{64 << 20, 2 << 30, 1 << 30, 512 << 20}}
 	plan, err := makeDSGACreationPlan(p, policy, time.Date(2026, 10, 21, 12, 0, 0, 1234, time.UTC), bytes.NewReader(bytes.Repeat([]byte{0x41}, 48)))
 	if err != nil {
 		t.Fatal(err)

@@ -60,6 +60,10 @@ type dsgaCreationPlan struct {
 	// VM执行所需的平台输入同样在接受时冻结，worker不再读取当前镜像/Issuer
 	// 环境变量。零值仅兼容读取历史计划，生产VM构造明确拒绝缺少profile。
 	VM dsgaVMProfile `json:"vm,omitzero"`
+	// 存储Service/凭据Secret只冻结平台对象引用，不把JWT/CA或任意URL写入
+	// Operation。历史零值可只读解码，但真实存储执行器必须拒绝；不能恢复时
+	// 从当前env偷偷补齐旧计划，以免原操作落到另一个controller或身份域。
+	Storage dsgaStorageProfile `json:"storage,omitzero"`
 }
 
 type dsgaCredentialReference struct {
@@ -84,6 +88,7 @@ type dsgaCreationPolicy struct {
 	MemorySlotBytes uint64              `json:"memory_slot_bytes"`
 	Budget          dsgaBootstrapBudget `json:"budget"`
 	VM              dsgaVMProfile       `json:"vm"`
+	Storage         dsgaStorageProfile  `json:"storage"`
 }
 
 var dsgaPinnedImage = regexp.MustCompile(`^[a-z0-9][a-z0-9./:_-]*@sha256:[0-9a-f]{64}$`)
@@ -117,6 +122,9 @@ func (plan dsgaCreationPlan) validate(p createPayload) error {
 		return errDSGACreationPlan
 	}
 	if plan.VM != (dsgaVMProfile{}) && plan.VM.validate() != nil {
+		return errDSGACreationPlan
+	}
+	if plan.Storage != (dsgaStorageProfile{}) && plan.Storage.validate(plan.Namespace) != nil {
 		return errDSGACreationPlan
 	}
 	if plan.ProtocolVersion != 1 || plan.PostgresVersion != 17 || len(plan.Namespace) > 63 || !dsgaPlanNamespace.MatchString(plan.Namespace) ||
@@ -181,7 +189,7 @@ func makeDSGACreationPlan(p createPayload, policy dsgaCreationPolicy, now time.T
 	uuid := hex.EncodeToString(entropy[32:])
 	plan := dsgaCreationPlan{dsgaCreationIdentity: dsgaCreationIdentity{1, 17, policy.Namespace, hex.EncodeToString(entropy[:16]), "ci_" + hex.EncodeToString(entropy[16:32])},
 		Image: policy.Image, OperationUUID: fmt.Sprintf("%s-%s-%s-%s-%s", uuid[:8], uuid[8:12], uuid[12:16], uuid[16:20], uuid[20:]),
-		AcceptedAt: now.UTC().Format(time.RFC3339Nano), MemorySlotBytes: policy.MemorySlotBytes, Budget: policy.Budget, VM: policy.VM}
+		AcceptedAt: now.UTC().Format(time.RFC3339Nano), MemorySlotBytes: policy.MemorySlotBytes, Budget: policy.Budget, VM: policy.VM, Storage: policy.Storage}
 	if err := plan.validate(p); err != nil {
 		return dsgaCreationPlan{}, err
 	}

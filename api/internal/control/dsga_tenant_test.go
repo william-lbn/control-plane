@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
@@ -21,6 +20,7 @@ type dsgaTenantTestAPI struct {
 	mode      string
 	fact      map[string]any
 	afterPost func()
+	storage   *dsgaStorageClient
 }
 
 // 从实际公开PG17接受路由生成原随机plan/Operation，VM尚未创建；真实元数据库
@@ -44,11 +44,12 @@ func dsgaTenantFixture(t *testing.T, mode string) (context.Context, *dsgaCreatio
 		api.exists = true
 		api.fact["shards"] = []any{map[string]any{"tenant_shard_id": tenant + "-0002"}, map[string]any{"tenant_shard_id": tenant + "-0102"}}
 	}
-	base := "/api/v1/namespaces/neon/services/http:storage-controller:1234/proxy/"
-	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	base := "/"
+	api.storage = dsgaStorageTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		api.mu.Lock()
 		defer api.mu.Unlock()
-		if r.Header.Get("Authorization") != "Bearer center-identity" {
+		scope, allowed := storageRequestScope(r.Method, strings.TrimPrefix(r.URL.Path, "/"))
+		if !allowed || !validDSGAStorageToken(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "), api.storage.publicKey, scope) {
 			creationStatus(w, 403)
 			return
 		}
@@ -104,8 +105,6 @@ func dsgaTenantFixture(t *testing.T, mode string) (context.Context, *dsgaCreatio
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"shards": []any{map[string]any{"shard_id": tenant, "node_id": 2, "generation": 1}}})
 	}))
-	t.Cleanup(server.Close)
-	f.s.kube.base, f.s.kube.http = server.URL, server.Client()
 	return f.ctx, binding, api
 }
 
@@ -122,7 +121,7 @@ func TestDSGATenantOriginalRecoveryNeverRecreatesConfirmedStorage(t *testing.T) 
 	for _, mode := range []string{"success", "unknown", "conflict", "conflict_drift", "existing_sharded", "429", "drift", "duplicate"} {
 		t.Run(mode, func(t *testing.T) {
 			ctx, binding, api := dsgaTenantFixture(t, mode)
-			err := binding.prepareTenant(ctx)
+			err := binding.prepareTenantWithStorage(ctx, api.storage)
 			if mode == "unknown" || mode == "429" || mode == "drift" || mode == "duplicate" || mode == "conflict_drift" {
 				if err == nil {
 					t.Fatal("failed/ambiguous/mismatched Tenant write fabricated confirmation")
@@ -139,14 +138,14 @@ func TestDSGATenantOriginalRecoveryNeverRecreatesConfirmedStorage(t *testing.T) 
 			} else if err != nil {
 				t.Fatal(err)
 			}
-			if err := binding.prepareTenant(ctx); err != nil {
+			if err := binding.prepareTenantWithStorage(ctx, api.storage); err != nil {
 				t.Fatal(err)
 			}
 			before, xmin := tenantFact(t, ctx, binding)
 			if before != binding.intent.TenantID {
 				t.Fatal("wrong Tenant confirmed")
 			}
-			if err := binding.prepareTenant(ctx); err != nil {
+			if err := binding.prepareTenantWithStorage(ctx, api.storage); err != nil {
 				t.Fatal(err)
 			}
 			after, afterXmin := tenantFact(t, ctx, binding)
@@ -161,7 +160,7 @@ func TestDSGATenantOriginalRecoveryNeverRecreatesConfirmedStorage(t *testing.T) 
 			posts := api.posts
 			api.exists = false
 			api.mu.Unlock()
-			if err := binding.prepareTenant(ctx); !errors.Is(err, errDSGATenantUnconfirmed) {
+			if err := binding.prepareTenantWithStorage(ctx, api.storage); !errors.Is(err, errDSGATenantUnconfirmed) {
 				t.Fatal("confirmed Tenant unavailable state was not preserved")
 			}
 			api.mu.Lock()
@@ -181,7 +180,7 @@ func TestDSGATenantExpiredLeaseAndSQLBindingFailurePreserveOriginal(t *testing.T
 			t.Error("external API held SQL Operation lock")
 		}
 	}
-	if err := binding.prepareTenant(ctx); err == nil {
+	if err := binding.prepareTenantWithStorage(ctx, api.storage); err == nil {
 		t.Fatal("expired worker confirmed Tenant")
 	}
 	var count int
@@ -197,13 +196,13 @@ func TestDSGATenantExpiredLeaseAndSQLBindingFailurePreserveOriginal(t *testing.T
 	if _, err := binding.server.db.Exec(ctx, `CREATE FUNCTION fail_tenant_binding() RETURNS trigger LANGUAGE plpgsql AS $$BEGIN RAISE EXCEPTION 'test tenant bind failure'; END$$; CREATE TRIGGER fail_tenant_binding BEFORE INSERT ON dsga_creation_tenants FOR EACH ROW EXECUTE FUNCTION fail_tenant_binding()`); err != nil {
 		t.Fatal(err)
 	}
-	if err := binding.prepareTenant(ctx); err == nil {
+	if err := binding.prepareTenantWithStorage(ctx, api.storage); err == nil {
 		t.Fatal("failed SQL Tenant binding reported success")
 	}
 	if _, err := binding.server.db.Exec(ctx, `DROP TRIGGER fail_tenant_binding ON dsga_creation_tenants`); err != nil {
 		t.Fatal(err)
 	}
-	if err := binding.prepareTenant(ctx); err != nil {
+	if err := binding.prepareTenantWithStorage(ctx, api.storage); err != nil {
 		t.Fatal(err)
 	}
 	api.mu.Lock()
@@ -215,8 +214,8 @@ func TestDSGATenantExpiredLeaseAndSQLBindingFailurePreserveOriginal(t *testing.T
 }
 
 func TestDSGATenantForwardReplayAndImmutableGuard(t *testing.T) {
-	ctx, binding, _ := dsgaTenantFixture(t, "success")
-	if err := binding.prepareTenant(ctx); err != nil {
+	ctx, binding, api := dsgaTenantFixture(t, "success")
+	if err := binding.prepareTenantWithStorage(ctx, api.storage); err != nil {
 		t.Fatal(err)
 	}
 	before, xmin := tenantFact(t, ctx, binding)
