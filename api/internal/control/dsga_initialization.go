@@ -15,7 +15,6 @@ import (
 	vmv1 "github.com/neondatabase/autoscaling/neonvm/apis/neonvm/v1"
 	dsgapi "github.com/neondatabase/autoscaling/pkg/api/dsga"
 	"github.com/neondatabase/autoscaling/pkg/dsga/bootstrap"
-	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -118,7 +117,15 @@ func (binding *dsgaCreationBinding) observeInitializationWithHTTP(ctx context.Co
 		return empty, errDSGACreationIdentity
 	}
 	service, err := clients.CoreV1().Services(plan.Namespace).Get(ctx, name+"-management", metav1.GetOptions{})
-	if err != nil || !dsgaInitializationService(service, vm, p) {
+	if err != nil {
+		return empty, errDSGACreationIdentity
+	}
+	wantedService, err := renderDSGAService(vm, p, plan, current.operationID, "management")
+	if err != nil {
+		return empty, err
+	}
+	serviceUID, err := current.serviceIdentity(ctx, "management", nil)
+	if err != nil || serviceUID == "" || !sameDSGAService(service, wantedService, serviceUID) {
 		return empty, errDSGACreationIdentity
 	}
 	key := ed25519.NewKeyFromSeed(credentials.Data["controlSigningSeed"])
@@ -158,16 +165,4 @@ func (binding *dsgaCreationBinding) observeInitializationWithHTTP(ctx context.Co
 		return empty, err
 	}
 	return fact, nil
-}
-
-func dsgaInitializationService(service *core.Service, vm *vmv1.VirtualMachine, p createPayload) bool {
-	if service == nil || vm == nil || service.Namespace != vm.Namespace || service.Name != vm.Name+"-management" || service.UID == "" || service.ResourceVersion == "" || service.DeletionTimestamp != nil ||
-		service.Labels["neon-control/project-id"] != p.ProjectID || service.Labels["neon-control/endpoint-id"] != p.EndpointID || len(service.OwnerReferences) != 1 ||
-		service.Spec.Type != core.ServiceTypeClusterIP || service.Spec.ExternalName != "" || len(service.Spec.ExternalIPs) != 0 || net.ParseIP(service.Spec.ClusterIP) == nil ||
-		len(service.Spec.Selector) != 1 || service.Spec.Selector["vm.neon.tech/name"] != vm.Name || len(service.Spec.Ports) != 1 {
-		return false
-	}
-	owner, port := service.OwnerReferences[0], service.Spec.Ports[0]
-	return owner.APIVersion == vmv1.SchemeGroupVersion.String() && owner.Kind == "VirtualMachine" && owner.Name == vm.Name && owner.UID == vm.UID && owner.Controller != nil && *owner.Controller &&
-		port.Name == "compute-control" && port.Protocol == core.ProtocolTCP && port.Port == 3080 && port.TargetPort.Type == 0 && port.TargetPort.IntVal == 3080 && port.NodePort == 0
 }

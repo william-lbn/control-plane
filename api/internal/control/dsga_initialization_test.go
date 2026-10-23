@@ -17,7 +17,6 @@ import (
 	vmv1 "github.com/neondatabase/autoscaling/neonvm/apis/neonvm/v1"
 	dsgapi "github.com/neondatabase/autoscaling/pkg/api/dsga"
 	core "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
@@ -52,11 +51,13 @@ type initializationTestState struct {
 
 func initializationBindingFixture(t *testing.T) (context.Context, *dsgaCreationBinding, *creationTestAPI, **core.Secret, *core.Service, *http.Client, *initializationTestState, dsgaInitializationResponse) {
 	t.Helper()
-	ctx, _, _, f, _, binding, source := credentialSourceFixture(t)
-	vm, err := binding.prepareVM(ctx)
-	if err != nil {
+	ctx, binding, services, f, source := dsgaServicesSourceFixture(t, "success")
+	if err := binding.prepareServices(ctx); err != nil {
 		t.Fatal(err)
 	}
+	f.mu.Lock()
+	vm := f.vm.DeepCopy()
+	f.mu.Unlock()
 	plan, err := binding.creationPlan(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -65,10 +66,10 @@ func initializationBindingFixture(t *testing.T) (context.Context, *dsgaCreationB
 	f.vm.Status.Phase = vmv1.VmRunning
 	key := ed25519.NewKeyFromSeed((*source).Data["controlSigningSeed"])
 	f.mu.Unlock()
-	controller := true
-	service := &core.Service{ObjectMeta: metav1.ObjectMeta{Namespace: vm.Namespace, Name: vm.Name + "-management", UID: "service-original", ResourceVersion: "1", Labels: credentialLabels(binding.intent.ProjectID, binding.intent.EndpointID),
-		OwnerReferences: []metav1.OwnerReference{{APIVersion: vmv1.SchemeGroupVersion.String(), Kind: "VirtualMachine", Name: vm.Name, UID: vm.UID, Controller: &controller}}},
-		Spec: core.ServiceSpec{Type: core.ServiceTypeClusterIP, ClusterIP: "10.0.0.8", Selector: map[string]string{"vm.neon.tech/name": vm.Name}, Ports: []core.ServicePort{{Name: "compute-control", Protocol: core.ProtocolTCP, Port: 3080, TargetPort: intstr.FromInt(3080)}}}}
+	services.mu.Lock()
+	service := services.objects[vm.Name+"-management"].DeepCopy()
+	services.mu.Unlock()
+	nativeTarget := net.JoinHostPort(service.Spec.ClusterIP, "3080")
 	api := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "Bearer creation-kube-identity" {
 			creationStatus(w, 403)
@@ -128,7 +129,7 @@ func initializationBindingFixture(t *testing.T) (context.Context, *dsgaCreationB
 	client := newDSGAProxy(nil).observer
 	transport := client.Transport.(*http.Transport)
 	transport.DialContext = func(ctx context.Context, network, address string) (net.Conn, error) {
-		if network != "tcp" || address != "10.0.0.8:3080" {
+		if network != "tcp" || address != nativeTarget {
 			t.Error("caller supplied a native address")
 			return nil, net.InvalidAddrError("unexpected native address")
 		}
@@ -189,6 +190,7 @@ func TestDSGAInitializationRejectsDriftBeforeNativeAndExpiredLeaseAfterResponse(
 		"config_uid":       func() { f.vm.Spec.DSGABootstrap.ConfigSecretUID = "replacement" },
 		"source_seed":      func() { (*source).Data["probeCredentialSeed"][0] ^= 1 },
 		"service_owner":    func() { service.OwnerReferences[0].UID = "foreign" },
+		"service_uid":      func() { service.UID = "replacement-service" },
 		"service_selector": func() { service.Spec.Selector["vm.neon.tech/name"] = "foreign" },
 		"service_external": func() { service.Spec.ExternalIPs = []string{"192.0.2.1"} },
 		"service_port":     func() { service.Spec.Ports[0].TargetPort = intstr.FromInt(5432) },
