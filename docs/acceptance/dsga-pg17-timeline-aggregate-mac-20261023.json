@@ -1,0 +1,79 @@
+{
+  "date": "2026-10-23",
+  "code_commit": "173ae909e7bd1446e3a598dfff22e0bb6312a757",
+  "dependency": "e1757bca375ffcb79b861b011e69459fa819c70f",
+  "scope": "original durable timeline create intent and authoritative full-shard observation; PG17 only",
+  "runs": [
+    {
+      "path": "build/dsga-timeline-aggregate-mac1",
+      "summary": {
+        "exit_code": 1,
+        "pass_events": 11,
+        "fail_events": 6,
+        "skip_events": 0,
+        "packages_passed": [],
+        "postgres_version": "postgres (PostgreSQL) 17.11 (fcada44b67d239aea8e699a721b99c470fc24d65)",
+        "source_files": 537,
+        "source_unchanged": true
+      }
+    },
+    {
+      "path": "build/dsga-json-observation-mac1",
+      "summary": {
+        "exit_code": 0,
+        "pass_events": 6,
+        "fail_events": 0,
+        "skip_events": 0,
+        "scope": "new observation JSON only; old write cap unchanged"
+      }
+    },
+    {
+      "path": "build/dsga-timeline-aggregate-fixed2",
+      "summary": {
+        "exit_code": 0,
+        "pass_events": 17,
+        "fail_events": 0,
+        "skip_events": 0,
+        "packages_passed": [
+          "github.com/william-lbn/control-plane/api/internal/control"
+        ],
+        "postgres_version": "postgres (PostgreSQL) 17.11 (fcada44b67d239aea8e699a721b99c470fc24d65)",
+        "source_files": 537,
+        "source_unchanged": true
+      }
+    },
+    {
+      "path": "build/dsga-timeline-large-boundary3",
+      "summary": {
+        "exit_code": 0,
+        "pass_events": 1,
+        "fail_events": 0,
+        "skip_events": 0,
+        "packages_passed": [
+          "github.com/william-lbn/control-plane/api/internal/control"
+        ],
+        "postgres_version": "postgres (PostgreSQL) 17.11 (fcada44b67d239aea8e699a721b99c470fc24d65)",
+        "source_files": 537,
+        "source_unchanged": true
+      }
+    }
+  ],
+  "final_vet": "build/dsga-timeline-aggregate-vet-final.log exit0",
+  "neon_index_lock_validation": "18 binaries / 4 pinned PG versions / 39 extension stages passed; initial invalid working-tree source-ref invocation failed and corrected",
+  "not_claimed": [
+    "full V3 completion",
+    "single final-source all-suite pass",
+    "actual native storage or K8s",
+    "physical kernel or VM certification"
+  ],
+  "remaining_code": [
+    "versioned worker/startup admission/safe SQL route",
+    "complete budgets/quiesce/policy/Scheduler/final Controller/Runner fences",
+    "branch/RO/catalog and suspend/wake/cleanup lifecycle"
+  ],
+  "linux": [
+    "strict native storage authentication and persistent shard/restart/failure recovery",
+    "K8s RBAC/SA/TLS provisioning/Service",
+    "NeonVM/KVM/hotplug/HugeTLB/physical/performance"
+  ]
+}
