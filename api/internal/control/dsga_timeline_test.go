@@ -5,203 +5,285 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
-// 通过真实typed Kube REST/TLS链验证服务代理路径与原PG版本，不模拟生产函数
-// 返回成功。此夹具不运行pageserver/storage-controller，实际存储E2E另验。
+// 真实元数据库与实际公开接受入口，只模拟原生controller协议；不运行K8s或
+// pageserver，不把fixture中幂等重放等同于目标环境的持久恢复认证。
 type dsgaTimelineAPI struct {
-	mu                                 sync.Mutex
-	p                                  createPayload
-	target, parent                     map[string]any
-	existing                           bool
-	posts, gets, redirects             int
-	lost, conflict, throttle, redirect bool
-	body                               map[string]any
+	mu        sync.Mutex
+	binding   *dsgaCreationBinding
+	storage   *dsgaStorageClient
+	mode      string
+	exists    bool
+	posts     int
+	request   []byte
+	shards    []any
+	afterPost func()
 }
 
-func (f *dsgaTimelineAPI) serve(w http.ResponseWriter, r *http.Request) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if r.Header.Get("Authorization") != "Bearer timeline-center" {
-		creationStatus(w, 403)
-		return
+func dsgaTimelineShards(tenant, timeline string) []any {
+	return []any{
+		map[string]any{"tenant_id": tenant + "-0002", "timeline_id": timeline, "pg_version": 17, "ancestor_timeline_id": nil, "ancestor_lsn": nil, "state": "Active"},
+		map[string]any{"tenant_id": tenant + "-0102", "timeline_id": timeline, "pg_version": 17, "ancestor_timeline_id": nil, "ancestor_lsn": nil, "state": "Active"},
 	}
-	base := "/api/v1/namespaces/neon/services/"
-	target := base + "http:pageserver-managed:9898/proxy/v1/tenant/" + f.p.TenantID + "/timeline/" + f.p.TimelineID
-	parent := base + "http:pageserver-managed:9898/proxy/v1/tenant/" + f.p.TenantID + "/timeline/" + f.p.ParentTimelineID
-	create := base + "http:storage-controller:1234/proxy/v1/tenant/" + f.p.TenantID + "/timeline"
-	if r.URL.Path == "/redirected" {
-		f.redirects++
-		_ = json.NewEncoder(w).Encode(f.target)
-		return
+}
+
+func newDSGATimelineFixture(t *testing.T, mode string) (context.Context, *dsgaCreationBinding, *dsgaTimelineAPI) {
+	t.Helper()
+	f := newDSGAProjectFixture(t)
+	key := "timeline-original-project"
+	if response := f.request("creation_admin", key, f.body); response.Code != 202 {
+		t.Fatal("project not accepted")
 	}
-	if r.Method == http.MethodGet && r.URL.Path == target {
-		f.gets++
-		if f.redirect {
-			w.Header().Set("Location", "/redirected")
-			w.WriteHeader(302)
+	op, _, _ := f.reservation(key)
+	f.exec(`UPDATE operations SET state='running',lease_owner='timeline-worker',lease_expires_at=clock_timestamp()+interval '60 seconds' WHERE id=$1`, op)
+	b, err := f.s.loadDSGACreationBinding(f.ctx, op, "timeline-worker")
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := b.intent.createPayload
+	a := &dsgaTimelineAPI{binding: b, mode: mode, exists: mode == "existing", shards: dsgaTimelineShards(p.TenantID, p.TimelineID)}
+	a.storage = dsgaStorageTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		a.mu.Lock()
+		defer a.mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		scope, allowed := storageRequestScope(r.Method, strings.TrimPrefix(r.URL.Path, "/"))
+		if !allowed || !validDSGAStorageToken(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "), a.storage.publicKey, scope) {
+			creationStatus(w, 403)
 			return
 		}
-		if !f.existing {
+		if r.Method == http.MethodGet && r.URL.Path == "/control/v1/tenant/"+p.TenantID {
+			_ = json.NewEncoder(w).Encode(map[string]any{"tenant_id": p.TenantID, "shards": []any{map[string]any{"tenant_shard_id": p.TenantID + "-0002"}, map[string]any{"tenant_shard_id": p.TenantID + "-0102"}}})
+			return
+		}
+		if r.Method == http.MethodGet && r.URL.Path == "/control/v1/tenant/"+p.TenantID+"/timeline/"+p.TimelineID {
+			if !a.exists {
+				creationStatus(w, 503)
+				return
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"shards": a.shards})
+			return
+		}
+		if r.Method != http.MethodPost || r.URL.Path != "/v1/tenant/"+p.TenantID+"/timeline" {
 			creationStatus(w, 404)
 			return
 		}
-		_ = json.NewEncoder(w).Encode(f.target)
-		return
-	}
-	if r.Method == http.MethodGet && f.p.ParentTimelineID != "" && r.URL.Path == parent {
-		_ = json.NewEncoder(w).Encode(f.parent)
-		return
-	}
-	if r.Method == http.MethodPost && r.URL.Path == create {
-		f.posts++
-		if json.NewDecoder(r.Body).Decode(&f.body) != nil {
+		a.posts++
+		var got dsgaTimelineRequest
+		if json.NewDecoder(r.Body).Decode(&got) != nil {
+			t.Error("invalid timeline POST")
 			creationStatus(w, 400)
 			return
 		}
-		if f.throttle && f.posts == 1 {
-			w.Header().Set("Retry-After", "1")
+		raw, _ := json.Marshal(got)
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+		var stored []byte
+		var unknown bool
+		if err := b.server.db.QueryRow(ctx, `SELECT request,confirmed_at IS NULL FROM dsga_creation_timelines WHERE operation_id=$1`, b.operationID).Scan(&stored, &unknown); err != nil || !unknown {
+			t.Error("POST preceded durable original intent or held SQL lock")
+			creationStatus(w, 500)
+			return
+		}
+		var original dsgaTimelineRequest
+		if decodeDSGAObject(stored, &original) != nil || original != got || got.TimelineID != p.TimelineID || got.PostgresVersion != 17 || got.ParentTimelineID != "" || got.ParentLSN != "" {
+			t.Error("POST differs from frozen intent")
+			creationStatus(w, 400)
+			return
+		}
+		if a.request != nil && string(a.request) != string(raw) {
+			t.Error("explicit replay changed original request")
+		}
+		a.request = raw
+		if a.afterPost != nil {
+			a.afterPost()
+		}
+		if a.mode == "throttle" {
 			creationStatus(w, 429)
 			return
 		}
-		f.existing = true
-		if f.lost {
-			f.lost = false
-			conn, _, err := w.(http.Hijacker).Hijack()
-			if err == nil {
-				_ = conn.Close()
-			}
+		if a.mode == "partial_unknown" && a.posts == 1 {
+			creationStatus(w, 504)
 			return
 		}
-		if f.conflict {
+		a.exists = true
+		if a.mode == "second_pg16" {
+			a.shards[1].(map[string]any)["pg_version"] = 16
+		}
+		if a.mode == "conflict" {
 			creationStatus(w, 409)
 			return
 		}
-		_ = json.NewEncoder(w).Encode(f.target)
-		return
+		_ = json.NewEncoder(w).Encode(a.shards[0])
+	}))
+	if err := b.prepareTenantWithStorage(f.ctx, a.storage); err != nil {
+		t.Fatal(err)
 	}
-	creationStatus(w, 404)
+	return f.ctx, b, a
 }
 
-func newDSGATimelineTest(t *testing.T, branch bool) (*dsgaTimelineAPI, *kubeClient, createPayload, dsgaCreationPlan) {
-	t.Helper()
-	p, _, plan := dsgaPlanFixture(t)
-	if branch {
-		p.ParentTimelineID, p.ParentLSN = strings.Repeat("c", 32), "0/1000"
-	}
-	f := &dsgaTimelineAPI{p: p, target: map[string]any{"tenant_id": p.TenantID, "timeline_id": p.TimelineID, "pg_version": 17, "ancestor_timeline_id": nil, "ancestor_lsn": nil}, parent: map[string]any{"tenant_id": p.TenantID, "timeline_id": p.ParentTimelineID, "pg_version": 17, "ancestor_timeline_id": strings.Repeat("d", 32), "ancestor_lsn": "0/800"}}
-	if branch {
-		f.target["ancestor_timeline_id"], f.target["ancestor_lsn"] = p.ParentTimelineID, "0/01000"
-	}
-	server := httptest.NewTLSServer(http.HandlerFunc(f.serve))
-	t.Cleanup(server.Close)
-	return f, &kubeClient{base: server.URL, namespace: "neon", token: "timeline-center", http: server.Client()}, p, plan
-}
-
-func TestDSGATimelineUsesFrozenVersionAndRecoversUnknownWrites(t *testing.T) {
-	for _, name := range []string{"root", "branch", "existing", "conflict", "lost_reply"} {
-		t.Run(name, func(t *testing.T) {
-			f, k, p, plan := newDSGATimelineTest(t, name != "root")
-			switch name {
-			case "existing":
-				f.existing = true
-			case "conflict":
-				f.conflict = true
-			case "lost_reply":
-				f.lost = true
-			}
-			err := k.createDSGATimeline(context.Background(), p, plan)
-			if name == "lost_reply" {
+func TestDSGATimelineAggregateOriginalRecoveryAndConfirmedLoss(t *testing.T) {
+	for _, mode := range []string{"success", "partial_unknown", "conflict", "existing", "second_pg16", "throttle"} {
+		t.Run(mode, func(t *testing.T) {
+			ctx, b, a := newDSGATimelineFixture(t, mode)
+			err := b.prepareTimelineWithStorage(ctx, a.storage)
+			if mode == "partial_unknown" || mode == "second_pg16" || mode == "throttle" {
 				if err == nil {
-					t.Fatal("unknown POST was reported successful")
+					t.Fatal("unknown/invalid storage fabricated confirmation")
 				}
-				f.mu.Lock()
-				posts := f.posts
-				f.mu.Unlock()
-				if posts != 1 {
-					t.Fatal("unknown POST transparently retried")
+				var confirmed bool
+				if err := b.server.db.QueryRow(ctx, `SELECT confirmed_at IS NOT NULL FROM dsga_creation_timelines WHERE operation_id=$1`, b.operationID).Scan(&confirmed); err != nil || confirmed {
+					t.Fatal("unconfirmed request lost its state")
 				}
-				// 明确第二次调用代表同一原Operation恢复，先GET已有目标，不再POST。
-				err = k.createDSGATimeline(context.Background(), p, plan)
+				if a.posts != 1 {
+					t.Fatal("POST transparently retried")
+				}
+				if mode != "partial_unknown" {
+					return
+				}
+				// 控制器聚合GET仍503：它不能证明没有执行；仅显式恢复相同原意图。
+				err = b.prepareTimelineWithStorage(ctx, a.storage)
 			}
 			if err != nil {
 				t.Fatal(err)
 			}
-			f.mu.Lock()
-			defer f.mu.Unlock()
 			expected := 1
-			if name == "existing" {
+			if mode == "existing" {
 				expected = 0
 			}
-			if f.posts != expected {
-				t.Fatal("recovery recreated the original timeline")
+			if mode == "partial_unknown" {
+				expected = 2
 			}
-			if expected == 1 {
-				if f.body["pg_version"] != float64(17) || f.body["new_timeline_id"] != p.TimelineID {
-					t.Fatalf("storage used wrong version or target: %v", f.body)
-				}
-				if p.ParentTimelineID != "" && (f.body["ancestor_timeline_id"] != p.ParentTimelineID || f.body["ancestor_start_lsn"] != p.ParentLSN) {
-					t.Fatal("original ancestor/LSN not sent")
-				}
+			if a.posts != expected {
+				t.Fatal("unexpected original POST count")
+			}
+			var xmin string
+			if err := b.server.db.QueryRow(ctx, `SELECT xmin::text FROM dsga_creation_timelines WHERE operation_id=$1 AND confirmed_at IS NOT NULL`, b.operationID).Scan(&xmin); err != nil {
+				t.Fatal(err)
+			}
+			if err := b.prepareTimelineWithStorage(ctx, a.storage); err != nil {
+				t.Fatal(err)
+			}
+			var after string
+			if err := b.server.db.QueryRow(ctx, `SELECT xmin::text FROM dsga_creation_timelines WHERE operation_id=$1`, b.operationID).Scan(&after); err != nil || after != xmin || a.posts != expected {
+				t.Fatal("confirmed recovery rewrote fact")
+			}
+			a.mu.Lock()
+			a.exists = false
+			a.mu.Unlock()
+			if err := b.prepareTimelineWithStorage(ctx, a.storage); !errors.Is(err, errDSGATimelineUnconfirmed) || a.posts != expected {
+				t.Fatal("confirmed loss automatically recreated empty timeline")
 			}
 		})
 	}
 }
 
-func TestDSGATimelineRejectsVersionAncestryAndTransportDowngrade(t *testing.T) {
-	cases := map[string]func(*dsgaTimelineAPI){
-		"target_pg16":               func(f *dsgaTimelineAPI) { f.existing = true; f.target["pg_version"] = 16 },
-		"target_missing_version":    func(f *dsgaTimelineAPI) { f.existing = true; delete(f.target, "pg_version") },
-		"target_fractional_version": func(f *dsgaTimelineAPI) { f.existing = true; f.target["pg_version"] = 17.5 },
-		"target_string_version":     func(f *dsgaTimelineAPI) { f.existing = true; f.target["pg_version"] = "17" },
-		"target_tenant":             func(f *dsgaTimelineAPI) { f.existing = true; f.target["tenant_id"] = strings.Repeat("f", 32) },
-		"target_timeline":           func(f *dsgaTimelineAPI) { f.existing = true; f.target["timeline_id"] = strings.Repeat("f", 32) },
-		"target_parent": func(f *dsgaTimelineAPI) {
-			f.existing = true
-			f.target["ancestor_timeline_id"] = strings.Repeat("f", 32)
+func TestDSGATimelineIntentGuardAndExpiredConfirmation(t *testing.T) {
+	ctx, b, a := newDSGATimelineFixture(t, "success")
+	a.afterPost = func() {
+		if _, err := b.server.db.Exec(ctx, `UPDATE operations SET lease_expires_at=clock_timestamp()-interval '1 second' WHERE id=$1`, b.operationID); err != nil {
+			t.Error(err)
+		}
+	}
+	if err := b.prepareTimelineWithStorage(ctx, a.storage); err == nil {
+		t.Fatal("expired worker confirmed timeline")
+	}
+	var confirmed bool
+	if err := b.server.db.QueryRow(ctx, `SELECT confirmed_at IS NOT NULL FROM dsga_creation_timelines WHERE operation_id=$1`, b.operationID).Scan(&confirmed); err != nil || confirmed {
+		t.Fatal("expired confirmation escaped")
+	}
+	for _, query := range []string{`DELETE FROM dsga_creation_timelines WHERE operation_id=$1`, `UPDATE dsga_creation_timelines SET request=request||'{"pg_version":16}'::jsonb WHERE operation_id=$1`} {
+		_, err := b.server.db.Exec(ctx, query, b.operationID)
+		var pe *pgconn.PgError
+		if !errors.As(err, &pe) || pe.Code != "23514" {
+			t.Fatal("original timeline intent mutable")
+		}
+	}
+	if _, err := b.server.db.Exec(ctx, `UPDATE operations SET lease_expires_at=clock_timestamp()+interval '60 seconds' WHERE id=$1`, b.operationID); err != nil {
+		t.Fatal(err)
+	}
+	if err := b.prepareTimelineWithStorage(ctx, a.storage); err != nil || a.posts != 1 {
+		t.Fatal("lease recovery recreated existing timeline", err)
+	}
+}
+
+func TestDSGATimelineAggregateRejectsPartialWrongVersionAndAncestry(t *testing.T) {
+	tenant, timeline, parent := strings.Repeat("a", 32), strings.Repeat("b", 32), strings.Repeat("c", 32)
+	valid := func() map[string]any { return map[string]any{"shards": dsgaTimelineShards(tenant, timeline)} }
+	if err := validateDSGATimelineAggregate(valid(), tenant, timeline, 17, "", "", true); err != nil {
+		t.Fatal(err)
+	}
+	for name, change := range map[string]func(map[string]any){
+		"missing_shard": func(v map[string]any) { v["shards"] = v["shards"].([]any)[:1] },
+		"duplicate":     func(v map[string]any) { v["shards"].([]any)[1] = v["shards"].([]any)[0] },
+		"foreign": func(v map[string]any) {
+			v["shards"].([]any)[1].(map[string]any)["tenant_id"] = strings.Repeat("f", 32) + "-0102"
 		},
-		"target_lsn":      func(f *dsgaTimelineAPI) { f.existing = true; f.target["ancestor_lsn"] = "0/2000" },
-		"parent_pg16":     func(f *dsgaTimelineAPI) { f.parent["pg_version"] = 16 },
-		"parent_identity": func(f *dsgaTimelineAPI) { f.parent["timeline_id"] = strings.Repeat("f", 32) },
-		"created_pg16":    func(f *dsgaTimelineAPI) { f.target["pg_version"] = 16 },
-		"conflict_pg16":   func(f *dsgaTimelineAPI) { f.conflict = true; f.target["pg_version"] = 16 },
-		"throttle":        func(f *dsgaTimelineAPI) { f.throttle = true },
-		"redirect":        func(f *dsgaTimelineAPI) { f.redirect = true },
-	}
-	for name, mutate := range cases {
+		"fractional_pg":    func(v map[string]any) { v["shards"].([]any)[1].(map[string]any)["pg_version"] = 17.5 },
+		"other_version":    func(v map[string]any) { v["shards"].([]any)[1].(map[string]any)["pg_version"] = 16 },
+		"loading":          func(v map[string]any) { v["shards"].([]any)[1].(map[string]any)["state"] = "Loading" },
+		"missing_ancestry": func(v map[string]any) { delete(v["shards"].([]any)[1].(map[string]any), "ancestor_timeline_id") },
+		"case_alias": func(v map[string]any) {
+			s := v["shards"].([]any)[1].(map[string]any)
+			delete(s, "pg_version")
+			s["PG_VERSION"] = 17
+		},
+	} {
 		t.Run(name, func(t *testing.T) {
-			f, k, p, plan := newDSGATimelineTest(t, true)
-			mutate(f)
-			err := k.createDSGATimeline(context.Background(), p, plan)
-			if err == nil {
-				t.Fatalf("unsafe storage fact or transport %s accepted", name)
-			}
-			f.mu.Lock()
-			defer f.mu.Unlock()
-			expected := 0
-			if name == "created_pg16" || name == "conflict_pg16" || name == "throttle" {
-				expected = 1
-			}
-			if f.posts != expected || f.redirects != 0 {
-				t.Fatalf("unsafe storage %s made extra POST or followed redirect: %d %d", name, f.posts, f.redirects)
+			v := valid()
+			change(v)
+			if validateDSGATimelineAggregate(v, tenant, timeline, 17, "", "", true) == nil {
+				t.Fatal("invalid aggregate accepted")
 			}
 		})
 	}
+	branch := valid()
+	for _, raw := range branch["shards"].([]any) {
+		s := raw.(map[string]any)
+		s["ancestor_timeline_id"] = parent
+		s["ancestor_lsn"] = "0/01000"
+	}
+	if err := validateDSGATimelineAggregate(branch, tenant, timeline, 17, parent, "0/1000", true); err != nil {
+		t.Fatal("canonical-equivalent original LSN refused")
+	}
+	branch["shards"].([]any)[1].(map[string]any)["ancestor_lsn"] = "0/2000"
+	if validateDSGATimelineAggregate(branch, tenant, timeline, 17, parent, "0/1000", true) == nil {
+		t.Fatal("one shard ancestor drift accepted")
+	}
 }
 
-func TestDSGATimelineRejectsPlanBeforeStorageIO(t *testing.T) {
-	f, k, p, plan := newDSGATimelineTest(t, false)
-	plan.PostgresVersion = 16
-	if !errors.Is(k.createDSGATimeline(context.Background(), p, plan), errDSGACreationPlan) {
-		t.Fatal("invalid plan reached storage")
+func TestDSGATimelineIntentMigrationReplayAndLargeAggregate(t *testing.T) {
+	ctx, b, a := newDSGATimelineFixture(t, "existing")
+	if err := b.prepareTimelineWithStorage(ctx, a.storage); err != nil {
+		t.Fatal(err)
 	}
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if f.posts != 0 || f.gets != 0 {
-		t.Fatal("invalid plan performed storage IO")
+	var before, after string
+	if err := b.server.db.QueryRow(ctx, `SELECT xmin::text FROM dsga_creation_timelines WHERE operation_id=$1`, b.operationID).Scan(&before); err != nil {
+		t.Fatal(err)
+	}
+	if err := migrate(ctx, b.server.db); err != nil {
+		t.Fatal(err)
+	}
+	if err := b.server.db.QueryRow(ctx, `SELECT xmin::text FROM dsga_creation_timelines WHERE operation_id=$1`, b.operationID).Scan(&after); err != nil || before != after {
+		t.Fatal("migration replay rewrote original timeline")
+	}
+	// 完整观测可超过写协议的1MiB：实际TLS读取必须使用只读入口，仍逐片核验。
+	c := dsgaStorageTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"shards": dsgaTimelineShards(b.intent.TenantID, b.intent.TimelineID), "future_metadata": strings.Repeat("x", (1<<20)+1)})
+	}))
+	p := b.intent.createPayload
+	fact, err := c.request(ctx, http.MethodGet, "control/v1/tenant/"+p.TenantID+"/timeline/"+p.TimelineID, nil)
+	if err != nil {
+		t.Fatal("large bounded aggregate transport failed", err)
+	}
+	if err = validateDSGATimelineAggregate(fact, p.TenantID, p.TimelineID, 17, "", "", true); err != nil {
+		t.Fatal(err)
 	}
 }

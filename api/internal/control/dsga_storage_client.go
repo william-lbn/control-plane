@@ -241,8 +241,19 @@ func (c *dsgaStorageClient) request(ctx context.Context, method, path string, bo
 	if response.Header.Get("Content-Encoding") != "" || len(types) != 1 || mediaErr != nil || mediaType != "application/json" {
 		return nil, errDSGAStorageManagement
 	}
-	data, err := io.ReadAll(io.LimitReader(response.Body, (1<<20)+1))
-	if err != nil || dsgapi.ValidateJSON(data, 1<<20, 65536) != nil {
+	limit, values := 1<<20, 65536
+	validate := dsgapi.ValidateJSON
+	if method == http.MethodGet && strings.Contains(path, "/timeline/") {
+		// 官方聚合TimelineInfo包含每片完整观测，255片不能沿用单Tenant的
+		// 1MiB上限；仍限制总字节/JSON值数，不随远端声明无限分配。
+		limit, values = 8<<20, 262144
+		validate = dsgapi.ValidateObservationJSON
+	}
+	if response.ContentLength > int64(limit) {
+		return nil, errDSGAStorageManagement
+	}
+	data, err := io.ReadAll(io.LimitReader(response.Body, int64(limit)+1))
+	if err != nil || validate(data, limit, values) != nil {
 		return nil, errDSGAStorageManagement
 	}
 	decoder := json.NewDecoder(bytes.NewReader(data))
