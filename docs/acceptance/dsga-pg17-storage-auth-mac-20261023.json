@@ -1,0 +1,62 @@
+{
+  "date": "2026-10-23",
+  "scope": "PG17 authenticated native storage client and original root Tenant wiring; Mac basic only",
+  "code_commit": "481da3020f5b9f2cddddc6a3c49d765d37db30c0",
+  "maintenance_commit": "456a4ec3a037c2cf3ad67ec21e1261f0969068e5",
+  "own_main": "4d9187c4454b867a66e517208cfd442f6adf2500",
+  "runs": [
+    {
+      "path": "build/dsga-storage-auth-mac1",
+      "summary": {
+        "exit_code": 0,
+        "pass_events": 29,
+        "fail_events": 0,
+        "skip_events": 0,
+        "packages_passed": [
+          "github.com/william-lbn/control-plane/api/internal/control"
+        ],
+        "postgres_version": "postgres (PostgreSQL) 17.11 (fcada44b67d239aea8e699a721b99c470fc24d65)",
+        "source_files": 517,
+        "source_unchanged": true
+      },
+      "source_manifest": "build/dsga-storage-auth-mac1/source-sha256.json"
+    },
+    {
+      "path": "build/dsga-control-main-s3-20261023",
+      "summary": {
+        "exit_code": 0,
+        "pass_events": 54,
+        "fail_events": 0,
+        "skip_events": 0,
+        "packages_passed": [
+          "github.com/william-lbn/control-plane/api/internal/s3protocol",
+          "github.com/william-lbn/control-plane/api/internal/control"
+        ],
+        "postgres_version": "postgres (PostgreSQL) 17.11 (fcada44b67d239aea8e699a721b99c470fc24d65)",
+        "source_files": 536,
+        "source_unchanged": true
+      },
+      "source_manifest": "build/dsga-control-main-s3-20261023/source-sha256.json"
+    }
+  ],
+  "final_checks": [
+    "OpenAPI 3 pass, 0 fail/skip",
+    "go vet control/s3protocol exit0",
+    "go build ./cmd/... exit0",
+    "Web supported bundled Node build exit0; initial old system Node environment failure retained in tool record"
+  ],
+  "not_claimed": "whole V3 completion, final-source full-suite pass, actual K8s/native storage/VM/physical validation",
+  "linux_k8s": [
+    "RBAC and SA rotation",
+    "TLS/JWT provisioning and rotation",
+    "Service routing and UID replacement",
+    "strict non-dev native storage integration",
+    "KVM/NeonVM/hotplug/HugeTLB/physical/performance"
+  ],
+  "remaining_code": [
+    "authoritative aggregate timeline and durable original coordination",
+    "versioned worker and budget/admission/safe SQL route",
+    "complete quiesce/policy/Scheduler/final Controller/Runner fences and lifecycle"
+  ],
+  "final_check_logs": "build/dsga-storage-auth-final-checks/"
+}
