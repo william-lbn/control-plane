@@ -1,6 +1,7 @@
 import { AIOrganizationProviders } from '../ai/AIOrganizationProviders';
 import { ConsoleSessions } from './ConsoleSessions';
 import { ConsoleMFA } from './ConsoleMFA';
+import { ConsoleSSO } from './ConsoleSSO';
 import { HistoryPolicy } from './HistoryPolicy';
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
@@ -108,6 +109,9 @@ export function Organizations({
       />
       <ConsoleSessions />
       <ConsoleMFA />
+      {organization && (
+        <ConsoleSSO key={'sso-' + organization.id} organizationId={organization.id} />
+      )}
       <HistoryPolicy />
       {organization && isAdmin && (
         <>

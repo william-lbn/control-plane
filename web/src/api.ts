@@ -1,8 +1,15 @@
 import { decodeAPIResponse } from './shared/apiResponse';
 export { ApiError } from './shared/apiResponse';
 
-export type User = { id: string; username: string; role: string };
-export type Organization = { id: string; name: string; slug: string; role: string; state: string };
+export type User = { id: string; username: string; role: string; sso_organization_id?: string };
+export type Organization = {
+  id: string;
+  name: string;
+  slug: string;
+  role: string;
+  state: string;
+  console_sso_required?: boolean;
+};
 export type Page<T> = { items: T[]; next_cursor: string | null };
 export type Project = {
   effective_permission: 'admin' | 'editor' | 'viewer' | 'none';

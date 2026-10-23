@@ -154,6 +154,8 @@ func (s *server) authorizeRoute(w http.ResponseWriter, r *http.Request, u user) 
 		a.OrganizationID = org
 		a.Level = roleLevel(a.OrganizationRole)
 		switch {
+		case strings.HasSuffix(r.URL.Path, "/sso/link") || strings.Contains(r.URL.Path, "/sso/bindings/"):
+			required = 0 // Existing members may link/revoke only their own identity.
 		case strings.HasSuffix(r.URL.Path, "/projects") && r.Method == http.MethodGet:
 			// Collaborators may list only projects with a positive explicit grant.
 			required = 0
@@ -196,6 +198,9 @@ func (s *server) authorizeRoute(w http.ResponseWriter, r *http.Request, u user) 
 			fail(w, r, 403, "forbidden", "API keys cannot manage credentials")
 			return r, false
 		}
+	}
+	if !s.consoleSSOAuthorize(w, r, u, a.OrganizationID) {
+		return r, false
 	}
 	if a.Level < required {
 		fail(w, r, 403, "forbidden", "Insufficient resource permission")

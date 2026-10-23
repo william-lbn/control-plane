@@ -30,8 +30,9 @@ func organizationRole(value string) bool {
 func (s *server) organizations(w http.ResponseWriter, r *http.Request) {
 	u := userFrom(r)
 	if r.Method == http.MethodGet {
-		rows, err := s.many(r.Context(), `SELECT o.id,o.slug,o.name,o.state,o.created_at,m.role
+		rows, err := s.many(r.Context(), `SELECT o.id,o.slug,o.name,o.state,o.created_at,m.role,COALESCE(p.mode='required',false) AS console_sso_required
             FROM organizations o JOIN organization_members m ON m.org_id=o.id
+			LEFT JOIN console_sso_policies p ON p.org_id=o.id
             WHERE m.user_id=$1 AND o.state='active' AND ($2='' OR o.id=$2) ORDER BY o.created_at,o.id`, u.ID, u.KeyOrg)
 		if err != nil {
 			fail(w, r, 503, "metadata_unavailable", "Could not list organizations")
