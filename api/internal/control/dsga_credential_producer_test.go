@@ -24,11 +24,12 @@ import (
 // 真实TLS/typed客户端，服务端仅模拟API协议与持久对象，不声称K8s认证。
 // 不输出Secret body，所有对象读写在同一锁下，race验证覆盖恢复读取。
 type credentialProducerAPI struct {
-	mu      sync.Mutex
-	objects map[string]*core.Secret
-	posts   int
-	mode    string
-	kube    *kubeClient
+	mu        sync.Mutex
+	objects   map[string]*core.Secret
+	posts     int
+	mode      string
+	kube      *kubeClient
+	afterPost func()
 }
 
 func newCredentialProducerAPI(t *testing.T, mode string) *credentialProducerAPI {
@@ -68,8 +69,18 @@ func newCredentialProducerAPI(t *testing.T, mode string) *credentialProducerAPI 
 			_ = json.NewEncoder(w).Encode(metav1.Status{Status: "Failure", Reason: metav1.StatusReasonTooManyRequests, Code: 429})
 			return
 		}
+		// apiserver同名CREATE返回AlreadyExists，不能像普通map赋值覆盖旧
+		// immutable对象。并发公开请求必须在真实赢家UID/Data上对账。
+		if f.objects[proposed.Name] != nil {
+			w.WriteHeader(409)
+			_ = json.NewEncoder(w).Encode(metav1.Status{Status: "Failure", Reason: metav1.StatusReasonAlreadyExists, Code: 409})
+			return
+		}
 		proposed.UID, proposed.ResourceVersion = types.UID("producer-uid-"+strconv.Itoa(f.posts)), "1"
 		f.objects[proposed.Name] = proposed.DeepCopy()
+		if f.afterPost != nil {
+			f.afterPost()
+		}
 		switch f.mode {
 		case "unknown":
 			w.WriteHeader(504)

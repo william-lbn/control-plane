@@ -79,11 +79,11 @@ func (ref dsgaCredentialReference) validate() error {
 // 策略来自受信任的平台配置，不是公开创建请求中的可选字段。此值仅在接受前
 // 快照；worker只加载已经提交的完整plan，不能重读env选择模式/镜像/内存下限。
 type dsgaCreationPolicy struct {
-	Namespace       string
-	Image           string
-	MemorySlotBytes uint64
-	Budget          dsgaBootstrapBudget
-	VM              dsgaVMProfile
+	Namespace       string              `json:"namespace"`
+	Image           string              `json:"image"`
+	MemorySlotBytes uint64              `json:"memory_slot_bytes"`
+	Budget          dsgaBootstrapBudget `json:"budget"`
+	VM              dsgaVMProfile       `json:"vm"`
 }
 
 var dsgaPinnedImage = regexp.MustCompile(`^[a-z0-9][a-z0-9./:_-]*@sha256:[0-9a-f]{64}$`)
@@ -134,8 +134,10 @@ func (plan dsgaCreationPlan) validate(p createPayload) error {
 	}
 	// 不沿用实验室createBounds.valid的固定3Gi上限。这里验证NeonVM可表示性和
 	// 资源顺序；租户配额/服务规格仍由生产者原有准入在同一事务内检查。
-	if p.MinCPU < 250 || p.MinCPU%250 != 0 || p.MaxCPU < p.MinCPU || p.MaxCPU%250 != 0 || uint64(p.MaxCPU) > uint64(^uint32(0)) ||
-		p.MinMem <= 0 || p.MaxMem < p.MinMem || uint64(p.MaxMem) > uint64(1<<63-1)/(1<<20) {
+	// 原元数据库的CPU/memory_mib/slot_size_mib列为integer；必须在任何
+	// 凭据写入前证明可持久化，不能等VM构造成功后才因SQL int溢出失败。
+	if p.MinCPU < 250 || p.MinCPU%250 != 0 || p.MaxCPU < p.MinCPU || p.MaxCPU%250 != 0 || p.MaxCPU > 1<<31-1 ||
+		p.MinMem <= 0 || p.MaxMem < p.MinMem || p.MaxMem > 1<<31-1 {
 		return errDSGACreationPlan
 	}
 	minGuest, maxGuest := uint64(p.MinMem)*(1<<20), uint64(p.MaxMem)*(1<<20)

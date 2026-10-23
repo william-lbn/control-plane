@@ -229,19 +229,21 @@ func creationPayload(projectID, branchID, endpointID, tenantID, timelineID strin
 		TenantID: tenantID, TimelineID: timelineID, MinCPU: b.MinCPU, MaxCPU: b.MaxCPU, MinMem: b.MinMem, MaxMem: b.MaxMem}
 }
 
+type projectCreateRequest struct {
+	Name              string        `json:"name"`
+	Password          string        `json:"password"`
+	DefaultBranchName string        `json:"default_branch_name"`
+	RegionID          string        `json:"region_id"`
+	PostgresVersion   int           `json:"postgres_version"`
+	Autoscaling       *createBounds `json:"autoscaling"`
+}
+
 func (s *server) createProject(w http.ResponseWriter, r *http.Request) {
 	if !creationEnabled() {
 		fail(w, r, 503, "creation_disabled", "Creation driver is not enabled")
 		return
 	}
-	var body struct {
-		Name              string        `json:"name"`
-		Password          string        `json:"password"`
-		DefaultBranchName string        `json:"default_branch_name"`
-		RegionID          string        `json:"region_id"`
-		PostgresVersion   int           `json:"postgres_version"`
-		Autoscaling       *createBounds `json:"autoscaling"`
-	}
+	var body projectCreateRequest
 	if err := readJSON(r, &body); err != nil {
 		fail(w, r, 422, "invalid_request", "Invalid project request")
 		return
@@ -249,11 +251,17 @@ func (s *server) createProject(w http.ResponseWriter, r *http.Request) {
 	if body.DefaultBranchName == "" {
 		body.DefaultBranchName = "main"
 	}
-	if body.RegionID == "" {
-		body.RegionID = "rke2-lab"
-	}
 	if body.PostgresVersion == 0 {
 		body.PostgresVersion = 16
+	}
+	// PG17显式进入版本化DSGA生产者；默认仍关闭，不借旧PG16凭据/Driver
+	// 忽略新增计划。原Region默认只在legacy分支应用，新路径先读原保留计划。
+	if body.PostgresVersion == 17 {
+		s.createDSGAProject(w, r, body)
+		return
+	}
+	if body.RegionID == "" {
+		body.RegionID = "rke2-lab"
 	}
 	bounds := defaults(body.Autoscaling)
 	if !validName(body.Name, 64) || !validName(body.DefaultBranchName, 63) || body.RegionID != "rke2-lab" ||

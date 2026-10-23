@@ -813,7 +813,8 @@
           "postgres_version": {
             "type": "integer",
             "enum": [
-              16
+              16,
+              17
             ]
           },
           "autoscaling": {
