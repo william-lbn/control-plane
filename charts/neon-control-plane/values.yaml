@@ -14,6 +14,10 @@ objectStorage:
     nodePort: 30893
 
 fullnameOverride: neon-control
+# Operator-provisioned OIDC clients; config.json is mounted only in the API.
+consoleSSO:
+  enabled: false
+  existingSecret: ''
 # Independent inference process. It has no Kubernetes service-account token.
 # config.json is an operator-approved immutable route snapshot; provider keys
 # are mounted only in the gateway, never in the Console or API projection.

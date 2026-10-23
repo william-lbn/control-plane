@@ -1,7 +1,7 @@
 # 实际 API 合同
 
 OpenAPI 3 合同的权威源是 [openapi-v1.json](../contracts/openapi-v1.json)。
-版本 0.80.0，162 个路径、226 个操作，全部拥有稳定且唯一的 operationId。
+版本 0.81.0，169 个路径、234 个操作，全部拥有稳定且唯一的 operationId。
 运行 Swagger 位于 `/api/docs`，JSON 位于 `/api/openapi.json`。
 本合同是自托管 `/api/v1`，不声称兼容 Neon SaaS `/api/v2`。
 
@@ -250,6 +250,14 @@ request_id/operation_id/error_code，再由显式 retry 接口恢复可重试操
 | PUT | `/api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/settings` | `putStorageBucketSettings` | 200 |
 | GET | `/api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/objects/settings` | `getStorageObjectSettings` | 200 |
 | PUT | `/api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/objects/settings` | `putStorageObjectSettings` | 200 |
+| GET | `/auth/sso/provider` | `getPublicConsoleSSOProvider` | 200 |
+| POST | `/auth/sso/start` | `startConsoleSSO` | 200 |
+| GET | `/auth/sso/callback` | `acceptConsoleSSOCallback` |  |
+| POST | `/auth/sso/mfa` | `verifyConsoleSSOMFA` | 200 |
+| GET | `/api/v1/organizations/{org}/sso` | `getOrganizationConsoleSSO` | 200 |
+| PUT | `/api/v1/organizations/{org}/sso` | `setOrganizationConsoleSSO` | 200 |
+| POST | `/api/v1/organizations/{org}/sso/link` | `linkOwnConsoleSSO` | 200 |
+| DELETE | `/api/v1/organizations/{org}/sso/bindings/{binding}` | `revokeOwnConsoleSSO` | 200 |
 
 ## 3. 实现映射与演进
 

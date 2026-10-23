@@ -742,6 +742,21 @@
           "type": "string"
         }
       }
+    },
+    "consoleSSO": {
+      "type": "object",
+      "required": [
+        "enabled"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "existingSecret": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
     }
   },
   "definitions": {

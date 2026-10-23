@@ -42,6 +42,7 @@ type server struct {
 	functions         *functionsPlatform
 	ai                *aigateway.Config
 	aiProviders       *aiProviderSettings
+	consoleOIDC       *consoleOIDCSettings
 	functionSlotsOnce sync.Once
 	functionSlots     chan struct{}
 }
@@ -164,6 +165,15 @@ func runProcess(ctx context.Context, role processRole) error {
 	s.backendKeys, err = loadBackendKeyring()
 	if err != nil {
 		return err
+	}
+	if role != roleWorker {
+		s.consoleOIDC, err = loadConsoleOIDCSettings(s.secureCookies)
+		if err != nil {
+			return err
+		}
+		if s.consoleOIDC != nil && s.backendKeys == nil {
+			return errors.New("Console OIDC requires versioned Backend encryption keys")
+		}
 	}
 	s.ai, err = loadAIConfig()
 	if err != nil {

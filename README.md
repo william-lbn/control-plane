@@ -5,9 +5,9 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 
 **发行状态：预览版本。已经验证的实验环境功能不等于生产认证，也不等于 Neon 官网全部 Backend 服务。**
 
-功能进度与当前优先级见 [已验收/剩余清单](docs/FUNCTIONAL-STATUS-2026-10-21.md)：15 组基础已有回执；五组专项后置，15 组尚未整体闭环。后续优先业务功能，复用来源未变的既有验收。
+功能进度与当前优先级见 [已验收/剩余清单](docs/FUNCTIONAL-STATUS-2026-10-21.md)：16 组基础已有回执；五组专项后置，14 组尚未整体闭环。后续优先业务功能，复用来源未变的既有验收。
 
-最新状态：[2026-10-23 S3 兼容矩阵与双 SDK](docs/DELIVERY-2026-10-23-S3-CAPABILITIES.md)：固定需求矩阵 41 项操作逐项关联既有/新增回执；27 个授权/加密写入负例、18 个未支持子资源及 Boto3 互通通过，元数据响应键大小写已修复。3 组新增 Go、3 组受影响检查和 15 个累计实机检查点通过，原上传未重做。API/Worker 0.80.0，Web/AI/Auth/Gateway 复用，schema 064 / 原生格式 4 / Chart 0.9.77 / Core Helm 169。17 张目录表、6 类旧存储清单、9 PVC、917 个原 Secret 和其他六套 Helm 配置保留，最终三节点、三个 Safekeeper Ready，VM 0。S04 固定矩阵基线闭环，当前 15 组基础有回执，12 个业务和 3 个其他组继续；5 GiB/完整 checksum、安全 GC、独立网关及性能/可靠性专项分别保留。
+最新状态：2026-10-24 SSO：[Console OIDC 与组织策略](docs/DELIVERY-2026-10-24-CONSOLE-SSO.md)完成固定本地基线；4 组新增 Go、4 组受影响检查、2 组 Helm 和 10 个累计浏览器检查点通过。原键恢复、显式绑定、强制策略、本地 MFA、恢复码、会话失效及 UI 已验收。Core Helm 171 / schema 065；API/Worker 0.81.0，Web 修复镜像，其他组件复用。17 张目录表、9 PVC、917 个原 Secret 保留，三节点、三个 Safekeeper Ready，VM 0。当前 16 组基础有回执，11 个业务和 3 个其他组继续；跨 authority IdP、商业接入和性能/可靠性认证单列。
 
 此前增量：[应用 TOTP 双重认证](docs/DELIVERY-2026-10-15-AUTH-TOTP.md)八项 UI 与[项目共享查询](docs/DELIVERY-2026-10-15-SHARED-QUERIES.md)六项 UI 均通过；该批基线为 API 0.33 / Chart 0.9.17 / migration 031。
 

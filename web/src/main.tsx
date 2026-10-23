@@ -5,6 +5,7 @@ import type { Capabilities, User, Organization, Page, Project } from './api';
 import { short } from './shared/ui';
 import { Projects, ProjectWorkspace } from './features/projects/Projects';
 import { Organizations } from './features/identity/Organizations';
+import { ConsoleSSOLogin, ConsoleSSOMFA } from './features/identity/ConsoleSSO';
 import { Signup } from './features/identity/Invitations';
 import { AIProviders } from './features/ai/AIProviders';
 import type { ProviderCapabilities } from './features/ai/AIProviders';
@@ -65,7 +66,10 @@ function App() {
           const saved = sessionStorage.getItem(`neon_v2_org_${user.id}`);
           setOrganizations(data.items);
           setOrganizationId(
-            data.items.find((item) => item.id === saved)?.id || data.items[0]?.id || '',
+            data.items.find((item) => item.id === user.sso_organization_id)?.id ||
+              data.items.find((item) => item.id === saved)?.id ||
+              data.items[0]?.id ||
+              '',
           );
           setOrganizationsLoaded(true);
         })
@@ -97,6 +101,7 @@ function App() {
     const id = setTimeout(() => setToast(''), 6000);
     return () => clearTimeout(id);
   }, [toast]);
+  if (parts[0] === 'sso-mfa') return <ConsoleSSOMFA />;
   if (user === undefined) return <div className="boot">正在连接控制面…</div>;
   if (!user) return parts[0] === 'signup' ? <Signup /> : <Login onLogin={setUser} />;
   const page = parts[2] || 'overview';
@@ -292,6 +297,12 @@ function App() {
           </div>
         </header>
         <main className="content">
+          {organization?.console_sso_required && user.sso_organization_id !== organization.id && (
+            <section className="panel">
+              <p>此组织要求通过自己的身份提供商登录。</p>
+              <ConsoleSSOLogin organizationId={organization.id} />
+            </section>
+          )}
           {!organizationsLoaded ? (
             <div className="skeleton" />
           ) : parts[0] === 'ai-providers' ? (
@@ -380,66 +391,72 @@ function Login({ onLogin }: { onLogin: (user: User) => void }) {
             <span>◇ PostgreSQL 元数据</span>
           </div>
         </div>
-        <form className="login-card" onSubmit={submit}>
-          <span className="eyebrow">欢迎回来</span>
-          <h2>登录控制台</h2>
-          <p>使用你的控制台账号登录。</p>
-          <label>
-            用户名
-            <input
-              autoComplete="username"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              required
-            />
-          </label>
-          <label>
-            密码
-            <input
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </label>
-          <details>
-            <summary>已启用双重验证？</summary>
+        <div className="login-card">
+          <form onSubmit={submit}>
+            <span className="eyebrow">欢迎回来</span>
+            <h2>登录控制台</h2>
+            <p>使用你的控制台账号登录。</p>
             <label>
-              登录验证码
+              用户名
+              <input
+                autoComplete="username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                required
+              />
+            </label>
+            <label>
+              密码
               <input
                 type="password"
-                autoComplete="one-time-code"
-                maxLength={64}
-                value={mfaCode}
-                onChange={(e) => setMfaCode(e.target.value)}
+                autoComplete="current-password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
               />
             </label>
-            <label>
-              <input
-                type="checkbox"
-                checked={recovery}
-                onChange={(e) => {
-                  setRecovery(e.target.checked);
-                  setMfaCode('');
-                }}
-              />
-              使用恢复码登录
-            </label>
+            <details>
+              <summary>已启用双重验证？</summary>
+              <label>
+                登录验证码
+                <input
+                  type="password"
+                  autoComplete="one-time-code"
+                  maxLength={64}
+                  value={mfaCode}
+                  onChange={(e) => setMfaCode(e.target.value)}
+                />
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={recovery}
+                  onChange={(e) => {
+                    setRecovery(e.target.checked);
+                    setMfaCode('');
+                  }}
+                />
+                使用恢复码登录
+              </label>
+            </details>
+            {error && (
+              <div role="alert" className="form-error">
+                {error}
+              </div>
+            )}
+            <button className="button primary full" disabled={busy}>
+              {busy ? '正在登录…' : '登录控制台 →'}
+            </button>
+            <a className="text-button" href="#/signup">
+              受邀注册
+            </a>
+          </form>
+          <details>
+            <summary>组织单点登录</summary>
+            <ConsoleSSOLogin />
           </details>
-          {error && (
-            <div role="alert" className="form-error">
-              {error}
-            </div>
-          )}
-          <button className="button primary full" disabled={busy}>
-            {busy ? '正在登录…' : '登录控制台 →'}
-          </button>
-          <a className="text-button" href="#/signup">
-            受邀注册
-          </a>
           <small>当前为受控实验环境。生产版身份与权限仍在实施中。</small>
-        </form>
+        </div>
       </div>
     </div>
   );

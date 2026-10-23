@@ -18,15 +18,19 @@ import (
 )
 
 type user struct {
-	ID         string `json:"id"`
-	Username   string `json:"username"`
-	Role       string `json:"role"`
-	CSRFHash   string `json:"-"`
-	APIKey     bool   `json:"-"`
-	KeyID      string `json:"-"`
-	KeyOrg     string `json:"-"`
-	KeyProject string `json:"-"`
-	KeyRole    string `json:"-"`
+	ID               string `json:"id"`
+	Username         string `json:"username"`
+	Role             string `json:"role"`
+	CSRFHash         string `json:"-"`
+	APIKey           bool   `json:"-"`
+	KeyID            string `json:"-"`
+	KeyOrg           string `json:"-"`
+	KeyProject       string `json:"-"`
+	KeyRole          string `json:"-"`
+	SSOOrganization  string `json:"sso_organization_id,omitempty"`
+	SSOProvider      string `json:"-"`
+	SSORevision      string `json:"-"`
+	SSOPolicyVersion int64  `json:"-"`
 }
 
 func digest(value string) string {
@@ -132,12 +136,28 @@ func (s *server) currentUser(r *http.Request) (user, error) {
 		return user{}, err
 	}
 	var u user
-	err = s.db.QueryRow(r.Context(), `SELECT u.id,u.username,u.role,s.csrf_hash
+	err = s.db.QueryRow(r.Context(), `SELECT u.id,u.username,u.role,s.csrf_hash,
+        COALESCE(b.org_id,''),COALESCE(b.provider_id,''),COALESCE(b.provider_revision,''),COALESCE(s.sso_policy_version,0)
         FROM sessions s JOIN users u ON u.id=s.user_id
+        LEFT JOIN console_sso_bindings b ON b.id=s.sso_binding_id
         WHERE s.token_hash=$1 AND s.expires_at > now() AND s.revoked_at IS NULL AND NOT u.disabled
+        AND (s.sso_binding_id IS NULL OR (b.user_id=u.id AND b.revoked_at IS NULL
+          AND EXISTS(SELECT 1 FROM organization_members m JOIN organizations o ON o.id=m.org_id AND o.state='active'
+            JOIN console_sso_policies p ON p.org_id=m.org_id AND p.provider_revision=b.provider_revision
+            AND p.provider_id=b.provider_id AND p.mode<>'disabled' AND p.version=s.sso_policy_version
+            WHERE m.user_id=u.id AND m.org_id=b.org_id)))
         AND NOT EXISTS(SELECT 1 FROM console_mfa f WHERE f.user_id=u.id AND f.enabled_at IS NOT NULL
             AND (s.mfa_verified_at IS NULL OR s.mfa_verified_at<f.enabled_at))`, digest(cookie.Value)).
-		Scan(&u.ID, &u.Username, &u.Role, &u.CSRFHash)
+		Scan(&u.ID, &u.Username, &u.Role, &u.CSRFHash, &u.SSOOrganization, &u.SSOProvider, &u.SSORevision, &u.SSOPolicyVersion)
+	if err == nil && u.SSOOrganization != "" {
+		if s.consoleOIDC == nil {
+			return user{}, pgx.ErrNoRows
+		}
+		p := s.consoleOIDC.byID[u.SSOProvider]
+		if p == nil || p.Organization != u.SSOOrganization || p.revision != u.SSORevision {
+			return user{}, pgx.ErrNoRows
+		}
+	}
 	return u, err
 }
 
@@ -312,6 +332,8 @@ func (s *server) cleanSessions(ctx context.Context) {
 		case <-ticker.C:
 			_, _ = s.db.Exec(ctx, "DELETE FROM sessions WHERE expires_at < now() AND (revoked_at IS NULL OR revoked_at < now()-interval '8 hours')")
 			_, _ = s.db.Exec(ctx, "DELETE FROM login_failures WHERE occurred_at < now()-interval '1 day'")
+			_, _ = s.db.Exec(ctx, "DELETE FROM console_sso_flows WHERE expires_at<now()-interval '1 day'")
+			_, _ = s.db.Exec(ctx, "DELETE FROM console_sso_challenges WHERE expires_at<now()-interval '1 day'")
 			s.cleanRegistrationLimits(ctx)
 			s.maintainSQLHistory(ctx)
 		}

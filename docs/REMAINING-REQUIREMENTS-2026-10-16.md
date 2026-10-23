@@ -33,7 +33,7 @@ website 文档快照 `c0d49cbb6979b2ce79ea502d62dbc40780a923b0`（提交时间
 | S04 | S3 兼容扩展 | 固定官网矩阵 41 项操作及预签名/POST/trailers、公开读阻断、MinIO/Boto3 基线已通过；版本/生命周期/Object Lock 仅存储 | [矩阵与回执](DELIVERY-2026-10-23-S3-CAPABILITIES.md)；5 GiB/完整 checksum、安全 GC、独立入口分别归 S02/S03/S05；原账本的 STS 不在固定支持矩阵中，不提供 |
 | S05 | 独立 Storage gateway / 可信计量 | 当前 S3 同 API 进程；last_used_at 不等于计费 | 最小权限独立部署、配额/物理容量、租户并发与用量 |
 | A01 | Console MFA | 基础自助已完成：标准 TOTP、恢复码、密码/重放、启用/关闭的其他会话撤销及 UI/PG 已验收 | [当前交付](DELIVERY-2026-10-16-CURRENT.md)；组织强制/WebAuthn/正式恢复流程仍是扩展门槛 |
-| A02 | Console OIDC/SSO | 未开发；外部 IdP 可后置，本地协议可先做 | state/nonce/PKCE、绑定、组织策略、本地 IdP 与 UI |
+| A02 | Console OIDC/SSO | 固定本地协议、显式绑定、组织策略、本地 MFA 与 UI 基础闭环 | [合同](CONSOLE-SSO.md)与[验收](DELIVERY-2026-10-24-CONSOLE-SSO.md)；跨 authority 需代码扩展，商业 IdP 接入未认证，SAML/SCIM/WebAuthn 未提供 |
 | A03 | 应用 Auth OAuth/Admin/组织/手机号/事件 | 邮件密码/OTP/Magic/TOTP 已有；其余非完整官网能力 | 标准插件、配置隔离、用户管理、webhooks、真实本地服务和 UI |
 | A04 | Auth 分支第二因素 | 显式物理迁移、独立重封装、会话/绑定清除、恢复码隔离和验证器恢复基础已验收 | [交付](DELIVERY-2026-10-22-AUTH-FACTOR-MIGRATION.md)；生命周期恢复与在线根密钥轮换保留独立门槛 |
 | A05 | Auth 完整删除/恢复/隔离 | 独立门槛 | 原账号/会话/JWKS/密钥与分支生命周期一致性矩阵 |
@@ -126,3 +126,5 @@ fixture、失败、日志、密码保护输入和所有业务字节。测试完�
 2026-10-23 BYOK 增量：[2026-10-23 组织自有 AI 供应商](DELIVERY-2026-10-23-AI-ORGANIZATION-BYOK.md)：组织密钥/模型隔离、发现发布、原凭据轮换和费用归属通过，BYOK 不扣平台额度并继续受分支预算约束。5 组新增 Go/PG、3 组受影响检查、累计 7 个实际页面检查通过；已完成步骤从原检查点续验。API/Worker/AI 0.76.0、Web 重建，schema 063 / Chart 0.9.73 / Core Helm 162。17 张目录表、9 PVC、916 个原 Secret 身份保留，最终三节点和三个 Safekeeper Ready，VM 0。完整多模态/持久引用、外部账单/支付及其他业务继续，性能/可靠性专项后置。
 
 2026-10-23 S3 矩阵收尾：[2026-10-23 S3 兼容矩阵与双 SDK](DELIVERY-2026-10-23-S3-CAPABILITIES.md)：固定需求矩阵 41 项操作逐项关联既有/新增回执；27 个授权/加密写入负例、18 个未支持子资源及 Boto3 互通通过，元数据响应键大小写已修复。3 组新增 Go、3 组受影响检查和 15 个累计实机检查点通过，原上传未重做。API/Worker 0.80.0，Web/AI/Auth/Gateway 复用，schema 064 / 原生格式 4 / Chart 0.9.77 / Core Helm 169。17 张目录表、6 类旧存储清单、9 PVC、917 个原 Secret 和其他六套 Helm 配置保留，最终三节点、三个 Safekeeper Ready，VM 0。S04 固定矩阵基线闭环，当前 15 组基础有回执，12 个业务和 3 个其他组继续；5 GiB/完整 checksum、安全 GC、独立网关及性能/可靠性专项分别保留。
+
+2026-10-24 SSO：[Console OIDC 与组织策略](DELIVERY-2026-10-24-CONSOLE-SSO.md)完成固定本地基线；4 组新增 Go、4 组受影响检查、2 组 Helm 和 10 个累计浏览器检查点通过。原键恢复、显式绑定、强制策略、本地 MFA、恢复码、会话失效及 UI 已验收。Core Helm 171 / schema 065；API/Worker 0.81.0，Web 修复镜像，其他组件复用。17 张目录表、9 PVC、917 个原 Secret 保留，三节点、三个 Safekeeper Ready，VM 0。当前 16 组基础有回执，11 个业务和 3 个其他组继续；跨 authority IdP、商业接入和性能/可靠性认证单列。
