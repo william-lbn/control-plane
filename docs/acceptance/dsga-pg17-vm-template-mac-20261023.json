@@ -1,0 +1,117 @@
+{
+  "date": "2026-10-23",
+  "goal": "active/incomplete; user corrected premature pause; PG17 complete business code required before final Linux handoff",
+  "code_sha": "3948b2be3e8c70db31bd08b3e7f26ee98056b81b",
+  "maintenance_merge": "3aabf76",
+  "main_included": "f5820c2458c3f53ac8e85964474b09ae59c9205f",
+  "postgres_sha": "fcada44b67d239aea8e699a721b99c470fc24d65",
+  "autoscaling_sha": "8e1e0ea93d5f2775376622a38ed10f39d9d1fc8c",
+  "runs": [
+    {
+      "directory": "/Users/williamlee/github/neon-self-dev/build/control-mainf582-input-affected",
+      "summary": {
+        "exit_code": 0,
+        "pass_events": 17,
+        "fail_events": 0,
+        "skip_events": 0,
+        "packages_passed": [
+          "github.com/william-lbn/control-plane/api/internal/control"
+        ],
+        "postgres_version": "postgres (PostgreSQL) 17.11 (fcada44b67d239aea8e699a721b99c470fc24d65)",
+        "source_files": 496,
+        "source_unchanged": true
+      },
+      "top_level_pass": 17,
+      "elapsed": [
+        9.007
+      ],
+      "sha256": {
+        "tests.jsonl": "aa124bd4f528c04318960889a11b07e37445904ed5361093f68b9442025b1763",
+        "tests.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "source-sha256.json": "bc04c6f7edc48c32f53c1a87c3cc8ee070cae86946f08c6cdd543ba0f5a97d83",
+        "summary.json": "78b5a2a22d712a4f508b39ec153ce58231446113f09a5172035d775d4a961043",
+        "postgres-version.txt": "38ebacac17c8b72f137d0ce143675f181baec4a3b3548b63c25b5e98cfe8be8e"
+      }
+    },
+    {
+      "directory": "/Users/williamlee/github/neon-self-dev/build/dsga-vm-template-mac1",
+      "summary": {
+        "exit_code": 0,
+        "pass_events": 45,
+        "fail_events": 0,
+        "skip_events": 0,
+        "packages_passed": [
+          "github.com/william-lbn/control-plane/api/internal/control"
+        ],
+        "postgres_version": "postgres (PostgreSQL) 17.11 (fcada44b67d239aea8e699a721b99c470fc24d65)",
+        "source_files": 498,
+        "source_unchanged": true
+      },
+      "top_level_pass": 10,
+      "elapsed": [
+        8.81
+      ],
+      "sha256": {
+        "tests.jsonl": "749a09a8b114ce76f0a23c449b73a096e8c7bcb6cdd16618fd58c5843f69eb07",
+        "tests.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "source-sha256.json": "6d4c87cca2bb9b37b6c225025f8652bc45e7a95c5c0fa5a708dc3adc24c6aaf8",
+        "summary.json": "c2b57e636e1ecc68586ddad6c0b4230dbf2145fd4bd122899920e16703d538ef",
+        "postgres-version.txt": "38ebacac17c8b72f137d0ce143675f181baec4a3b3548b63c25b5e98cfe8be8e"
+      }
+    },
+    {
+      "directory": "/Users/williamlee/github/neon-self-dev/build/dsga-vm-final-return2",
+      "summary": {
+        "exit_code": 0,
+        "pass_events": 1,
+        "fail_events": 0,
+        "skip_events": 0,
+        "packages_passed": [
+          "github.com/william-lbn/control-plane/api/internal/control"
+        ],
+        "postgres_version": "postgres (PostgreSQL) 17.11 (fcada44b67d239aea8e699a721b99c470fc24d65)",
+        "source_files": 498,
+        "source_unchanged": true
+      },
+      "top_level_pass": 1,
+      "elapsed": [
+        3.597
+      ],
+      "sha256": {
+        "tests.jsonl": "ec098b9e5686c738852bd53978ebf33ed5e64c06c6d1bf8f1ee83e717ef193a9",
+        "tests.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "source-sha256.json": "c79899b036be2419b7406abc18085b0fe2a76cb64f8de06b5a6f6ba3c6ea5933",
+        "summary.json": "8f30758b8b38b93c59ecd28fb9a40ab850c3daa01a8b8d9824efecb0c1da4c69",
+        "postgres-version.txt": "38ebacac17c8b72f137d0ce143675f181baec4a3b3548b63c25b5e98cfe8be8e"
+      }
+    }
+  ],
+  "final_code_proof": {
+    "only_change_between_runs": "api/internal/control/dsga_vm.go: return前对最终快照再次调用已有完整模板核验；其他函数逐字节不变，已重构前版本并核对首轮SHA256",
+    "reconstructed_initial_sha256": "787dbf9724a0cb8de80bcee0e2607f4c73b4cc8ffa233f25659dccb12c52e689",
+    "final_source_matches": true,
+    "source_files": 498
+  },
+  "final_vet": {
+    "exit_code": 0,
+    "log": "/Users/williamlee/github/neon-self-dev/build/dsga-vm-final-return-vet.log",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "unchanged_not_repeated": [
+    "PG内核/check-world/旧DSGA/SDK/Agent",
+    "旧凭据真实SCRAM认证专项",
+    "未变Web/全API"
+  ],
+  "not_executed": [
+    "实际cert-manager/ClusterIssuer签发与轮转",
+    "Linux Guest镜像/CLI/cgroup/Monitor实际启动",
+    "真实K8s准入/RBAC/VM/物理回收与性能长稳"
+  ],
+  "incomplete_business": [
+    "公开创建接受/idempotency与worker调度",
+    "可信catalog来源/初始化回执和租户准入",
+    "完整预算/quiesce/Host与Guest领域",
+    "最终Runner fencing和完整存储E2E"
+  ],
+  "default_enabled": false
+}

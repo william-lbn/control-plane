@@ -579,5 +579,8 @@
     "完整预算/quiesce/最终Runner闭环",
     "完整Neon存储E2E"
   ],
-  "release_enabled": false
+  "release_enabled": false,
+  "historical_module_only": true,
+  "requirement_correction": "用户已澄清需完成PG17全部业务代码，暂停结论撤回，Goal active；不重复未变测试不等于停止开发",
+  "superseded_by": "docs/acceptance/dsga-pg17-vm-template-mac-20261023.json"
 }
