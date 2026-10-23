@@ -1,3 +1,6 @@
+import { AIInputFiles } from './AIInputFiles';
+import type { AIInputFile } from './AIInputFiles';
+import { attachInputFiles, supportedInputTypes } from './inputFiles';
 import { useEffect, useRef, useState } from 'react';
 import { api, projectPath, route } from '../../api';
 import type { Branch } from '../../api';
@@ -18,6 +21,7 @@ type Model = {
   max_output_tokens: number;
   protocols: string[];
   billing_owner: string;
+  input_modalities: string[];
 };
 type Catalog = { enabled: boolean; models: Model[]; public_endpoint: string };
 type Budget = {
@@ -77,6 +81,7 @@ export function AIGateway({
   const [protocol, setProtocol] = useState<AIProtocol>('chat_completions');
   const [advanced, setAdvanced] = useState(false);
   const [requestJSON, setRequestJSON] = useState('');
+  const [inputFiles, setInputFiles] = useState<AIInputFile[]>([]);
   const [budget, setBudget] = useState<Budget | null>(null);
   const [budgetEnabled, setBudgetEnabled] = useState(false);
   const [budgetUSD, setBudgetUSD] = useState('0');
@@ -101,6 +106,7 @@ export function AIGateway({
     setReconcileRequest('');
     pendingBudget.current = null;
     setPrompt('');
+    setInputFiles([]);
     setAnswer('');
     setError('');
     setRequestId('');
@@ -183,6 +189,7 @@ export function AIGateway({
       setProtocol((selected.protocols[0] || 'chat_completions') as AIProtocol);
     setAdvanced(false);
     setRequestJSON('');
+    setInputFiles([]);
   }, [catalog, model, protocol]);
   async function invoke() {
     setBusy(true);
@@ -199,9 +206,15 @@ export function AIGateway({
           ?.slice('neon_v2_csrf='.length) || '';
       const selected = catalog?.models.find((m) => m.id === model);
       const streaming = stream && protocol !== 'embeddings' && protocol !== 'gemini';
-      const payload = advanced
+      const draft = advanced
         ? JSON.parse(requestJSON)
         : playgroundRequest(protocol, model, prompt, selected?.max_output_tokens || 128, streaming);
+      const payload = attachInputFiles(
+        protocol,
+        draft,
+        inputFiles,
+        selected?.input_modalities || ['text', 'image'],
+      );
       if (payload.model !== model) throw new Error('请求 JSON 的 model 必须与当前模型一致');
       if (Boolean(payload.stream) !== streaming)
         throw new Error('请求 JSON 的 stream 必须与流式选项一致');
@@ -217,7 +230,7 @@ export function AIGateway({
       );
       if (!response.ok) {
         const data = await response.json();
-        throw new Error(data.error?.message || `HTTP ${response.status}`);
+        throw new Error(data.message || data.error?.message || `HTTP ${response.status}`);
       }
       setRequestId(response.headers.get('X-Request-ID') || '');
       if (!streaming) {
@@ -336,6 +349,19 @@ export function AIGateway({
               <strong>{usage?.summary.unknown_usage || 0}</strong>
             </div>
           </div>
+          {canEdit && branch && (
+            <AIInputFiles
+              key={prefix}
+              prefix={prefix}
+              selected={inputFiles}
+              onSelection={setInputFiles}
+              busy={busy}
+              types={supportedInputTypes(
+                protocol,
+                catalog.models.find((m) => m.id === model)?.input_modalities || ['text', 'image'],
+              )}
+            />
+          )}
           <section className="panel ai-playground">
             <div className="panel-heading">
               <h2>Playground</h2>

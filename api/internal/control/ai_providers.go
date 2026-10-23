@@ -154,6 +154,7 @@ type aiProviderDraftInput struct {
 	Credential   aiProviderCredentialInput `json:"credential"`
 }
 type aiProviderModel struct {
+	InputModalities []string         `json:"input_modalities,omitempty"`
 	ID              string           `json:"id"`
 	Name            string           `json:"name"`
 	UpstreamModel   string           `json:"upstream_model"`
@@ -490,6 +491,9 @@ func validateProviderPublication(entries []aiProviderModel, discovered []string,
 		available[id] = true
 	}
 	for _, entry := range entries {
+		if aigateway.ValidateInputModalities(entry.Protocols, entry.InputModalities) != nil {
+			return providerProblem(422, "invalid_models", "Choose input types supported by the selected protocols")
+		}
 		if entry.Price != nil && entry.Price.Validate() != nil {
 			return providerProblem(422, "invalid_models", "Model pricing requires a versioned integer USD tariff")
 		}

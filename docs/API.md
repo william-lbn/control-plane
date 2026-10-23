@@ -1,7 +1,7 @@
 # 实际 API 合同
 
 OpenAPI 3 合同的权威源是 [openapi-v1.json](../contracts/openapi-v1.json)。
-版本 0.76.0，154 个路径、212 个操作，全部拥有稳定且唯一的 operationId。
+版本 0.77.0，160 个路径、222 个操作，全部拥有稳定且唯一的 operationId。
 运行 Swagger 位于 `/api/docs`，JSON 位于 `/api/openapi.json`。
 本合同是自托管 `/api/v1`，不声称兼容 Neon SaaS `/api/v2`。
 
@@ -236,6 +236,16 @@ request_id/operation_id/error_code，再由显式 retry 接口恢复可重试操
 | POST | `/api/v1/organizations/{org}/ai-providers/{provider}/disable` | `organizationDisableAIProvider` | 200 |
 | GET | `/api/v1/organizations/{org}/ai-provider-operations/{providerOperation}` | `organizationGetAIProviderOperation` | 200 |
 | POST | `/api/v1/organizations/{org}/ai-provider-operations/{providerOperation}/retry` | `organizationRetryAIProviderOperation` | 202 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/files` | `listAIInputFiles` | 200 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/files` | `createAIInputFile` | 201 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/files/{inputFile}` | `getAIInputFile` | 200 |
+| DELETE | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/files/{inputFile}` | `deleteAIInputFile` | 200 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/files/{inputFile}/content` | `contentAIInputFile` | 200 |
+| GET | `/ai/v1/{aiBranch}/v1/files` | `gatewayListAIInputFiles` | 200 |
+| POST | `/ai/v1/{aiBranch}/v1/files` | `gatewayCreateAIInputFile` | 201 |
+| GET | `/ai/v1/{aiBranch}/v1/files/{inputFile}` | `gatewayGetAIInputFile` | 200 |
+| DELETE | `/ai/v1/{aiBranch}/v1/files/{inputFile}` | `gatewayDeleteAIInputFile` | 200 |
+| GET | `/ai/v1/{aiBranch}/v1/files/{inputFile}/content` | `gatewayContentAIInputFile` | 200 |
 
 ## 3. 实现映射与演进
 

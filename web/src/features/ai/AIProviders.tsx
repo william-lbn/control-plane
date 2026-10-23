@@ -42,6 +42,7 @@ type Model = {
   max_output_tokens: number;
   protocols?: string[];
   price?: AIPrice;
+  input_modalities?: string[];
 };
 type Detail = {
   provider: Provider;
@@ -49,6 +50,26 @@ type Detail = {
   publications: { id: string; revision_id: string; models: Model[]; created_at: string }[];
 };
 type Pending = { path: string; method: string; body: string; key: string };
+const inputLabels: Record<string, string> = {
+  text: '文本',
+  image: '图片',
+  pdf: 'PDF',
+  audio: '音频',
+  video: '视频',
+};
+function allowedInputTypes(protocols: string[] = ['chat_completions']) {
+  const result = ['text'];
+  if (protocols.some((v) => v !== 'embeddings')) result.push('image', 'pdf');
+  if (protocols.includes('chat_completions') || protocols.includes('gemini')) result.push('audio');
+  if (protocols.includes('gemini')) result.push('video');
+  return result;
+}
+function modelInputTypes(model: Model) {
+  return (
+    model.input_modalities ||
+    allowedInputTypes(model.protocols).filter((v) => v === 'text' || v === 'image')
+  );
+}
 const blankModel = (kind = 'openai_compatible'): Model => ({
   id: '',
   name: '',
@@ -607,12 +628,39 @@ export function AIProviders({
                                   : current.filter((v) => v !== p);
                                 updateModel(index, {
                                   protocols: next.length ? next : ['chat_completions'],
+                                  input_modalities: modelInputTypes(model).filter((v) =>
+                                    allowedInputTypes(
+                                      next.length ? next : ['chat_completions'],
+                                    ).includes(v),
+                                  ),
                                 });
                               }}
                             />
                             {label}
                           </label>
                         ))}
+                    </fieldset>
+                    <fieldset>
+                      <legend>已批准的输入类型 {index + 1}</legend>
+                      {allowedInputTypes(model.protocols).map((kind) => (
+                        <label key={kind}>
+                          <input
+                            type="checkbox"
+                            aria-label={`输入 ${inputLabels[kind]} ${index + 1}`}
+                            disabled={kind === 'text'}
+                            checked={modelInputTypes(model).includes(kind)}
+                            onChange={(e) => {
+                              const current = modelInputTypes(model);
+                              updateModel(index, {
+                                input_modalities: e.target.checked
+                                  ? [...current, kind]
+                                  : current.filter((v) => v !== kind),
+                              });
+                            }}
+                          />
+                          {inputLabels[kind]}
+                        </label>
+                      ))}
                     </fieldset>
                     <label>
                       <input
