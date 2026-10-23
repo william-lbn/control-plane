@@ -27,17 +27,19 @@ var multipartID = regexp.MustCompile(`^mpu_[a-f0-9]{24}$`)
 var multipartETag = regexp.MustCompile(`^[a-f0-9]{32}$`)
 
 type multipartUpload struct {
-	ID             string            `json:"upload_id"`
-	Key            string            `json:"key"`
-	ContentType    string            `json:"content_type"`
-	Metadata       map[string]string `json:"metadata"`
-	ExpectedSHA256 string            `json:"expected_sha256"`
-	ExpectedSize   int64             `json:"expected_size"`
-	State          string            `json:"state"`
-	Created        time.Time         `json:"created_at"`
-	SHA256         string            `json:"sha256"`
-	Size           int64             `json:"size"`
-	completion     string
+	ID              string            `json:"upload_id"`
+	Key             string            `json:"key"`
+	ContentType     string            `json:"content_type"`
+	Metadata        map[string]string `json:"metadata"`
+	ExpectedSHA256  string            `json:"expected_sha256"`
+	ExpectedSize    int64             `json:"expected_size"`
+	State           string            `json:"state"`
+	Created         time.Time         `json:"created_at"`
+	SHA256          string            `json:"sha256"`
+	Size            int64             `json:"size"`
+	Tags            []storageTag      `json:"tags,omitempty"`
+	ResponseHeaders map[string]string `json:"response_headers,omitempty"`
+	completion      string
 }
 type multipartPart struct {
 	Number   int       `json:"part_number" xml:"PartNumber"`
@@ -52,11 +54,13 @@ type multipartSelection struct {
 	ETag   string `json:"etag" xml:"ETag"`
 }
 type multipartCreate struct {
-	Key         string            `json:"key"`
-	ContentType string            `json:"content_type"`
-	Metadata    map[string]string `json:"metadata"`
-	SHA256      string            `json:"sha256"`
-	Size        int64             `json:"size"`
+	Key             string            `json:"key"`
+	ContentType     string            `json:"content_type"`
+	Metadata        map[string]string `json:"metadata"`
+	SHA256          string            `json:"sha256"`
+	Size            int64             `json:"size"`
+	Tags            []storageTag      `json:"tags,omitempty"`
+	ResponseHeaders map[string]string `json:"response_headers,omitempty"`
 }
 
 func multipartFault(status int, code string) error { return &storageMutationFault{status, code} }
@@ -80,7 +84,7 @@ func loadMultipart(ctx context.Context, tx pgx.Tx, p objectStoragePayload, princ
 	if !multipartID.MatchString(id) {
 		return u, multipartFault(404, "NoSuchUpload")
 	}
-	e := tx.QueryRow(ctx, `SELECT id,key,content_type,metadata,expected_sha256,expected_size,state,created_at,result_sha256,result_size,completion_hash FROM neon_storage.multipart_uploads WHERE id=$1 AND branch_id=$2 AND principal=$3 AND bucket=$4 AND ($5='' OR key=$5) FOR UPDATE`, id, p.BranchID, principal, bucket, key).Scan(&u.ID, &u.Key, &u.ContentType, &u.Metadata, &u.ExpectedSHA256, &u.ExpectedSize, &u.State, &u.Created, &u.SHA256, &u.Size, &u.completion)
+	e := tx.QueryRow(ctx, `SELECT id,key,content_type,metadata,expected_sha256,expected_size,state,created_at,result_sha256,result_size,completion_hash,tags,response_headers FROM neon_storage.multipart_uploads WHERE id=$1 AND branch_id=$2 AND principal=$3 AND bucket=$4 AND ($5='' OR key=$5) FOR UPDATE`, id, p.BranchID, principal, bucket, key).Scan(&u.ID, &u.Key, &u.ContentType, &u.Metadata, &u.ExpectedSHA256, &u.ExpectedSize, &u.State, &u.Created, &u.SHA256, &u.Size, &u.completion, &u.Tags, &u.ResponseHeaders)
 	if isNoRows(e) {
 		e = multipartFault(404, "NoSuchUpload")
 	}
@@ -102,6 +106,14 @@ func (s *server) createMultipart(ctx context.Context, conn *pgx.Conn, p objectSt
 		return u, multipartFault(400, "InvalidArgument")
 	}
 	input.Metadata = metadata
+	input.Tags, e = normalizeStorageTags(input.Tags, 10)
+	if e != nil {
+		return u, multipartFault(400, "InvalidTag")
+	}
+	input.ResponseHeaders, e = normalizeStorageResponseHeaders(input.ResponseHeaders)
+	if e != nil {
+		return u, multipartFault(400, "InvalidArgument")
+	}
 	raw, _ := json.Marshal(input)
 	fingerprint := fmt.Sprintf("%x", sha256.Sum256(append([]byte(bucket+"\x00"), raw...)))
 	tx, e := multipartTx(ctx, conn)
@@ -141,12 +153,12 @@ func (s *server) createMultipart(ctx context.Context, conn *pgx.Conn, p objectSt
 		return u, multipartFault(429, "QuotaExceeded")
 	}
 	u.ID = newID("mpu_")
-	_, e = tx.Exec(ctx, `INSERT INTO neon_storage.multipart_uploads(id,branch_id,principal,bucket,key,content_type,metadata,expected_sha256,expected_size,request_key,request_hash) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,NULLIF($10,''),$11)`, u.ID, p.BranchID, principal, bucket, input.Key, input.ContentType, metadata, input.SHA256, input.Size, func() string {
+	_, e = tx.Exec(ctx, `INSERT INTO neon_storage.multipart_uploads(id,branch_id,principal,bucket,key,content_type,metadata,expected_sha256,expected_size,request_key,request_hash,tags,response_headers) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,NULLIF($10,''),$11,$12,$13)`, u.ID, p.BranchID, principal, bucket, input.Key, input.ContentType, metadata, input.SHA256, input.Size, func() string {
 		if requestKey != "" {
 			return keyHash(requestKey)
 		}
 		return ""
-	}(), fingerprint)
+	}(), fingerprint, input.Tags, input.ResponseHeaders)
 	if e == nil {
 		u, e = loadMultipart(ctx, tx, p, principal, bucket, input.Key, u.ID)
 	}
@@ -344,6 +356,7 @@ func (s *server) completeMultipart(ctx context.Context, conn *pgx.Conn, p object
 		indexed[v.Number] = v
 	}
 	var size int64
+	layout := make([]storageObjectPart, 0, len(selection))
 	for i, v := range selection {
 		part, found := indexed[v.Number]
 		if !found || part.ETag != v.ETag {
@@ -353,6 +366,7 @@ func (s *server) completeMultipart(ctx context.Context, conn *pgx.Conn, p object
 			return u, multipartFault(400, "EntityTooSmall")
 		}
 		size += part.Size
+		layout = append(layout, storageObjectPart{part.Number, part.Size, part.SHA256})
 	}
 	if size > storageObjectLimit {
 		return u, multipartFault(413, "EntityTooLarge")
@@ -401,6 +415,11 @@ func (s *server) completeMultipart(ctx context.Context, conn *pgx.Conn, p object
 	if u.Size != size || u.ExpectedSHA256 != "" && u.ExpectedSHA256 != u.SHA256 {
 		return u, multipartFault(400, "BadDigest")
 	}
+	settings, err := normalizeStorageObjectSettings(storageObjectSettings{Tags: u.Tags, ResponseHeaders: u.ResponseHeaders})
+	if err != nil {
+		return u, multipartFault(409, "InvalidUploadSettings")
+	}
+	u.Tags, u.ResponseHeaders = settings.Tags, settings.ResponseHeaders
 	blob := p.ProjectID + "/" + newID("blob_")
 	reader, e := content.Reader()
 	if e != nil {
@@ -410,7 +429,7 @@ func (s *server) completeMultipart(ctx context.Context, conn *pgx.Conn, p object
 		return u, e
 	}
 
-	_, e = tx.Exec(ctx, `INSERT INTO neon_storage.objects(bucket,key,blob_key,sha256,size,content_type,metadata) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(bucket,key) DO UPDATE SET blob_key=$3,sha256=$4,size=$5,content_type=$6,metadata=$7,updated_at=now()`, bucket, u.Key, blob, u.SHA256, size, u.ContentType, u.Metadata)
+	_, e = tx.Exec(ctx, `INSERT INTO neon_storage.objects(bucket,key,blob_key,sha256,size,content_type,metadata,tags,response_headers,part_layout) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(bucket,key) DO UPDATE SET blob_key=$3,sha256=$4,size=$5,content_type=$6,metadata=$7,tags=$8,response_headers=$9,part_layout=$10,updated_at=now()`, bucket, u.Key, blob, u.SHA256, size, u.ContentType, u.Metadata, u.Tags, u.ResponseHeaders, layout)
 	if e != nil {
 		return u, e
 	}

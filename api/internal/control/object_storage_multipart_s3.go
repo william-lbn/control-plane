@@ -27,7 +27,7 @@ func validMultipartQuery(q url.Values) bool {
 			continue
 		}
 		switch k {
-		case "uploads", "uploadId", "partNumber", "part-number-marker", "max-parts", "key-marker", "upload-id-marker", "max-uploads", "prefix", "delimiter", "encoding-type":
+		case "x-id", "uploads", "uploadId", "partNumber", "part-number-marker", "max-parts", "key-marker", "upload-id-marker", "max-uploads", "prefix", "delimiter", "encoding-type":
 		default:
 			return false
 		}
@@ -58,7 +58,7 @@ func (s *server) s3Multipart(w http.ResponseWriter, r *http.Request, conn *pgx.C
 	}
 	for k := range r.Header {
 		v := strings.ToLower(k)
-		if strings.HasPrefix(v, "x-amz-checksum-") || strings.HasPrefix(v, "x-amz-server-side-") || v == "x-amz-acl" || v == "x-amz-tagging" || v == "x-amz-storage-class" || v == "x-amz-sdk-checksum-algorithm" || strings.HasPrefix(v, "x-amz-object-lock-") || v == "x-amz-expected-bucket-owner" || v == "x-amz-request-payer" {
+		if strings.HasPrefix(v, "x-amz-checksum-") || strings.HasPrefix(v, "x-amz-server-side-") || v == "x-amz-acl" || (v == "x-amz-tagging" && !(q.Has("uploads") && r.Method == http.MethodPost && key != "")) || v == "x-amz-storage-class" || v == "x-amz-sdk-checksum-algorithm" || strings.HasPrefix(v, "x-amz-object-lock-") || v == "x-amz-expected-bucket-owner" || v == "x-amz-request-payer" {
 			s3Error(w, r, 501, "NotImplemented")
 			return
 		}
@@ -77,7 +77,17 @@ func (s *server) s3Multipart(w http.ResponseWriter, r *http.Request, conn *pgx.C
 			multipartError(w, r, multipartFault(400, "InvalidArgument"), true)
 			return
 		}
-		u, e := s.createMultipart(r.Context(), conn, p, principal, bucket, "", multipartCreate{Key: key, ContentType: r.Header.Get("Content-Type"), Metadata: metadata, Size: -1})
+		tags, err := storageTagsHeader(r)
+		if err != nil {
+			s3Error(w, r, 400, "InvalidTag")
+			return
+		}
+		headers, err := storageResponseHeaders(r)
+		if err != nil {
+			s3Error(w, r, 400, "InvalidArgument")
+			return
+		}
+		u, e := s.createMultipart(r.Context(), conn, p, principal, bucket, "", multipartCreate{Key: key, ContentType: r.Header.Get("Content-Type"), Metadata: metadata, Size: -1, Tags: tags, ResponseHeaders: headers})
 		if e != nil {
 			multipartError(w, r, e, true)
 			return
@@ -172,7 +182,7 @@ func (s *server) s3Multipart(w http.ResponseWriter, r *http.Request, conn *pgx.C
 func qWithoutSignature(q url.Values) url.Values {
 	v := url.Values{}
 	for k, x := range q {
-		if !strings.HasPrefix(k, "X-Amz-") {
+		if !strings.HasPrefix(k, "X-Amz-") && k != "x-id" {
 			v[k] = x
 		}
 	}

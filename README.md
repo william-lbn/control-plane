@@ -7,7 +7,7 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 
 功能进度与当前优先级见 [已验收/剩余清单](docs/FUNCTIONAL-STATUS-2026-10-21.md)：14 组基础已有回执；五组专项后置，16 组尚未整体闭环。后续优先业务功能，复用来源未变的既有验收。
 
-最新状态：[2026-10-23 分支 AI 文件与多模态输入](docs/DELIVERY-2026-10-23-AI-INPUT-FILES.md)：加密文件、原键恢复、确切分支隔离、四种原生协议引用、删除/过期和计费引用历史通过。9 组新增 PostgreSQL、4 组受影响检查、3 组新增媒体和 8 个实际页面检查通过；四次合成调用，旧功能回执复用。API/Worker/AI 0.77.0、Web 重建，schema 064 / Chart 0.9.74 / Core Helm 164。17 张目录表、9 PVC、917 个此前 Secret 身份保留，最终三节点和三个 Safekeeper Ready，VM 0。供应商侧持久会话/响应引用、外部账单/支付及其他业务继续，性能/可靠性专项后置。
+最新状态：[2026-10-23 S3 完整属性与分片快照](docs/DELIVERY-2026-10-23-S3-ATTRIBUTES.md)：完整类型化 SDK 属性、非连续分片分页/校验值、COPY 字节及覆盖后清除旧分片布局通过，UTC 日期边界已修正。3 组新增 Go、3 组受影响检查和 10 个实机检查点通过，旧标签/POST/尾部回执复用。API/Worker 0.79.0、原 Web 复用，schema 064 / 原生格式 4 / Chart 0.9.76 / Core Helm 167；17 张目录表、6 类旧存储清单、9 PVC、917 个原 Secret 和其他六套 Helm 配置保留。最终三节点、三个 Safekeeper Ready，VM 0。历史对象分片布局未推断或回填；完整兼容矩阵及其他业务继续，性能/可靠性后置。
 
 此前增量：[应用 TOTP 双重认证](docs/DELIVERY-2026-10-15-AUTH-TOTP.md)八项 UI 与[项目共享查询](docs/DELIVERY-2026-10-15-SHARED-QUERIES.md)六项 UI 均通过；该批基线为 API 0.33 / Chart 0.9.17 / migration 031。
 
@@ -46,7 +46,7 @@ S3 的 test-only `875e48b` 只修正选择器和原 checkpoint 续测，不改�
 | 时间点恢复到新分支 | 原生时间戳/LSN、存储保留租约、异步调谐、历史目录隔离、React UI | 默认禁用；仅受管理分支；原地恢复、Time Travel Assist、完整 Backend 一致性恢复未实现 |
 | 项目/分支保留删除与独立 Compute 删除 | 保护/依赖图、关闭 Proxy 和服务、正常 Runner 回收、held tombstone、项目恢复、原密码重建与 React UI | 分支 TTL 和唯一原失败创建保留清理已验收；物理 GC 与跨实例栅栏后置；详见 [删除手册](docs/RETAINED-DELETION.md)和本版交付 |
 | HA / DR | 部分租约与恢复工具 | 未通过独立故障域 HA/DR；历史新分支恢复不等于完整 DR |
-| 产品 Object Storage | Go REST Driver、独立受限 bucket、分支目录、REST/S3、SigV4/signed chunks、统一密钥、条件写/预签名、COPY/bulk/CORS 与有界 multipart 已分别实际验收 | 当前单对象 8 MiB；大对象/完整 checksum、安全物理 GC、完整兼容矩阵、HA/TLS 仍有缺口 |
+| 产品 Object Storage | Go REST Driver、独立受限 bucket、分支目录、REST/S3、SigV4/signed chunks、统一密钥、条件写/预签名、COPY/bulk/CORS 与有界 multipart 已分别实际验收 | 当前单对象 64 MiB；标签/POST/尾部校验已通过；5 GiB/完整 checksum、安全物理 GC、完整兼容矩阵、HA/TLS 仍有缺口 |
 | Functions | Go Driver、隔离 Node guest、ZIP/环境、真实 SQL、停止/重部署/删除、监控、版本冷醒、UTC 定时触发和客户异常 idle 回收已分别通过实际 UI；默认关闭 | 公开 HTTP/SSE/WebSocket、自动休眠/冷醒已验收；对象事件、客户 stdout/stderr、完整计量和 Backend 分支复制仍缺 |
 | AI Gateway 推理 | 独立 Go 网关、模型目录/Playground、文本 Chat/SSE、分支应用授权与用量，本地 Ollama 已真实 UI 验收 | 动态供应商管理、其他协议/预算、商业上游、HA/可信 TLS 尚有缺口 |
 | Data API | 原生 Go Driver、持久 Operation、React UI、分支 JWT Gateway 和固定 PostgREST 镜像 | 默认禁用；须显式 labHTTP，真实 Neon UI 验收独立于 PG CI；RPC/views 等不在首版范围 |

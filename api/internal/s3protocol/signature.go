@@ -187,18 +187,24 @@ func (s Signature) Verify(r *http.Request, body []byte, secret, region string) e
 		// Query signatures authorize a bounded PUT capability. Ordinary header
 		// signatures still require a payload hash; DELETE/POST remain excluded.
 		upload := s.Presigned && r.Method == http.MethodPut && r.Header.Get("X-Amz-Copy-Source") == ""
-		// MinIO SetBucketCors signs Content-MD5 and uses UNSIGNED-PAYLOAD.
-		// Limit this exception to bounded XML configuration, never object PUT.
+		// SDK configuration writers can bind bounded XML with signed Content-MD5
+		// instead of a SHA256 payload hash. The subresource remains signed.
 		checksum := md5.Sum(body)
-		cors := r.Method == http.MethodPut && r.URL.Query().Has("cors") && len(body) > 0 && len(body) <= 65536 && r.Header.Get("X-Amz-Copy-Source") == "" && strings.Contains(";"+s.Headers+";", ";content-md5;") && r.Header.Get("Content-MD5") == base64.StdEncoding.EncodeToString(checksum[:])
+		q := r.URL.Query()
+		configuration := false
+		for _, name := range []string{"cors", "tagging", "versioning", "lifecycle", "object-lock", "publicAccessBlock"} {
+			configuration = configuration || q.Has(name) && q.Get(name) == ""
+		}
+		configuration = configuration && r.Method == http.MethodPut && len(body) > 0 && len(body) <= 65536 && r.Header.Get("X-Amz-Copy-Source") == "" && strings.Contains(";"+s.Headers+";", ";content-md5;") && r.Header.Get("Content-MD5") == base64.StdEncoding.EncodeToString(checksum[:])
+		settingsDelete := !s.Presigned && r.Method == http.MethodDelete && len(body) == 0 && r.Header.Get("X-Amz-Copy-Source") == "" &&
+			(q.Has("tagging") && q.Get("tagging") == "" || q.Has("lifecycle") && q.Get("lifecycle") == "" || q.Has("publicAccessBlock") && q.Get("publicAccessBlock") == "")
 		// Actual S3 SDKs use UNSIGNED-PAYLOAD for bodyless initiate/abort.
 		// The canonical signature still binds method, upload ID, path and all
 		// metadata. No bytes or general POST/DELETE are admitted by this case.
-		q := r.URL.Query()
 		multipartControl := !s.Presigned && len(body) == 0 && r.Header.Get("X-Amz-Copy-Source") == "" &&
 			((r.Method == http.MethodPost && q.Has("uploads") && q.Get("uploads") == "" && !q.Has("uploadId")) ||
 				(r.Method == http.MethodDelete && q.Get("uploadId") != "" && !q.Has("uploads") && !q.Has("partNumber")))
-		if !upload && !cors && !multipartControl && ((!read && !copy) || len(body) != 0) {
+		if !upload && !configuration && !settingsDelete && !multipartControl && ((!read && !copy) || len(body) != 0) {
 			return ErrSignature
 		}
 	} else if !digestPattern.MatchString(payload) || !hmac.Equal([]byte(payload), []byte(Hash(body))) {

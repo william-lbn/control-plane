@@ -8,6 +8,7 @@ import { newRequestKey } from '../../shared/requestKey';
 import { followOperation } from '../../shared/followOperation';
 import { MultipartUpload } from './MultipartUpload';
 import { MultipartAdministration } from './MultipartAdministration';
+import { StorageSettings } from './StorageSettings';
 
 type Instance = {
   generation: number;
@@ -79,6 +80,7 @@ export function ObjectStorage({
     null,
   );
   const [metadataEdit, setMetadataEdit] = useState('{}');
+  const [settingsKey, setSettingsKey] = useState<string | null>(null);
   const [uploadCapability, setUploadCapability] = useState<{
     url: string;
     headers: Record<string, string>;
@@ -93,6 +95,7 @@ export function ObjectStorage({
   const path = `${projectPath(projectId)}/branches/${encodeURIComponent(branch)}/storage`;
   const bucketPath = `${path}/buckets/${encodeURIComponent(bucket)}`;
   useEffect(() => {
+    setSettingsKey(null);
     setCORSETag('');
     setCORSJSON('[]');
     setObjectMetadata(null);
@@ -448,6 +451,7 @@ export function ObjectStorage({
       if (epoch.current !== current) return;
       await loadObjects(current);
       await loadBuckets(current);
+      if (settingsKey === item.key) setSettingsKey(null);
       setNotice('当前分支对象已删除；共享文件保留');
     });
   }
@@ -737,6 +741,26 @@ export function ObjectStorage({
                     </button>
                   ))}
                 </nav>
+              )}
+              <StorageSettings
+                key={'settings/' + bucketPath}
+                bucketPath={bucketPath}
+                canEdit={canEdit}
+                busy={busy}
+                onSaved={async () => {
+                  const current = epoch.current;
+                  await loadBuckets(current);
+                }}
+              />
+              {settingsKey !== null && (
+                <StorageSettings
+                  key={'object-settings/' + bucketPath + '/' + settingsKey}
+                  bucketPath={bucketPath}
+                  objectKey={settingsKey}
+                  canEdit={canEdit}
+                  busy={busy}
+                  onSaved={async () => {}}
+                />
               )}
               <MultipartUpload
                 key={`${projectId}/${branch}/${bucket}`}
@@ -1045,6 +1069,14 @@ export function ObjectStorage({
                           onClick={() => void inspectMetadata(item)}
                         >
                           元数据
+                        </button>
+                        <button
+                          className="button ghost"
+                          aria-label={'对象设置 ' + item.key}
+                          disabled={busy}
+                          onClick={() => setSettingsKey(item.key)}
+                        >
+                          对象设置
                         </button>
                         {canEdit && (
                           <>

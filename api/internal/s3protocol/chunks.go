@@ -19,6 +19,13 @@ func (s Signature) VerifyAndDecode(r *http.Request, wire []byte, secret, region 
 	if limit < 0 || len(wire) > limit+(1<<20) {
 		return nil, ErrSignature
 	}
+	if isTrailerPayload(r.Header.Get("X-Amz-Content-Sha256")) {
+		var decoded bytes.Buffer
+		if err := s.decodeTrailerChunksTo(r, bytes.NewReader(wire), &decoded, secret, region, int64(limit)); err != nil {
+			return nil, err
+		}
+		return decoded.Bytes(), nil
+	}
 	if r.Header.Get("X-Amz-Content-Sha256") != SignedChunkPayload {
 		if len(wire) > limit || s.Verify(r, wire, secret, region) != nil {
 			return nil, ErrSignature

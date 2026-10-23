@@ -16,6 +16,9 @@ import (
 // The seed, body hash or all chained chunks, terminal signature and EOF must
 // succeed before the caller publishes any SQL object reference.
 func (s Signature) VerifyAndDecodeTo(r *http.Request, source io.Reader, destination io.Writer, secret, region string, limit int64) error {
+	if isTrailerPayload(r.Header.Get("X-Amz-Content-Sha256")) {
+		return s.decodeTrailerChunksTo(r, source, destination, secret, region, limit)
+	}
 	if limit < 0 || r.Method != http.MethodPut || len(s.Date) != 16 || len(secret) < 32 || len(secret) > 256 || !keyID.MatchString(s.KeyID) || !digestPattern.MatchString(s.Value) || r.Header.Get("X-Amz-Trailer") != "" {
 		return ErrSignature
 	}
