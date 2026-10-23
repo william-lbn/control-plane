@@ -54,6 +54,23 @@ type dsgaCreationPlan struct {
 	AcceptedAt      string              `json:"accepted_at"`
 	MemorySlotBytes uint64              `json:"memory_slot_bytes"`
 	Budget          dsgaBootstrapBudget `json:"budget"`
+	// 凭据由接受前的immutable Secret保留，再把实际UID/完整Data摘要冻结进原
+	// Operation。纯值避免浅拷贝共享指针；缺省只供历史计划解码，新启动回调拒绝。
+	Credentials dsgaCredentialReference `json:"credentials,omitzero"`
+}
+
+type dsgaCredentialReference struct {
+	ProtocolVersion uint32 `json:"protocol_version"`
+	UID             string `json:"uid"`
+	ContentSHA256   string `json:"content_sha256"`
+}
+
+func (ref dsgaCredentialReference) validate() error {
+	decoded, err := hex.DecodeString(ref.ContentSHA256)
+	if ref.ProtocolVersion != 1 || dsgapi.ValidateID(ref.UID, "credentials Secret") != nil || err != nil || len(decoded) != sha256.Size || hex.EncodeToString(decoded) != ref.ContentSHA256 {
+		return errDSGACreationPlan
+	}
+	return nil
 }
 
 // 策略来自受信任的平台配置，不是公开创建请求中的可选字段。此值仅在接受前
@@ -92,6 +109,9 @@ func (b dsgaBootstrapBudget) validate() error {
 }
 
 func (plan dsgaCreationPlan) validate(p createPayload) error {
+	if plan.Credentials != (dsgaCredentialReference{}) && plan.Credentials.validate() != nil {
+		return errDSGACreationPlan
+	}
 	if plan.ProtocolVersion != 1 || plan.PostgresVersion != 17 || len(plan.Namespace) > 63 || !dsgaPlanNamespace.MatchString(plan.Namespace) ||
 		dsgapi.ValidateIncarnation(plan.Incarnation) != nil || dsgapi.ValidateID(plan.ComputeInstanceID, "Compute") != nil ||
 		!dsgaPinnedImage.MatchString(plan.Image) || !dsgaPlanUUID.MatchString(plan.OperationUUID) {

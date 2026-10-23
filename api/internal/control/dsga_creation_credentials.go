@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"time"
@@ -26,6 +27,10 @@ type dsgaCredentialSnapshot struct {
 	uid         string
 	digest      [32]byte
 	credentials dsgaRenderCredentials
+}
+
+func (snapshot dsgaCredentialSnapshot) reference() dsgaCredentialReference {
+	return dsgaCredentialReference{1, snapshot.uid, hex.EncodeToString(snapshot.digest[:])}
 }
 
 func snapshotDSGACredentials(secret *core.Secret, namespace, name, project, endpoint string) (dsgaCredentialSnapshot, error) {
@@ -66,6 +71,11 @@ func (binding *dsgaCreationBinding) renderDSGABootstrap(ctx context.Context, vm 
 	if err != nil {
 		return nil, err
 	}
+	// 原Operation必须已经记录接受时的UID/摘要；不能在第一次worker读取时
+	// 收养碰巧同名的Secret。历史无ref的计划不自动升级为生产启动来源。
+	if plan.Credentials.validate() != nil {
+		return nil, errDSGACredentialSource
+	}
 	clients, _, err := newDSGAKubeClients(binding.server.kube)
 	if err != nil {
 		return nil, err
@@ -77,6 +87,9 @@ func (binding *dsgaCreationBinding) renderDSGABootstrap(ctx context.Context, vm 
 	snapshot, err := snapshotDSGACredentials(secret, plan.Namespace, vm.Name+"-credentials", binding.intent.ProjectID, binding.intent.EndpointID)
 	if err != nil {
 		return nil, err
+	}
+	if snapshot.reference() != plan.Credentials || !dsgaCredentialProvenance(secret, binding.operationID, plan) {
+		return nil, errDSGACredentialSource
 	}
 	config, err := renderDSGAComputeBootstrap(binding.intent.createPayload, plan, string(vm.UID), snapshot.credentials)
 	if err != nil {

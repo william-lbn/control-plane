@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -75,7 +76,7 @@ func TestDSGACredentialSourceSnapshotIsolationAndUnsafeInputs(t *testing.T) {
 // 使用真实独占PG/schema，Kube部分仅TLS API夹具。新Operation由生产数据库入口
 // 接受完整计划，不改旧Operation payload；真实Render回调读取typed Secret并持久
 // 来源，真实Bind回调固定VM/Config UID。所有敏感失败信息只报告错误类别。
-func credentialSourceFixture(t *testing.T) (context.Context, *server, string, *creationTestAPI, dsgaCreationInput, *dsgaCreationBinding, **core.Secret) {
+func credentialSourceFixture(t *testing.T, legacy ...bool) (context.Context, *server, string, *creationTestAPI, dsgaCreationInput, *dsgaCreationBinding, **core.Secret) {
 	t.Helper()
 	ctx, s, old, f, input := dsgaBindingFixture(t)
 	p, policy, _ := dsgaPlanFixture(t)
@@ -87,6 +88,68 @@ func credentialSourceFixture(t *testing.T) (context.Context, *server, string, *c
 	}
 	input.Payload = p
 	input.VM.Spec.DSGABootstrap.Incarnation, input.VM.Spec.DSGABootstrap.ComputeInstanceID = plan.Incarnation, plan.ComputeInstanceID
+	op := newID("op_source_")
+	var source *core.Secret
+	api := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		credentialsRequest := r.URL.Path == f.kube.path("secret", brokerTestWorkload+"-credentials")
+		if r.Method == http.MethodPost && r.URL.Path == f.kube.path("secret", "") {
+			// credentials与config共享同一API collection；按实际请求对象分流，
+			// 原字节交回Config夹具，不能把第二个Secret误判为凭据重复创建。
+			raw, err := io.ReadAll(io.LimitReader(r.Body, 1<<20))
+			var proposed core.Secret
+			if err != nil || json.Unmarshal(raw, &proposed) != nil {
+				w.WriteHeader(400)
+				return
+			}
+			r.Body = io.NopCloser(bytes.NewReader(raw))
+			credentialsRequest = proposed.Name == brokerTestWorkload+"-credentials"
+		}
+		if credentialsRequest {
+			if r.Header.Get("Authorization") != "Bearer creation-kube-identity" {
+				t.Error("typed credentials did not use center identity")
+				w.WriteHeader(403)
+				return
+			}
+			f.mu.Lock()
+			defer f.mu.Unlock()
+			w.Header().Set("Content-Type", "application/json")
+			if r.Method == http.MethodPost {
+				if source != nil {
+					w.WriteHeader(409)
+					return
+				}
+				var proposed core.Secret
+				if json.NewDecoder(r.Body).Decode(&proposed) != nil {
+					w.WriteHeader(400)
+					return
+				}
+				proposed.UID, proposed.ResourceVersion = "original-credentials", "1"
+				source = &proposed
+				w.WriteHeader(201)
+			} else if r.Method != http.MethodGet {
+				w.WriteHeader(405)
+				return
+			}
+			if source == nil {
+				w.WriteHeader(404)
+				return
+			}
+			_ = json.NewEncoder(w).Encode(source)
+			return
+		}
+		f.serve(w, r)
+	}))
+	t.Cleanup(api.Close)
+	f.kube.base, f.kube.http = api.URL, api.Client()
+	// 原Operation接受前通过真实typed生产者写入并读回immutable来源，而非手填
+	// UID/摘要。其后元数据库、Renderer和held→ready继续使用真实生产代码。
+	plan, err = f.kube.prepareDSGACredentials(ctx, p, plan, op, dsgaCredentialInput{Password: "credential-fixture-password"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(legacy) > 0 && legacy[0] {
+		plan.Credentials = dsgaCredentialReference{}
+	}
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
 		t.Fatal(err)
@@ -95,7 +158,6 @@ func credentialSourceFixture(t *testing.T) (context.Context, *server, string, *c
 	if _, err := tx.Exec(ctx, `UPDATE operations SET state='failed',lease_owner=NULL,lease_expires_at=NULL,finished_at=clock_timestamp() WHERE id=$1`, old); err != nil {
 		t.Fatal(err)
 	}
-	op := newID("op_source_")
 	if err := addDSGACreateOperation(ctx, tx, "create_endpoint", "endpoint", p.EndpointID, p.ProjectID, op, "test", "source-test", p, plan, "source-key", strings.Repeat("e", 64), createSteps("create_endpoint", true)); err != nil {
 		t.Fatal(err)
 	}
@@ -123,26 +185,52 @@ func credentialSourceFixture(t *testing.T) (context.Context, *server, string, *c
 		return traceConfig(ctx, secret)
 	}
 	input.Render = binding.renderDSGABootstrap
-	source := credentialSourceSecret()
-	api := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet && r.URL.Path == f.kube.path("secret", brokerTestWorkload+"-credentials") {
-			if r.Header.Get("Authorization") != "Bearer creation-kube-identity" {
-				t.Error("typed source GET did not use center identity")
-				w.WriteHeader(403)
-				return
-			}
-			f.mu.Lock()
-			copy := source.DeepCopy()
-			f.mu.Unlock()
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(copy)
-			return
-		}
-		f.serve(w, r)
-	}))
-	t.Cleanup(api.Close)
-	f.kube.base, f.kube.http = api.URL, api.Client()
 	return ctx, s, op, f, input, binding, &source
+}
+
+func TestDSGACredentialSourceFrozenBeforeFirstWorkerRead(t *testing.T) {
+	ctx, s, op, f, input, binding, source := credentialSourceFixture(t)
+	vm := input.VM.DeepCopy()
+	vm.UID, vm.ResourceVersion = "vm-uid", "1"
+	if err := binding.bindVM(ctx, vm); err != nil {
+		t.Fatal(err)
+	}
+	f.mu.Lock()
+	original := (*source).DeepCopy()
+	f.mu.Unlock()
+	for name, mutate := range map[string]func(*core.Secret){
+		"uid":         func(v *core.Secret) { v.UID = "recreated-source" },
+		"seed":        func(v *core.Secret) { v.Data["controlSigningSeed"][0] ^= 1 },
+		"operation":   func(v *core.Secret) { v.Annotations[dsgaCredentialOperation] = "other-operation" },
+		"incarnation": func(v *core.Secret) { v.Annotations[dsgaCredentialIncarnation] = "other-incarnation" },
+		"compute":     func(v *core.Secret) { v.Annotations[dsgaCredentialCompute] = "other-compute" },
+	} {
+		t.Run(name, func(t *testing.T) {
+			f.mu.Lock()
+			*source = original.DeepCopy()
+			mutate(*source)
+			f.mu.Unlock()
+			if data, err := binding.renderDSGABootstrap(ctx, vm); !errors.Is(err, errDSGACredentialSource) || data != nil {
+				t.Fatal("first worker adopted changed accepted source")
+			}
+			var count int
+			if err := s.db.QueryRow(ctx, `SELECT count(*) FROM dsga_creation_credential_sources WHERE operation_id=$1`, op).Scan(&count); err != nil || count != 0 {
+				t.Fatal("rejected source changed persisted facts")
+			}
+		})
+	}
+	// 历史无ref计划可以读取，但必须阻止自动启动，不从同名Secret补写原意图。
+	t.Run("legacy_missing_ref", func(t *testing.T) {
+		ctx, _, _, _, input, binding, _ := credentialSourceFixture(t, true)
+		vm := input.VM.DeepCopy()
+		vm.UID, vm.ResourceVersion = "vm-uid", "1"
+		if err := binding.bindVM(ctx, vm); err != nil {
+			t.Fatal(err)
+		}
+		if data, err := binding.renderDSGABootstrap(ctx, vm); !errors.Is(err, errDSGACredentialSource) || data != nil {
+			t.Fatal("legacy missing ref was silently adopted")
+		}
+	})
 }
 
 func sourceFact(t *testing.T, ctx context.Context, s *server, op string) (string, string) {
