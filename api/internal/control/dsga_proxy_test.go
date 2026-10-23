@@ -166,9 +166,9 @@ func TestDSGAProxyExplicitRoutesPreserveOriginalBytesAndCredential(t *testing.T)
 		w.Header().Set("Location", "https://foreign.invalid")
 		_, _ = w.Write([]byte(`{"native_fact_fixture":true}`))
 	})
-	for _, path := range []string{"capabilities", "memory", "initialization", "resize", "resize/status", "resize/cancel", "issuer/fence", "admission", "admission/status", "admission/close-original", "admission/close-original/status"} {
+	for _, path := range []string{"capabilities", "memory", "initialization", "budget/shared", "resize", "resize/status", "resize/cancel", "issuer/fence", "admission", "admission/status", "admission/close-original", "admission/close-original/status"} {
 		method, body := http.MethodPost, []byte(`{"issuer_epoch":"18446744073709551615"}`)
-		if path == "capabilities" || path == "memory" || path == "initialization" {
+		if path == "capabilities" || path == "memory" || path == "initialization" || path == "budget/shared" {
 			method, body = http.MethodGet, nil
 		}
 		code, data := proxyRequest(t, client, method, base+"/dsg/v1/"+path, token, body)
@@ -176,7 +176,7 @@ func TestDSGAProxyExplicitRoutesPreserveOriginalBytesAndCredential(t *testing.T)
 			t.Fatalf("route %s got %d", path, code)
 		}
 	}
-	if calls.Load() != 11 {
+	if calls.Load() != 12 {
 		t.Fatal("not all native calls ran")
 	}
 }
@@ -271,9 +271,9 @@ func TestDSGAProxyObservationIndependentFromBlockedExecution(t *testing.T) {
 	case <-time.After(3 * time.Second):
 		t.Fatal("execution did not enter")
 	}
-	for _, path := range []string{"memory", "resize/status", "resize/cancel", "admission", "admission/status", "admission/close-original", "admission/close-original/status"} {
+	for _, path := range []string{"memory", "budget/shared", "resize/status", "resize/cancel", "admission", "admission/status", "admission/close-original", "admission/close-original/status"} {
 		method, body := http.MethodPost, []byte(`{}`)
-		if path == "memory" {
+		if path == "memory" || path == "budget/shared" {
 			method, body = http.MethodGet, nil
 		}
 		code, _ := proxyRequest(t, client, method, base+"/dsg/v1/"+path, token, body)
