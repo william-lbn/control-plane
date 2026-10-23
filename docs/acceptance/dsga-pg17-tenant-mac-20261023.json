@@ -1,0 +1,74 @@
+{
+  "scope": "Root PG17 Tenant existence producer/recovery, not full create worker or physical storage acceptance",
+  "control_plane_code": "4c25b1fb970b0ebf230fad759d4c2399e8da4c3c",
+  "pg17": "fcada44b67d239aea8e699a721b99c470fc24d65",
+  "runs": {
+    "dsga-tenant-mac1": {
+      "exit_code": 1,
+      "pass_events": 19,
+      "fail_events": 2,
+      "skip_events": 0,
+      "packages_passed": [],
+      "postgres_version": "postgres (PostgreSQL) 17.11 (fcada44b67d239aea8e699a721b99c470fc24d65)",
+      "source_files": 515,
+      "source_unchanged": true
+    },
+    "dsga-tenant-conflict2": {
+      "exit_code": 0,
+      "pass_events": 4,
+      "fail_events": 0,
+      "skip_events": 0,
+      "packages_passed": [
+        "github.com/william-lbn/control-plane/api/internal/control"
+      ],
+      "postgres_version": "postgres (PostgreSQL) 17.11 (fcada44b67d239aea8e699a721b99c470fc24d65)",
+      "source_files": 515,
+      "source_unchanged": true
+    },
+    "dsga-tenant-action-guard3": {
+      "exit_code": 0,
+      "pass_events": 1,
+      "fail_events": 0,
+      "skip_events": 0,
+      "packages_passed": [
+        "github.com/william-lbn/control-plane/api/internal/control"
+      ],
+      "postgres_version": "postgres (PostgreSQL) 17.11 (fcada44b67d239aea8e699a721b99c470fc24d65)",
+      "source_files": 515,
+      "source_unchanged": true
+    }
+  },
+  "final_source_files": 515,
+  "final_source_matches_manifest": true,
+  "validation_note": "First new suite19pass/2fail (one409 child plus parent). Fixed actual proxy HTTP409 handling, targeted4pass success/conflict/foreign-conflict and separate new action/SQL boundary1pass. Do not count overlaps as unique or relabel first suite final full-pass.",
+  "static": "final Go vet/diff passed",
+  "primary_sources": [
+    "neon/libs/pageserver_api/src/controller_api.rs TenantCreateRequest/TenantDescribeResponse",
+    "neon/libs/utils/src/shard.rs TenantShardId display",
+    "neon/storage_controller/src/service.rs tenant_create/tenant_describe"
+  ],
+  "upstream": "fresh fetched this goal turn; Neon fa504217, AS a4bce09e, NeonPG17 56692dfb, community e05b7e2a, ownCPmain f5820c24 complete ancestors; no unseen commits",
+  "release": "disabled; no images/deployment/main merge; Tenant exists is not storage/VM/SQL readiness",
+  "unfinished_coding": [
+    "full-shard controller timeline origin and safe native storage/config chain",
+    "public create worker/ordinary SQL complete budget admission/safe route",
+    "new-action pending/failed cleanup with unknown external action reconciliation; lease timeout alone is not remote cancellation",
+    "branch/RO/catalog and complete quiesce/Monitor/policy/Scheduler/finalRunner"
+  ],
+  "linux_pending": [
+    "actual storage-controller/pageserver/safekeeper/K8s/network/TLS",
+    "Linux/KVM/NeonVM/HugeTLB physical reclaim/fault/migration/performance"
+  ],
+  "evidence_sha256": {
+    "build/dsga-tenant-mac1/tests.jsonl": "83bfbbfbd42358730ea40b497fdf5ab6a503d4dda9bea0d3041a43f1bb78d0bd",
+    "build/dsga-tenant-mac1/source-sha256.json": "771506169096f00b2147648b4dc6a17634aae8725d63981848920748c345c133",
+    "build/dsga-tenant-mac1/summary.json": "8bb8026785596cab5c59c00952793b67c52e49d55683123e73cb5981affc127f",
+    "build/dsga-tenant-conflict2/tests.jsonl": "a4a5efb1127219645ea39cc2f0d76a83c8d3cd99de2707cec0778e33d30676de",
+    "build/dsga-tenant-conflict2/source-sha256.json": "ebf73d43e20e3bc2bfccc3b0a78b13eaaea2a06f94100f5cd54c7c466d0e0fea",
+    "build/dsga-tenant-conflict2/summary.json": "2858bf020693b4b223ee78df759520f74c12eb7b1fb8038600990f0b3d71a5a0",
+    "build/dsga-tenant-action-guard3/tests.jsonl": "80c3bd56ae17be3f11f4f478b4415c21df4b6f64de126eef2fcb6ab72db8ebd8",
+    "build/dsga-tenant-action-guard3/source-sha256.json": "37c36c734bf5d0b1d66184684c5879b58c2f45c1b728b04bc2a752682857c580",
+    "build/dsga-tenant-action-guard3/summary.json": "ac28830bd5f5a58a534fcbad424def8f1e25bdd470205b5a373c69659c0b151e",
+    "build/dsga-tenant-vet-final.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}
