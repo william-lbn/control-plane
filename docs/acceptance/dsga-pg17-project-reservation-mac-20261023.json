@@ -1,0 +1,181 @@
+{
+  "date": "2026-10-23",
+  "goal": "active/incomplete; PG17 complete functionality still required",
+  "code_sha": "1cd5a96de0549082b1687bb44ece2d7a4614456e",
+  "upstream": {
+    "neon": "fa504217c61bbcaf5c512d75830564541f917f8f",
+    "autoscaling": "a4bce09e4d6bd7932ea634a1ed79afe26a9cfd1f",
+    "neon_pg17": "56692dfb680281a963c7470fc7f0fec7f65ecfd4",
+    "community_pg17": "e05b7e2a45c7a151ad3f8771ba7f5d8b4ddd8d0c",
+    "control_plane_main": "f5820c2458c3f53ac8e85964474b09ae59c9205f",
+    "fresh_fetch_all_included": true
+  },
+  "postgres_sha": "fcada44b67d239aea8e699a721b99c470fc24d65",
+  "autoscaling_sha": "8e1e0ea93d5f2775376622a38ed10f39d9d1fc8c",
+  "runs": [
+    {
+      "directory": "/Users/williamlee/github/neon-self-dev/build/dsga-project-reservation-mac1",
+      "summary": {
+        "exit_code": 1,
+        "pass_events": 7,
+        "fail_events": 1,
+        "skip_events": 0,
+        "packages_passed": [],
+        "postgres_version": "postgres (PostgreSQL) 17.11 (fcada44b67d239aea8e699a721b99c470fc24d65)",
+        "source_files": 502,
+        "source_unchanged": true
+      },
+      "top_level_pass": 5,
+      "package_elapsed": [
+        5.076
+      ],
+      "sha256": {
+        "tests.jsonl": "15d2d1d76eb50ac4dcd3df8f70154e57e3463b4f6d43774203bf9bbaa9146977",
+        "tests.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "source-sha256.json": "7ef46149324f6bc03fc2204eb387fcfe7ef4c2c0d5b9def3c7e13185c50123f7",
+        "summary.json": "457da8402fb2421e30a9c26266f20294143fe5d6dd88d5b86e976a7039350e42",
+        "postgres-version.txt": "38ebacac17c8b72f137d0ce143675f181baec4a3b3548b63c25b5e98cfe8be8e"
+      }
+    },
+    {
+      "directory": "/Users/williamlee/github/neon-self-dev/build/dsga-project-reservation-fix2",
+      "summary": {
+        "exit_code": 0,
+        "pass_events": 4,
+        "fail_events": 0,
+        "skip_events": 0,
+        "packages_passed": [
+          "github.com/william-lbn/control-plane/api/internal/control"
+        ],
+        "postgres_version": "postgres (PostgreSQL) 17.11 (fcada44b67d239aea8e699a721b99c470fc24d65)",
+        "source_files": 502,
+        "source_unchanged": true
+      },
+      "top_level_pass": 4,
+      "package_elapsed": [
+        5.003
+      ],
+      "sha256": {
+        "tests.jsonl": "b43be33006cd6098b429d9ab91bf93b809ba037136c7ff0e06a448affde93823",
+        "tests.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "source-sha256.json": "bb839e06e24b43f233b6f01045a58164ee2ef7e74b3099e5800908c217f6d625",
+        "summary.json": "db8548a11530670bd2a2ca101d801b320fd0c4dd51284f5677bd03e7776d3c00",
+        "postgres-version.txt": "38ebacac17c8b72f137d0ce143675f181baec4a3b3548b63c25b5e98cfe8be8e"
+      }
+    },
+    {
+      "directory": "/Users/williamlee/github/neon-self-dev/build/dsga-project-final-accept3",
+      "summary": {
+        "exit_code": 1,
+        "pass_events": 0,
+        "fail_events": 7,
+        "skip_events": 0,
+        "packages_passed": [],
+        "postgres_version": "postgres (PostgreSQL) 17.11 (fcada44b67d239aea8e699a721b99c470fc24d65)",
+        "source_files": 502,
+        "source_unchanged": true
+      },
+      "top_level_pass": 0,
+      "package_elapsed": [
+        4.26
+      ],
+      "sha256": {
+        "tests.jsonl": "36aac45e05666d8fa246cf08aa3b22a929ca3f71ce43ecc35bc1a8f17cf22d74",
+        "tests.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "source-sha256.json": "f4fb17e37bd1674af6a5a9beb6254fdf4f74ba115a08727ca12c8520ccc40cbe",
+        "summary.json": "cb3eb746a2a33503ba8d0e78154bfb1b6f521d8cac7d823a3dc4c936a3a927df",
+        "postgres-version.txt": "38ebacac17c8b72f137d0ce143675f181baec4a3b3548b63c25b5e98cfe8be8e"
+      }
+    },
+    {
+      "directory": "/Users/williamlee/github/neon-self-dev/build/dsga-project-final-schema4",
+      "summary": {
+        "exit_code": 0,
+        "pass_events": 13,
+        "fail_events": 0,
+        "skip_events": 0,
+        "packages_passed": [
+          "github.com/william-lbn/control-plane/api/internal/control"
+        ],
+        "postgres_version": "postgres (PostgreSQL) 17.11 (fcada44b67d239aea8e699a721b99c470fc24d65)",
+        "source_files": 502,
+        "source_unchanged": true
+      },
+      "top_level_pass": 9,
+      "package_elapsed": [
+        7.918
+      ],
+      "sha256": {
+        "tests.jsonl": "21909863f39ad093a3934a9c36ea91406cfe98384f109188b59ef1f14bfca7ff",
+        "tests.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "source-sha256.json": "4e1776d2ba0afb807460a8e9bc1ed6e7677a528a281e543b059449ceaf93291b",
+        "summary.json": "c986581c37031bd7c77f4e43ca5c921277be55349b5ec0ee456988474ac5e79a",
+        "postgres-version.txt": "38ebacac17c8b72f137d0ce143675f181baec4a3b3548b63c25b5e98cfe8be8e"
+      }
+    },
+    {
+      "directory": "/Users/williamlee/github/neon-self-dev/build/dsga-project-request-auth5",
+      "summary": {
+        "exit_code": 0,
+        "pass_events": 17,
+        "fail_events": 0,
+        "skip_events": 0,
+        "packages_passed": [
+          "github.com/william-lbn/control-plane/api/internal/control"
+        ],
+        "postgres_version": "postgres (PostgreSQL) 17.11 (fcada44b67d239aea8e699a721b99c470fc24d65)",
+        "source_files": 503,
+        "source_unchanged": true
+      },
+      "top_level_pass": 11,
+      "package_elapsed": [
+        11.153
+      ],
+      "sha256": {
+        "tests.jsonl": "064448d6d6cd71c2bf88dcf3363f60ee8ee1bb86da1f88fec7c2c194fceceb8b",
+        "tests.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "source-sha256.json": "617abdc22855158db879f137fae0af532fe683baec873b3c1445d3f6ede74968",
+        "summary.json": "28885deac1bfc3aa22b80b9b09c4e2417c7300d99d27999c9fc5a87c41e62c35",
+        "postgres-version.txt": "38ebacac17c8b72f137d0ce143675f181baec4a3b3548b63c25b5e98cfe8be8e"
+      }
+    }
+  ],
+  "final_result": {
+    "top_level": 11,
+    "pass_events": 17,
+    "fail": 0,
+    "skip": 0,
+    "source_files": 503,
+    "source_unchanged": true,
+    "elapsed_seconds": 11.153
+  },
+  "contract": {
+    "pass": 3,
+    "fail": 0,
+    "skip": 0,
+    "sha256": "c21d266136c83ae3b1eedcc9918830ff57d7d1776cc897a0aefbac0d31cf347a",
+    "only_semantic_change": "CreateProject.postgres_version enum adds17"
+  },
+  "final_vet": {
+    "exit_code": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "not_repeated": [
+    "旧内核/check-world/SDK/Agent/VM模板",
+    "旧SCRAM认证和全API",
+    "未变Web"
+  ],
+  "not_executed": [
+    "真实K8s/ClusterIssuer/NeonVM/HugeTLB/物理回收",
+    "worker完整到Neon存储的端到端",
+    "Linux并发故障和性能长稳"
+  ],
+  "business_missing": [
+    "版本化worker八阶段派发",
+    "分支/RO与可信catalog来源",
+    "初始化回执与普通SQL准入",
+    "pending显式清理",
+    "完整预算/quiesce/最终Runner与存储E2E"
+  ],
+  "default_enabled": false
+}
