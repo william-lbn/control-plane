@@ -197,18 +197,18 @@ func TestDSGACredentialProducerReplicaCopiesFrozenVerifiers(t *testing.T) {
 	replica := f.objects[kubeName(p.EndpointID)+"-credentials"].DeepCopy()
 	posts := f.posts
 	f.mu.Unlock()
-	if posts != 2 || !bytes.Equal(writer.Data["applicationVerifier"], replica.Data["applicationVerifier"]) || !bytes.Equal(writer.Data["probeVerifier"], replica.Data["probeVerifier"]) || bytes.Equal(writer.Data["controlSigningSeed"], replica.Data["controlSigningSeed"]) {
+	if posts != 2 || !bytes.Equal(writer.Data["applicationVerifier"], replica.Data["applicationVerifier"]) || !bytes.Equal(writer.Data["probeVerifier"], replica.Data["probeVerifier"]) || !bytes.Equal(writer.Data["probeCredentialSeed"], replica.Data["probeCredentialSeed"]) || bytes.Equal(writer.Data["controlSigningSeed"], replica.Data["controlSigningSeed"]) {
 		t.Fatal("replica did not inherit SQL identity with separate control key")
 	}
 }
 
 func TestDSGACredentialProducerEntropyAndBothSCRAMKeys(t *testing.T) {
 	password := "original-writer-password"
-	if data, err := makeDSGACredentialData(password, dsgaRenderCredentials{}, false, bytes.NewReader(make([]byte, 95))); err == nil || data != nil {
+	if data, err := makeDSGACredentialData(password, dsgaCredentialSnapshot{}, false, bytes.NewReader(make([]byte, 95))); err == nil || data != nil {
 		t.Fatal("partial entropy returned credentials")
 	}
-	data, err := makeDSGACredentialData(password, dsgaRenderCredentials{}, false, bytes.NewReader(bytes.Repeat([]byte{7}, 96)))
-	if err != nil || len(data) != 3 || !dsgaPasswordMatches(password, string(data["applicationVerifier"])) {
+	data, err := makeDSGACredentialData(password, dsgaCredentialSnapshot{}, false, bytes.NewReader(bytes.Repeat([]byte{7}, 96)))
+	if err != nil || len(data) != 4 || !dsgaPasswordMatches(password, string(data["applicationVerifier"])) {
 		t.Fatal("canonical credentials rejected")
 	}
 	verifier := string(data["applicationVerifier"])
@@ -239,7 +239,7 @@ func TestDSGACredentialProducerNativePGXAndLibpqSCRAM(t *testing.T) {
 	// 实际验证新verifier能被两种客户端接受，不把纯哈希自测当认证成功。
 	for name, password := range map[string]string{"ascii": "real-native-password", "chinese": "真实数据库口令校验", "non_ascii_space": "native\u00a0password", "composed": "native-e\u0301-password"} {
 		t.Run(name, func(t *testing.T) {
-			data, err := makeDSGACredentialData(password, dsgaRenderCredentials{}, false, bytes.NewReader(bytes.Repeat([]byte{9}, 96)))
+			data, err := makeDSGACredentialData(password, dsgaCredentialSnapshot{}, false, bytes.NewReader(bytes.Repeat([]byte{9}, 96)))
 			if err != nil {
 				t.Fatal("test password unexpectedly incompatible")
 			}

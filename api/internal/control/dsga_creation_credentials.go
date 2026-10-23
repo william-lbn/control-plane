@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -20,13 +21,24 @@ import (
 
 var errDSGACredentialSource = errors.New("DSGA original immutable credential source is unavailable or differs")
 
-// 只保存Renderer所需的复制值和摘要，不保留Secret指针/seed；调用后原API对象
-// 被复用不会改变输出。摘要不含ResourceVersion，正常读回元数据版本不算换凭据。
-// TLS证书不放入本immutable来源：其挂载与轮转必须由独立受控身份链处理。
+// 快照复制完整来源摘要和Renderer的公开输入，不保留Secret指针或管理签名seed。
+// probeSeed仅供可信控制面的普通SQL探针使用，绝不能交给Renderer/Guest/Operation。
+// 摘要不含ResourceVersion，正常读回元数据版本不算换凭据；TLS另走证书轮转链。
 type dsgaCredentialSnapshot struct {
 	uid         string
 	digest      [32]byte
 	credentials dsgaRenderCredentials
+	probeSeed   []byte
+}
+
+// SCRAM verifier不能恢复客户端口令；只有创建时独立保留的32字节随机种子才能
+// 生成原探针口令。历史三键Secret允许只读核验来源，但不能据此通过SQL健康检查，
+// 更不能用租户口令/管理签名seed代替。调用方不得记录返回值或放入错误消息。
+func (snapshot dsgaCredentialSnapshot) probePassword() (string, error) {
+	if len(snapshot.probeSeed) != 32 {
+		return "", errDSGACredentialSource
+	}
+	return base64.RawURLEncoding.EncodeToString(snapshot.probeSeed), nil
 }
 
 func (snapshot dsgaCredentialSnapshot) reference() dsgaCredentialReference {
@@ -36,15 +48,21 @@ func (snapshot dsgaCredentialSnapshot) reference() dsgaCredentialReference {
 func snapshotDSGACredentials(secret *core.Secret, namespace, name, project, endpoint string) (dsgaCredentialSnapshot, error) {
 	var empty dsgaCredentialSnapshot
 	if !dsgaOwnedSecret(secret, namespace, name, project, endpoint) || dsgapi.ValidateID(string(secret.UID), "credentials Secret") != nil || secret.Immutable == nil || !*secret.Immutable || secret.Type != core.SecretTypeOpaque ||
-		len(secret.Data) != 3 || len(secret.Data["controlSigningSeed"]) != ed25519.SeedSize {
+		(len(secret.Data) != 3 && len(secret.Data) != 4) || len(secret.Data["controlSigningSeed"]) != ed25519.SeedSize {
 		return empty, errDSGACredentialSource
 	}
 	application, probe := string(secret.Data["applicationVerifier"]), string(secret.Data["probeVerifier"])
 	if !functionsql.ValidVerifier(application) || !functionsql.ValidVerifier(probe) {
 		return empty, errDSGACredentialSource
 	}
-	// 精确三键且长度有界，避免额外私有字段被误认为已登记，或对任意大Secret
-	// 做序列化/分配。encoding/json稳定排序并编码[]byte，不存在拼接分隔歧义。
+	probeSeed, hasProbeSeed := secret.Data["probeCredentialSeed"]
+	if (len(secret.Data) == 4) != hasProbeSeed || (hasProbeSeed && (len(probeSeed) != 32 ||
+		!dsgaPasswordMatches(base64.RawURLEncoding.EncodeToString(probeSeed), probe))) {
+		return empty, errDSGACredentialSource
+	}
+	// 精确三键为旧只读格式；四键新增独立probe种子且必须实际匹配原verifier。
+	// 新字段纳入同一完整Data摘要，不能给旧UID补字段或改写已冻结的原引用。
+	// 字段数/长度有界后才序列化；JSON稳定排序，避免拼接分隔歧义。
 	raw, err := json.Marshal(secret.Data)
 	if err != nil || len(raw) > 2048 {
 		return empty, errDSGACredentialSource
@@ -53,7 +71,7 @@ func snapshotDSGACredentials(secret *core.Secret, namespace, name, project, endp
 	key := ed25519.NewKeyFromSeed(secret.Data["controlSigningSeed"])
 	return dsgaCredentialSnapshot{string(secret.UID), digest, dsgaRenderCredentials{
 		ApplicationVerifier: application, ProbeVerifier: probe, ControlPublicKey: key.Public().(ed25519.PublicKey),
-	}}, nil
+	}, append([]byte(nil), probeSeed...)}, nil
 }
 
 // renderDSGABootstrap为真实typed创建执行器的Render回调：读取原计划和当前owned

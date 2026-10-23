@@ -72,7 +72,7 @@ func (k *kubeClient) prepareDSGACredentials(ctx context.Context, p createPayload
 	if err != nil {
 		return empty, errDSGACredentialSource
 	}
-	var inherited dsgaRenderCredentials
+	var inherited dsgaCredentialSnapshot
 	if inherit {
 		sourceName := kubeName(input.SourceEndpoint) + "-credentials"
 		source, err := clients.CoreV1().Secrets(plan.Namespace).Get(ctx, sourceName, metav1.GetOptions{})
@@ -80,20 +80,21 @@ func (k *kubeClient) prepareDSGACredentials(ctx context.Context, p createPayload
 			return empty, errDSGACredentialSource
 		}
 		snapshot, err := snapshotDSGACredentials(source, plan.Namespace, sourceName, p.ProjectID, input.SourceEndpoint)
-		if err != nil || snapshot.reference() != input.Source {
+		if err != nil || snapshot.reference() != input.Source || len(snapshot.probeSeed) != 32 {
 			return empty, errDSGACredentialSource
 		}
-		inherited = snapshot.credentials
+		inherited = snapshot
 	}
 	name := kubeName(p.EndpointID) + "-credentials"
 	confirm := func(secret *core.Secret) (dsgaCreationPlan, error) {
 		snapshot, err := snapshotDSGACredentials(secret, plan.Namespace, name, p.ProjectID, p.EndpointID)
-		if err != nil || !dsgaCredentialProvenance(secret, operation, plan) ||
+		if err != nil || len(snapshot.probeSeed) != 32 || !dsgaCredentialProvenance(secret, operation, plan) ||
 			(plan.Credentials != (dsgaCredentialReference{}) && snapshot.reference() != plan.Credentials) {
 			return empty, errDSGACredentialSource
 		}
 		if inherit {
-			if snapshot.credentials.ApplicationVerifier != inherited.ApplicationVerifier || snapshot.credentials.ProbeVerifier != inherited.ProbeVerifier {
+			if snapshot.credentials.ApplicationVerifier != inherited.credentials.ApplicationVerifier || snapshot.credentials.ProbeVerifier != inherited.credentials.ProbeVerifier ||
+				!bytes.Equal(snapshot.probeSeed, inherited.probeSeed) {
 				return empty, errDSGACredentialSource
 			}
 		} else if !dsgaPasswordMatches(input.Password, snapshot.credentials.ApplicationVerifier) {
@@ -193,12 +194,13 @@ func dsgaPasswordMatches(password, verifier string) bool {
 	return err == nil && hmac.Equal([]byte(dsgaVerifier(prepared, salt)), []byte(verifier))
 }
 
-func makeDSGACredentialData(password string, source dsgaRenderCredentials, inherit bool, random io.Reader) (map[string][]byte, error) {
+func makeDSGACredentialData(password string, source dsgaCredentialSnapshot, inherit bool, random io.Reader) (map[string][]byte, error) {
 	var entropy [96]byte
 	count := len(entropy)
 	if inherit {
 		count = ed25519.SeedSize
-		if !functionsql.ValidVerifier(source.ApplicationVerifier) || !functionsql.ValidVerifier(source.ProbeVerifier) {
+		if !functionsql.ValidVerifier(source.credentials.ApplicationVerifier) || !functionsql.ValidVerifier(source.credentials.ProbeVerifier) || len(source.probeSeed) != 32 ||
+			!dsgaPasswordMatches(base64.RawURLEncoding.EncodeToString(source.probeSeed), source.credentials.ProbeVerifier) {
 			return nil, errDSGACredentialSource
 		}
 	}
@@ -214,10 +216,16 @@ func makeDSGACredentialData(password string, source dsgaRenderCredentials, inher
 	if _, err := io.ReadFull(random, entropy[:count]); err != nil {
 		return nil, errDSGACredentialSource
 	}
-	app, probe := source.ApplicationVerifier, source.ProbeVerifier
+	app, probe, probeSeed := source.credentials.ApplicationVerifier, source.credentials.ProbeVerifier, source.probeSeed
 	if !inherit {
 		app = dsgaVerifier(prepared, entropy[64:80])
-		probe = dsgaVerifier(base64.RawURLEncoding.EncodeToString(entropy[32:64]), entropy[80:96])
+		probeSeed = entropy[32:64]
+		probe = dsgaVerifier(base64.RawURLEncoding.EncodeToString(probeSeed), entropy[80:96])
 	}
-	return map[string][]byte{"applicationVerifier": []byte(app), "probeVerifier": []byte(probe), "controlSigningSeed": append([]byte(nil), entropy[:ed25519.SeedSize]...)}, nil
+	// 探针身份属于物理timeline的SQL目录，副本/分支必须继承原种子及verifier；
+	// 管理签名身份属于本Compute，始终重新独立生成。两份种子不能相互推导。
+	// 仅在immutable Secret保留原本就用于生成probe verifier的随机字节，不保存
+	// 租户明文，也不改变既有应用口令/盐算法；失败不返回半份来源。
+	return map[string][]byte{"applicationVerifier": []byte(app), "probeVerifier": []byte(probe),
+		"controlSigningSeed": append([]byte(nil), entropy[:ed25519.SeedSize]...), "probeCredentialSeed": append([]byte(nil), probeSeed...)}, nil
 }
