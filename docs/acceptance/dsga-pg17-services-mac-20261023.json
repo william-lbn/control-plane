@@ -1,0 +1,88 @@
+{
+  "scope": "Original VM internal Service producer + immutable UID binding and initialization consumer integration; full V3 active/incomplete",
+  "control_plane_code": "139d4c011fd9a3da0206a09e8e84060d052a77f5",
+  "pg17": "fcada44b67d239aea8e699a721b99c470fc24d65",
+  "neon_prior": "d8bcc3b164cb1b4443da8960f1795ecb6b439183",
+  "autoscaling": "8e1e0ea93d5f2775376622a38ed10f39d9d1fc8c",
+  "runs": {
+    "dsga-services-mac1": {
+      "exit_code": 0,
+      "pass_events": 8,
+      "fail_events": 0,
+      "skip_events": 0,
+      "packages_passed": [
+        "github.com/william-lbn/control-plane/api/internal/control"
+      ],
+      "postgres_version": "postgres (PostgreSQL) 17.11 (fcada44b67d239aea8e699a721b99c470fc24d65)",
+      "source_files": 509,
+      "source_unchanged": true
+    },
+    "dsga-services-route-guard2": {
+      "exit_code": 0,
+      "pass_events": 11,
+      "fail_events": 0,
+      "skip_events": 0,
+      "packages_passed": [
+        "github.com/william-lbn/control-plane/api/internal/control"
+      ],
+      "postgres_version": "postgres (PostgreSQL) 17.11 (fcada44b67d239aea8e699a721b99c470fc24d65)",
+      "source_files": 509,
+      "source_unchanged": true
+    },
+    "dsga-services-init-chain3": {
+      "exit_code": 0,
+      "pass_events": 17,
+      "fail_events": 0,
+      "skip_events": 0,
+      "packages_passed": [
+        "github.com/william-lbn/control-plane/api/internal/control"
+      ],
+      "postgres_version": "postgres (PostgreSQL) 17.11 (fcada44b67d239aea8e699a721b99c470fc24d65)",
+      "source_files": 509,
+      "source_unchanged": true
+    },
+    "dsga-services-init-uid4": {
+      "exit_code": 0,
+      "pass_events": 2,
+      "fail_events": 0,
+      "skip_events": 0,
+      "packages_passed": [
+        "github.com/william-lbn/control-plane/api/internal/control"
+      ],
+      "postgres_version": "postgres (PostgreSQL) 17.11 (fcada44b67d239aea8e699a721b99c470fc24d65)",
+      "source_files": 509,
+      "source_unchanged": true
+    }
+  },
+  "count_note": "Service8 and route-guard11 cover distinct cases; initialization17 is affected integration rerun, new Service UID2 targets only added child+common parent. Do not sum overlapping coverage or relabel first run as final full-suite.",
+  "source_files": 509,
+  "final_source_matches_manifest": true,
+  "static": "go vet and diff passed",
+  "upstream": "fresh fetched again; complete heads all ancestors: Neonfa504217, ASa4bce09e, NeonPG1756692dfb, communitye05b7e2a, ownCPmainf5820c24; no new maintenance commits",
+  "constraints": "PG17 only; no images/deployment/main merge/subagents/stash reapply; AS owner AGENTS preserved",
+  "unfinished_coding": [
+    "public versioned worker and safe route publisher",
+    "durable initialization observation history and ordinary SQL budget admission",
+    "branch/RO/catalog and pending explicit cleanup",
+    "full budgets/quiesce/Monitor/policy/Scheduler/final Controller/Runner and full storage chain"
+  ],
+  "linux_pending": [
+    "actual K8s/RBAC/service allocation/routing/TLS/network isolation",
+    "Linux/KVM/NeonVM/HugeTLB/physical reclaim/migration/fault/performance"
+  ],
+  "evidence_sha256": {
+    "build/dsga-services-mac1/summary.json": "4eea33f6a74ae465d3c0ce34d116d2c6458b6018af8e852d943229f8d99af79d",
+    "build/dsga-services-mac1/tests.jsonl": "1d8bea7e0e7c4ec3f275b99a03432fdd8f21cf6880796dad471dba232c59c14c",
+    "build/dsga-services-mac1/source-sha256.json": "12fdb39aa4ebae1e341f4883f9279d27fdf69e6e6afce51bf1ce43489a9041ed",
+    "build/dsga-services-route-guard2/summary.json": "ad2f6ea5a9dcdfe1cf466e4bdc224da0e961d7c136be3d2d837adeb34e1d4103",
+    "build/dsga-services-route-guard2/tests.jsonl": "4ca5dd1e41b275c7350b9cec6daa201b756cc3632154d0e73c664d62b3f28cab",
+    "build/dsga-services-route-guard2/source-sha256.json": "d98db9854155f0c757b6febccbe9c43267623bb3f7fc483d7ce2769ac4b8cced",
+    "build/dsga-services-init-chain3/summary.json": "8544ca349718a93a0fdf3590c43b3468f348f38aaedb13202d3e5edb65f25292",
+    "build/dsga-services-init-chain3/tests.jsonl": "cbeef67cb2ce17a4d5e012573ff32d989070eb19b96fd5616c3ce1667f06f754",
+    "build/dsga-services-init-chain3/source-sha256.json": "ba17c2e7e4841ad89104ed44e6c6f960f6b57777159dbc9e4161019a25a582ba",
+    "build/dsga-services-init-uid4/summary.json": "0f1257bbe7f24038c7c152c158408d7ba90b5f1b435521e134f20c19131d3d18",
+    "build/dsga-services-init-uid4/tests.jsonl": "c0a44109e901382c0c597956671ba2975dde5c819207f2b88d66c251f4d681e1",
+    "build/dsga-services-init-uid4/source-sha256.json": "14d5dfc9d29184999964e8a536f2ba605886c7004b3dee225a95f8215cc49d97",
+    "build/dsga-services-vet-final.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}
