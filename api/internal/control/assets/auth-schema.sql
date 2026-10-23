@@ -17,3 +17,10 @@ create index "session_userId_idx" on "session" ("userId");
 create index "account_userId_idx" on "account" ("userId");
 
 create index "verification_identifier_idx" on "verification" ("identifier");
+
+-- Maintained admin plugin fields also preserve bans when management is off.
+alter table "user" add column role text;
+alter table "user" add column banned boolean default false;
+alter table "user" add column "banReason" text;
+alter table "user" add column "banExpires" timestamptz;
+alter table "session" add column "impersonatedBy" text;
