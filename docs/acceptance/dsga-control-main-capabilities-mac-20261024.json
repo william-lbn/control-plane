@@ -1,0 +1,23 @@
+{
+  "date": "2026-10-24",
+  "scope": "own control-plane main e381caa complete maintenance merge",
+  "merge_commit": "506ae1f3c55b690c446396f40d5b91977fabccf8",
+  "source": "e381caa06e7d728884ffc272e72e1afc730c45c3",
+  "mac_summary": {
+    "exit_code": 0,
+    "pass_events": 6,
+    "fail_events": 0,
+    "skip_events": 0,
+    "packages_passed": [
+      "github.com/william-lbn/control-plane/api/internal/control"
+    ],
+    "postgres_version": "postgres (PostgreSQL) 17.11 (13e109b720d7192e1ca29db0ac878884adaaf831)",
+    "source_files": 540,
+    "source_unchanged": true
+  },
+  "vet": "exit0 build/dsga-control-main-capabilities-20261024/vet.log",
+  "cmd_build": "exit0 build/dsga-control-main-capabilities-20261024/cmd-build.log",
+  "not_repeated": "no Web source changes; no unchanged DSGA or K8s suites repeated",
+  "not_claimed": "prior main deployment report was authored upstream; this task did not deploy or buildimages",
+  "remaining": "DSGA runtime implementation continues; onlyPG17; Linux physical/cluster later"
+}
