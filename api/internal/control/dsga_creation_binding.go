@@ -182,6 +182,15 @@ func (binding *dsgaCreationBinding) read(ctx context.Context, tx pgx.Tx) (string
 }
 
 func (binding *dsgaCreationBinding) bindVM(ctx context.Context, vm *vmv1.VirtualMachine) error {
+	if err := binding.validateVM(vm); err != nil {
+		return err
+	}
+	return binding.bind(ctx, string(vm.UID), "")
+}
+
+// validateVM只核对实际读回对象，不创建绑定、不访问网络。凭据Renderer复用
+// 同一身份规则，再在原Operation行锁内核对已经持久化的VM UID，不能隐式收养。
+func (binding *dsgaCreationBinding) validateVM(vm *vmv1.VirtualMachine) error {
 	// 回调接收真实API读回对象；只信任原Operation固定的命名空间、标签和随机身份。
 	// held与ready都可按原事实恢复，但删除对象、坏bootstrap与同名新UID不能收养。
 	if vm == nil || vm.Namespace != binding.intent.Creation.Namespace || vm.Name != kubeName(binding.intent.EndpointID) || vm.ResourceVersion == "" ||
@@ -192,7 +201,7 @@ func (binding *dsgaCreationBinding) bindVM(ctx context.Context, vm *vmv1.Virtual
 	if _, err := vm.DSGABootstrapHeld(); err != nil || vm.DeletionTimestamp != nil {
 		return errDSGACreationIdentity
 	}
-	return binding.bind(ctx, string(vm.UID), "")
+	return nil
 }
 
 func (binding *dsgaCreationBinding) bindConfig(ctx context.Context, secret *core.Secret) error {
