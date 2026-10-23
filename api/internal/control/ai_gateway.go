@@ -131,7 +131,7 @@ func (s *server) aiRead(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if strings.HasSuffix(r.URL.Path, "/usage") {
-		items, e := s.many(r.Context(), `SELECT id,model_id,protocol,streaming,state,started_at,finished_at,prompt_tokens,completion_tokens,total_tokens,cache_read_tokens,cache_write_tokens,duration_ms,first_token_ms FROM ai_gateway_requests WHERE project_id=$1 AND branch_id=$2 ORDER BY started_at DESC LIMIT 50`, project, branch)
+		items, e := s.many(r.Context(), `SELECT id,model_id,protocol,streaming,state,started_at,finished_at,prompt_tokens,completion_tokens,total_tokens,cache_read_tokens,cache_write_tokens,duration_ms,first_token_ms,billing_owner,provider_id,provider_revision_id FROM ai_gateway_requests WHERE project_id=$1 AND branch_id=$2 ORDER BY started_at DESC LIMIT 50`, project, branch)
 		if e != nil {
 			fail(w, r, 503, "metadata_unavailable", "Could not read AI usage")
 			return
@@ -147,7 +147,7 @@ func (s *server) aiRead(w http.ResponseWriter, r *http.Request) {
 	enabled := s.ai != nil && s.backendKeys != nil && os.Getenv("NEON_AI_GATEWAY_URL") != ""
 	models := []map[string]any{}
 	if enabled {
-		snapshot, err := s.aiCatalog(r.Context(), false)
+		snapshot, err := s.aiBranchCatalog(r.Context(), false, r.PathValue("branch"))
 		if err != nil {
 			fail(w, r, 503, "provider_catalog_unavailable", "Could not read published model routes")
 			return
@@ -180,7 +180,7 @@ func (s *server) aiConsoleRequest(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 422, "invalid_request", "Invalid chat request")
 		return
 	}
-	snapshot, e := s.aiCatalog(r.Context(), false)
+	snapshot, e := s.aiBranchCatalog(r.Context(), false, r.PathValue("branch"))
 	if e != nil {
 		fail(w, r, 503, "provider_catalog_unavailable", "Could not read published model routes")
 		return
@@ -329,7 +329,7 @@ func RunAIGateway(ctx context.Context) error {
 func (s *server) aiPublic(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	snapshot, catalogErr := s.aiCatalog(r.Context(), true)
+	snapshot, catalogErr := s.aiBranchCatalog(r.Context(), true, r.PathValue("branch"))
 	if catalogErr != nil || snapshot.Config == nil {
 		aigateway.Error(w, 503, "provider_catalog_unavailable")
 		return
@@ -523,11 +523,27 @@ func (s *server) reserveAIRequestFor(ctx context.Context, id, project, branch, a
 	if protocol == "" {
 		protocol = "chat_completions"
 	}
-	_, e = tx.Exec(ctx, `INSERT INTO ai_gateway_requests(id,project_id,branch_id,actor_id,credential_id,model_id,route_generation,streaming,state,expires_at,protocol) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'running',clock_timestamp()+make_interval(secs=>$9),$10)`, id, project, branch, actor, cid, q.Model, cfg.Generation, q.Stream, cfg.TimeoutSeconds+10, protocol)
+	route, found := cfg.Find(q.Model)
+	if !found {
+		return false, errors.New("unknown model route")
+	}
+	var org string
+	if e = tx.QueryRow(ctx, `SELECT p.org_id FROM projects p JOIN branches b ON b.project_id=p.id WHERE p.id=$1 AND b.id=$2`, project, branch).Scan(&org); e != nil {
+		return false, e
+	}
+	billingOwner := "platform"
+	var billingOrg any
+	if route.OwnerOrgID != "" {
+		if route.OwnerOrgID != org {
+			return false, errors.New("provider organization scope denied")
+		}
+		billingOwner = "organization_byok"
+		billingOrg = org
+	}
+	_, e = tx.Exec(ctx, `INSERT INTO ai_gateway_requests(id,project_id,branch_id,actor_id,credential_id,model_id,route_generation,streaming,state,expires_at,protocol,billing_owner,billing_org_id,provider_id,provider_revision_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'running',clock_timestamp()+make_interval(secs=>$9),$10,$11,$12,NULLIF($13,''),NULLIF($14,''))`, id, project, branch, actor, cid, q.Model, cfg.Generation, q.Stream, cfg.TimeoutSeconds+10, protocol, billingOwner, billingOrg, route.ProviderID, route.RevisionID)
 	if e != nil {
 		return false, e
 	}
-	route, _ := cfg.Find(q.Model)
 	if e = reserveAIBudget(ctx, tx, id, branch, route, q.MaxTokens); e != nil {
 		return false, e
 	}

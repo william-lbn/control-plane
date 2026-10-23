@@ -12,7 +12,13 @@ import {
 import type { AIProtocol } from './protocols';
 import { newRequestKey } from '../../shared/requestKey';
 
-type Model = { id: string; name: string; max_output_tokens: number; protocols: string[] };
+type Model = {
+  id: string;
+  name: string;
+  max_output_tokens: number;
+  protocols: string[];
+  billing_owner: string;
+};
 type Catalog = { enabled: boolean; models: Model[]; public_endpoint: string };
 type Budget = {
   policy: {
@@ -36,6 +42,7 @@ type Usage = {
   items: {
     id: string;
     model_id: string;
+    billing_owner: string;
     state: string;
     total_tokens: number | null;
     duration_ms: number | null;
@@ -345,6 +352,7 @@ export function AIGateway({
                 {catalog.models.map((m) => (
                   <option key={m.id} value={m.id}>
                     {m.name} · {m.id}
+                    {m.billing_owner === 'organization_byok' ? ' · 组织自有账户' : ''}
                   </option>
                 ))}
               </select>
@@ -464,6 +472,7 @@ export function AIGateway({
                 <tr>
                   <th>请求</th>
                   <th>模型</th>
+                  <th>费用归属</th>
                   <th>状态</th>
                   <th>Token</th>
                   <th>耗时</th>
@@ -475,6 +484,9 @@ export function AIGateway({
                   <tr key={item.id}>
                     <td>{item.id}</td>
                     <td>{item.model_id}</td>
+                    <td>
+                      {item.billing_owner === 'organization_byok' ? '组织供应商账户' : '平台额度'}
+                    </td>
                     <td>{item.state}</td>
                     <td>{item.total_tokens ?? '未确定'}</td>
                     <td>{item.duration_ms === null ? '—' : `${item.duration_ms} ms`}</td>

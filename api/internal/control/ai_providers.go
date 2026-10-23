@@ -90,6 +90,12 @@ func (s *server) aiProviderMutation(w http.ResponseWriter, r *http.Request, inpu
 		aiProviderFailure(w, r, err)
 		return
 	}
+	if org := r.PathValue("org"); org != "" {
+		if err = aiProviderOrganizationActor(r.Context(), tx, org, actor); err != nil {
+			aiProviderFailure(w, r, err)
+			return
+		}
+	}
 	var stored string
 	var response []byte
 	var status int
@@ -175,10 +181,10 @@ func providerNameValid(name string) bool {
 	}
 	return true
 }
-func providerLocked(ctx context.Context, tx pgx.Tx, id string, version int64) (string, error) {
+func providerLocked(ctx context.Context, tx pgx.Tx, id string, version int64, org string) (string, error) {
 	var current int64
 	var state string
-	err := tx.QueryRow(ctx, `SELECT version,state FROM ai_providers WHERE id=$1 FOR UPDATE`, id).Scan(&current, &state)
+	err := tx.QueryRow(ctx, `SELECT version,state FROM ai_providers WHERE id=$1 AND org_id IS NOT DISTINCT FROM NULLIF($2,'') FOR UPDATE`, id, org).Scan(&current, &state)
 	if isNoRows(err) || err == nil && state == "deleted" {
 		return "", providerProblem(404, "not_found", "Provider not found")
 	}
@@ -191,7 +197,7 @@ func providerLocked(ctx context.Context, tx pgx.Tx, id string, version int64) (s
 	return state, nil
 }
 func (s *server) aiProviderDraft(w http.ResponseWriter, r *http.Request) {
-	if !s.requireAIProviderOperator(w, r) {
+	if !s.requireAIProviderManager(w, r) {
 		return
 	}
 	var input aiProviderDraftInput
@@ -211,14 +217,14 @@ func (s *server) aiProviderDraft(w http.ResponseWriter, r *http.Request) {
 		}
 		if creating {
 			var count int
-			if err := tx.QueryRow(r.Context(), `SELECT count(*) FROM ai_providers WHERE state<>'deleted'`).Scan(&count); err != nil {
+			if err := tx.QueryRow(r.Context(), `SELECT count(*) FROM ai_providers WHERE state<>'deleted' AND org_id IS NOT DISTINCT FROM NULLIF($1,'')`, r.PathValue("org")).Scan(&count); err != nil {
 				return nil, 0, err
 			}
 			if count >= 16 {
 				return nil, 0, providerProblem(429, "provider_quota_exceeded", "At most 16 provider definitions are allowed")
 			}
 			id = newID("aip_")
-		} else if _, err := providerLocked(r.Context(), tx, id, input.Version); err != nil {
+		} else if _, err := providerLocked(r.Context(), tx, id, input.Version, r.PathValue("org")); err != nil {
 			return nil, 0, err
 		}
 		kind := aigateway.ProviderType(input.ProviderType)
@@ -235,6 +241,9 @@ func (s *server) aiProviderDraft(w http.ResponseWriter, r *http.Request) {
 		var sealed any
 		var source, previous any
 		credential := input.Credential
+		if r.PathValue("org") != "" && credential.Mode != "sealed" && credential.Mode != "reuse" {
+			return nil, 0, providerProblem(422, "organization_credential_required", "Organization BYOK requires its own new or same-provider tested credential")
+		}
 		switch credential.Mode {
 		case "none":
 			if credential.Secret != "" || credential.SourceID != "" || credential.ReuseRevisionID != "" {
@@ -277,7 +286,7 @@ func (s *server) aiProviderDraft(w http.ResponseWriter, r *http.Request) {
 			return nil, 0, providerProblem(422, "invalid_credential", "Choose no authentication, a new key, an approved source or the tested credential")
 		}
 		if creating {
-			_, err = tx.Exec(r.Context(), `INSERT INTO ai_providers(id,name,created_by) VALUES($1,$2,$3)`, id, input.Name, userFrom(r).ID)
+			_, err = tx.Exec(r.Context(), `INSERT INTO ai_providers(id,name,created_by,org_id) VALUES($1,$2,$3,NULLIF($4,''))`, id, input.Name, userFrom(r).ID, r.PathValue("org"))
 			if err != nil {
 				return nil, 0, err
 			}
@@ -300,12 +309,12 @@ func (s *server) aiProviderDraft(w http.ResponseWriter, r *http.Request) {
 const aiProviderReadColumns = `id,name,version,state,active_publication_id,target_revision_id,created_by,created_at,updated_at`
 
 func (s *server) aiProviderRead(w http.ResponseWriter, r *http.Request) {
-	if !s.requireAIProviderOperator(w, r) {
+	if !s.requireAIProviderManager(w, r) {
 		return
 	}
 	id := r.PathValue("provider")
 	if id == "" {
-		items, err := s.many(r.Context(), `SELECT `+aiProviderReadColumns+` FROM ai_providers WHERE state<>'deleted' ORDER BY created_at,id`)
+		items, err := s.many(r.Context(), `SELECT `+aiProviderReadColumns+` FROM ai_providers WHERE state<>'deleted' AND org_id IS NOT DISTINCT FROM NULLIF($1,'') ORDER BY created_at,id`, r.PathValue("org"))
 		if err != nil {
 			aiProviderFailure(w, r, err)
 			return
@@ -317,7 +326,7 @@ func (s *server) aiProviderRead(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 404, "not_found", "Provider not found")
 		return
 	}
-	provider, err := s.one(r.Context(), `SELECT `+aiProviderReadColumns+` FROM ai_providers WHERE id=$1 AND state<>'deleted'`, id)
+	provider, err := s.one(r.Context(), `SELECT `+aiProviderReadColumns+` FROM ai_providers WHERE id=$1 AND state<>'deleted' AND org_id IS NOT DISTINCT FROM NULLIF($2,'')`, id, r.PathValue("org"))
 	if isNoRows(err) {
 		fail(w, r, 404, "not_found", "Provider not found")
 		return
@@ -339,7 +348,7 @@ func (s *server) aiProviderRead(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, 200, record{"provider": provider, "revisions": revisions, "publications": publications})
 }
 func (s *server) aiProviderOperation(w http.ResponseWriter, r *http.Request) {
-	if !s.requireAIProviderOperator(w, r) {
+	if !s.requireAIProviderManager(w, r) {
 		return
 	}
 	id := r.PathValue("providerOperation")
@@ -347,7 +356,7 @@ func (s *server) aiProviderOperation(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 404, "not_found", "Provider operation not found")
 		return
 	}
-	item, err := s.one(r.Context(), `SELECT id,provider_id,revision_id,state,attempts,retryable,error_code,created_at,finished_at FROM ai_provider_operations WHERE id=$1`, id)
+	item, err := s.one(r.Context(), `SELECT id,provider_id,revision_id,state,attempts,retryable,error_code,created_at,finished_at FROM ai_provider_operations WHERE id=$1 AND EXISTS(SELECT 1 FROM ai_providers p WHERE p.id=ai_provider_operations.provider_id AND p.org_id IS NOT DISTINCT FROM NULLIF($2,''))`, id, r.PathValue("org"))
 	if isNoRows(err) {
 		fail(w, r, 404, "not_found", "Provider operation not found")
 		return
@@ -359,7 +368,7 @@ func (s *server) aiProviderOperation(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, 200, item)
 }
 func (s *server) aiProviderRetry(w http.ResponseWriter, r *http.Request) {
-	if !s.requireAIProviderOperator(w, r) {
+	if !s.requireAIProviderManager(w, r) {
 		return
 	}
 	id := r.PathValue("providerOperation")
@@ -369,7 +378,7 @@ func (s *server) aiProviderRetry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.aiProviderMutation(w, r, input, func(tx pgx.Tx) (record, int, error) {
-		tag, err := tx.Exec(r.Context(), `UPDATE ai_provider_operations o SET state='queued',error_code=NULL,retryable=false,finished_at=NULL,lease_owner=NULL,lease_expires_at=NULL FROM ai_providers p WHERE o.id=$1 AND o.actor_id=$2 AND o.state='failed' AND o.retryable AND o.attempts<5 AND p.id=o.provider_id AND p.state<>'deleted' AND p.target_revision_id=o.revision_id`, id, userFrom(r).ID)
+		tag, err := tx.Exec(r.Context(), `UPDATE ai_provider_operations o SET state='queued',error_code=NULL,retryable=false,finished_at=NULL,lease_owner=NULL,lease_expires_at=NULL FROM ai_providers p WHERE o.id=$1 AND o.actor_id=$2 AND o.state='failed' AND o.retryable AND o.attempts<5 AND p.id=o.provider_id AND p.state<>'deleted' AND p.target_revision_id=o.revision_id AND p.org_id IS NOT DISTINCT FROM NULLIF($3,'')`, id, userFrom(r).ID, r.PathValue("org"))
 		if err != nil {
 			return nil, 0, err
 		}
@@ -381,7 +390,7 @@ func (s *server) aiProviderRetry(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) aiProviderPublish(w http.ResponseWriter, r *http.Request) {
-	if !s.requireAIProviderOperator(w, r) {
+	if !s.requireAIProviderManager(w, r) {
 		return
 	}
 	id := r.PathValue("provider")
@@ -391,7 +400,7 @@ func (s *server) aiProviderPublish(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.aiProviderMutation(w, r, input, func(tx pgx.Tx) (record, int, error) {
-		if _, err := providerLocked(r.Context(), tx, id, input.Version); err != nil {
+		if _, err := providerLocked(r.Context(), tx, id, input.Version, r.PathValue("org")); err != nil {
 			return nil, 0, err
 		}
 		var models []string
@@ -413,7 +422,7 @@ func (s *server) aiProviderPublish(w http.ResponseWriter, r *http.Request) {
 				existing[route.ID] = true
 			}
 		}
-		rows, err := tx.Query(r.Context(), `SELECT pub.models FROM ai_providers p JOIN ai_provider_publications pub ON pub.id=p.active_publication_id AND pub.provider_id=p.id WHERE p.state='active' AND p.id<>$1`, id)
+		rows, err := tx.Query(r.Context(), `SELECT pub.models FROM ai_providers p JOIN ai_provider_publications pub ON pub.id=p.active_publication_id AND pub.provider_id=p.id WHERE p.state='active' AND p.id<>$1 AND (p.org_id IS NULL OR p.org_id=NULLIF($2,''))`, id, r.PathValue("org"))
 		if err != nil {
 			return nil, 0, err
 		}
@@ -435,6 +444,23 @@ func (s *server) aiProviderPublish(w http.ResponseWriter, r *http.Request) {
 		}
 		if err = validateProviderPublication(input.Models, models, existing); err != nil {
 			return nil, 0, err
+		}
+		if r.PathValue("org") == "" {
+			aliases := []string{}
+			for _, m := range input.Models {
+				aliases = append(aliases, m.ID)
+			}
+			var conflict, full bool
+			err = tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM ai_providers p JOIN ai_provider_publications pub ON pub.id=p.active_publication_id AND pub.provider_id=p.id CROSS JOIN LATERAL jsonb_array_elements(pub.models) m WHERE p.state='active' AND p.org_id IS NOT NULL AND m->>'id'=ANY($1::text[])),EXISTS(SELECT 1 FROM ai_providers p JOIN ai_provider_publications pub ON pub.id=p.active_publication_id AND pub.provider_id=p.id WHERE p.state='active' AND p.org_id IS NOT NULL GROUP BY p.org_id HAVING sum(jsonb_array_length(pub.models))+$2>100)`, aliases, len(existing)).Scan(&conflict, &full)
+			if err != nil {
+				return nil, 0, err
+			}
+			if conflict {
+				return nil, 0, providerProblem(409, "model_alias_conflict", "Model alias already belongs to an approved route")
+			}
+			if full {
+				return nil, 0, providerProblem(429, "model_catalog_quota_exceeded", "Shared catalog expansion would exceed an organization catalog limit")
+			}
 		}
 		for _, model := range input.Models {
 			if !aigateway.ProviderProtocolsValid(kind, model.Protocols) {
@@ -481,7 +507,7 @@ func validateProviderPublication(entries []aiProviderModel, discovered []string,
 	return nil
 }
 func (s *server) aiProviderDisable(w http.ResponseWriter, r *http.Request) {
-	if !s.requireAIProviderOperator(w, r) {
+	if !s.requireAIProviderManager(w, r) {
 		return
 	}
 	id := r.PathValue("provider")
@@ -491,7 +517,7 @@ func (s *server) aiProviderDisable(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.aiProviderMutation(w, r, input, func(tx pgx.Tx) (record, int, error) {
-		state, err := providerLocked(r.Context(), tx, id, input.Version)
+		state, err := providerLocked(r.Context(), tx, id, input.Version, r.PathValue("org"))
 		if err != nil {
 			return nil, 0, err
 		}

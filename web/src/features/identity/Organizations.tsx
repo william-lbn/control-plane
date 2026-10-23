@@ -1,3 +1,4 @@
+import { AIOrganizationProviders } from '../ai/AIOrganizationProviders';
 import { ConsoleSessions } from './ConsoleSessions';
 import { ConsoleMFA } from './ConsoleMFA';
 import { HistoryPolicy } from './HistoryPolicy';
@@ -109,7 +110,13 @@ export function Organizations({
       <ConsoleMFA />
       <HistoryPolicy />
       {organization && isAdmin && (
-        <AICredits key={organization.id} organizationId={organization.id} />
+        <>
+          <AICredits key={organization.id} organizationId={organization.id} />
+          <AIOrganizationProviders
+            key={'byok-' + organization.id}
+            organizationId={organization.id}
+          />
+        </>
       )}
       <section className="panel identity-panel">
         <h2>创建组织</h2>

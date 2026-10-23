@@ -28,6 +28,9 @@ func aiCreditOrgLock(ctx context.Context, tx pgx.Tx, org string) error {
 }
 
 func reserveAICredits(ctx context.Context, tx pgx.Tx, id, branch string, route aigateway.Route, maxOutput int) error {
+	if route.OwnerOrgID != "" {
+		return nil
+	} // BYOK vendor fees are paid by the organization supplier account.
 	var org, project string
 	err := tx.QueryRow(ctx, `SELECT p.org_id,p.id FROM branches b JOIN projects p ON p.id=b.project_id WHERE b.id=$1`, branch).Scan(&org, &project)
 	if err != nil {
