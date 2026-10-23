@@ -1,0 +1,134 @@
+{
+  "recorded_at": "2026-10-23T13:20:27.178101+08:00",
+  "overall": "active/incomplete; safe bootstrap Renderer and actual config consumer gate, not full public creation worker or budget/VM permit",
+  "scope": "PG17 only; other majors deferred; existing canonical branch in each fork; no repeated unchanged functional tests",
+  "control_plane_code_commit": "7c5da7fee6c60c8c73270647f46f1c277d65d6cb",
+  "neon_gate_code_commit": "a9ce6453b4ff00bff61ecf511f8e447f61e95f91",
+  "pg_commit": "fcada44b67d239aea8e699a721b99c470fc24d65",
+  "autoscaling_commit": "8e1e0ea93d5f2775376622a38ed10f39d9d1fc8c",
+  "canonical_branches": {
+    "neon": "codex/dsga-neon-v3-20261019",
+    "postgres": "codex/dsga-pg17-v3-20261019",
+    "control-plane": "codex/dsga-control-plane-v3-20261020",
+    "autoscaling": "codex/dsga-autoscaling-20261019"
+  },
+  "upstream_snapshot": {
+    "checked_at": "2026-10-23T13:00:38.597320+08:00",
+    "refs": [
+      {
+        "repo": "repos/neon",
+        "ref": "upstream/main",
+        "sha": "fa504217c61bbcaf5c512d75830564541f917f8f",
+        "included": true
+      },
+      {
+        "repo": "repos/autoscaling",
+        "ref": "upstream/main",
+        "sha": "a4bce09e4d6bd7932ea634a1ed79afe26a9cfd1f",
+        "included": true
+      },
+      {
+        "repo": "repos/neon/vendor/postgres-v17",
+        "ref": "neon-upstream/REL_17_STABLE_neon",
+        "sha": "56692dfb680281a963c7470fc7f0fec7f65ecfd4",
+        "included": true
+      },
+      {
+        "repo": "repos/neon/vendor/postgres-v17",
+        "ref": "pg-upstream/REL_17_STABLE",
+        "sha": "e05b7e2a45c7a151ad3f8771ba7f5d8b4ddd8d0c",
+        "included": true
+      },
+      {
+        "repo": "repos/control-plane",
+        "ref": "origin/main",
+        "sha": "6db7bd74732d1a8000e210e006ab97226831d7ca",
+        "included": true
+      }
+    ]
+  },
+  "actual_execution": {
+    "go_top_level_passed": 4,
+    "go_pass_events": 15,
+    "go_seconds": 3.191,
+    "go_race": true,
+    "rust_passed": 1,
+    "rust_seconds": 0.0,
+    "sample_modes": [
+      "read_write",
+      "read_only"
+    ],
+    "fail": 0,
+    "skip": 0,
+    "ignored": 0,
+    "note": "no PG/VM startup; Go typed Kube creation barrier uses TLS API fixture, not real K8s apiserver",
+    "rust_filtered": 0,
+    "go_selection": "^TestDSGARenderer; unchanged old tests intentionally not run"
+  },
+  "tested_source_sha256": {
+    "/Users/williamlee/github/neon-self-dev/repos/control-plane/api/internal/control/dsga_renderer.go": "ad69d7dbff9686dc4301b4a93942c5db6041f09211fcfac904c3e36d229beba5",
+    "/Users/williamlee/github/neon-self-dev/repos/control-plane/api/internal/control/dsga_renderer_test.go": "b7be8f4cec008b9b22bcba760a94e77ac95fd843049fec988b24e5d8bc2c43b1",
+    "/Users/williamlee/github/neon-self-dev/repos/control-plane/api/internal/control/dsga_creation.go": "40b67194d6d9a2c4e0377d6721eb7d8887f39e497d6d9e23cd2a512b817c7a43",
+    "/Users/williamlee/github/neon-self-dev/repos/control-plane/api/internal/control/dsga_creation_plan.go": "d845674612dbc21fc878b7635ba5016b747ffbc199f50693165947248e2f44e8",
+    "/Users/williamlee/github/neon-self-dev/repos/control-plane/api/internal/functionsql/identity.go": "f818ac7bd7cbdec6017f028104998f6ea5e6106af3ffdf878dfb37e75ce5e1c1",
+    "/Users/williamlee/github/neon-self-dev/repos/neon/compute_tools/tests/dsg_renderer_contract.rs": "3298d7c1a266b63860aca40f07bb34438867d7a8ec4926be7815413a6646feb8",
+    "/Users/williamlee/github/neon-self-dev/repos/neon/compute_tools/src/compute.rs": "53ae573ff361d7a2878f47f93f436463b3e549610e59390ca0d170e62d05dec4",
+    "/Users/williamlee/github/neon-self-dev/repos/neon/compute_tools/src/dsg_roles.rs": "16b04ec616139085b384964faabfe90416cba92fea12900bb98ffc5a8fac2d4e",
+    "/Users/williamlee/github/neon-self-dev/repos/neon/libs/compute_api/src/spec.rs": "45f1228955c2ca8bcd96a0b79603c30c50147efc9e8ada74c885a579eb4e2e61",
+    "/Users/williamlee/github/neon-self-dev/repos/neon/libs/compute_api/src/responses.rs": "a04e5d94dd14f431025de239df4ad8c4910fc224da3918425469b38d235bd7af",
+    "/Users/williamlee/github/neon-self-dev/repos/neon/ci/test_dsg_renderer.py": "2ea818fb47db8ddc36b1cb9088f6c0a2aa87b496db2a3802f820af7ad7f64cc7",
+    "/Users/williamlee/github/neon-self-dev/repos/neon/ci/test_dsg_creation_plan.py": "023950ee5e9b810159623fa289422ef77a0a653f9e72d3edfbd0b84849752f8b"
+  },
+  "final_source_sha256": {
+    "repos/control-plane/api/internal/control/dsga_renderer.go": "ad69d7dbff9686dc4301b4a93942c5db6041f09211fcfac904c3e36d229beba5",
+    "repos/control-plane/api/internal/control/dsga_renderer_test.go": "b7be8f4cec008b9b22bcba760a94e77ac95fd843049fec988b24e5d8bc2c43b1",
+    "repos/control-plane/api/internal/control/dsga_creation.go": "40b67194d6d9a2c4e0377d6721eb7d8887f39e497d6d9e23cd2a512b817c7a43",
+    "repos/control-plane/api/internal/control/dsga_creation_plan.go": "d845674612dbc21fc878b7635ba5016b747ffbc199f50693165947248e2f44e8",
+    "repos/control-plane/api/internal/functionsql/identity.go": "f818ac7bd7cbdec6017f028104998f6ea5e6106af3ffdf878dfb37e75ce5e1c1",
+    "repos/neon/compute_tools/tests/dsg_renderer_contract.rs": "91cb6af00bbb2846521f9098880afda7ca01a4feaf4b141f6912bcd21aeca487",
+    "repos/neon/compute_tools/src/compute.rs": "53ae573ff361d7a2878f47f93f436463b3e549610e59390ca0d170e62d05dec4",
+    "repos/neon/compute_tools/src/dsg_roles.rs": "16b04ec616139085b384964faabfe90416cba92fea12900bb98ffc5a8fac2d4e",
+    "repos/neon/libs/compute_api/src/spec.rs": "45f1228955c2ca8bcd96a0b79603c30c50147efc9e8ada74c885a579eb4e2e61",
+    "repos/neon/libs/compute_api/src/responses.rs": "a04e5d94dd14f431025de239df4ad8c4910fc224da3918425469b38d235bd7af",
+    "repos/neon/ci/test_dsg_renderer.py": "2ea818fb47db8ddc36b1cb9088f6c0a2aa87b496db2a3802f820af7ad7f64cc7",
+    "repos/neon/ci/test_dsg_creation_plan.py": "023950ee5e9b810159623fa289422ef77a0a653f9e72d3edfbd0b84849752f8b"
+  },
+  "formatting_only_reuse_proof": {
+    "before_sha256": "3298d7c1a266b63860aca40f07bb34438867d7a8ec4926be7815413a6646feb8",
+    "after_sha256": "91cb6af00bbb2846521f9098880afda7ca01a4feaf4b141f6912bcd21aeca487",
+    "all_nonwhitespace_tokens_and_string_literals_identical": true,
+    "functional_test_replayed": false
+  },
+  "static": {
+    "go_full_vet": "passed",
+    "linux_amd64_cmd_cross_build": "passed; CGO0, not Linux execution",
+    "affected_clippy": "passed38.75s; existing dependency warnings only",
+    "rustfmt": "pinned1.88 checked; initial deprecated binary unsupported flags retained in tool transcript",
+    "python_syntax": "passed"
+  },
+  "negative_or_environment_failure": "first clippy omitted SDK/CC, jemalloc C compiler exit77; retained failed log, corrected SDK/CC passed with unchanged business source",
+  "remaining_coding": [
+    "original credentials Secret UID/content binding and full frozen catalog projection",
+    "actual public creation selection and real worker, VM template/TLS source mounting and original authenticated initialization receipt",
+    "full budgets/quiesce and final Monitor/Scheduler/Controller/Runner owner fences",
+    "full Neon storage E2E"
+  ],
+  "linux_not_run": [
+    "real K8s/TokenReview/Lease/admission/UID",
+    "Linux Provider/HugeTLB/KVM/NeonVM/HostGuest physical reclaim/migration",
+    "performance/fault/long-run and real storage load"
+  ],
+  "release": "default off; no images/deployment preparation/execution/main merge/production",
+  "evidence_sha256": {
+    "build/dsga-renderer-mac-new1/metadata.json": "03c3b20316ddb13de245a32f15fb748f44d1fd098febee008165d7ee86187500",
+    "build/dsga-renderer-mac-new1/go.jsonl": "732d0c47ff754b28bc8b5aa9be50cd167aef5f6720737b228d38bb3b96ad29bc",
+    "build/dsga-renderer-mac-new1/rust.log": "a9abf7bedc93992be3a2464456458cb02b9776fca4872e225d3fcc35f4344ebd",
+    "build/dsga-renderer-mac-new1/go-renderer.json": "996e5f1a8777c38f127f2316ded8764ebf71b5ab45b1fd85423967ed0f68e6e5",
+    "build/dsga-renderer-rustfmt-proof.json": "0e2ae1c6e6bc43b67d071d7bd6bb3b91217c63ba4b6fd2d0e377e4ef9e89bc6b",
+    "build/dsga-renderer-clippy.log": "1003bc63933ab2f85041c51f6167c2ef7857e0ef61392d1e4f4008b9fa41773e",
+    "build/dsga-renderer-clippy-without-sdk-failed.log": "fd6c2d5e5ae27845961747e0dfaaf750e8bbffdeefe53e49239985e6bf425193",
+    "build/dsga-renderer-vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "build/dsga-renderer-linux-cli.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "build/dsga-hba-upstream-publish.json": "8b0343604783a6d6bf95cd43fe4178cae053165dc538dd91e5740769eed33bdd"
+  }
+}
