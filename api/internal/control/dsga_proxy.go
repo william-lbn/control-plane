@@ -161,7 +161,12 @@ func (proxy *dsgaProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		known = r.Method == http.MethodGet
 	case "/dsg/v1/resize", "/dsg/v1/issuer/fence":
 		execution, known = true, r.Method == http.MethodPost
-	case "/dsg/v1/resize/status", "/dsg/v1/resize/cancel":
+	case "/dsg/v1/resize/status", "/dsg/v1/resize/cancel",
+		"/dsg/v1/admission", "/dsg/v1/admission/status",
+		"/dsg/v1/admission/close-original", "/dsg/v1/admission/close-original/status":
+		// 准入写入也走独立观察连接池：关闭必须能在resize阻塞时到达PG。
+		// 这里只扩展固定路由名单，仍逐次核验原VM/Service/current owner；
+		// 原生Rust按完整请求再核对执行epoch，网关不代造预算或执行回执。
 		known = r.Method == http.MethodPost
 	default:
 		known = false

@@ -150,7 +150,7 @@ func proxyRequest(t *testing.T, client *http.Client, method, address, token stri
 	return response.StatusCode, data
 }
 
-func TestDSGAProxyAllSevenRoutesPreserveOriginalBytesAndCredential(t *testing.T) {
+func TestDSGAProxyExplicitRoutesPreserveOriginalBytesAndCredential(t *testing.T) {
 	var calls atomic.Int32
 	_, client, base, token := proxyFixture(t, func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
@@ -166,7 +166,7 @@ func TestDSGAProxyAllSevenRoutesPreserveOriginalBytesAndCredential(t *testing.T)
 		w.Header().Set("Location", "https://foreign.invalid")
 		_, _ = w.Write([]byte(`{"native_fact_fixture":true}`))
 	})
-	for _, path := range []string{"capabilities", "memory", "initialization", "resize", "resize/status", "resize/cancel", "issuer/fence"} {
+	for _, path := range []string{"capabilities", "memory", "initialization", "resize", "resize/status", "resize/cancel", "issuer/fence", "admission", "admission/status", "admission/close-original", "admission/close-original/status"} {
 		method, body := http.MethodPost, []byte(`{"issuer_epoch":"18446744073709551615"}`)
 		if path == "capabilities" || path == "memory" || path == "initialization" {
 			method, body = http.MethodGet, nil
@@ -176,7 +176,7 @@ func TestDSGAProxyAllSevenRoutesPreserveOriginalBytesAndCredential(t *testing.T)
 			t.Fatalf("route %s got %d", path, code)
 		}
 	}
-	if calls.Load() != 7 {
+	if calls.Load() != 11 {
 		t.Fatal("not all native calls ran")
 	}
 }
@@ -271,7 +271,7 @@ func TestDSGAProxyObservationIndependentFromBlockedExecution(t *testing.T) {
 	case <-time.After(3 * time.Second):
 		t.Fatal("execution did not enter")
 	}
-	for _, path := range []string{"memory", "resize/status", "resize/cancel"} {
+	for _, path := range []string{"memory", "resize/status", "resize/cancel", "admission", "admission/status", "admission/close-original", "admission/close-original/status"} {
 		method, body := http.MethodPost, []byte(`{}`)
 		if path == "memory" {
 			method, body = http.MethodGet, nil
