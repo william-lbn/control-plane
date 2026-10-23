@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.77.0",
+    "version": "0.78.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -5185,6 +5185,27 @@
           "size": {
             "type": "integer",
             "minimum": 0
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StorageTag"
+            },
+            "maxItems": 10
+          },
+          "response_headers": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "content-disposition": {
+                "type": "string",
+                "maxLength": 1024
+              },
+              "cache-control": {
+                "type": "string",
+                "maxLength": 1024
+              }
+            }
           }
         },
         "required": [
@@ -5279,6 +5300,27 @@
             "type": "integer",
             "minimum": 0,
             "maximum": 67108864
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StorageTag"
+            },
+            "maxItems": 10
+          },
+          "response_headers": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "content-disposition": {
+                "type": "string",
+                "maxLength": 1024
+              },
+              "cache-control": {
+                "type": "string",
+                "maxLength": 1024
+              }
+            }
           }
         },
         "required": [
@@ -8369,6 +8411,421 @@
         },
         "required": [
           "error"
+        ]
+      },
+      "StorageTag": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 256
+          }
+        },
+        "required": [
+          "key",
+          "value"
+        ]
+      },
+      "StoragePublicAccessBlock": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "block_public_acls": {
+            "type": "boolean"
+          },
+          "ignore_public_acls": {
+            "type": "boolean"
+          },
+          "block_public_policy": {
+            "type": "boolean"
+          },
+          "restrict_public_buckets": {
+            "type": "boolean"
+          }
+        }
+      },
+      "StorageVersioning": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "",
+              "Enabled",
+              "Suspended"
+            ]
+          },
+          "mfa_delete": {
+            "type": "string",
+            "enum": [
+              "",
+              "Disabled"
+            ]
+          }
+        }
+      },
+      "StorageLifecycleAnd": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "prefix": {
+            "type": "string",
+            "maxLength": 1024
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StorageTag"
+            },
+            "maxItems": 50
+          }
+        }
+      },
+      "StorageLifecycleFilter": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "prefix": {
+            "type": "string",
+            "maxLength": 1024
+          },
+          "tag": {
+            "$ref": "#/components/schemas/StorageTag"
+          },
+          "and": {
+            "$ref": "#/components/schemas/StorageLifecycleAnd"
+          }
+        }
+      },
+      "StorageExpiration": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 36500
+          },
+          "date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expired_object_delete_marker": {
+            "type": "boolean"
+          }
+        }
+      },
+      "StorageTransition": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "days": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 36500
+          },
+          "date": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "storage_class": {
+            "type": "string",
+            "enum": [
+              "STANDARD_IA",
+              "ONEZONE_IA",
+              "INTELLIGENT_TIERING",
+              "GLACIER",
+              "DEEP_ARCHIVE",
+              "GLACIER_IR"
+            ]
+          }
+        },
+        "required": [
+          "storage_class"
+        ]
+      },
+      "StorageLifecycleRule": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 255
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "Enabled",
+              "Disabled"
+            ]
+          },
+          "prefix": {
+            "type": "string",
+            "maxLength": 1024
+          },
+          "filter": {
+            "$ref": "#/components/schemas/StorageLifecycleFilter"
+          },
+          "expiration": {
+            "$ref": "#/components/schemas/StorageExpiration"
+          },
+          "transitions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StorageTransition"
+            },
+            "maxItems": 10
+          },
+          "abort_incomplete_multipart_upload": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "days_after_initiation": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 36500
+              }
+            },
+            "required": [
+              "days_after_initiation"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "StorageLifecycle": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StorageLifecycleRule"
+            },
+            "maxItems": 1000,
+            "minItems": 1
+          }
+        },
+        "required": [
+          "rules"
+        ],
+        "description": "Stored configuration only. Expiration, transitions and multipart cleanup rules are not executed."
+      },
+      "StorageRetention": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "type": "string",
+            "enum": [
+              "GOVERNANCE",
+              "COMPLIANCE"
+            ]
+          },
+          "days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 36500
+          },
+          "years": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "mode"
+        ]
+      },
+      "StorageObjectLock": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "object_lock_enabled": {
+            "type": "string",
+            "const": "Enabled"
+          },
+          "rule": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "default_retention": {
+                "$ref": "#/components/schemas/StorageRetention"
+              }
+            },
+            "required": [
+              "default_retention"
+            ]
+          }
+        },
+        "required": [
+          "object_lock_enabled"
+        ],
+        "description": "Stored configuration only. Object retention, legal hold and WORM enforcement are not provided."
+      },
+      "StorageBucketSettings": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "tags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StorageTag"
+            },
+            "maxItems": 50
+          },
+          "public_access_block": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StoragePublicAccessBlock"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "versioning": {
+            "$ref": "#/components/schemas/StorageVersioning"
+          },
+          "lifecycle": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StorageLifecycle"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "object_lock": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/StorageObjectLock"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "StorageObjectSettings": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "tags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StorageTag"
+            },
+            "maxItems": 10
+          },
+          "response_headers": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "content-disposition": {
+                "type": "string",
+                "maxLength": 1024
+              },
+              "cache-control": {
+                "type": "string",
+                "maxLength": 1024
+              }
+            }
+          }
+        }
+      },
+      "StorageBucketSettingsResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "branch_id": {
+            "type": "string",
+            "maxLength": 1024
+          },
+          "bucket": {
+            "type": "string",
+            "maxLength": 63
+          },
+          "access": {
+            "type": "string",
+            "enum": [
+              "private",
+              "public_read"
+            ]
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9223372036854775807
+          },
+          "settings": {
+            "$ref": "#/components/schemas/StorageBucketSettings"
+          },
+          "lifecycle_rules_enforced": {
+            "type": "boolean",
+            "const": false
+          },
+          "object_versioning_enforced": {
+            "type": "boolean",
+            "const": false
+          },
+          "object_lock_retention_enforced": {
+            "type": "boolean",
+            "const": false
+          }
+        },
+        "required": [
+          "branch_id",
+          "bucket",
+          "access",
+          "version",
+          "settings",
+          "lifecycle_rules_enforced",
+          "object_versioning_enforced",
+          "object_lock_retention_enforced"
+        ]
+      },
+      "StorageObjectSettingsResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "branch_id": {
+            "type": "string",
+            "maxLength": 1024
+          },
+          "bucket": {
+            "type": "string",
+            "maxLength": 63
+          },
+          "key": {
+            "type": "string",
+            "maxLength": 1024
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "settings": {
+            "$ref": "#/components/schemas/StorageObjectSettings"
+          }
+        },
+        "required": [
+          "branch_id",
+          "bucket",
+          "key",
+          "sha256",
+          "settings"
         ]
       }
     },
@@ -28654,6 +29111,494 @@
                 "schema": {
                   "$ref": "#/components/schemas/AIInputGatewayError"
                 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/settings": {
+      "get": {
+        "operationId": "getStorageBucketSettings",
+        "tags": [
+          "Object Storage"
+        ],
+        "summary": "Read branch-owned typed settings",
+        "description": "Bucket lifecycle, versioning and object lock declarations are stored but do not execute retention, expiration or object versioning. Public access block is enforced for public access. No immutable object bytes are deleted.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bucket",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current or original immutable mutation receipt",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Idempotency-Replayed": {
+                "schema": {
+                  "type": "string",
+                  "const": "true"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageBucketSettingsResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Editor permission required for writes"
+          },
+          "404": {
+            "description": "Scoped object or bucket unavailable"
+          },
+          "409": {
+            "description": "Original key or public grant conflict"
+          },
+          "412": {
+            "description": "Settings or immutable byte identity changed"
+          },
+          "422": {
+            "description": "Invalid typed settings"
+          },
+          "428": {
+            "description": "Current ETag required"
+          },
+          "503": {
+            "description": "Metadata, native directory or configured key unavailable"
+          }
+        }
+      },
+      "put": {
+        "operationId": "putStorageBucketSettings",
+        "tags": [
+          "Object Storage"
+        ],
+        "summary": "Replace typed settings with current representation ETag and original-key replay",
+        "description": "Bucket lifecycle, versioning and object lock declarations are stored but do not execute retention, expiration or object versioning. Public access block is enforced for public access. No immutable object bytes are deleted.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bucket",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"[a-f0-9]{64}\"$"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "Required for Console cookie mutations.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current or original immutable mutation receipt",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Idempotency-Replayed": {
+                "schema": {
+                  "type": "string",
+                  "const": "true"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageBucketSettingsResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Editor permission required for writes"
+          },
+          "404": {
+            "description": "Scoped object or bucket unavailable"
+          },
+          "409": {
+            "description": "Original key or public grant conflict"
+          },
+          "412": {
+            "description": "Settings or immutable byte identity changed"
+          },
+          "422": {
+            "description": "Invalid typed settings"
+          },
+          "428": {
+            "description": "Current ETag required"
+          },
+          "503": {
+            "description": "Metadata, native directory or configured key unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "access": {
+                    "type": "string",
+                    "enum": [
+                      "private",
+                      "public_read"
+                    ]
+                  },
+                  "settings": {
+                    "$ref": "#/components/schemas/StorageBucketSettings"
+                  }
+                },
+                "required": [
+                  "access",
+                  "settings"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/storage/buckets/{bucket}/objects/settings": {
+      "get": {
+        "operationId": "getStorageObjectSettings",
+        "tags": [
+          "Object Storage"
+        ],
+        "summary": "Read branch-owned typed settings",
+        "description": "Bucket lifecycle, versioning and object lock declarations are stored but do not execute retention, expiration or object versioning. Public access block is enforced for public access. No immutable object bytes are deleted.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bucket",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 1024,
+              "minLength": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current or original immutable mutation receipt",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Idempotency-Replayed": {
+                "schema": {
+                  "type": "string",
+                  "const": "true"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageObjectSettingsResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Editor permission required for writes"
+          },
+          "404": {
+            "description": "Scoped object or bucket unavailable"
+          },
+          "409": {
+            "description": "Original key or public grant conflict"
+          },
+          "412": {
+            "description": "Settings or immutable byte identity changed"
+          },
+          "422": {
+            "description": "Invalid typed settings"
+          },
+          "428": {
+            "description": "Current ETag required"
+          },
+          "503": {
+            "description": "Metadata, native directory or configured key unavailable"
+          }
+        }
+      },
+      "put": {
+        "operationId": "putStorageObjectSettings",
+        "tags": [
+          "Object Storage"
+        ],
+        "summary": "Replace typed settings with current representation ETag and original-key replay",
+        "description": "Bucket lifecycle, versioning and object lock declarations are stored but do not execute retention, expiration or object versioning. Public access block is enforced for public access. No immutable object bytes are deleted.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "bucket",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "key",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 1024,
+              "minLength": 1
+            }
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\"[a-f0-9]{64}\"$"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "description": "Required for Console cookie mutations.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current or original immutable mutation receipt",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Idempotency-Replayed": {
+                "schema": {
+                  "type": "string",
+                  "const": "true"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageObjectSettingsResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Editor permission required for writes"
+          },
+          "404": {
+            "description": "Scoped object or bucket unavailable"
+          },
+          "409": {
+            "description": "Original key or public grant conflict"
+          },
+          "412": {
+            "description": "Settings or immutable byte identity changed"
+          },
+          "422": {
+            "description": "Invalid typed settings"
+          },
+          "428": {
+            "description": "Current ETag required"
+          },
+          "503": {
+            "description": "Metadata, native directory or configured key unavailable"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "settings": {
+                    "$ref": "#/components/schemas/StorageObjectSettings"
+                  }
+                },
+                "required": [
+                  "settings"
+                ]
               }
             }
           }

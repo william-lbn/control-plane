@@ -267,6 +267,9 @@ func s3StreamingObjectPUT(r *http.Request) bool {
 		return false
 	}
 	query := r.URL.Query()
+	if resource, valid := s3SettingResource(query); !valid || resource != "" {
+		return false
+	}
 	for _, name := range []string{"uploads", "uploadId", "partNumber", "cors", "location", "delete"} {
 		if query.Has(name) {
 			return false

@@ -61,7 +61,7 @@ func TestStorageMetadataEditRealPostgresCASAndS3Replacement(t *testing.T) {
 	if _, e = updateStorageMetadata(ctx, conn, p, "cors-bucket", "source.txt", storageMetadataState("br_other", "cors-bucket", "source.txt", p.ProjectID+"/blob_retained", strings.Repeat("a", 64), "text/plain", map[string]string{"purpose": "edited"}), "", map[string]string{}); e == nil {
 		t.Fatal("foreign branch metadata token allowed")
 	}
-	_, e = copyStorageObject(ctx, conn, p.ProjectID, "cors-bucket", "source.txt", "cors-bucket", "source.txt", strings.Repeat("a", 64), "", "", storageCopyMetadata{map[string]string{"purpose": "sdk-replaced"}, "application/json"})
+	_, e = copyStorageObject(ctx, conn, p.ProjectID, "cors-bucket", "source.txt", "cors-bucket", "source.txt", strings.Repeat("a", 64), "", "", storageCopyMetadata{Metadata: map[string]string{"purpose": "sdk-replaced"}, ContentType: "application/json"})
 	if e != nil {
 		t.Fatal(e)
 	}
@@ -70,7 +70,7 @@ func TestStorageMetadataEditRealPostgresCASAndS3Replacement(t *testing.T) {
 	if blob != p.ProjectID+"/blob_retained" || purpose != "sdk-replaced" || contentType != "application/json" {
 		t.Fatal("replacement broke immutable content or metadata")
 	}
-	if _, e = copyStorageObject(ctx, conn, p.ProjectID, "cors-bucket", "source.txt", "cors-bucket", "source.txt", strings.Repeat("b", 64), "", "", storageCopyMetadata{map[string]string{}, "text/plain"}); e == nil {
+	if _, e = copyStorageObject(ctx, conn, p.ProjectID, "cors-bucket", "source.txt", "cors-bucket", "source.txt", strings.Repeat("b", 64), "", "", storageCopyMetadata{Metadata: map[string]string{}, ContentType: "text/plain"}); e == nil {
 		t.Fatal("stale source replaced metadata")
 	}
 }

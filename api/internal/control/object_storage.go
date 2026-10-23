@@ -62,9 +62,9 @@ func (s *server) objectStorageRead(w http.ResponseWriter, r *http.Request) {
 		item["s3_endpoint"] = s3Origin() + "/s3/" + r.PathValue("branch")
 	}
 	item["s3_region"] = s3Region()
-	item["s3_supported"] = []string{"ListBuckets", "CreateBucket", "DeleteBucket", "HeadBucket", "GetBucketLocation", "ListObjects", "ListObjectsV2", "Delimiter", "CopyObjectBasic", "PutObject", "GetObject", "HeadObject", "DeleteObject", "DeleteObjects", "PresignedGet", "PresignedPut", "BucketCORS", "UserMetadata", "CopyObjectMetadataReplace", "CopyObjectSourceConditions", "SignedChunksWithoutTrailers", "CreateMultipartUpload", "UploadPart", "UploadPartCopy", "CompleteMultipartUpload", "AbortMultipartUpload", "ListMultipartUploads", "ListParts", "MultipartDelimiter", "StreamedPutObject", "StreamedGetObject", "FullObjectSHA256", "PayloadChecksums", "ByteRanges"}
+	item["s3_supported"] = []string{"ListBuckets", "CreateBucket", "DeleteBucket", "HeadBucket", "GetBucketLocation", "ListObjects", "ListObjectsV2", "Delimiter", "CopyObjectBasic", "PutObject", "GetObject", "HeadObject", "DeleteObject", "DeleteObjects", "PresignedGet", "PresignedPut", "BucketCORS", "UserMetadata", "CopyObjectMetadataReplace", "CopyObjectSourceConditions", "SignedChunksWithoutTrailers", "CreateMultipartUpload", "UploadPart", "UploadPartCopy", "CompleteMultipartUpload", "AbortMultipartUpload", "ListMultipartUploads", "ListParts", "MultipartDelimiter", "StreamedPutObject", "StreamedGetObject", "FullObjectSHA256", "PayloadChecksums", "ByteRanges", "BucketTagging", "ObjectTagging", "ReadOnlyACL", "ReadOnlyBucketPolicy", "StoredVersioningConfiguration", "StoredLifecycleConfiguration", "StoredObjectLockConfiguration", "PublicAccessBlock", "SelectedObjectAttributes", "AnonymousPublicRead", "BrowserPostPolicy", "SignedChecksumTrailers", "UnsignedChecksumTrailers", "ObjectResponseHeaders"}
 	item["multipart_administration_enabled"] = s.storage != nil
-	item["s3_missing"] = []string{"advanced_checksums", "anonymous_public_read", "streaming_trailers", "physical_gc"}
+	item["s3_missing"] = []string{"advanced_checksums", "object_attribute_parts", "physical_gc"}
 	item["limits"] = record{"object_bytes": storageObjectLimit, "part_bytes": storagePartLimit, "branch_bytes": storageBranchLimit, "buckets": 32, "objects": 1000, "active_uploads": multipartActiveLimit, "parts_per_upload": multipartPartLimit, "multipart_minimum_nonfinal_part_bytes": multipartMinimumPart}
 	w.Header().Set("ETag", fmt.Sprintf(`"%d"`, item["generation"].(int64)))
 	jsonResponse(w, 200, item)
@@ -520,7 +520,7 @@ func (s *server) storageObjects(w http.ResponseWriter, r *http.Request) {
 		s.storageFailure(w, r, err)
 		return
 	}
-	_, err = tx.Exec(r.Context(), `INSERT INTO neon_storage.objects(bucket,key,blob_key,sha256,size,content_type,metadata) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(bucket,key) DO UPDATE SET blob_key=$3,sha256=$4,size=$5,content_type=$6,metadata=$7,updated_at=now()`, bucket, key, blob, digest, data.Size, contentType, metadata)
+	_, err = tx.Exec(r.Context(), `INSERT INTO neon_storage.objects(bucket,key,blob_key,sha256,size,content_type,metadata) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(bucket,key) DO UPDATE SET blob_key=$3,sha256=$4,size=$5,content_type=$6,metadata=$7,tags='[]'::jsonb,response_headers='{}'::jsonb,updated_at=now()`, bucket, key, blob, digest, data.Size, contentType, metadata)
 	if err == nil {
 		err = s.publishStorageFunctionEvent(r.Context(), tx, p, bucket, key, digest, data.Size)
 	}
@@ -556,10 +556,11 @@ func storageWriteCondition(w http.ResponseWriter, r *http.Request, previous stri
 }
 func (s *server) serveStorageObject(w http.ResponseWriter, r *http.Request, conn *pgx.Conn, p objectStoragePayload, bucket, key string, anonymous bool) {
 	var blob, digest, contentType, access string
-	var metadata map[string]string
+	var settings storageBucketSettings
+	var metadata, responseHeaders map[string]string
 	var size int64
 	var modified time.Time
-	err := conn.QueryRow(r.Context(), `SELECT o.blob_key,o.sha256,o.size,o.content_type,o.updated_at,b.access,o.metadata FROM neon_storage.objects o JOIN neon_storage.buckets b ON b.name=o.bucket WHERE o.bucket=$1 AND o.key=$2`, bucket, key).Scan(&blob, &digest, &size, &contentType, &modified, &access, &metadata)
+	err := conn.QueryRow(r.Context(), `SELECT o.blob_key,o.sha256,o.size,o.content_type,o.updated_at,b.access,o.metadata,b.settings,o.response_headers FROM neon_storage.objects o JOIN neon_storage.buckets b ON b.name=o.bucket WHERE o.bucket=$1 AND o.key=$2`, bucket, key).Scan(&blob, &digest, &size, &contentType, &modified, &access, &metadata, &settings, &responseHeaders)
 	if err != nil {
 		s.storageFailure(w, r, err)
 		return
@@ -568,7 +569,7 @@ func (s *server) serveStorageObject(w http.ResponseWriter, r *http.Request, conn
 		s.storageFailure(w, r, errors.New("object identity mismatch"))
 		return
 	}
-	if anonymous && access != "public_read" && !s.validStorageDownload(r, p, bucket, key, blob) {
+	if anonymous && !storageAnonymousAllowed(access, settings) && !s.validStorageDownload(r, p, bucket, key, blob) {
 		fail(w, r, 404, "not_found", "Object not found")
 		return
 	}
@@ -591,6 +592,10 @@ func (s *server) serveStorageObject(w http.ResponseWriter, r *http.Request, conn
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Content-Security-Policy", "sandbox; default-src 'none'")
 	w.Header().Set("Cache-Control", "private, no-store")
+	if writeStorageResponseHeaders(w, responseHeaders) != nil {
+		s.storageFailure(w, r, errors.New("invalid stored headers"))
+		return
+	}
 	http.ServeContent(w, r, "", modified, source)
 }
 

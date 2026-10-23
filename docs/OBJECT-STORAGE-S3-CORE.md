@@ -1,6 +1,6 @@
 # Object Storage S3 基础兼容预览
 
-> 最新本地增量：目录/COPY/bulk、预签名 PUT、CORS、用户 metadata 已通过各自 UI 闭环，见 [当前交付](DELIVERY-2026-10-15-STORAGE-BROWSER.md)。下文历史基础兼容范围不代替当前版本。
+> 历史基础协议记录。当前范围见 [S3 设置、POST 与校验尾部](OBJECT-STORAGE-S3-SETTINGS.md)及[有界大对象](DELIVERY-2026-10-22-STORAGE-LARGE-OBJECTS.md)，实际验收见[最新 S3 交付](DELIVERY-2026-10-23-S3-SETTINGS.md)。下文早期实现细节不代替当前合同。
 
 ## 1. 目标、当前范围和官网差异
 
@@ -14,7 +14,7 @@ S3 服务为目标，[认证](https://neon.com/docs/storage/authentication) 使�
 GetBucketLocation、ListObjects/V2（flat/grouped delimiter、fetch-owner、分页）、Put/Get/Head/DeleteObject、单 Range、
 条件写、basic CopyObject、SigV4 Header 和预签名 GET。目录与复制的实际 UI/SDK 验收见
 [目录](OBJECT-STORAGE-DIRECTORIES.md)和[复制](DELIVERY-2026-10-15-OBJECT-COPY.md)。
-批量删除、CORS、ASCII 用户 metadata、metadata REPLACE、预签名 PUT 和 COPY 源 ETag/时间条件已有实现，具体实际验收以各自交付记录为准。源条件合同见 [COPY 条件](OBJECT-STORAGE-COPY-CONDITIONS.md)。尚缺 multipart、完整 checksum、anonymous public_read、STS、SigV4 checksum trailers 和大对象；单对象仍 8 MiB，分支 100 MiB/1000 objects。
+批量删除、CORS、ASCII 用户 metadata、metadata REPLACE、预签名 PUT 和 COPY 源 ETag/时间条件已有实现，具体实际验收以各自交付记录为准。源条件合同见 [COPY 条件](OBJECT-STORAGE-COPY-CONDITIONS.md)。当前 multipart、匿名公开读/阻断和签名/非签名校验尾部已验收；单对象 64 MiB、分片 8 MiB、分支可见字节 256 MiB。完整 checksum、ObjectParts 和物理 GC 仍缺；不提供 STS。
 官网最大单对象 5 GiB，不能用当前实验室配额声称等价。物理 GC/HA/DR/TLS 另行准入。
 
 ## 2. 组件、密钥与模型
@@ -57,7 +57,7 @@ URI 编码、scalar query、Host、sorted signed headers 和 SHA256 body；重�
 拒绝，不接受 SDK/proxy 对重复排序的不同解释。Header 时间窗 ±5 分钟；presign
 最长 86400 秒，但凭据到期/撤销先结束授权。实现有界的 `STREAMING-AWS4-HMAC-SHA256-PAYLOAD`，
 验证 seed、每块与末尾零块的链式签名，确认完整 decoded length 后才访问 SQL/blob。
-解码配额 8 MiB、wire overhead 最多 1 MiB、最多 4096 块；不接受 trailers/unsigned write/STS。
+当前解码配额 64 MiB、wire overhead 最多 1 MiB、最多 4096 块；支持经完整验证的签名及非签名校验尾部，普通无签名对象写入仍拒绝，不提供 STS。
 锁定 MinIO SDK 的普通 HTTP PutObject 会使用这种逐块签名，不能只用 SignV4 helper 验证兼容。
 算法参考 [AWS chained signing](https://docs.aws.amazon.com/AmazonS3/latest/API/sigv4-streaming.html)
 和 [MinIO 7.2.0 streaming signer](https://github.com/minio/minio-go/blob/v7.2.0/pkg/signer/request-signature-streaming.go)。
@@ -65,7 +65,7 @@ URI 编码、scalar query、Host、sorted signed headers 和 SHA256 body；重�
 ListObjectsV2 的 `fetch-owner=true` 返回已授权 branch ID 作为目录的对象 Owner，
 不暴露控制台或应用用户身份；`false` 省略 Owner。真实 MinIO SDK 与 PostgreSQL 清单
 验证了中文/空格 key、encoding-type=url 和 max-keys=1 的两页读取。其他未知子资源
-仍明确拒绝，不能通过忽略参数伪造 multipart/user metadata 支持。
+仍明确拒绝；multipart、用户 metadata 和新增设置子资源的当前合同分别以对应文档为准。
 
 S3 的普通 PUT 是授权的 unconditional overwrite；存在 If-Match/If-None-Match 时
 应用真实 precondition。它不伪造 Console REST v1 强制版本条件。清单变更由 branch

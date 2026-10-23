@@ -30,6 +30,9 @@ func (e *storageMutationFault) Error() string { return e.Code }
 type storageCopyMetadata struct {
 	Metadata    map[string]string
 	ContentType string
+	Tags        *[]storageTag
+	Headers     map[string]string
+	OnlyTags    bool
 }
 
 // One metadata transaction references the original immutable, project-owned
@@ -46,16 +49,30 @@ func copyStorageObjectWithConditions(ctx context.Context, conn *pgx.Conn, projec
 	var replacement *storageCopyMetadata
 	if len(replacements) == 1 {
 		replacement = &replacements[0]
-		value, e := normalizeStorageMetadata(replacement.Metadata)
-		if e != nil {
-			return nil, &storageMutationFault{400, "InvalidArgument"}
+		if replacement.Tags != nil {
+			tags, e := normalizeStorageTags(*replacement.Tags, 10)
+			if e != nil {
+				return nil, &storageMutationFault{400, "InvalidTag"}
+			}
+			replacement.Tags = &tags
 		}
-		replacement.Metadata = value
-		if len(replacement.ContentType) > 256 {
-			return nil, &storageMutationFault{400, "InvalidArgument"}
-		}
-		if _, _, e := mime.ParseMediaType(replacement.ContentType); e != nil {
-			return nil, &storageMutationFault{400, "InvalidArgument"}
+		if !replacement.OnlyTags {
+			value, e := normalizeStorageMetadata(replacement.Metadata)
+			if e != nil {
+				return nil, &storageMutationFault{400, "InvalidArgument"}
+			}
+			replacement.Metadata = value
+			if len(replacement.ContentType) > 256 {
+				return nil, &storageMutationFault{400, "InvalidArgument"}
+			}
+			if _, _, e := mime.ParseMediaType(replacement.ContentType); e != nil {
+				return nil, &storageMutationFault{400, "InvalidArgument"}
+			}
+			headers, e := normalizeStorageResponseHeaders(replacement.Headers)
+			if e != nil {
+				return nil, &storageMutationFault{400, "InvalidArgument"}
+			}
+			replacement.Headers = headers
 		}
 	}
 	if !storageBucketName.MatchString(srcBucket) || !storageBucketName.MatchString(dstBucket) || !validStorageKey(srcKey) || !validStorageKey(dstKey) || (srcBucket == dstBucket && srcKey == dstKey && replacement == nil) {
@@ -77,10 +94,11 @@ func copyStorageObjectWithConditions(ctx context.Context, conn *pgx.Conn, projec
 		return nil, &storageMutationFault{404, "NoSuchBucket"}
 	}
 	var blob, digest, contentType string
-	var metadata map[string]string
+	var metadata, responseHeaders map[string]string
+	var tags []storageTag
 	var size int64
 	var sourceModified time.Time
-	if e = tx.QueryRow(ctx, `SELECT blob_key,sha256,size,content_type,metadata,updated_at FROM neon_storage.objects WHERE bucket=$1 AND key=$2`, srcBucket, srcKey).Scan(&blob, &digest, &size, &contentType, &metadata, &sourceModified); e != nil {
+	if e = tx.QueryRow(ctx, `SELECT blob_key,sha256,size,content_type,metadata,updated_at,tags,response_headers FROM neon_storage.objects WHERE bucket=$1 AND key=$2`, srcBucket, srcKey).Scan(&blob, &digest, &size, &contentType, &metadata, &sourceModified, &tags, &responseHeaders); e != nil {
 		if errors.Is(e, pgx.ErrNoRows) {
 			return nil, &storageMutationFault{404, "NoSuchKey"}
 		}
@@ -93,8 +111,14 @@ func copyStorageObjectWithConditions(ctx context.Context, conn *pgx.Conn, projec
 		return nil, &storageMutationFault{412, "PreconditionFailed"}
 	}
 	if replacement != nil {
-		metadata = replacement.Metadata
-		contentType = replacement.ContentType
+		if replacement.Tags != nil {
+			tags = *replacement.Tags
+		}
+		if !replacement.OnlyTags {
+			metadata = replacement.Metadata
+			contentType = replacement.ContentType
+			responseHeaders = replacement.Headers
+		}
 	}
 	var oldDigest string
 	var oldSize int64
@@ -114,8 +138,8 @@ func copyStorageObjectWithConditions(ctx context.Context, conn *pgx.Conn, projec
 		return nil, &storageMutationFault{429, "QuotaExceeded"}
 	}
 	var modified time.Time
-	e = tx.QueryRow(ctx, `INSERT INTO neon_storage.objects(bucket,key,blob_key,sha256,size,content_type,metadata) VALUES($1,$2,$3,$4,$5,$6,$7)
- ON CONFLICT(bucket,key) DO UPDATE SET blob_key=$3,sha256=$4,size=$5,content_type=$6,metadata=$7,updated_at=now() RETURNING updated_at`, dstBucket, dstKey, blob, digest, size, contentType, metadata).Scan(&modified)
+	e = tx.QueryRow(ctx, `INSERT INTO neon_storage.objects(bucket,key,blob_key,sha256,size,content_type,metadata,tags,response_headers) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)
+ ON CONFLICT(bucket,key) DO UPDATE SET blob_key=$3,sha256=$4,size=$5,content_type=$6,metadata=$7,tags=$8,response_headers=$9,updated_at=now() RETURNING updated_at`, dstBucket, dstKey, blob, digest, size, contentType, metadata, tags, responseHeaders).Scan(&modified)
 	if e != nil {
 		return nil, e
 	}

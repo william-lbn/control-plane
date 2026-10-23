@@ -66,6 +66,12 @@ func (s *server) s3Invoke(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer done()
+	if s.s3BrowserPost(w, r) {
+		return
+	}
+	if s.s3AnonymousRead(w, r) {
+		return
+	}
 	signature, e := s3protocol.Parse(r, s3Region(), time.Now())
 	if e != nil {
 		s3Error(w, r, 403, "SignatureDoesNotMatch")
@@ -104,6 +110,13 @@ func (s *server) s3Invoke(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// The decoder has authenticated the seed and the complete entity. Promote
+	// only its verified checksum for the existing payload/part admission layer.
+	marker := r.Header.Get("X-Amz-Content-Sha256")
+	if marker == s3protocol.SignedTrailerPayload || marker == s3protocol.UnsignedTrailerPayload {
+		name := r.Header.Get("X-Amz-Trailer")
+		r.Header.Set(name, r.Trailer.Get(name))
+	}
 	target, objectPath := anchor, strings.TrimPrefix(r.URL.Path, "/")
 	if strings.HasPrefix(objectPath, "s3/") {
 		pieces := strings.SplitN(strings.TrimPrefix(objectPath, "s3/"), "/", 2)
@@ -163,6 +176,10 @@ func (s *server) s3Invoke(w http.ResponseWriter, r *http.Request) {
 		defer cancel()
 		s.db.Exec(usageCtx, `UPDATE backend_credentials SET last_used_at=now() WHERE id=$1`, signature.KeyID)
 	}()
+	if owner := r.Header.Get("X-Amz-Expected-Bucket-Owner"); owner != "" && owner != p.BranchID {
+		s3Error(w, r, 403, "AccessDenied")
+		return
+	}
 	r.SetPathValue("project", p.ProjectID)
 	r.SetPathValue("branch", target)
 	if objectPath == "" {
@@ -189,6 +206,17 @@ func (s *server) s3Invoke(w http.ResponseWriter, r *http.Request) {
 				applyStorageCORS(w, rule, origin, nil, false)
 			}
 		}
+	}
+	if key != "" && !validStorageKey(key) {
+		s3Error(w, r, 400, "InvalidArgument")
+		return
+	}
+	if query.Has("versionId") && query.Get("versionId") != "null" {
+		s3Error(w, r, 404, "NoSuchVersion")
+		return
+	}
+	if s.s3Settings(w, r, conn, p, bucket, key, data, query) {
+		return
 	}
 	if query.Has("uploads") || query.Has("uploadId") || query.Has("partNumber") {
 		s.s3Multipart(w, r, conn, p, "credential:"+signature.KeyID, bucket, key, data, query)
@@ -227,7 +255,8 @@ func (s *server) s3Invoke(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if source := r.Header.Get("X-Amz-Copy-Source"); source != "" {
-		var replacement []storageCopyMetadata
+		var replacements []storageCopyMetadata
+		var replacement storageCopyMetadata
 		if r.Header.Get("X-Amz-Metadata-Directive") == "REPLACE" {
 			metadata, e := metadataFromHeaders(r, true)
 			if e != nil {
@@ -238,7 +267,13 @@ func (s *server) s3Invoke(w http.ResponseWriter, r *http.Request) {
 			if contentType == "" {
 				contentType = "application/octet-stream"
 			}
-			replacement = []storageCopyMetadata{{metadata, contentType}}
+			headers, err := storageResponseHeaders(r)
+			if err != nil {
+				s3Error(w, r, 400, "InvalidArgument")
+				return
+			}
+			replacement = storageCopyMetadata{Metadata: metadata, ContentType: contentType, Headers: headers}
+			replacements = []storageCopyMetadata{replacement}
 		} else {
 			for header := range r.Header {
 				if strings.HasPrefix(strings.ToLower(header), "x-amz-meta-") {
@@ -247,13 +282,33 @@ func (s *server) s3Invoke(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-		for _, header := range []string{"X-Amz-Acl", "X-Amz-Tagging", "X-Amz-Tagging-Directive", "X-Amz-Storage-Class"} {
+		for _, header := range []string{"X-Amz-Acl", "X-Amz-Storage-Class"} {
 			if r.Header.Get(header) != "" {
 				s3Error(w, r, 501, "NotImplemented")
 				return
 			}
 		}
 
+		directive := r.Header.Get("X-Amz-Tagging-Directive")
+		if directive != "" && directive != "COPY" && directive != "REPLACE" {
+			s3Error(w, r, 400, "InvalidArgument")
+			return
+		}
+		if directive == "REPLACE" {
+			tags, err := storageTagsHeader(r)
+			if err != nil {
+				s3Error(w, r, 400, "InvalidTag")
+				return
+			}
+			if len(replacements) == 0 {
+				replacement = storageCopyMetadata{OnlyTags: true}
+			}
+			replacement.Tags = &tags
+			replacements = []storageCopyMetadata{replacement}
+		} else if r.Header.Get("X-Amz-Tagging") != "" {
+			s3Error(w, r, 400, "InvalidRequest")
+			return
+		}
 		if len(data) != 0 || r.Header.Get("X-Amz-Server-Side-Encryption") != "" || (r.Header.Get("X-Amz-Metadata-Directive") != "" && r.Header.Get("X-Amz-Metadata-Directive") != "COPY" && r.Header.Get("X-Amz-Metadata-Directive") != "REPLACE") {
 			s3Error(w, r, 501, "NotImplemented")
 			return
@@ -268,7 +323,7 @@ func (s *server) s3Invoke(w http.ResponseWriter, r *http.Request) {
 			s3Error(w, r, 400, "InvalidArgument")
 			return
 		}
-		item, err := copyStorageObjectWithConditions(s.storagePublicationContext(r.Context(), p), conn, p.ProjectID, srcBucket, srcKey, bucket, key, conditions, r.Header.Get("If-Match"), r.Header.Get("If-None-Match"), replacement...)
+		item, err := copyStorageObjectWithConditions(s.storagePublicationContext(r.Context(), p), conn, p.ProjectID, srcBucket, srcKey, bucket, key, conditions, r.Header.Get("If-Match"), r.Header.Get("If-None-Match"), replacements...)
 		if err != nil {
 			var fault *storageMutationFault
 			if errors.As(err, &fault) {
@@ -296,10 +351,11 @@ func (s *server) s3Invoke(w http.ResponseWriter, r *http.Request) {
 }
 func (s *server) serveS3Object(w http.ResponseWriter, r *http.Request, conn *pgx.Conn, p objectStoragePayload, bucket, key string) {
 	var blob, digest, contentType string
-	var metadata map[string]string
+	var metadata, responseHeaders map[string]string
+	var tags []storageTag
 	var size int64
 	var modified time.Time
-	e := conn.QueryRow(r.Context(), `SELECT blob_key,sha256,size,content_type,updated_at,metadata FROM neon_storage.objects WHERE bucket=$1 AND key=$2`, bucket, key).Scan(&blob, &digest, &size, &contentType, &modified, &metadata)
+	e := conn.QueryRow(r.Context(), `SELECT blob_key,sha256,size,content_type,updated_at,metadata,response_headers,tags FROM neon_storage.objects WHERE bucket=$1 AND key=$2`, bucket, key).Scan(&blob, &digest, &size, &contentType, &modified, &metadata, &responseHeaders, &tags)
 	if isNoRows(e) {
 		s3Error(w, r, 404, "NoSuchKey")
 		return
@@ -323,6 +379,7 @@ func (s *server) serveS3Object(w http.ResponseWriter, r *http.Request, conn *pgx
 		writeStoragePayloadChecksums(w, r, data)
 	}
 	w.Header().Set("ETag", "\""+digest+"\"")
+	w.Header().Set("X-Amz-Version-Id", "null")
 	w.Header().Set("Content-Type", contentType)
 	w.Header().Set("X-Neon-Metadata-ETag", storageMetadataState(p.BranchID, bucket, key, blob, digest, contentType, metadata))
 	writeStorageMetadata(w, metadata)
@@ -330,6 +387,11 @@ func (s *server) serveS3Object(w http.ResponseWriter, r *http.Request, conn *pgx
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": key[strings.LastIndex(key, "/")+1:]}))
 	w.Header().Set("Cache-Control", "private, no-store")
+	if writeStorageResponseHeaders(w, responseHeaders) != nil {
+		s3Error(w, r, 503, "ServiceUnavailable")
+		return
+	}
+	w.Header().Set("X-Amz-Tagging-Count", strconv.Itoa(len(tags)))
 	http.ServeContent(w, r, "", modified, source)
 }
 func (s *server) s3ListBuckets(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
@@ -491,6 +553,31 @@ func (s *server) s3WritePayload(w http.ResponseWriter, r *http.Request, conn *pg
 		return false
 	}
 
+	tags, parseErr := storageTagsHeader(r)
+	if parseErr != nil {
+		s3Error(w, r, 400, "InvalidTag")
+		return false
+	}
+	responseHeaders, parseErr := storageResponseHeaders(r)
+	if parseErr != nil {
+		s3Error(w, r, 400, "InvalidArgument")
+		return false
+	}
+	for name := range r.Header {
+		if strings.HasPrefix(strings.ToLower(name), "x-amz-object-lock-") {
+			s3Error(w, r, 501, "NotImplemented")
+			return false
+		}
+	}
+	if acl := r.Header.Get("X-Amz-Acl"); acl != "" && acl != "private" {
+		s3Error(w, r, 501, "NotImplemented")
+		return false
+	}
+	if class := r.Header.Get("X-Amz-Storage-Class"); class != "" && class != "STANDARD" {
+		s3Error(w, r, 501, "NotImplemented")
+		return false
+	}
+
 	tx, e := conn.Begin(r.Context())
 	if e != nil {
 		s3Error(w, r, 503, "ServiceUnavailable")
@@ -566,11 +653,12 @@ func (s *server) s3WritePayload(w http.ResponseWriter, r *http.Request, conn *pg
 			s3Error(w, r, 503, "ServiceUnavailable")
 			return false
 		}
-		_, e = tx.Exec(r.Context(), `INSERT INTO neon_storage.objects(bucket,key,blob_key,sha256,size,content_type,metadata) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(bucket,key) DO UPDATE SET blob_key=$3,sha256=$4,size=$5,content_type=$6,metadata=$7,updated_at=now()`, bucket, key, blob, digest, data.Size, contentType, metadata)
+		_, e = tx.Exec(r.Context(), `INSERT INTO neon_storage.objects(bucket,key,blob_key,sha256,size,content_type,metadata,tags,response_headers) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(bucket,key) DO UPDATE SET blob_key=$3,sha256=$4,size=$5,content_type=$6,metadata=$7,tags=$8,response_headers=$9,updated_at=now()`, bucket, key, blob, digest, data.Size, contentType, metadata, tags, responseHeaders)
 		if e == nil {
 			e = s.publishStorageFunctionEvent(r.Context(), tx, p, bucket, key, digest, data.Size)
 		}
 		w.Header().Set("ETag", "\""+digest+"\"")
+		w.Header().Set("X-Amz-Version-Id", "null")
 		writeStoragePayloadChecksums(w, r, data)
 	}
 	if e == nil {
@@ -589,6 +677,9 @@ func (s *server) s3WritePayload(w http.ResponseWriter, r *http.Request, conn *pg
 }
 
 func s3QuerySupported(q url.Values) bool {
+	if q.Has("withUpdatedAt") && (!q.Has("lifecycle") || q.Get("withUpdatedAt") != "true") {
+		return false
+	}
 	for _, name := range []string{"part-number-marker", "max-parts", "key-marker", "upload-id-marker", "max-uploads"} {
 		if q.Has(name) && !q.Has("uploads") && !q.Has("uploadId") {
 			return false
@@ -600,12 +691,14 @@ func s3QuerySupported(q url.Values) bool {
 		}
 		switch name {
 		case "uploads", "uploadId", "partNumber", "part-number-marker", "max-parts", "key-marker", "upload-id-marker", "max-uploads":
+		case "acl", "policy", "tagging", "versioning", "lifecycle", "object-lock", "publicAccessBlock", "attributes", "versionId", "x-id", "withUpdatedAt":
 		case "cors", "delete", "list-type", "prefix", "marker", "max-keys", "continuation-token", "start-after", "delimiter", "encoding-type", "location", "fetch-owner":
 		default:
 			return false
 		}
 	}
-	return true
+	_, valid := s3SettingResource(q)
+	return valid
 }
 
 type s3ObjectOwner struct {

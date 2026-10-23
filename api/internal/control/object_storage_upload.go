@@ -107,7 +107,7 @@ func (s *server) storagePresignUpload(w http.ResponseWriter, r *http.Request) {
 }
 func (s *server) storagePublicUpload(w http.ResponseWriter, r *http.Request) {
 	for name := range r.Header {
-		if strings.HasPrefix(strings.ToLower(name), "x-amz-meta-") || strings.EqualFold(name, "X-Neon-Object-Metadata") {
+		if strings.HasPrefix(strings.ToLower(name), "x-amz-meta-") || strings.EqualFold(name, "X-Neon-Object-Metadata") || strings.EqualFold(name, "X-Amz-Tagging") {
 			fail(w, r, 403, "invalid_upload_capability", "Upload capability does not authorize metadata")
 			return
 		}
@@ -154,6 +154,9 @@ func (s *server) storagePublicUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	r = r.WithContext(context.WithValue(r.Context(), userKey, user{ID: v.Actor}))
+	r = r.Clone(r.Context())
+	r.Header.Del("Content-Disposition")
+	r.Header.Del("Cache-Control")
 	if s.s3WritePayload(w, r, conn, p, v.Bucket, v.Key, data) {
 		close()
 		s.audit(r.Context(), v.Actor, "presigned_put_object", "object_storage", v.Branch, "succeeded", requestID(r))

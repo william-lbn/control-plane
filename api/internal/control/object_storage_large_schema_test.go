@@ -61,7 +61,7 @@ func TestStorageLargeSchemaUpgradePreservesExistingObjectsAndPartBounds(t *testi
 	snapshot := func() []byte {
 		t.Helper()
 		var value []byte
-		if e := conn.QueryRow(ctx, `SELECT jsonb_build_object('objects',(SELECT jsonb_agg(to_jsonb(o)) FROM neon_storage.objects o WHERE key='retained'),'uploads',(SELECT jsonb_agg(to_jsonb(u)) FROM neon_storage.multipart_uploads u WHERE id='original-upload'))`).Scan(&value); e != nil {
+		if e := conn.QueryRow(ctx, `SELECT jsonb_build_object('objects',(SELECT jsonb_agg(to_jsonb(o)-'tags'-'response_headers') FROM neon_storage.objects o WHERE key='retained'),'uploads',(SELECT jsonb_agg(to_jsonb(u)-'tags'-'response_headers') FROM neon_storage.multipart_uploads u WHERE id='original-upload'))`).Scan(&value); e != nil {
 			t.Fatal(e)
 		}
 		return value
@@ -89,6 +89,10 @@ func TestStorageLargeSchemaUpgradePreservesExistingObjectsAndPartBounds(t *testi
 		}
 	}
 	upgrade()
+	var defaults bool
+	if e := conn.QueryRow(ctx, `SELECT (SELECT bool_and(tags='[]'::jsonb AND response_headers='{}'::jsonb) FROM neon_storage.objects WHERE key='retained') AND (SELECT bool_and(tags='[]'::jsonb AND response_headers='{}'::jsonb) FROM neon_storage.multipart_uploads WHERE id='original-upload')`).Scan(&defaults); e != nil || !defaults {
+		t.Fatal("additive settings changed the original default behavior", e)
+	}
 	if !bytes.Equal(original, snapshot()) {
 		t.Fatal("schema upgrade rewrote retained objects or unfinished uploads")
 	}
@@ -102,7 +106,7 @@ func TestStorageLargeSchemaUpgradePreservesExistingObjectsAndPartBounds(t *testi
 		t.Fatal("large object upgrade removed the bounded part constraint")
 	}
 	var format int
-	if e := conn.QueryRow(ctx, `SELECT format_version FROM neon_storage.installations WHERE branch_id=$1`, p.BranchID).Scan(&format); e != nil || format != 2 {
+	if e := conn.QueryRow(ctx, `SELECT format_version FROM neon_storage.installations WHERE branch_id=$1`, p.BranchID).Scan(&format); e != nil || format != 3 {
 		t.Fatal("native format marker missing", e)
 	}
 	upgrade()
