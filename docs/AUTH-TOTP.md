@@ -10,7 +10,7 @@ Neon 官方 Auth 的分支身份目标参考 [官方概览](https://neon.com/doc
 
 控制面启用请求在原 `ManagedAuthSpec` 中增加 `two_factor_enabled: true`。省略或 false 不加载插件。使用现有异步 Operation、分支/项目授权和启停流程；不增加独立部署或监听端口。
 
-所有下列应用接口均位于 `/auth/v1/{branch_id}`，POST JSON，使用分支 HttpOnly Cookie；不得传控制台 Token。完整结构见 `contracts/application-auth-v1.json`（0.25.1）。
+所有下列应用接口均位于 `/auth/v1/{branch_id}`，POST JSON，使用分支 HttpOnly Cookie；不得传控制台 Token。完整结构见 `contracts/application-auth-v1.json`（0.26.0）。
 
 | 路径 | 输入 | 作用 |
 | --- | --- | --- |

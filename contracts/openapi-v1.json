@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.81.0",
+    "version": "0.82.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -2601,6 +2601,17 @@
             "type": "boolean",
             "default": false,
             "description": "Explicitly rewrap inherited verified TOTP factors for the physical child branch. Requires two_factor_enabled. Copied sessions and pending enrollments are cleared; inherited recovery codes are reset."
+          },
+          "admin_enabled": {
+            "type": "boolean",
+            "default": false,
+            "description": "Expose maintained application administrator endpoints. Existing persisted bans remain enforced when management is disabled."
+          },
+          "admin_bootstrap_user_id": {
+            "type": "string",
+            "maxLength": 128,
+            "pattern": "^[a-zA-Z0-9_-]{1,128}$",
+            "description": "Optional explicit grant to an existing unbanned application user, once per newly admitted Auth generation; requires admin_enabled. Never inherited as a grant command."
           }
         }
       },

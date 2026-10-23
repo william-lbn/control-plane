@@ -22,6 +22,9 @@ var managedAuthSchema string
 //go:embed assets/auth-totp-schema.sql
 var managedAuthTOTPSchema string
 
+//go:embed assets/auth-admin-schema.sql
+var managedAuthAdminSchema string
+
 // TOTP ciphertext must survive service generations. This branch-scoped key
 // keeps cookie isolation; branch-clone re-encryption is a separate gate.
 func (s *server) managedAuthTOTPSecret(p managedAuthPayload) (string, error) {
@@ -55,7 +58,7 @@ func (s *server) reserveManagedAuth(ctx context.Context, p managedAuthPayload) e
 			return err
 		}
 	}
-	config, _ := json.Marshal(record{"version": 1, "branchID": p.BranchID, "baseURL": managedAuthBase(p.BranchID), "databaseURL": dsn.String(), "databaseTLS": record{"caFile": "/run/auth-ca/ca.crt", "serverName": env("NEON_AUTH_PG_SERVER_NAME", "")}, "secret": authSecret, "trustedOrigins": p.Spec.AllowedOrigins, "allowLabHTTP": true, "requireEmailVerification": p.Spec.RequireEmailVerification, "emailOTPEnabled": p.Spec.EmailOTPEnabled, "magicLinkEnabled": p.Spec.MagicLinkEnabled, "magicLinkExpiresIn": p.Spec.MagicLinkExpiresIn, "magicLinkAllowRegistration": p.Spec.MagicLinkAllowRegistration, "twoFactorEnabled": p.Spec.TwoFactorEnabled})
+	config, _ := json.Marshal(record{"version": 1, "branchID": p.BranchID, "baseURL": managedAuthBase(p.BranchID), "databaseURL": dsn.String(), "databaseTLS": record{"caFile": "/run/auth-ca/ca.crt", "serverName": env("NEON_AUTH_PG_SERVER_NAME", "")}, "secret": authSecret, "trustedOrigins": p.Spec.AllowedOrigins, "allowLabHTTP": true, "requireEmailVerification": p.Spec.RequireEmailVerification, "emailOTPEnabled": p.Spec.EmailOTPEnabled, "magicLinkEnabled": p.Spec.MagicLinkEnabled, "magicLinkExpiresIn": p.Spec.MagicLinkExpiresIn, "magicLinkAllowRegistration": p.Spec.MagicLinkAllowRegistration, "twoFactorEnabled": p.Spec.TwoFactorEnabled, "adminEnabled": p.Spec.AdminEnabled})
 	_, err = s.kube.createOwned(ctx, "secret", record{"apiVersion": "v1", "kind": "Secret", "type": "Opaque", "immutable": true, "metadata": record{"name": p.SecretRef, "labels": managedAuthLabels(p)}, "stringData": map[string]string{"config.json": string(config), "password": password, "verifier": verifier}}, p.ProjectID, p.EndpointID)
 	return err
 }
@@ -131,7 +134,24 @@ func applyManagedAuthSQLWithFactorsTx(ctx context.Context, tx pgx.Tx, p managedA
 	if generation > p.Generation {
 		return errors.New("Managed Auth SQL generation advanced")
 	}
+	if _, err = tx.Exec(ctx, managedAuthAdminSchema, pgx.QueryExecModeSimpleProtocol); err != nil {
+		return err
+	}
 	if generation < p.Generation {
+		// The explicit grant is part of this durable generation, not a standing
+		// runtime bypass. A retried installation never re-grants a removed role.
+		if p.Spec.AdminBootstrapUserID != "" {
+			if !p.Spec.AdminEnabled {
+				return errors.New("Admin bootstrap requires enabled policy")
+			}
+			command, grantErr := tx.Exec(ctx, `UPDATE neon_auth."user" SET role='admin',"updatedAt"=now() WHERE id=$1 AND NOT COALESCE(banned,false)`, p.Spec.AdminBootstrapUserID)
+			if grantErr != nil {
+				return grantErr
+			}
+			if command.RowsAffected() != 1 {
+				return dataAPIPrerequisiteError{"auth_admin_user_required", "Select an existing, unbanned application user for the explicit admin grant"}
+			}
+		}
 		// Copied opaque reset tokens must not remain valid in a child branch.
 		// Re-enable also rotates the issuer generation; clear outstanding links
 		// with sessions/JWKS, without touching application users/passwords.
@@ -392,7 +412,7 @@ func (s *server) managedAuthUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer conn.Close(context.Background())
-	rows, err := conn.Query(r.Context(), `SELECT id,name,email,"emailVerified" AS email_verified,"createdAt" AS created_at,COALESCE((to_jsonb(u)->>'twoFactorEnabled')::boolean,false) AS two_factor_enabled FROM neon_auth."user" u ORDER BY "createdAt" DESC,id LIMIT 100`)
+	rows, err := conn.Query(r.Context(), `SELECT id,name,email,"emailVerified" AS email_verified,"createdAt" AS created_at,COALESCE((to_jsonb(u)->>'twoFactorEnabled')::boolean,false) AS two_factor_enabled,COALESCE(to_jsonb(u)->>'role','user') AS role,COALESCE((to_jsonb(u)->>'banned')::boolean,false) AS banned FROM neon_auth."user" u ORDER BY "createdAt" DESC,id LIMIT 100`)
 	if err != nil {
 		s.sqlFailureResponse(w, r, sqlExecutionError{"query", err})
 		return
@@ -431,6 +451,8 @@ func (s *server) queueInheritedManagedAuthTx(ctx context.Context, tx pgx.Tx, cre
 	}
 	// A copied migration opt-in is not authorization for a subsequent branch.
 	auth.Spec.InheritTwoFactor = false
+	// An explicit parent admin grant is never re-executed in a child branch.
+	auth.Spec.AdminBootstrapUserID = ""
 	spec, _ := json.Marshal(auth.Spec)
 	payload, _ := json.Marshal(auth)
 	if _, err = tx.Exec(ctx, `INSERT INTO managed_auth_instances(branch_id,project_id,endpoint_id,generation,state,spec,secret_ref) VALUES($1,$2,$3,1,'provisioning',$4,$5)`, p.BranchID, p.ProjectID, p.EndpointID, spec, auth.SecretRef); err != nil {

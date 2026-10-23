@@ -18,15 +18,25 @@ var managedAuthRelaySlots = make(chan struct{}, 32)
 var managedAuthActions = map[string]bool{"sign-up/email": true, "sign-in/email": true, "sign-out": true, "get-session": true, "token": true, "jwks": true, "list-sessions": true, "revoke-session": true, "revoke-sessions": true, "revoke-other-sessions": true, "change-password": true, "update-user": true}
 var managedAuthOTPActions = map[string]bool{"email-otp/send-verification-otp": true, "email-otp/check-verification-otp": true, "email-otp/verify-email": true, "email-otp/request-password-reset": true, "email-otp/reset-password": true, "sign-in/email-otp": true}
 var managedAuthTwoFactorActions = map[string]bool{"two-factor/enable": true, "two-factor/disable": true, "two-factor/get-totp-uri": true, "two-factor/verify-totp": true, "two-factor/verify-backup-code": true, "two-factor/generate-backup-codes": true}
+var managedAuthAdminActions = map[string]string{
+	"admin/get-user": "GET", "admin/list-users": "GET",
+	"admin/create-user": "POST", "admin/update-user": "POST", "admin/set-role": "POST",
+	"admin/ban-user": "POST", "admin/unban-user": "POST", "admin/list-user-sessions": "POST",
+	"admin/revoke-user-session": "POST", "admin/revoke-user-sessions": "POST", "admin/set-user-password": "POST",
+	"admin/remove-user": "POST", "admin/impersonate-user": "POST", "admin/stop-impersonating": "POST", "admin/has-permission": "POST",
+}
 var managedAuthResetCallback = regexp.MustCompile(`^reset-password/[a-zA-Z0-9_-]{20,128}$`)
 
-func managedAuthRelayCookieAllowed(name, branch string, twoFactor bool) bool {
+func managedAuthRelayCookieAllowed(name, branch string, twoFactor bool, admin ...bool) bool {
 	base := strings.TrimPrefix(name, "__Secure-")
 	prefix := "neon_app_" + branch + "."
-	return base == prefix+"session_token" || (twoFactor && base == prefix+"two_factor")
+	return base == prefix+"session_token" || (twoFactor && base == prefix+"two_factor") || (len(admin) == 1 && admin[0] && base == prefix+"admin_session")
 }
 
 func managedAuthAllowedAction(action, method string) bool {
+	if required, ok := managedAuthAdminActions[action]; ok {
+		return method == required || method == "OPTIONS"
+	}
 	if managedAuthActions[action] {
 		return true
 	}
@@ -147,6 +157,10 @@ func (s *server) managedAuthRelay(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 503, "auth_unavailable", "Branch Auth configuration unavailable")
 		return
 	}
+	if _, adminAction := managedAuthAdminActions[r.PathValue("rest")]; adminAction && !spec.AdminEnabled {
+		http.NotFound(w, r)
+		return
+	}
 	if managedAuthTwoFactorActions[r.PathValue("rest")] && !spec.TwoFactorEnabled {
 		http.NotFound(w, r)
 		return
@@ -197,7 +211,9 @@ func (s *server) managedAuthRelay(w http.ResponseWriter, r *http.Request) {
 	r.Body = http.MaxBytesReader(w, r.Body, 16384)
 	target, _ := url.Parse("http://" + managedAuthName(branch) + "." + s.kube.namespace + ".svc.cluster.local:9082")
 	base, _ := url.Parse(managedAuthBase(branch))
-	cookieAllowed := func(name string) bool { return managedAuthRelayCookieAllowed(name, branch, spec.TwoFactorEnabled) }
+	cookieAllowed := func(name string) bool {
+		return managedAuthRelayCookieAllowed(name, branch, spec.TwoFactorEnabled, spec.AdminEnabled)
+	}
 	proxy := &httputil.ReverseProxy{Rewrite: func(pr *httputil.ProxyRequest) {
 		pr.SetURL(target)
 		pr.Out.Host = base.Host

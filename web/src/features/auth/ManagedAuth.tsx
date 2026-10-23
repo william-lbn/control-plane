@@ -9,6 +9,7 @@ import { AuthRecoveryPanel } from './AuthRecoveryPanel';
 import { AuthOTPPanel } from './AuthOTPPanel';
 import { AuthMagicLinkPanel } from './AuthMagicLinkPanel';
 import { AuthTOTPPanel } from './AuthTOTPPanel';
+import { AuthAdminPanel } from './AuthAdminPanel';
 
 type Instance = {
   branch_id: string;
@@ -28,6 +29,8 @@ type Instance = {
     magic_link_allow_registration?: boolean;
     two_factor_enabled?: boolean;
     inherit_two_factor?: boolean;
+    admin_enabled?: boolean;
+    admin_bootstrap_user_id?: string;
   } | null;
   factor_migration?: {
     migrated_factors: number;
@@ -46,6 +49,8 @@ type AppUser = {
   emailVerified?: boolean;
   twoFactorEnabled?: boolean;
   created_at?: string;
+  role?: string;
+  banned?: boolean;
 };
 
 export function ManagedAuth({
@@ -73,6 +78,8 @@ export function ManagedAuth({
   const [emailOTPEnabled, setEmailOTPEnabled] = useState(false);
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
   const [inheritTwoFactor, setInheritTwoFactor] = useState(false);
+  const [adminEnabled, setAdminEnabled] = useState(false);
+  const [adminBootstrapUserID, setAdminBootstrapUserID] = useState('');
   const [magicLinkEnabled, setMagicLinkEnabled] = useState(false);
   const [magicLinkExpiresIn, setMagicLinkExpiresIn] = useState(300);
   const [magicLinkAllowRegistration, setMagicLinkAllowRegistration] = useState(false);
@@ -103,6 +110,10 @@ export function ManagedAuth({
       setEmailOTPEnabled(value.spec.email_otp_enabled ?? false);
       setTwoFactorEnabled(value.spec.two_factor_enabled ?? false);
       setInheritTwoFactor(value.spec.inherit_two_factor ?? false);
+      setAdminEnabled(value.spec.admin_enabled ?? false);
+      // A grant is an explicit command for the next publication, never a
+      // standing selection silently copied into a later configuration.
+      setAdminBootstrapUserID('');
       setMagicLinkEnabled(value.spec.magic_link_enabled ?? false);
       setMagicLinkExpiresIn(value.spec.magic_link_expires_in || 300);
       setMagicLinkAllowRegistration(value.spec.magic_link_allow_registration ?? false);
@@ -126,6 +137,8 @@ export function ManagedAuth({
     setEmailOTPEnabled(false);
     setTwoFactorEnabled(false);
     setInheritTwoFactor(false);
+    setAdminEnabled(false);
+    setAdminBootstrapUserID('');
     setMagicLinkEnabled(false);
     setMagicLinkExpiresIn(300);
     setMagicLinkAllowRegistration(false);
@@ -149,6 +162,14 @@ export function ManagedAuth({
           ...(emailOTPEnabled ? { email_otp_enabled: true } : {}),
           ...(twoFactorEnabled ? { two_factor_enabled: true } : {}),
           ...(twoFactorEnabled && inheritTwoFactor ? { inherit_two_factor: true } : {}),
+          ...(adminEnabled
+            ? {
+                admin_enabled: true,
+                ...(adminBootstrapUserID.trim()
+                  ? { admin_bootstrap_user_id: adminBootstrapUserID.trim() }
+                  : {}),
+              }
+            : {}),
           ...(magicLinkEnabled
             ? {
                 magic_link_enabled: true,
@@ -414,6 +435,33 @@ export function ManagedAuth({
             />
             邮箱免密码登录（Magic Link）
           </label>
+          <label className="auth-mail-policy backend-wide">
+            <input
+              aria-label="启用应用管理员接口"
+              type="checkbox"
+              checked={adminEnabled}
+              disabled={busy || active}
+              onChange={(e) => setAdminEnabled(e.target.checked)}
+            />
+            开放应用管理员接口（需要应用管理员会话）
+          </label>
+          {adminEnabled && (
+            <label className="backend-wide">
+              本次授予管理员的已有应用用户 ID（可选）
+              <input
+                aria-label="应用管理员授权用户 ID"
+                value={adminBootstrapUserID}
+                maxLength={128}
+                disabled={busy || active}
+                onChange={(e) => setAdminBootstrapUserID(e.target.value)}
+              />
+              <span className="subtle-note">
+                先注册并读取用户
+                ID；停用后重新启用时可显式授予。每次发布只执行一次，不会根据邮箱、注册顺序或 Console
+                账号自动赋权。
+              </span>
+            </label>
+          )}
           {magicLinkEnabled && (
             <>
               <label>
@@ -678,6 +726,7 @@ export function ManagedAuth({
               <th>姓名</th>
               <th>邮箱</th>
               <th>身份 ID</th>
+              <th>应用角色 / 封禁</th>
             </tr>
           </thead>
           <tbody>
@@ -688,11 +737,18 @@ export function ManagedAuth({
                 <td>
                   <code>{u.id}</code>
                 </td>
+                <td>
+                  {u.role || 'user'}
+                  {u.banned ? ' · 已封禁' : ''}
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </section>
+      {active && instance?.spec?.admin_enabled && (
+        <AuthAdminPanel key={branch + '/admin'} branch={branch} />
+      )}
     </div>
   );
 }

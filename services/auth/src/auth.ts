@@ -1,5 +1,5 @@
 import { betterAuth } from "better-auth";
-import { jwt, emailOTP, magicLink, twoFactor } from "better-auth/plugins";
+import { admin, jwt, emailOTP, magicLink, twoFactor } from "better-auth/plugins";
 import type { Pool } from "pg";
 import type { AuthConfig } from "./config.ts";
 import { createMailer } from "./mail.ts";
@@ -88,6 +88,9 @@ export function authOptions(c: AuthConfig, database: Pool) {
       storage: "database" as const,
     },
     plugins: [
+      // Keep persisted bans enforced even when management endpoints are disabled.
+      // Only the explicitly enabled branch exposes the administrative protocol.
+      admin({defaultRole:"user",adminRoles:["admin"],impersonationSessionDuration:3600,allowImpersonatingAdmins:false}),
       ...(c.twoFactorEnabled ? [twoFactor({issuer:"Neon Self Hosted",skipVerificationOnEnable:false,twoFactorCookieMaxAge:300,backupCodeOptions:{storeBackupCodes:"encrypted"}})] : []),
       ...(mail && c.magicLinkEnabled
         ? [
@@ -136,5 +139,12 @@ export function authOptions(c: AuthConfig, database: Pool) {
   };
 }
 export function createAuth(c: AuthConfig, database: Pool) {
-  return betterAuth(authOptions(c, database));
+  const auth = betterAuth(authOptions(c, database));
+  const handler = auth.handler;
+  auth.handler = async (request: Request) => {
+    if (!c.adminEnabled && new URL(request.url).pathname.startsWith(`/auth/v1/${c.branchID}/admin/`))
+      return new Response(null,{status:404,headers:{"Cache-Control":"no-store"}});
+    return handler(request);
+  };
+  return auth;
 }

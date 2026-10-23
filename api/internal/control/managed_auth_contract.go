@@ -44,6 +44,9 @@ func (s *server) applicationAuthOpenAPI(w http.ResponseWriter, r *http.Request) 
 		if challenge, ok := nested(document, "components", "securitySchemes", "applicationFactorChallenge").(map[string]any); ok {
 			challenge["name"] = "neon_app_" + branch + ".two_factor"
 		}
+		if original, ok := nested(document, "components", "securitySchemes", "applicationAdminReturn").(map[string]any); ok {
+			original["name"] = "neon_app_" + branch + ".admin_session"
+		}
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	jsonResponse(w, 200, document)

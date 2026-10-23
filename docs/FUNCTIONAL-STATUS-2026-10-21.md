@@ -35,7 +35,7 @@
 | S02 | 大对象/checksum | 64 MiB 流式、Range/基础 checksum 与 UI 已通过；5 GiB、完整扩展 checksum 等仍缺 |
 | S03 | 引用安全 GC | 分支/历史引用保护下的清理功能；只使用新建专用夹具验证，不删除历史业务字节 |
 | S05 | Storage gateway/用量 | 独立入口、授权/配额与可信用量；吞吐和容量压测后置 |
-| A03 | 应用 Auth 高级功能 | OAuth/Admin/组织/手机号/事件等；现有密码、邮件、OTP、Magic Link、TOTP 不重测 |
+| A03 | 应用 Auth 高级功能 | Admin 已有[功能回执](DELIVERY-2026-10-24-AUTH-ADMIN.md)；OAuth/组织/手机号/事件继续；原密码、邮件、OTP、Magic Link、TOTP 回执复用 |
 | A05 | Auth 生命周期 | 账号/会话/JWKS/密钥在删除、恢复和分支中的一致性 |
 | L02 | 原分支 reset/PITR | 备份、原地切换、失败回退和 UI |
 | L03 | Time Travel/Backend 一致恢复 | 查询时间点辅助与 Auth/对象/函数恢复语义 |
@@ -87,3 +87,5 @@
 2026-10-23 S3 矩阵收尾：[2026-10-23 S3 兼容矩阵与双 SDK](DELIVERY-2026-10-23-S3-CAPABILITIES.md)：固定需求矩阵 41 项操作逐项关联既有/新增回执；27 个授权/加密写入负例、18 个未支持子资源及 Boto3 互通通过，元数据响应键大小写已修复。3 组新增 Go、3 组受影响检查和 15 个累计实机检查点通过，原上传未重做。API/Worker 0.80.0，Web/AI/Auth/Gateway 复用，schema 064 / 原生格式 4 / Chart 0.9.77 / Core Helm 169。17 张目录表、6 类旧存储清单、9 PVC、917 个原 Secret 和其他六套 Helm 配置保留，最终三节点、三个 Safekeeper Ready，VM 0。S04 固定矩阵基线闭环，当前 15 组基础有回执，12 个业务和 3 个其他组继续；5 GiB/完整 checksum、安全 GC、独立网关及性能/可靠性专项分别保留。
 
 2026-10-24 SSO：[Console OIDC 与组织策略](DELIVERY-2026-10-24-CONSOLE-SSO.md)完成固定本地基线；4 组新增 Go、4 组受影响检查、2 组 Helm 和 10 个累计浏览器检查点通过。原键恢复、显式绑定、强制策略、本地 MFA、恢复码、会话失效及 UI 已验收。Core Helm 171 / schema 065；API/Worker 0.81.0，Web 修复镜像，其他组件复用。17 张目录表、9 PVC、917 个原 Secret 保留，三节点、三个 Safekeeper Ready，VM 0。当前 16 组基础有回执，11 个业务和 3 个其他组继续；跨 authority IdP、商业接入和性能/可靠性认证单列。
+
+2026-10-24 应用 Admin：[管理员功能与实际页面](DELIVERY-2026-10-24-AUTH-ADMIN.md)通过 2 组新增/7 组受影响 Go、1 组新增/5 组受影响维护库 PostgreSQL 检查，以及 11 个累计实机检查点。显式授权、角色、封禁、会话、改密/删除及一小时身份代入闭环；原已过步骤及改密未重做。Core Helm 172 / schema 065 / Auth 协议 0.26.0；原目录和凭据身份保留，三节点、三个 Safekeeper Ready，VM 0。A03 的 OAuth、组织、手机号、事件继续；全项目仍有 11 个业务和 3 个其他组未整体闭环。
