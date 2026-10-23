@@ -52,13 +52,16 @@ func multipartNumber(q url.Values, name string, def, min, max int) (int, error) 
 	return n, nil
 }
 func (s *server) s3Multipart(w http.ResponseWriter, r *http.Request, conn *pgx.Conn, p objectStoragePayload, principal, bucket, key string, data []byte, q url.Values) {
+	if rejectUnsupportedS3Headers(w, r) {
+		return
+	}
 	if !validMultipartQuery(q) || (key != "" && !validStorageKey(key)) {
 		s3Error(w, r, 400, "InvalidArgument")
 		return
 	}
 	for k := range r.Header {
 		v := strings.ToLower(k)
-		if strings.HasPrefix(v, "x-amz-checksum-") || strings.HasPrefix(v, "x-amz-server-side-") || v == "x-amz-acl" || (v == "x-amz-tagging" && !(q.Has("uploads") && r.Method == http.MethodPost && key != "")) || v == "x-amz-storage-class" || v == "x-amz-sdk-checksum-algorithm" || strings.HasPrefix(v, "x-amz-object-lock-") || v == "x-amz-expected-bucket-owner" || v == "x-amz-request-payer" {
+		if strings.HasPrefix(v, "x-amz-checksum-") || strings.HasPrefix(v, "x-amz-server-side-") || (v == "x-amz-acl" || v == "x-amz-storage-class") && !(q.Has("uploads") && r.Method == http.MethodPost && key != "") || (v == "x-amz-tagging" && !(q.Has("uploads") && r.Method == http.MethodPost && key != "")) || v == "x-amz-sdk-checksum-algorithm" || strings.HasPrefix(v, "x-amz-object-lock-") || v == "x-amz-expected-bucket-owner" || v == "x-amz-request-payer" {
 			s3Error(w, r, 501, "NotImplemented")
 			return
 		}

@@ -1,6 +1,6 @@
 # Object Storage S3 基础兼容预览
 
-> 历史基础协议记录。当前范围见 [S3 设置、POST 与校验尾部](OBJECT-STORAGE-S3-SETTINGS.md)及[有界大对象](DELIVERY-2026-10-22-STORAGE-LARGE-OBJECTS.md)，实际验收见[最新 S3 交付](DELIVERY-2026-10-23-S3-SETTINGS.md)。下文早期实现细节不代替当前合同。
+> 历史基础协议记录。当前范围见 [S3 设置、POST 与校验尾部](OBJECT-STORAGE-S3-SETTINGS.md)及[有界大对象](DELIVERY-2026-10-22-STORAGE-LARGE-OBJECTS.md)，固定矩阵及双 SDK 验收见[最新 S3 交付](DELIVERY-2026-10-23-S3-CAPABILITIES.md)。下文早期实现细节不代替当前合同。
 
 ## 1. 目标、当前范围和官网差异
 

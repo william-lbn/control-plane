@@ -33,6 +33,8 @@ GET 的 `ETag` 在响应头中。PUT 必须提交完整 `settings`、`If-Match` 
 | 浏览器 POST | SigV4 策略、单文件表单、成功状态 200/201/204、元数据/标签及有界校验字段 |
 | aws-chunked 尾部 | 签名与非签名数据块模式；SHA-256、SHA-1、CRC32、CRC32C 校验和 |
 
+显式 `private` ACL 和 `STANDARD` 存储类型适用于对象 PUT/COPY 与 multipart 初始化。其他 ACL/类型以及 grant、服务端加密、Object Lock 写入请求头、网站重定向请求头明确返回 501，不发布普通对象来代替所请求的能力。用户 metadata 响应头在线路上保持小写，Boto3 读取返回原小写键。固定需求矩阵的 41 项操作、MinIO/Boto3 互通及拒绝路径见[矩阵验收](DELIVERY-2026-10-23-S3-CAPABILITIES.md)。
+
 **版本、生命周期和 Object Lock 仅保存配置，不执行对象多版本、自动到期或 WORM 保留。** 这与应用页面的声明一致，不能把配置读取成功当作保留策略执行证明。历史分片布局回填、完整扩展 checksum、大于 64 MiB 的对象和物理 GC 继续列在缺口中。没有宣称实现 AWS STS。
 
 `BlockPublicAcls`/`BlockPublicPolicy` 阻止新增公开授权；`IgnorePublicAcls`/`RestrictPublicBuckets` 阻止已有公开桶的匿名读取。解除新增授权阻断需要先保存，再开放公开读取。任何失败或畸形的签名请求都不会降级为匿名请求。

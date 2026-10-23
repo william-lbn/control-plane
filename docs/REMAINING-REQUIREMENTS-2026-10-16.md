@@ -30,7 +30,7 @@ website 文档快照 `c0d49cbb6979b2ce79ea502d62dbc40780a923b0`（提交时间
 | S01 | S3 multipart | 有界基础已实现并验收：七类 S3 操作、身份隔离、原子发布/回执、UI 续传、中止、SDK 字节、目录分组分页、已撤销身份管理员中止/审计恢复；仍限 8 MiB | [当前交付](DELIVERY-2026-10-16-CURRENT.md)与[运维合同](MULTIPART-ADMINISTRATION.md)；完整 checksum/大对象、GC/自动回收和写入权转让仍有独立扩展门槛 |
 | S02 | 大对象与完整 checksum | 64 MiB 有界流式、Range/基础 checksum、UI 已验收；官网快照 5 GiB 仍未满足 | 5 GiB 和完整扩展 checksum 等继续，见 [交付](DELIVERY-2026-10-22-STORAGE-LARGE-OBJECTS.md) |
 | S03 | 引用安全物理 GC | 未开发；删除只移除分支清单 | 分支/PITR/保留窗口引用证明、隔离清扫、失败恢复；不得删除历史业务字节 |
-| S04 | S3 兼容扩展 | anonymous public read、trailers、STS 等未完成 | 按官网支持矩阵分别实现；每项签名/负例/真实 SDK 验证 |
+| S04 | S3 兼容扩展 | 固定官网矩阵 41 项操作及预签名/POST/trailers、公开读阻断、MinIO/Boto3 基线已通过；版本/生命周期/Object Lock 仅存储 | [矩阵与回执](DELIVERY-2026-10-23-S3-CAPABILITIES.md)；5 GiB/完整 checksum、安全 GC、独立入口分别归 S02/S03/S05；原账本的 STS 不在固定支持矩阵中，不提供 |
 | S05 | 独立 Storage gateway / 可信计量 | 当前 S3 同 API 进程；last_used_at 不等于计费 | 最小权限独立部署、配额/物理容量、租户并发与用量 |
 | A01 | Console MFA | 基础自助已完成：标准 TOTP、恢复码、密码/重放、启用/关闭的其他会话撤销及 UI/PG 已验收 | [当前交付](DELIVERY-2026-10-16-CURRENT.md)；组织强制/WebAuthn/正式恢复流程仍是扩展门槛 |
 | A02 | Console OIDC/SSO | 未开发；外部 IdP 可后置，本地协议可先做 | state/nonce/PKCE、绑定、组织策略、本地 IdP 与 UI |
@@ -124,3 +124,5 @@ fixture、失败、日志、密码保护输入和所有业务字节。测试完�
 2026-10-23 组织额度增量：[2026-10-23 组织 AI 额度](DELIVERY-2026-10-23-AI-ORGANIZATION-CREDITS.md)：手工授信/更正、原键恢复、双账本原子准入/结算、未知用量保留及凭证对账通过。9 组新增 Go/PG、3 组受影响检查、8 个实际页面检查通过，原功能回执复用。API/Worker/AI 0.75.0、Web 重建，schema 062 / Chart 0.9.72 / Core Helm 160；Auth 和 Gateway 保留。17 张目录表、9 PVC、916 个原 Secret 身份保留，最终三节点、三个 Safekeeper Ready，VM 0。合成授信未接入真实支付；BYOK、完整多模态及其余业务继续，性能/可靠性专项后置。
 
 2026-10-23 BYOK 增量：[2026-10-23 组织自有 AI 供应商](DELIVERY-2026-10-23-AI-ORGANIZATION-BYOK.md)：组织密钥/模型隔离、发现发布、原凭据轮换和费用归属通过，BYOK 不扣平台额度并继续受分支预算约束。5 组新增 Go/PG、3 组受影响检查、累计 7 个实际页面检查通过；已完成步骤从原检查点续验。API/Worker/AI 0.76.0、Web 重建，schema 063 / Chart 0.9.73 / Core Helm 162。17 张目录表、9 PVC、916 个原 Secret 身份保留，最终三节点和三个 Safekeeper Ready，VM 0。完整多模态/持久引用、外部账单/支付及其他业务继续，性能/可靠性专项后置。
+
+2026-10-23 S3 矩阵收尾：[2026-10-23 S3 兼容矩阵与双 SDK](DELIVERY-2026-10-23-S3-CAPABILITIES.md)：固定需求矩阵 41 项操作逐项关联既有/新增回执；27 个授权/加密写入负例、18 个未支持子资源及 Boto3 互通通过，元数据响应键大小写已修复。3 组新增 Go、3 组受影响检查和 15 个累计实机检查点通过，原上传未重做。API/Worker 0.80.0，Web/AI/Auth/Gateway 复用，schema 064 / 原生格式 4 / Chart 0.9.77 / Core Helm 169。17 张目录表、6 类旧存储清单、9 PVC、917 个原 Secret 和其他六套 Helm 配置保留，最终三节点、三个 Safekeeper Ready，VM 0。S04 固定矩阵基线闭环，当前 15 组基础有回执，12 个业务和 3 个其他组继续；5 GiB/完整 checksum、安全 GC、独立网关及性能/可靠性专项分别保留。

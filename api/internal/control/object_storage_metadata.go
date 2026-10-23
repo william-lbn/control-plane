@@ -57,6 +57,8 @@ func metadataFromHeaders(r *http.Request, s3 bool) (map[string]string, error) {
 }
 func writeStorageMetadata(w http.ResponseWriter, metadata map[string]string) {
 	for k, v := range metadata {
-		w.Header().Set("X-Amz-Meta-"+k, v)
+		// S3 metadata names are lowercase on the wire. Header.Set title-cases
+		// them, which older botocore parsers expose as different map keys.
+		w.Header()["x-amz-meta-"+strings.ToLower(k)] = []string{v}
 	}
 }
