@@ -150,7 +150,7 @@ func proxyRequest(t *testing.T, client *http.Client, method, address, token stri
 	return response.StatusCode, data
 }
 
-func TestDSGAProxyAllSixRoutesPreserveOriginalBytesAndCredential(t *testing.T) {
+func TestDSGAProxyAllSevenRoutesPreserveOriginalBytesAndCredential(t *testing.T) {
 	var calls atomic.Int32
 	_, client, base, token := proxyFixture(t, func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
@@ -166,9 +166,9 @@ func TestDSGAProxyAllSixRoutesPreserveOriginalBytesAndCredential(t *testing.T) {
 		w.Header().Set("Location", "https://foreign.invalid")
 		_, _ = w.Write([]byte(`{"native_fact_fixture":true}`))
 	})
-	for _, path := range []string{"capabilities", "memory", "resize", "resize/status", "resize/cancel", "issuer/fence"} {
+	for _, path := range []string{"capabilities", "memory", "initialization", "resize", "resize/status", "resize/cancel", "issuer/fence"} {
 		method, body := http.MethodPost, []byte(`{"issuer_epoch":"18446744073709551615"}`)
-		if path == "capabilities" || path == "memory" {
+		if path == "capabilities" || path == "memory" || path == "initialization" {
 			method, body = http.MethodGet, nil
 		}
 		code, data := proxyRequest(t, client, method, base+"/dsg/v1/"+path, token, body)
@@ -176,7 +176,7 @@ func TestDSGAProxyAllSixRoutesPreserveOriginalBytesAndCredential(t *testing.T) {
 			t.Fatalf("route %s got %d", path, code)
 		}
 	}
-	if calls.Load() != 6 {
+	if calls.Load() != 7 {
 		t.Fatal("not all native calls ran")
 	}
 }

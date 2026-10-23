@@ -157,7 +157,7 @@ func (proxy *dsgaProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	deny := func(code int) { http.Error(w, "DSGA management request rejected", code) }
 	execution, known := false, true
 	switch r.URL.Path {
-	case "/dsg/v1/capabilities", "/dsg/v1/memory":
+	case "/dsg/v1/capabilities", "/dsg/v1/memory", "/dsg/v1/initialization":
 		known = r.Method == http.MethodGet
 	case "/dsg/v1/resize", "/dsg/v1/issuer/fence":
 		execution, known = true, r.Method == http.MethodPost
