@@ -57,6 +57,9 @@ type dsgaCreationPlan struct {
 	// 凭据由接受前的immutable Secret保留，再把实际UID/完整Data摘要冻结进原
 	// Operation。纯值避免浅拷贝共享指针；缺省只供历史计划解码，新启动回调拒绝。
 	Credentials dsgaCredentialReference `json:"credentials,omitzero"`
+	// VM执行所需的平台输入同样在接受时冻结，worker不再读取当前镜像/Issuer
+	// 环境变量。零值仅兼容读取历史计划，生产VM构造明确拒绝缺少profile。
+	VM dsgaVMProfile `json:"vm,omitzero"`
 }
 
 type dsgaCredentialReference struct {
@@ -80,6 +83,7 @@ type dsgaCreationPolicy struct {
 	Image           string
 	MemorySlotBytes uint64
 	Budget          dsgaBootstrapBudget
+	VM              dsgaVMProfile
 }
 
 var dsgaPinnedImage = regexp.MustCompile(`^[a-z0-9][a-z0-9./:_-]*@sha256:[0-9a-f]{64}$`)
@@ -112,6 +116,9 @@ func (plan dsgaCreationPlan) validate(p createPayload) error {
 	if plan.Credentials != (dsgaCredentialReference{}) && plan.Credentials.validate() != nil {
 		return errDSGACreationPlan
 	}
+	if plan.VM != (dsgaVMProfile{}) && plan.VM.validate() != nil {
+		return errDSGACreationPlan
+	}
 	if plan.ProtocolVersion != 1 || plan.PostgresVersion != 17 || len(plan.Namespace) > 63 || !dsgaPlanNamespace.MatchString(plan.Namespace) ||
 		dsgapi.ValidateIncarnation(plan.Incarnation) != nil || dsgapi.ValidateID(plan.ComputeInstanceID, "Compute") != nil ||
 		!dsgaPinnedImage.MatchString(plan.Image) || !dsgaPlanUUID.MatchString(plan.OperationUUID) {
@@ -132,10 +139,10 @@ func (plan dsgaCreationPlan) validate(p createPayload) error {
 		return errDSGACreationPlan
 	}
 	minGuest, maxGuest := uint64(p.MinMem)*(1<<20), uint64(p.MaxMem)*(1<<20)
-	// 当前NeonVM virtio-mem块为8MiB；slots为int32。禁止按MiB整数除法截断，
+	// 当前NeonVM virtio-mem块为8MiB；CRD的slots上限为512。禁止按MiB整数除法截断，
 	// 否则数据库意图与实际Guest内存不一致。未来最低合法Guest也必须落在槽边界。
 	slot := plan.MemorySlotBytes
-	if slot == 0 || slot%(8<<20) != 0 || minGuest%slot != 0 || maxGuest%slot != 0 || maxGuest/slot > 1<<31-1 ||
+	if slot == 0 || slot%(8<<20) != 0 || minGuest%slot != 0 || maxGuest%slot != 0 || maxGuest/slot > 512 ||
 		plan.Budget.MinimumGuestMemoryBytes < slot || plan.Budget.MinimumGuestMemoryBytes%slot != 0 || plan.Budget.MinimumGuestMemoryBytes > minGuest {
 		return errDSGACreationPlan
 	}
@@ -172,7 +179,7 @@ func makeDSGACreationPlan(p createPayload, policy dsgaCreationPolicy, now time.T
 	uuid := hex.EncodeToString(entropy[32:])
 	plan := dsgaCreationPlan{dsgaCreationIdentity: dsgaCreationIdentity{1, 17, policy.Namespace, hex.EncodeToString(entropy[:16]), "ci_" + hex.EncodeToString(entropy[16:32])},
 		Image: policy.Image, OperationUUID: fmt.Sprintf("%s-%s-%s-%s-%s", uuid[:8], uuid[8:12], uuid[12:16], uuid[16:20], uuid[20:]),
-		AcceptedAt: now.UTC().Format(time.RFC3339Nano), MemorySlotBytes: policy.MemorySlotBytes, Budget: policy.Budget}
+		AcceptedAt: now.UTC().Format(time.RFC3339Nano), MemorySlotBytes: policy.MemorySlotBytes, Budget: policy.Budget, VM: policy.VM}
 	if err := plan.validate(p); err != nil {
 		return dsgaCreationPlan{}, err
 	}

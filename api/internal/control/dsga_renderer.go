@@ -125,7 +125,7 @@ func renderDSGAComputeBootstrap(p createPayload, plan dsgaCreationPlan, vmUID st
 		},
 		"compute_ctl_config": map[string]any{
 			"jwks": map[string]any{"keys": []any{map[string]any{"use": "sig", "key_ops": []string{"verify"}, "alg": "EdDSA", "kid": hex.EncodeToString(id[:16]), "kty": "OKP", "crv": "Ed25519", "x": base64.RawURLEncoding.EncodeToString(public)}}},
-			"tls":  map[string]string{"key_path": "/run/neon/management/control.key", "cert_path": "/run/neon/management/control.crt"},
+			"tls":  map[string]string{"key_path": dsgaTLSKey, "cert_path": dsgaTLSCert},
 		},
 	}
 	encoded, err := json.Marshal(document)

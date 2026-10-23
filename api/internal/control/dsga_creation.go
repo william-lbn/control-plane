@@ -140,7 +140,11 @@ func (k *kubeClient) prepareDSGACreation(ctx context.Context, input dsgaCreation
 		if !apierrors.IsNotFound(secretErr) {
 			return nil, errDSGACreationIdentity
 		}
-		vm, err = vmAPI.Create(ctx, input.VM.DeepCopy(), metav1.CreateOptions{})
+		// typed Create默认可按Retry-After重试429；创建原身份的一次写入禁止
+		// 透明重发。未知结果必须交下一次原Operation GET，不能生成新UID。
+		created := new(vmv1.VirtualMachine)
+		err = vms.NeonvmV1().RESTClient().Post().Namespace(k.namespace).Resource("virtualmachines").Body(input.VM.DeepCopy()).MaxRetries(0).Do(ctx).Into(created)
+		vm = created
 	}
 	if err != nil {
 		return nil, err
@@ -183,7 +187,9 @@ func (k *kubeClient) prepareDSGACreation(ctx context.Context, input dsgaCreation
 		if vm.Spec.DSGABootstrap.Ready || input.ExpectedConfigUID != "" {
 			return nil, errDSGACreationIdentity
 		}
-		secret, err = secretAPI.Create(ctx, desired, metav1.CreateOptions{})
+		created := new(core.Secret)
+		err = clients.CoreV1().RESTClient().Post().Namespace(k.namespace).Resource("secrets").Body(desired).MaxRetries(0).Do(ctx).Into(created)
+		secret = created
 		if err != nil {
 			return nil, err
 		}

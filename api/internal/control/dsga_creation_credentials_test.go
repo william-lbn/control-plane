@@ -82,6 +82,7 @@ func credentialSourceFixture(t *testing.T, legacy ...bool) (context.Context, *se
 	p, policy, _ := dsgaPlanFixture(t)
 	p.ProjectID, p.BranchID, p.EndpointID, p.TenantID, p.TimelineID = input.Payload.ProjectID, input.Payload.BranchID, input.Payload.EndpointID, input.Payload.TenantID, input.Payload.TimelineID
 	policy.Namespace = f.kube.namespace
+	policy.VM = dsgaVMProfileFixture()
 	plan, err := newDSGACreationPlan(p, policy, time.Now())
 	if err != nil {
 		t.Fatal(err)
@@ -144,6 +145,10 @@ func credentialSourceFixture(t *testing.T, legacy ...bool) (context.Context, *se
 	// 原Operation接受前通过真实typed生产者写入并读回immutable来源，而非手填
 	// UID/摘要。其后元数据库、Renderer和held→ready继续使用真实生产代码。
 	plan, err = f.kube.prepareDSGACredentials(ctx, p, plan, op, dsgaCredentialInput{Password: "credential-fixture-password"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	input.VM, err = renderDSGAVM(p, plan)
 	if err != nil {
 		t.Fatal(err)
 	}
