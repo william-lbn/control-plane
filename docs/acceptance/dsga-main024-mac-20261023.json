@@ -1,0 +1,88 @@
+{
+  "recorded_at": "2026-10-23T15:14:52.748169+08:00",
+  "control_plane_merge": "2b89687072e31dae1a28a8e781bd82375a3655b8",
+  "upstream_commit": "024b065ae399786ec0dc40a7607a88e4fe25c084",
+  "upstream_files_sha256": {
+    ".github/workflows/live-e2e.yml": "89ac007d9547d24c9a4795301e5ca20a9d58647a7dbbac64116268bdf4622a9f",
+    "README.md": "2bdc0d3db68de4f06be5ab1f0e05424cc9784c7c07e821aa672648fc12cac384",
+    "api/internal/aigateway/config.go": "a0aac7900b0bb921debad10145cfb9f1636fbae0b9dfa201a8d637a406163f52",
+    "api/internal/control/ai_credits.go": "ada59207b689e539bff475f44a48392aaa75987919937c6db66220851bbb97d6",
+    "api/internal/control/ai_gateway.go": "eabe955e813af5bb8a101ec263abfeb92ff561d3735a4fb28efba4acf43ec0b2",
+    "api/internal/control/ai_provider_catalog.go": "4048b8fe0ed15fdd61f58c5610d43b804b5ee94f5f9d459d0dca2907a1769ffa",
+    "api/internal/control/ai_provider_organizations.go": "88102f44ed25a563415801a37722e81e931996b78887f5f0bf5df2ebeb74eea6",
+    "api/internal/control/ai_provider_organizations_integration_test.go": "eb5448c6104a9e5b22c9c9cb753400f4d31ba658bae7522666ad4b64d8bc571e",
+    "api/internal/control/ai_provider_settings.go": "a03ad0ad7037c740e67815edc9feacc6704bd55d0d99aef4405e47dd21dc2b5d",
+    "api/internal/control/ai_provider_worker.go": "c318d5551a4006a77d84abbb99ab79572d369b951ee5f1dda5b33c3b3a6958cf",
+    "api/internal/control/ai_providers.go": "9d85d4d8d8573fc5fe9b0c2b02520b8ba23b55958d8e2842570b02f07b6a1a0e",
+    "api/internal/control/handlers.go": "44ba9e62c2fc2d3749f8a204fe0f175e8054a196e5c16bc40044264c4fd876ef",
+    "api/internal/control/migrations/063_ai_organization_providers.sql": "668e306d87a7298c25b72edca0d960b1e7e28e61a292e753cb2b58277cef3b1e",
+    "charts/neon-control-plane/Chart.yaml": "f2353ef843273416da5ff07ad40c9e3622f0b94b15a013c42a89ce4d1f69ec58",
+    "contracts/openapi-v1.json": "faeaf71cadd865986c5aaa7e5a85873514701e5ed600c1f3b9f4bb2090a885c6",
+    "docs/AI-GATEWAY-IMPLEMENTATION.md": "c8c794c6ccddea56266eb02e3648823b3544c3015a6ca1366fdc29eb4e1dd5b0",
+    "docs/AI-ORGANIZATION-BYOK.md": "469bde076bd913bfeb874ba75c256baf050d0b8f2159331c4b7740265d732616",
+    "docs/API.md": "61f2f5ae9ccc0e2e566f7758aba729a0029b4c6101c46414094142efdca7a27f",
+    "docs/DELIVERY-2026-10-23-AI-ORGANIZATION-BYOK.md": "5559944e8b1800c5f1487bbccbb0b4d2bbf87612af6a2fb88a60aa19627c3353",
+    "docs/FUNCTIONAL-STATUS-2026-10-21.md": "d36996b0921123e14898b9a63f672b1d1606ab37bae4e359be74d4c34a945e66",
+    "docs/PRODUCT-COMPLETION-PLAN.md": "a56cf7623d75c9fe799de034e91d39df191fa5b91f2277af670377ede7113f3b",
+    "docs/PRODUCTION-GATES.md": "716310893491a8fd50311043d5da3d92daeb78a068741b1216b996e7da813a1f",
+    "docs/REMAINING-REQUIREMENTS-2026-10-16.md": "2d339e22d94741ee6e06bca5bb5e2db71217d5094d652c1f21de48dcf805c78b",
+    "docs/TESTING.md": "d90f629c63d81e691ff4940329ef19dcf0d9f796e48933c313f3c32ccce946d6",
+    "docs/acceptance/2026-10-23-ai-organization-byok-functional.json": "86391fdb917bb8eaf267b43a96bcefb16a19976810f79a65d2f30aa8155506ce",
+    "web/e2e/ai-organization-byok.spec.ts": "eacc7cf85351dd86aff758d4109d3f44f225db302a462bad1ef2b7cb00a0e313",
+    "web/src/features/ai/AIGateway.tsx": "87b1181d68dd47cc03ccaeaadea2f063c8e86e8c9e82bd36aef25c46771adce4",
+    "web/src/features/ai/AIOrganizationProviders.tsx": "1eb203bb484cb5370c860657829b180fc912f4c056ecf1d022bee95809b47b5d",
+    "web/src/features/ai/AIProviders.tsx": "40c62374a905d1072b6fa89832e20632595e174a55920300f2c30124bfa72466",
+    "web/src/features/identity/Organizations.tsx": "c7e92100e360229cc7e53bf4a511397f85378ab94f2d63e093454a880d789840"
+  },
+  "actual_scoped_results": {
+    "control": {
+      "top_level": 32,
+      "pass_events": 34,
+      "failed": 0,
+      "skipped": 0,
+      "seconds": 17.262
+    },
+    "gateway": {
+      "top_level": 21,
+      "pass_events": 70,
+      "failed": 0,
+      "skipped": 0,
+      "seconds": 2.516
+    }
+  },
+  "web": "typecheck and Vite build passed; unchanged47 unit tests not rerun",
+  "vet": "control/aigateway affected packages passed",
+  "no_images_or_deploy": true,
+  "full_v3": "active/incomplete; credentials factory work not started before this maintenance",
+  "all487_api_source_verified": true,
+  "DSGA_sources_unchanged_from_previous_published": true,
+  "pg": "fcada44b67d239aea8e699a721b99c470fc24d65",
+  "as": "8e1e0ea93d5f2775376622a38ed10f39d9d1fc8c",
+  "same_canonical_branches": true,
+  "other_PG_versions": "deferred by owner",
+  "not_repeated": [
+    "oldPG/DSGA/SDK/Go bridge/control other tests",
+    "unchanged47 Web tests",
+    "oldCLI crossbuild"
+  ],
+  "not_run": [
+    "protected Linux BYOK browser E2E (requires owned Linux fixture; no substitute)",
+    "images/deployment/main merge/production"
+  ],
+  "remaining": "PG17 credential producer/catalog/publicworker/init receipt/fullbudget/quiesce/finalRunner/storageE2E coding remains; Goal active/incomplete",
+  "evidence_sha256": {
+    "build/dsga-main024-final-proof.json": "c606094aa6185e2a67351d292a4b358c201aa62d3f47092126d7995edc9e6c10",
+    "build/dsga-main024-upstream.json": "07702c79151969ab059586f809ebfa91428ac4dd009c969ea91acbbfe246ae89",
+    "build/control-main024-aigateway.jsonl": "019287d1d4f55380e0197cf483c4d56d14aed879e33300d9682dba2d1e3a6fc7",
+    "build/control-main024-aigateway.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "build/control-main024-vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "build/control-main024-web-build.log": "1c1f3e2fffe5574b206783c01cbb8eb50e07e9a4dab3842e42496b22103ce58a",
+    "build/control-main024-byok-affected/summary.json": "916398f702ba1ddf71501a31ce2797da94c73a0104e32971b37d9961402a98bc",
+    "build/control-main024-byok-affected/source-sha256.json": "ad21b52cb961f953c01d6271efac199a52563b7a7130f6b5e20a201c554dffd4",
+    "build/control-main024-byok-affected/tests.jsonl": "84e370a19740bdb3a6c124468627b23bada03429fc57e7550e8dbd649bcfcc7f",
+    "build/control-main024-byok-affected/tests.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "build/control-main024-byok-affected/postgres-version.txt": "38ebacac17c8b72f137d0ce143675f181baec4a3b3548b63c25b5e98cfe8be8e",
+    "build/control-main024-byok-affected/metadata.json": "a1bb751863442818bbc4836cb483866d402aa819a2430be4422670e5a28231e1",
+    "build/control-main024-byok-affected/postgres.log": "c225e04fcb0fde5afd2bff8206c57e65fe7b6658cd2b65befdbff150f602674b"
+  }
+}
