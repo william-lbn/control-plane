@@ -164,6 +164,7 @@ func (s *server) runLeaderControllers(ctx context.Context, role processRole, sta
 	start(s.runBranchExpirationController)
 	start(s.runMonitor)
 	start(s.cleanSessions)
+	start(s.runAIInputExpiry) // Expiry must continue when inference or key loading is disabled.
 	if s.aiProviders != nil && s.aiProviders.opener != nil {
 		start(s.runAIProviderController)
 	}

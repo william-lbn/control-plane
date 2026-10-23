@@ -14,6 +14,7 @@ import (
 )
 
 type Route struct {
+	InputModalities []string `json:"input_modalities,omitempty"`
 	OwnerOrgID      string   `json:"-"`
 	ProviderID      string   `json:"-"`
 	RevisionID      string   `json:"-"`
@@ -99,6 +100,9 @@ func (c *Config) Validate() error {
 		if !modelID.MatchString(r.ID) || seen[r.ID] || len(r.Name) < 1 || len(r.Name) > 100 || len(r.UpstreamModel) < 1 || len(r.UpstreamModel) > 128 || r.Provider != "openai_compatible" || e != nil || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || strings.TrimRight(u.Path, "/") != "/v1" || !(u.Scheme == "https" || u.Scheme == "http" && r.LabHTTP) || r.MaxOutputTokens < 1 || r.MaxOutputTokens > 4096 || len(r.AllowedIPs) < 1 || len(r.AllowedIPs) > 8 {
 			return errors.New("invalid AI model route")
 		}
+		if ValidateInputModalities(r.Protocols, r.InputModalities) != nil {
+			return errors.New("invalid AI input modalities")
+		}
 		for _, ip := range r.AllowedIPs {
 			if net.ParseIP(ip) == nil {
 				return errors.New("AI route requires pinned provider IPs")
@@ -132,7 +136,7 @@ func (c *Config) PublicModels() []map[string]any {
 		if r.OwnerOrgID != "" {
 			owner = "organization_byok"
 		}
-		items = append(items, map[string]any{"billing_owner": owner, "id": r.ID, "object": "model", "name": r.Name, "owned_by": ProviderType(r.ProviderType), "protocols": r.SupportedProtocols(), "max_output_tokens": r.MaxOutputTokens, "price": r.Price})
+		items = append(items, map[string]any{"billing_owner": owner, "input_modalities": r.InputTypes(), "id": r.ID, "object": "model", "name": r.Name, "owned_by": ProviderType(r.ProviderType), "protocols": r.SupportedProtocols(), "max_output_tokens": r.MaxOutputTokens, "price": r.Price})
 	}
 	return items
 }

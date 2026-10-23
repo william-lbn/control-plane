@@ -1,6 +1,6 @@
 # 测试与交付标准
 
-新增 `ai-organization-byok.spec.ts` 累计七个唯一实机检查点通过，只发起一次合成推理；修正测试目录路径后从原检查点续验。5 组新增 Go/PG、3 组受影响检查及源码/前端门槛见[0.76 交付](DELIVERY-2026-10-23-AI-ORGANIZATION-BYOK.md)。83 个可选入口不是本批全量重跑。
+新增 `ai-input-files.spec.ts` 八个唯一实机检查点通过，四种原生协议各一次合成调用；原键上传恢复、跨分支拒绝、删除和历史保留全部通过。9 组新增 PostgreSQL、4 组受影响、3 组新媒体及前端门槛见[0.77 交付](DELIVERY-2026-10-23-AI-INPUT-FILES.md)。84 个可选入口不是本批全量重跑。
 
 新增 `ai-credits.spec.ts` 八个唯一实机检查点一次通过，仅两次合成推理；9 组新增 Go/PG、3 组受影响检查和当前源码/前端门槛见[0.75 交付](DELIVERY-2026-10-23-AI-ORGANIZATION-CREDITS.md)。82 个可选入口不是本批全量重跑。
 

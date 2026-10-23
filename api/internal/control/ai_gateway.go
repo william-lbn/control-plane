@@ -41,8 +41,18 @@ func (s *server) aiRelay(w http.ResponseWriter, r *http.Request) {
 		aigateway.Error(w, 503, "ai_gateway_disabled")
 		return
 	}
+	fileRoute := strings.HasSuffix(r.URL.Path, "/v1/files") || r.PathValue("inputFile") != ""
 	path := "/models"
-	if r.Method == http.MethodPost {
+	if fileRoute {
+		path = "/files"
+		if id := r.PathValue("inputFile"); id != "" {
+			path += "/" + url.PathEscape(id)
+		}
+		if strings.HasSuffix(r.URL.Path, "/content") {
+			path += "/content"
+		}
+	}
+	if !fileRoute && r.Method == http.MethodPost {
 		path = "/chat/completions"
 		if protocol, model, stream := aiNativeRequestRoute(r); protocol != "" {
 			path = aiNativePath(protocol, model, stream)
@@ -55,6 +65,13 @@ func (s *server) aiRelay(w http.ResponseWriter, r *http.Request) {
 	}
 	request.Header.Set("Authorization", aiAuthorization(r))
 	request.Header.Set("Content-Type", "application/json")
+	if fileRoute {
+		for _, name := range []string{"Content-Type", "Idempotency-Key", "X-Neon-Filename", "X-Neon-File-TTL"} {
+			if value := r.Header.Get(name); value != "" {
+				request.Header.Set(name, value)
+			}
+		}
+	}
 	transport := &http.Transport{Proxy: nil, ResponseHeaderTimeout: time.Duration(s.ai.TimeoutSeconds) * time.Second}
 	defer transport.CloseIdleConnections()
 	client := &http.Client{Transport: transport, Timeout: time.Duration(s.ai.TimeoutSeconds+5) * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
@@ -64,7 +81,7 @@ func (s *server) aiRelay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer response.Body.Close()
-	for _, name := range []string{"Content-Type", "Cache-Control", "X-Request-ID", "X-Accel-Buffering"} {
+	for _, name := range []string{"Content-Type", "Cache-Control", "X-Request-ID", "X-Accel-Buffering", "Idempotency-Replayed", "Content-Disposition", "Content-Length", "ETag"} {
 		if v := response.Header.Get(name); v != "" {
 			w.Header().Set(name, v)
 		}
@@ -186,14 +203,19 @@ func (s *server) aiConsoleRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	protocol, _, _ := aiNativeRequestRoute(r)
-	q, _, e := aigateway.Decode(raw, snapshot.Config)
+	decodeRaw, _, inputErr := s.resolveAIInputs(r.Context(), r.PathValue("project"), r.PathValue("branch"), raw, protocol)
+	if inputErr != nil {
+		aiInputFailure(w, r, inputErr)
+		return
+	}
+	q, _, e := aigateway.Decode(decodeRaw, snapshot.Config)
 	if protocol == "" && e != nil {
-		native, _, err := aigateway.DecodeNative(raw, snapshot.Config, "chat_completions", "", false)
+		native, _, err := aigateway.DecodeNative(decodeRaw, snapshot.Config, "chat_completions", "", false)
 		q = aigateway.ChatRequest{Model: native.Model, Stream: native.Stream, MaxTokens: native.MaxTokens}
 		e = err
 	}
 	if protocol != "" {
-		native, _, err := aigateway.DecodeNative(raw, snapshot.Config, protocol, "", false)
+		native, _, err := aigateway.DecodeNative(decodeRaw, snapshot.Config, protocol, "", false)
 		q = aigateway.ChatRequest{Model: native.Model, Stream: native.Stream, MaxTokens: native.MaxTokens, Protocol: protocol}
 		e = err
 	}
@@ -308,6 +330,12 @@ func RunAIGateway(ctx context.Context) error {
 		jsonResponse(w, 200, record{"status": "ready"})
 	})
 	mux.HandleFunc("GET /ai/v1/{branch}/v1/models", s.aiPublic)
+	mux.HandleFunc("GET /ai/v1/{branch}/v1/files", s.aiPublicInputFiles)
+	mux.HandleFunc("POST /ai/v1/{branch}/v1/files", s.aiPublicInputFiles)
+	mux.HandleFunc("GET /ai/v1/{branch}/v1/files/{inputFile}", s.aiPublicInputFiles)
+	mux.HandleFunc("GET /ai/v1/{branch}/v1/files/{inputFile}/content", s.aiPublicInputFiles)
+	mux.HandleFunc("DELETE /ai/v1/{branch}/v1/files/{inputFile}", s.aiPublicInputFiles)
+
 	mux.HandleFunc("POST /ai/v1/{branch}/v1/chat/completions", s.aiPublic)
 	registerAINativePublic(mux, "branch", s.aiPublic)
 	httpServer := &http.Server{Addr: env("NEON_AI_BIND", ":8791"), Handler: mux, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: time.Duration(cfg.TimeoutSeconds+10) * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 16384}
@@ -329,41 +357,27 @@ func RunAIGateway(ctx context.Context) error {
 func (s *server) aiPublic(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	snapshot, catalogErr := s.aiBranchCatalog(r.Context(), true, r.PathValue("branch"))
-	if catalogErr != nil || snapshot.Config == nil {
-		aigateway.Error(w, 503, "provider_catalog_unavailable")
-		return
-	}
-	cfg := snapshot.Config
 	branch := r.PathValue("branch")
-	model := ""
-	var q aigateway.ChatRequest
-	var native aigateway.NativeRequest
 	protocol, pathModel, pathStream := aiNativeRequestRoute(r)
-	var route aigateway.Route
+	model := ""
 	raw := []byte{}
 	var e error
 	if r.Method == http.MethodPost {
 		raw, e = io.ReadAll(io.LimitReader(r.Body, aigateway.MaxBodyBytes+1))
-		if e != nil {
+		if e != nil || len(raw) > aigateway.MaxBodyBytes {
 			aigateway.Error(w, 400, "invalid_request")
 			return
 		}
-		q, route, e = aigateway.Decode(raw, cfg)
-		if protocol == "" && e != nil {
-			native, route, e = aigateway.DecodeNative(raw, cfg, "chat_completions", "", false)
-			q = aigateway.ChatRequest{Model: native.Model, Stream: native.Stream, MaxTokens: native.MaxTokens}
+		var hint struct {
+			Model string `json:"model"`
 		}
-		if protocol != "" {
-			native, route, e = aigateway.DecodeNative(raw, cfg, protocol, pathModel, pathStream)
-			q = aigateway.ChatRequest{Model: native.Model, Stream: native.Stream, MaxTokens: native.MaxTokens, Protocol: protocol}
+		_ = json.Unmarshal(raw, &hint)
+		model = hint.Model
+		if pathModel != "" {
+			model = pathModel
 		}
-		if e != nil {
-			aigateway.Error(w, 400, "invalid_request")
-			return
-		}
-		model = q.Model
 	}
+	ticketGeneration := -1
 	requestID := newID("air_")
 	actor, project, credential := "", "", ""
 	models := []string{}
@@ -373,10 +387,7 @@ func (s *server) aiPublic(w http.ResponseWriter, r *http.Request) {
 			aigateway.Error(w, 401, "invalid_console_ticket")
 			return
 		}
-		if s.aiProviders != nil && t.Generation != cfg.Generation {
-			aigateway.Error(w, 409, "provider_catalog_changed")
-			return
-		}
+		ticketGeneration = t.Generation
 		actor = t.Actor
 		requestID = t.ID
 		e = s.db.QueryRow(r.Context(), `SELECT b.project_id FROM branches b JOIN users u ON u.id=$2 AND NOT u.disabled JOIN projects p ON p.id=b.project_id AND p.state='ready' AND p.deleted_at IS NULL WHERE b.id=$1 AND b.state='ready' AND b.deleted_at IS NULL`, branch, actor).Scan(&project)
@@ -410,6 +421,46 @@ func (s *server) aiPublic(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	// Only an authenticated project/branch caller may open provider keys or
+	// resolve private input. Invalid callers cannot probe private model aliases.
+	snapshot, catalogErr := s.aiBranchCatalog(r.Context(), r.Method == http.MethodPost, branch)
+	if catalogErr != nil || snapshot.Config == nil {
+		aigateway.Error(w, 503, "provider_catalog_unavailable")
+		return
+	}
+	cfg := snapshot.Config
+	if ticketGeneration >= 0 && s.aiProviders != nil && ticketGeneration != cfg.Generation {
+		aigateway.Error(w, 409, "provider_catalog_changed")
+		return
+	}
+	var q aigateway.ChatRequest
+	var native aigateway.NativeRequest
+	var route aigateway.Route
+	if r.Method == http.MethodPost {
+		decodeRaw, files, inputErr := s.resolveAIInputs(r.Context(), project, branch, raw, protocol)
+		if inputErr != nil {
+			aiInputFailure(w, r, inputErr)
+			return
+		}
+		q, route, e = aigateway.Decode(decodeRaw, cfg)
+		if protocol == "" && e != nil {
+			native, route, e = aigateway.DecodeNative(decodeRaw, cfg, "chat_completions", "", false)
+			q = aigateway.ChatRequest{Model: native.Model, Stream: native.Stream, MaxTokens: native.MaxTokens}
+		}
+		if protocol != "" {
+			native, route, e = aigateway.DecodeNative(decodeRaw, cfg, protocol, pathModel, pathStream)
+			q = aigateway.ChatRequest{Model: native.Model, Stream: native.Stream, MaxTokens: native.MaxTokens, Protocol: protocol}
+		}
+		if e != nil {
+			aigateway.Error(w, 400, "invalid_request")
+			return
+		}
+		q.InputFiles = files
+		if q.Model != model {
+			aigateway.Error(w, 400, "invalid_request")
+			return
+		}
+	}
 	if r.Method == http.MethodGet {
 		allowed := cfg.PublicModels()
 		if len(models) > 0 {
@@ -435,6 +486,11 @@ func (s *server) aiPublic(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	admitted, e := s.reserveAIRequestFor(ctx, requestID, project, branch, actor, credential, q, cfg)
 	if e != nil {
+		var inputProblem aiProviderProblem
+		if errors.As(e, &inputProblem) {
+			aiInputFailure(w, r, e)
+			return
+		}
 		if errors.Is(e, errAICreditsExceeded) || errors.Is(e, errAICreditsPrice) || errors.Is(e, errAICreditsPending) {
 			code := "organization_credits_exhausted"
 			if errors.Is(e, errAICreditsPrice) {
@@ -542,6 +598,9 @@ func (s *server) reserveAIRequestFor(ctx context.Context, id, project, branch, a
 	}
 	_, e = tx.Exec(ctx, `INSERT INTO ai_gateway_requests(id,project_id,branch_id,actor_id,credential_id,model_id,route_generation,streaming,state,expires_at,protocol,billing_owner,billing_org_id,provider_id,provider_revision_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,'running',clock_timestamp()+make_interval(secs=>$9),$10,$11,$12,NULLIF($13,''),NULLIF($14,''))`, id, project, branch, actor, cid, q.Model, cfg.Generation, q.Stream, cfg.TimeoutSeconds+10, protocol, billingOwner, billingOrg, route.ProviderID, route.RevisionID)
 	if e != nil {
+		return false, e
+	}
+	if e = pinAIInputFiles(ctx, tx, id, project, branch, q.InputFiles); e != nil {
 		return false, e
 	}
 	if e = reserveAIBudget(ctx, tx, id, branch, route, q.MaxTokens); e != nil {

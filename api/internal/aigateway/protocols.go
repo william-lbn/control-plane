@@ -102,7 +102,7 @@ func statelessInput(v any, depth int) bool {
 	case map[string]any:
 		for k, value := range x {
 			switch k {
-			case "file_id", "file_uri", "fileUri", "fileData", "cachedContent", "conversation", "previous_response_id", "container", "vector_store_ids":
+			case "file_url", "fileUrl", "file_id", "file_uri", "fileUri", "fileData", "cachedContent", "conversation", "previous_response_id", "container", "vector_store_ids":
 				return false
 			case "image_url":
 				s, ok := value.(string)
@@ -113,7 +113,7 @@ func statelessInput(v any, depth int) bool {
 					return false
 				}
 			}
-			if k == "type" && (value == "item_reference" || value == "input_file") {
+			if k == "type" && (value == "item_reference" || value == "input_file" && x["file_data"] == nil) {
 				return false
 			}
 			if !statelessInput(value, depth+1) {
@@ -145,7 +145,7 @@ func DecodeNative(raw []byte, c *Config, protocol, pathModel string, pathStream 
 		q.Model = pathModel
 	}
 	r, ok := c.Find(q.Model)
-	if !ok || !r.Supports(protocol) || !statelessInput(v, 0) {
+	if !ok || !r.Supports(protocol) || !statelessInput(v, 0) || validateNativeMedia(v, protocol, r) != nil || nativeTextBytes(v) > 16000 {
 		return q, r, errNativeRequest
 	}
 	if stream, exists := v["stream"]; exists {
@@ -189,8 +189,7 @@ func DecodeNative(raw []byte, c *Config, protocol, pathModel string, pathStream 
 			if text, ok := m["content"].(string); ok {
 				inputBytes += len(text)
 			} else {
-				encoded, _ := json.Marshal(m["content"])
-				inputBytes += len(encoded)
+				inputBytes += nativeTextBytes(m["content"])
 			}
 		}
 		if inputBytes > 16000 {

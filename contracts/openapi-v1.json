@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.76.0",
+    "version": "0.77.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -3726,7 +3726,8 @@
           "id",
           "name",
           "max_output_tokens",
-          "billing_owner"
+          "billing_owner",
+          "input_modalities"
         ],
         "properties": {
           "id": {
@@ -3773,6 +3774,21 @@
               "platform",
               "organization_byok"
             ]
+          },
+          "input_modalities": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 5,
+            "items": {
+              "type": "string",
+              "enum": [
+                "text",
+                "image",
+                "pdf",
+                "audio",
+                "video"
+              ]
+            }
           }
         }
       },
@@ -6335,6 +6351,21 @@
                 "type": "null"
               }
             ]
+          },
+          "input_modalities": {
+            "type": "array",
+            "uniqueItems": true,
+            "maxItems": 5,
+            "items": {
+              "type": "string",
+              "enum": [
+                "text",
+                "image",
+                "pdf",
+                "audio",
+                "video"
+              ]
+            }
           }
         },
         "required": [
@@ -8196,6 +8227,148 @@
           "reconciled",
           "evidence_sha256",
           "reconciled_at"
+        ]
+      },
+      "AIInputFile": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^nif_[a-f0-9]{24}$"
+          },
+          "object": {
+            "const": "file"
+          },
+          "filename": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "content_type": {
+            "type": "string",
+            "enum": [
+              "image/png",
+              "image/jpeg",
+              "image/gif",
+              "image/webp",
+              "application/pdf",
+              "audio/wav",
+              "audio/mpeg",
+              "video/mp4"
+            ]
+          },
+          "purpose": {
+            "type": "string",
+            "enum": [
+              "user_data",
+              "vision"
+            ]
+          },
+          "bytes": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1048576
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "created_at": {
+            "type": "integer"
+          },
+          "expires_at": {
+            "type": "integer"
+          },
+          "status": {
+            "const": "processed"
+          }
+        },
+        "required": [
+          "id",
+          "object",
+          "filename",
+          "content_type",
+          "purpose",
+          "bytes",
+          "sha256",
+          "created_at",
+          "expires_at",
+          "status"
+        ]
+      },
+      "AIInputFileList": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "object": {
+            "const": "list"
+          },
+          "has_more": {
+            "const": false
+          },
+          "data": {
+            "type": "array",
+            "maxItems": 32,
+            "items": {
+              "$ref": "#/components/schemas/AIInputFile"
+            }
+          }
+        },
+        "required": [
+          "object",
+          "data",
+          "has_more"
+        ]
+      },
+      "AIInputFileDeleted": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^nif_[a-f0-9]{24}$"
+          },
+          "object": {
+            "const": "file"
+          },
+          "deleted": {
+            "const": true
+          }
+        },
+        "required": [
+          "id",
+          "object",
+          "deleted"
+        ]
+      },
+      "AIInputGatewayError": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "type": {
+                "const": "gateway_error"
+              },
+              "code": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type",
+              "code",
+              "message"
+            ]
+          }
+        },
+        "required": [
+          "error"
         ]
       }
     },
@@ -27297,6 +27470,1190 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/EmptyRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/ai-gateway/files": {
+      "get": {
+        "operationId": "listAIInputFiles",
+        "tags": [
+          "AI Gateway"
+        ],
+        "summary": "list branch AI input file",
+        "description": "Exact-branch references only; 1 MiB per file, 8 files/1 MiB per inference, 32 live files/16 MiB per branch. Encrypted content, metadata retained after deletion/expiry. Deleting blocks new admissions; accepted inference may finish. Mutation requires original Idempotency-Key. Supplier file IDs and remote URLs are not accepted.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Scoped AI input file operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputFileList"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createAIInputFile",
+        "tags": [
+          "AI Gateway"
+        ],
+        "summary": "create branch AI input file",
+        "description": "Exact-branch references only; 1 MiB per file, 8 files/1 MiB per inference, 32 live files/16 MiB per branch. Encrypted content, metadata retained after deletion/expiry. Deleting blocks new admissions; accepted inference may finish. Mutation requires original Idempotency-Key. Supplier file IDs and remote URLs are not accepted.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          },
+          {
+            "name": "X-Neon-Filename",
+            "in": "header",
+            "required": false,
+            "description": "Required for raw binary uploads; multipart uses the file part filename.",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "X-Neon-File-TTL",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 60,
+              "maximum": 604800,
+              "default": 86400
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Scoped AI input file operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputFile"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "image/png": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/jpeg": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/gif": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/webp": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "application/pdf": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "audio/wav": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "audio/mpeg": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "video/mp4": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "purpose": {
+                    "type": "string",
+                    "enum": [
+                      "user_data",
+                      "vision"
+                    ]
+                  }
+                },
+                "required": [
+                  "file"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/ai-gateway/files/{inputFile}": {
+      "get": {
+        "operationId": "getAIInputFile",
+        "tags": [
+          "AI Gateway"
+        ],
+        "summary": "get branch AI input file",
+        "description": "Exact-branch references only; 1 MiB per file, 8 files/1 MiB per inference, 32 live files/16 MiB per branch. Encrypted content, metadata retained after deletion/expiry. Deleting blocks new admissions; accepted inference may finish. Mutation requires original Idempotency-Key. Supplier file IDs and remote URLs are not accepted.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "name": "inputFile",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^nif_[a-f0-9]{24}$"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Scoped AI input file operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputFile"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteAIInputFile",
+        "tags": [
+          "AI Gateway"
+        ],
+        "summary": "delete branch AI input file",
+        "description": "Exact-branch references only; 1 MiB per file, 8 files/1 MiB per inference, 32 live files/16 MiB per branch. Encrypted content, metadata retained after deletion/expiry. Deleting blocks new admissions; accepted inference may finish. Mutation requires original Idempotency-Key. Supplier file IDs and remote URLs are not accepted.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "name": "inputFile",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^nif_[a-f0-9]{24}$"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Scoped AI input file operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputFileDeleted"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/ai-gateway/files/{inputFile}/content": {
+      "get": {
+        "operationId": "contentAIInputFile",
+        "tags": [
+          "AI Gateway"
+        ],
+        "summary": "content branch AI input file",
+        "description": "Exact-branch references only; 1 MiB per file, 8 files/1 MiB per inference, 32 live files/16 MiB per branch. Encrypted content, metadata retained after deletion/expiry. Deleting blocks new admissions; accepted inference may finish. Mutation requires original Idempotency-Key. Supplier file IDs and remote URLs are not accepted.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "name": "inputFile",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^nif_[a-f0-9]{24}$"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Scoped AI input file operation",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/gif": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "audio/wav": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "audio/mpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "video/mp4": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/ai/v1/{aiBranch}/v1/files": {
+      "get": {
+        "operationId": "gatewayListAIInputFiles",
+        "tags": [
+          "AI Gateway"
+        ],
+        "summary": "list branch AI input file",
+        "description": "Exact-branch references only; 1 MiB per file, 8 files/1 MiB per inference, 32 live files/16 MiB per branch. Encrypted content, metadata retained after deletion/expiry. Deleting blocks new admissions; accepted inference may finish. Mutation requires original Idempotency-Key. Supplier file IDs and remote URLs are not accepted.",
+        "parameters": [
+          {
+            "name": "aiBranch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "backendCredential": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Scoped AI input file operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputFileList"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Input unavailable or request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputGatewayError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Input unavailable or request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputGatewayError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Input unavailable or request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputGatewayError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Input unavailable or request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputGatewayError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Input unavailable or request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputGatewayError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Input unavailable or request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputGatewayError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Input unavailable or request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputGatewayError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "gatewayCreateAIInputFile",
+        "tags": [
+          "AI Gateway"
+        ],
+        "summary": "create branch AI input file",
+        "description": "Exact-branch references only; 1 MiB per file, 8 files/1 MiB per inference, 32 live files/16 MiB per branch. Encrypted content, metadata retained after deletion/expiry. Deleting blocks new admissions; accepted inference may finish. Mutation requires original Idempotency-Key. Supplier file IDs and remote URLs are not accepted.",
+        "parameters": [
+          {
+            "name": "aiBranch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          },
+          {
+            "name": "X-Neon-Filename",
+            "in": "header",
+            "required": false,
+            "description": "Required for raw binary uploads; multipart uses the file part filename.",
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            }
+          },
+          {
+            "name": "X-Neon-File-TTL",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 60,
+              "maximum": 604800,
+              "default": 86400
+            }
+          }
+        ],
+        "security": [
+          {
+            "backendCredential": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Scoped AI input file operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputFile"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Input unavailable or request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputGatewayError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Input unavailable or request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputGatewayError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Input unavailable or request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputGatewayError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Input unavailable or request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputGatewayError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Input unavailable or request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputGatewayError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Input unavailable or request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputGatewayError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Input unavailable or request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputGatewayError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "image/png": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/jpeg": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/gif": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "image/webp": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "application/pdf": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "audio/wav": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "audio/mpeg": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "video/mp4": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "purpose": {
+                    "type": "string",
+                    "enum": [
+                      "user_data",
+                      "vision"
+                    ]
+                  }
+                },
+                "required": [
+                  "file"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai/v1/{aiBranch}/v1/files/{inputFile}": {
+      "get": {
+        "operationId": "gatewayGetAIInputFile",
+        "tags": [
+          "AI Gateway"
+        ],
+        "summary": "get branch AI input file",
+        "description": "Exact-branch references only; 1 MiB per file, 8 files/1 MiB per inference, 32 live files/16 MiB per branch. Encrypted content, metadata retained after deletion/expiry. Deleting blocks new admissions; accepted inference may finish. Mutation requires original Idempotency-Key. Supplier file IDs and remote URLs are not accepted.",
+        "parameters": [
+          {
+            "name": "aiBranch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "inputFile",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^nif_[a-f0-9]{24}$"
+            }
+          }
+        ],
+        "security": [
+          {
+            "backendCredential": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Scoped AI input file operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputFile"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Input unavailable or request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputGatewayError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Input unavailable or request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputGatewayError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Input unavailable or request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputGatewayError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Input unavailable or request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputGatewayError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Input unavailable or request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputGatewayError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Input unavailable or request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputGatewayError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Input unavailable or request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputGatewayError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "gatewayDeleteAIInputFile",
+        "tags": [
+          "AI Gateway"
+        ],
+        "summary": "delete branch AI input file",
+        "description": "Exact-branch references only; 1 MiB per file, 8 files/1 MiB per inference, 32 live files/16 MiB per branch. Encrypted content, metadata retained after deletion/expiry. Deleting blocks new admissions; accepted inference may finish. Mutation requires original Idempotency-Key. Supplier file IDs and remote URLs are not accepted.",
+        "parameters": [
+          {
+            "name": "aiBranch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "inputFile",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^nif_[a-f0-9]{24}$"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          }
+        ],
+        "security": [
+          {
+            "backendCredential": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Scoped AI input file operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputFileDeleted"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Input unavailable or request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputGatewayError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Input unavailable or request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputGatewayError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Input unavailable or request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputGatewayError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Input unavailable or request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputGatewayError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Input unavailable or request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputGatewayError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Input unavailable or request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputGatewayError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Input unavailable or request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputGatewayError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai/v1/{aiBranch}/v1/files/{inputFile}/content": {
+      "get": {
+        "operationId": "gatewayContentAIInputFile",
+        "tags": [
+          "AI Gateway"
+        ],
+        "summary": "content branch AI input file",
+        "description": "Exact-branch references only; 1 MiB per file, 8 files/1 MiB per inference, 32 live files/16 MiB per branch. Encrypted content, metadata retained after deletion/expiry. Deleting blocks new admissions; accepted inference may finish. Mutation requires original Idempotency-Key. Supplier file IDs and remote URLs are not accepted.",
+        "parameters": [
+          {
+            "name": "aiBranch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "inputFile",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^nif_[a-f0-9]{24}$"
+            }
+          }
+        ],
+        "security": [
+          {
+            "backendCredential": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Scoped AI input file operation",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/gif": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/webp": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "audio/wav": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "audio/mpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "video/mp4": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Input unavailable or request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputGatewayError"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Input unavailable or request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputGatewayError"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Input unavailable or request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputGatewayError"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Input unavailable or request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputGatewayError"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Input unavailable or request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputGatewayError"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Input unavailable or request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputGatewayError"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Input unavailable or request refused",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AIInputGatewayError"
+                }
               }
             }
           }

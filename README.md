@@ -7,7 +7,7 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 
 功能进度与当前优先级见 [已验收/剩余清单](docs/FUNCTIONAL-STATUS-2026-10-21.md)：14 组基础已有回执；五组专项后置，16 组尚未整体闭环。后续优先业务功能，复用来源未变的既有验收。
 
-最新状态：[2026-10-23 组织自有 AI 供应商](docs/DELIVERY-2026-10-23-AI-ORGANIZATION-BYOK.md)：组织密钥/模型隔离、发现发布、原凭据轮换和费用归属通过，BYOK 不扣平台额度并继续受分支预算约束。5 组新增 Go/PG、3 组受影响检查、累计 7 个实际页面检查通过；已完成步骤从原检查点续验。API/Worker/AI 0.76.0、Web 重建，schema 063 / Chart 0.9.73 / Core Helm 162。17 张目录表、9 PVC、916 个原 Secret 身份保留，最终三节点和三个 Safekeeper Ready，VM 0。完整多模态/持久引用、外部账单/支付及其他业务继续，性能/可靠性专项后置。
+最新状态：[2026-10-23 分支 AI 文件与多模态输入](docs/DELIVERY-2026-10-23-AI-INPUT-FILES.md)：加密文件、原键恢复、确切分支隔离、四种原生协议引用、删除/过期和计费引用历史通过。9 组新增 PostgreSQL、4 组受影响检查、3 组新增媒体和 8 个实际页面检查通过；四次合成调用，旧功能回执复用。API/Worker/AI 0.77.0、Web 重建，schema 064 / Chart 0.9.74 / Core Helm 164。17 张目录表、9 PVC、917 个此前 Secret 身份保留，最终三节点和三个 Safekeeper Ready，VM 0。供应商侧持久会话/响应引用、外部账单/支付及其他业务继续，性能/可靠性专项后置。
 
 此前增量：[应用 TOTP 双重认证](docs/DELIVERY-2026-10-15-AUTH-TOTP.md)八项 UI 与[项目共享查询](docs/DELIVERY-2026-10-15-SHARED-QUERIES.md)六项 UI 均通过；该批基线为 API 0.33 / Chart 0.9.17 / migration 031。
 

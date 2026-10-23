@@ -1,6 +1,6 @@
 # AI Gateway: current implementation and historical protocol v1
 
-Current implementation: API/Worker/AI 0.76.0, schema 063. Organization BYOK isolation, rotation and supplier fee attribution are accepted in the [BYOK contract](AI-ORGANIZATION-BYOK.md) and [0.76 receipt](DELIVERY-2026-10-23-AI-ORGANIZATION-BYOK.md). Manual organization credit grants and dual accounting are accepted in the [credits contract](AI-ORGANIZATION-CREDITS.md). Native provider discovery, native protocols/streaming and branch budgets retain their earlier receipts. Commercial account certification, full multimodal/persistent references and external payment/billing integration remain open. The text below records the original text-only v1 baseline; its future-gate descriptions do not supersede the current receipts.
+Current implementation: API/Worker/AI 0.77.0, schema 064. Branch-owned encrypted files, native PDF/image/audio references, original upload replay, expiry and immutable request references are accepted in the [file contract](AI-INPUT-FILES.md) and [0.77 receipt](DELIVERY-2026-10-23-AI-INPUT-FILES.md). Organization BYOK, credit accounting, native discovery/protocols and branch budgets retain their earlier receipts. Supplier-side persistent conversations/responses, commercial account certification and external payment/billing integration remain open. The text below records the original text-only v1 baseline; its future-gate descriptions do not supersede current receipts.
 
 ## Original protocol v1 contract and scope
 

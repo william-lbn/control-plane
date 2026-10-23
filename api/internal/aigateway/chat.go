@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-const MaxBodyBytes = 32768
+const MaxBodyBytes = 2 << 20
 const MaxResponseBytes = 1048576
 
 type Message struct {
@@ -24,6 +24,7 @@ type Message struct {
 	Content string `json:"content"`
 }
 type ChatRequest struct {
+	InputFiles  []string  `json:"-"`
 	Protocol    string    `json:"-"`
 	RequestID   string    `json:"-"`
 	Model       string    `json:"model"`
