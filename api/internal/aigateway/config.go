@@ -14,6 +14,9 @@ import (
 )
 
 type Route struct {
+	OwnerOrgID      string   `json:"-"`
+	ProviderID      string   `json:"-"`
+	RevisionID      string   `json:"-"`
 	ProviderType    string   `json:"provider_type,omitempty"`
 	ID              string   `json:"id"`
 	Name            string   `json:"name"`
@@ -125,7 +128,11 @@ func (c *Config) Find(id string) (Route, bool) {
 func (c *Config) PublicModels() []map[string]any {
 	items := []map[string]any{}
 	for _, r := range c.Routes {
-		items = append(items, map[string]any{"id": r.ID, "object": "model", "name": r.Name, "owned_by": ProviderType(r.ProviderType), "protocols": r.SupportedProtocols(), "max_output_tokens": r.MaxOutputTokens, "price": r.Price})
+		owner := "platform"
+		if r.OwnerOrgID != "" {
+			owner = "organization_byok"
+		}
+		items = append(items, map[string]any{"billing_owner": owner, "id": r.ID, "object": "model", "name": r.Name, "owned_by": ProviderType(r.ProviderType), "protocols": r.SupportedProtocols(), "max_output_tokens": r.MaxOutputTokens, "price": r.Price})
 	}
 	return items
 }

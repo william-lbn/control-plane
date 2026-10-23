@@ -18,6 +18,9 @@ var errAIProviderCatalogChanged = errors.New("AI provider catalog changed before
 // Build a private immutable snapshot for each request. Never mutate s.ai while
 // concurrent requests are using it. The Gateway opens boxes; API reads do not.
 func (s *server) aiCatalog(ctx context.Context, open bool) (aiCatalogSnapshot, error) {
+	return s.aiCatalogForOrganization(ctx, open, "")
+}
+func (s *server) aiCatalogForOrganization(ctx context.Context, open bool, org string) (aiCatalogSnapshot, error) {
 	snapshot := aiCatalogSnapshot{Config: s.ai, Unavailable: map[string]bool{}}
 	if s.ai == nil || s.aiProviders == nil {
 		return snapshot, nil
@@ -37,7 +40,7 @@ func (s *server) aiCatalog(ctx context.Context, open bool) (aiCatalogSnapshot, e
 		return snapshot, errors.New("catalog generation exhausted")
 	}
 	copyConfig.Generation += snapshot.Revision
-	rows, err := tx.Query(ctx, `SELECT provider_id,revision_id,base_url,endpoint_sha256,credential_mode,credential_box,network,policy_sha256,models,provider_type FROM ai_provider_runtime ORDER BY provider_id`)
+	rows, err := tx.Query(ctx, `SELECT provider_id,revision_id,base_url,endpoint_sha256,credential_mode,credential_box,network,policy_sha256,models,provider_type,COALESCE(org_id,'') FROM ai_provider_runtime WHERE org_id IS NULL OR org_id=NULLIF($1,'') ORDER BY provider_id`, org)
 	if err != nil {
 		return snapshot, err
 	}
@@ -46,15 +49,18 @@ func (s *server) aiCatalog(ctx context.Context, open bool) (aiCatalogSnapshot, e
 		seen[route.ID] = true
 	}
 	for rows.Next() {
-		var provider, revision, base, hash, mode, policy, kind string
+		var provider, revision, base, hash, mode, policy, kind, ownerOrg string
 		var box *aigateway.SealedProviderCredential
 		var network aigateway.ResolvedProviderEndpoint
 		var models []aiProviderModel
-		if err = rows.Scan(&provider, &revision, &base, &hash, &mode, &box, &network, &policy, &models, &kind); err != nil {
+		if err = rows.Scan(&provider, &revision, &base, &hash, &mode, &box, &network, &policy, &models, &kind, &ownerOrg); err != nil {
 			break
 		}
 		// An operator policy change immediately withdraws older approvals; it never
 		// turns an unapproved address into a network request or a fallback provider.
+		if ownerOrg != "" && !s.aiProviders.policy.AllowOrganizationBYOK {
+			continue
+		}
 		if policy != s.aiProviders.policySHA256 || network.BaseURL != base || network.EndpointSHA256 != hash || s.aiProviders.network.ValidateResolved(network) != nil {
 			continue
 		}
@@ -77,7 +83,7 @@ func (s *server) aiCatalog(ctx context.Context, open bool) (aiCatalogSnapshot, e
 				return snapshot, errors.New("catalog aliases conflict")
 			}
 			seen[model.ID] = true
-			route := aigateway.Route{ID: model.ID, Name: model.Name, Provider: "openai_compatible", ProviderType: kind, BaseURL: base, UpstreamModel: model.UpstreamModel, AllowedIPs: append([]string(nil), network.AllowedIPs...), LabHTTP: network.LabHTTP, MaxOutputTokens: model.MaxOutputTokens, Protocols: append([]string(nil), model.Protocols...), Price: model.Price}
+			route := aigateway.Route{OwnerOrgID: ownerOrg, ProviderID: provider, RevisionID: revision, ID: model.ID, Name: model.Name, Provider: "openai_compatible", ProviderType: kind, BaseURL: base, UpstreamModel: model.UpstreamModel, AllowedIPs: append([]string(nil), network.AllowedIPs...), LabHTTP: network.LabHTTP, MaxOutputTokens: model.MaxOutputTokens, Protocols: append([]string(nil), model.Protocols...), Price: model.Price}
 			if !unavailable {
 				route, err = s.aiProviders.network.ConfigureRoute(network, route, secret)
 				if err != nil {

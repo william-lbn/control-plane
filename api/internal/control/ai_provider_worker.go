@@ -70,11 +70,19 @@ func (s *server) aiProviderWorkOnce(ctx context.Context) (bool, error) {
 }
 func (s *server) aiProviderWorkCurrent(ctx context.Context, tx pgx.Tx, work aiProviderWork) error {
 	var valid bool
+	var org string
+	if err := tx.QueryRow(ctx, `SELECT COALESCE(org_id,'') FROM ai_providers WHERE id=$1`, work.ProviderID).Scan(&org); err != nil {
+		return err
+	}
+	authorized := s.aiProviders.operators[work.ActorID]
+	if org != "" {
+		authorized = s.aiProviders.policy.AllowOrganizationBYOK && aiProviderOrganizationActor(ctx, tx, org, work.ActorID) == nil
+	}
 	err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM ai_provider_operations o JOIN ai_providers p ON p.id=o.provider_id JOIN users u ON u.id=o.actor_id AND NOT u.disabled WHERE o.id=$1 AND o.revision_id=$2 AND o.provider_id=$3 AND o.actor_id=$4 AND o.lease_owner=$5 AND o.state='running' AND o.lease_expires_at>clock_timestamp() AND p.state<>'deleted' AND p.target_revision_id=o.revision_id)`, work.ID, work.RevisionID, work.ProviderID, work.ActorID, work.Lease).Scan(&valid)
 	if err != nil {
 		return err
 	}
-	if !valid || !s.aiProviders.operators[work.ActorID] || work.PolicySHA256 != s.aiProviders.policySHA256 {
+	if !valid || !authorized || work.PolicySHA256 != s.aiProviders.policySHA256 {
 		return aigateway.ProviderProbeError{Code: "provider_operation_superseded", Retryable: false}
 	}
 	return nil

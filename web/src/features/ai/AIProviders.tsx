@@ -49,7 +49,6 @@ type Detail = {
   publications: { id: string; revision_id: string; models: Model[]; created_at: string }[];
 };
 type Pending = { path: string; method: string; body: string; key: string };
-const prefix = '/api/v1/platform/ai-providers';
 const blankModel = (kind = 'openai_compatible'): Model => ({
   id: '',
   name: '',
@@ -62,14 +61,23 @@ const blankModel = (kind = 'openai_compatible'): Model => ({
       : {}),
 });
 
-export function AIProviders({ capabilities }: { capabilities: ProviderCapabilities | null }) {
+export function AIProviders({
+  capabilities,
+  organizationId,
+}: {
+  capabilities: ProviderCapabilities | null;
+  organizationId?: string;
+}) {
+  const prefix = organizationId
+    ? `/api/v1/organizations/${encodeURIComponent(organizationId)}/ai-providers`
+    : '/api/v1/platform/ai-providers';
   const [items, setItems] = useState<Provider[]>([]);
   const [selected, setSelected] = useState('');
   const [detail, setDetail] = useState<Detail | null>(null);
   const [name, setName] = useState('');
   const [base, setBase] = useState('');
   const [providerType, setProviderType] = useState('openai_compatible');
-  const [mode, setMode] = useState('operator_reference');
+  const [mode, setMode] = useState(organizationId ? 'sealed' : 'operator_reference');
   const [source, setSource] = useState('');
   const [reuse, setReuse] = useState('');
   const [secret, setSecret] = useState('');
@@ -125,7 +133,7 @@ export function AIProviders({ capabilities }: { capabilities: ProviderCapabiliti
       setName('');
       setBase('');
       setProviderType('openai_compatible');
-      setMode('operator_reference');
+      setMode(organizationId ? 'sealed' : 'operator_reference');
       setReuse('');
       setSource('');
       return;
@@ -141,7 +149,15 @@ export function AIProviders({ capabilities }: { capabilities: ProviderCapabiliti
       const tested = value.revisions.find((r) => r.state === 'tested' && r.has_credential);
       setReuse(tested?.id || '');
       setSource(current?.credential_source_id || '');
-      setMode(tested ? 'reuse' : current?.credential_source_id ? 'operator_reference' : 'none');
+      setMode(
+        tested
+          ? 'reuse'
+          : organizationId
+            ? 'sealed'
+            : current?.credential_source_id
+              ? 'operator_reference'
+              : 'none',
+      );
       const published = value.publications.find(
         (p) => p.id === value.provider.active_publication_id,
       );
@@ -243,14 +259,25 @@ export function AIProviders({ capabilities }: { capabilities: ProviderCapabiliti
   if (!capabilities) return <Empty title="正在读取平台权限" message="请稍候。" />;
   if (!canManage)
     return (
-      <Empty title="需要平台操作员权限" message="仅明确获准的平台操作员可以管理模型供应商。" />
+      <Empty
+        title={organizationId ? '组织 BYOK 未启用' : '需要平台操作员权限'}
+        message={
+          organizationId
+            ? '需要组织管理员会话及运营方启用组织 BYOK。'
+            : '仅明确获准的平台操作员可以管理模型供应商。'
+        }
+      />
     );
   return (
     <>
       <PageHeading
-        kicker="PLATFORM / AI"
-        title="AI 供应商"
-        description="测试连接和模型列表，选择公开别名后发布到各分支的 AI Gateway。"
+        kicker={organizationId ? 'ORGANIZATION / AI' : 'PLATFORM / AI'}
+        title={organizationId ? '组织自有 AI 供应商' : 'AI 供应商'}
+        description={
+          organizationId
+            ? '使用本组织供应商账户；模型仅供本组织分支使用，供应商费用不扣平台额度，仍受分支预算限制。'
+            : '测试连接和模型列表，选择公开别名后发布到各分支的 AI Gateway。'
+        }
         action={
           <button disabled={busy || uncertain} onClick={() => choose('')}>
             ＋ 新建供应商
@@ -362,8 +389,13 @@ export function AIProviders({ capabilities }: { capabilities: ProviderCapabiliti
                       setLabAck(false);
                     }}
                   >
-                    <option value="operator_reference">使用平台已批准的凭据</option>
-                    <option value="none" disabled={providerType !== 'openai_compatible'}>
+                    {!organizationId && (
+                      <option value="operator_reference">使用平台已批准的凭据</option>
+                    )}
+                    <option
+                      value="none"
+                      disabled={!!organizationId || providerType !== 'openai_compatible'}
+                    >
                       无需认证
                     </option>
                     <option
@@ -481,7 +513,7 @@ export function AIProviders({ capabilities }: { capabilities: ProviderCapabiliti
                   disabled={busy || uncertain}
                   onClick={() =>
                     mutate(
-                      `/api/v1/platform/ai-provider-operations/${target.operation_id}/retry`,
+                      `${organizationId ? `/api/v1/organizations/${encodeURIComponent(organizationId)}` : '/api/v1/platform'}/ai-provider-operations/${target.operation_id}/retry`,
                       {},
                     )
                   }

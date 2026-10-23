@@ -27,12 +27,13 @@ type aiProviderCredentialSource struct {
 	AllowedBaseURLs []string `json:"allowed_base_urls"`
 }
 type aiProviderPolicyInput struct {
-	Version             int                                  `json:"version"`
-	OperatorIDs         []string                             `json:"operator_ids"`
-	ApprovedEndpoints   []aigateway.ApprovedProviderEndpoint `json:"approved_endpoints"`
-	CredentialSources   []aiProviderCredentialSource         `json:"credential_sources"`
-	AllowLabSecretInput bool                                 `json:"allow_lab_secret_input"`
-	EgressProxyURL      string                               `json:"egress_proxy_url,omitempty"`
+	AllowOrganizationBYOK bool                                 `json:"allow_organization_byok,omitempty"`
+	Version               int                                  `json:"version"`
+	OperatorIDs           []string                             `json:"operator_ids"`
+	ApprovedEndpoints     []aigateway.ApprovedProviderEndpoint `json:"approved_endpoints"`
+	CredentialSources     []aiProviderCredentialSource         `json:"credential_sources"`
+	AllowLabSecretInput   bool                                 `json:"allow_lab_secret_input"`
+	EgressProxyURL        string                               `json:"egress_proxy_url,omitempty"`
 }
 type aiProviderSettings struct {
 	policy       aiProviderPolicyInput
