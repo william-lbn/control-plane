@@ -26,6 +26,14 @@ var managedAuthAdminActions = map[string]string{
 	"admin/remove-user": "POST", "admin/impersonate-user": "POST", "admin/stop-impersonating": "POST", "admin/has-permission": "POST",
 }
 var managedAuthResetCallback = regexp.MustCompile(`^reset-password/[a-zA-Z0-9_-]{20,128}$`)
+var managedAuthOrganizationActions = map[string]string{
+	"organization/create": "POST", "organization/check-slug": "POST", "organization/update": "POST", "organization/delete": "POST", "organization/set-active": "POST",
+	"organization/get-organization": "GET", "organization/get-full-organization": "GET", "organization/list": "GET",
+	"organization/invite-member": "POST", "organization/cancel-invitation": "POST", "organization/accept-invitation": "POST", "organization/reject-invitation": "POST",
+	"organization/get-invitation": "GET", "organization/list-invitations": "GET", "organization/list-user-invitations": "GET",
+	"organization/remove-member": "POST", "organization/update-member-role": "POST", "organization/leave": "POST",
+	"organization/get-active-member": "GET", "organization/get-active-member-role": "GET", "organization/list-members": "GET", "organization/has-permission": "POST",
+}
 
 func managedAuthRelayCookieAllowed(name, branch string, twoFactor bool, admin ...bool) bool {
 	base := strings.TrimPrefix(name, "__Secure-")
@@ -34,6 +42,9 @@ func managedAuthRelayCookieAllowed(name, branch string, twoFactor bool, admin ..
 }
 
 func managedAuthAllowedAction(action, method string) bool {
+	if required, ok := managedAuthOrganizationActions[action]; ok {
+		return method == required || method == "OPTIONS"
+	}
 	if required, ok := managedAuthAdminActions[action]; ok {
 		return method == required || method == "OPTIONS"
 	}
@@ -158,6 +169,10 @@ func (s *server) managedAuthRelay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if _, adminAction := managedAuthAdminActions[r.PathValue("rest")]; adminAction && !spec.AdminEnabled {
+		http.NotFound(w, r)
+		return
+	}
+	if _, organizationAction := managedAuthOrganizationActions[r.PathValue("rest")]; organizationAction && !spec.OrganizationEnabled {
 		http.NotFound(w, r)
 		return
 	}

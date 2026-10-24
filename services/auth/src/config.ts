@@ -18,6 +18,12 @@ export interface AuthConfig {
   magicLinkAllowRegistration?: boolean;
   twoFactorEnabled?: boolean;
   adminEnabled?: boolean;
+  organizationEnabled?: boolean;
+  organizationLimit?: number;
+  organizationMembershipLimit?: number;
+  organizationCreatorRole?: "owner" | "admin";
+  organizationInvitationEmail?: boolean;
+  organizationInvitationURL?: string;
 }
 
 // Both the URL and SQL credential come from an immutable, owned Secret file.
@@ -28,6 +34,17 @@ export function parseConfig(value: unknown): AuthConfig {
   const c = value as AuthConfig;
   if (c.adminEnabled !== undefined && typeof c.adminEnabled !== "boolean")
     throw new Error("Invalid application admin policy");
+  if (c.organizationEnabled !== undefined && typeof c.organizationEnabled !== "boolean")
+    throw new Error("Invalid application organization policy");
+  for (const [value,max] of [[c.organizationLimit,100],[c.organizationMembershipLimit,1000]] as const)
+    if (value!==undefined && (!Number.isInteger(value)||value<1||value>max))
+      throw new Error("Invalid application organization limit");
+  if (c.organizationCreatorRole!==undefined && !["owner","admin"].includes(c.organizationCreatorRole))
+    throw new Error("Invalid application organization creator role");
+  if (c.organizationInvitationEmail!==undefined && typeof c.organizationInvitationEmail!=="boolean")
+    throw new Error("Invalid organization invitation mail policy");
+  if (!c.organizationEnabled && [c.organizationLimit,c.organizationMembershipLimit,c.organizationCreatorRole,c.organizationInvitationEmail,c.organizationInvitationURL].some(v=>v!==undefined))
+    throw new Error("Organization options require the plugin to be enabled");
   if(c.twoFactorEnabled!==undefined && typeof c.twoFactorEnabled!=="boolean")throw new Error("Invalid two-factor policy");
   if (
     (c.magicLinkEnabled !== undefined &&
@@ -86,6 +103,16 @@ export function parseConfig(value: unknown): AuthConfig {
     )
       throw new Error("Invalid trusted origin");
   }
+  if (c.organizationInvitationEmail) {
+    if (!c.requireEmailVerification || typeof c.organizationInvitationURL!=="string" || c.organizationInvitationURL.length>2048)
+      throw new Error("Organization invitations require verified email and a fixed application URL");
+    const target=new URL(c.organizationInvitationURL);
+    if (target.username||target.password||target.search||target.hash||
+      (target.protocol!=="https:"&&!(c.allowLabHTTP&&target.protocol==="http:"))||
+      ![base.origin,...c.trustedOrigins].includes(target.origin))
+      throw new Error("Organization invitation URL must belong to a trusted application origin");
+  } else if (c.organizationInvitationURL!==undefined)
+    throw new Error("Organization invitation URL requires invitation email");
   const sql = new URL(c.databaseURL);
   if (
     sql.protocol !== "postgresql:" ||

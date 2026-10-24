@@ -6,6 +6,7 @@ import { createAuth } from "./auth.ts";
 import { loadConfig } from "./config.ts";
 import { databaseOptions } from "./database.ts";
 import { adminActions } from "./admin.ts";
+import { organizationActions } from "./organization.ts";
 
 const config = loadConfig();
 // max=1 and a one-second idle lifetime leave no permanent database session.
@@ -65,13 +66,15 @@ const server = createServer(async (req, res) => {
   const action = path.slice(`/auth/v1/${config.branchID}/`.length);
   const adminAction = config.adminEnabled && Object.hasOwn(adminActions,action) &&
     (req.method===adminActions[action] || req.method==="OPTIONS");
+  const organizationAction = config.organizationEnabled && Object.hasOwn(organizationActions,action) &&
+    (req.method===organizationActions[action] || req.method==="OPTIONS");
   const resetCallback =
     !!config.mail &&
     /^reset-password\/[a-zA-Z0-9_-]{20,128}$/.test(action) &&
     req.method === "GET";
   if (
     !path.startsWith(`/auth/v1/${config.branchID}/`) ||
-    (!allowed.has(action) && !resetCallback && !adminAction) ||
+    (!allowed.has(action) && !resetCallback && !adminAction && !organizationAction) ||
     !["GET", "POST", "OPTIONS"].includes(req.method || "")
   ) {
     res.writeHead(404).end();

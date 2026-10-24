@@ -1,12 +1,15 @@
 import { betterAuth } from "better-auth";
-import { admin, jwt, emailOTP, magicLink, twoFactor } from "better-auth/plugins";
+import { admin, organization, jwt, emailOTP, magicLink, twoFactor } from "better-auth/plugins";
 import type { Pool } from "pg";
 import type { AuthConfig } from "./config.ts";
 import { createMailer } from "./mail.ts";
+import { transactionalAuthDatabase } from "./transactions.ts";
+import { organizationActions } from "./organization.ts";
+import { adminActions } from "./admin.ts";
 
-export function authOptions(c: AuthConfig, database: Pool) {
+export function authOptions(c: AuthConfig, database: Pool, trackOrganizationMail?: (task:Promise<void>)=>Promise<void>) {
   if (
-    (c.requireEmailVerification || c.emailOTPEnabled || c.magicLinkEnabled) &&
+    (c.requireEmailVerification || c.emailOTPEnabled || c.magicLinkEnabled || c.organizationInvitationEmail) &&
     !c.mail
   )
     throw new Error("Email verification requires a mail transport");
@@ -91,6 +94,21 @@ export function authOptions(c: AuthConfig, database: Pool) {
       // Keep persisted bans enforced even when management endpoints are disabled.
       // Only the explicitly enabled branch exposes the administrative protocol.
       admin({defaultRole:"user",adminRoles:["admin"],impersonationSessionDuration:3600,allowImpersonatingAdmins:false}),
+      ...(c.organizationEnabled ? [organization({
+        organizationLimit:c.organizationLimit||10,membershipLimit:c.organizationMembershipLimit||100,
+        creatorRole:c.organizationCreatorRole||"owner",teams:{enabled:false},dynamicAccessControl:{enabled:false},
+        requireEmailVerificationOnInvitation:true,invitationExpiresIn:172800,invitationLimit:100,
+        organizationHooks:{beforeDeleteOrganization:async({organization}:{organization:{id:string}})=>{
+          // The maintained endpoint has already checked this organization's
+          // delete permission. Its adapter removes members before the parent.
+          // The Neon extension reserves neon.* for its server settings.
+          await database.query("SELECT set_config('neon_control.auth_deleting_organization',$1,true)",[organization.id]);
+        }},
+        ...(c.organizationInvitationEmail&&mail ? {sendInvitationEmail:async(data:{id:string;email:string})=>{
+          const task=mail.sendOrganizationInvitation(data.email,data.id,c.organizationInvitationURL!);
+          await (trackOrganizationMail?trackOrganizationMail(task):task);
+        }} : {}),
+      })] : []),
       ...(c.twoFactorEnabled ? [twoFactor({issuer:"Neon Self Hosted",skipVerificationOnEnable:false,twoFactorCookieMaxAge:300,backupCodeOptions:{storeBackupCodes:"encrypted"}})] : []),
       ...(mail && c.magicLinkEnabled
         ? [
@@ -124,10 +142,14 @@ export function authOptions(c: AuthConfig, database: Pool) {
           issuer: c.baseURL,
           audience: c.branchID,
           expirationTime: "5m",
-          definePayload: ({ user }: { user: { id: string } }) => ({
-            branch_id: c.branchID,
-            sub: user.id,
-          }),
+          definePayload: async ({ user,session }: { user: { id: string };session?:{id?:string;activeOrganizationId?:string|null} }) => {
+            const claims:Record<string,string>={branch_id:c.branchID,sub:user.id};
+            if(c.organizationEnabled&&session?.activeOrganizationId){
+              const member=await database.query('SELECT m.role FROM member m JOIN organization o ON o.id=m."organizationId" WHERE m."userId"=$1 AND m."organizationId"=$2',[user.id,session.activeOrganizationId]);
+              if(member.rows.length===1){claims.organization_id=session.activeOrganizationId;claims.organization_role=member.rows[0].role}
+            }
+            return claims;
+          },
         },
         jwks: {
           keyPairConfig: { alg: "EdDSA" as const, crv: "Ed25519" as const },
@@ -139,12 +161,16 @@ export function authOptions(c: AuthConfig, database: Pool) {
   };
 }
 export function createAuth(c: AuthConfig, database: Pool) {
-  const auth = betterAuth(authOptions(c, database));
+  const transactions=transactionalAuthDatabase(database);
+  const auth = betterAuth(authOptions(c, transactions.database,transactions.trackOrganizationMail));
   const handler = auth.handler;
   auth.handler = async (request: Request) => {
-    if (!c.adminEnabled && new URL(request.url).pathname.startsWith(`/auth/v1/${c.branchID}/admin/`))
+    const action=new URL(request.url).pathname.slice(`/auth/v1/${c.branchID}/`.length);
+    if (action.startsWith('admin/')&&(!c.adminEnabled||!Object.hasOwn(adminActions,action)||(request.method!==adminActions[action]&&request.method!=='OPTIONS')))
       return new Response(null,{status:404,headers:{"Cache-Control":"no-store"}});
-    return handler(request);
+    if (action.startsWith('organization/')&&(!c.organizationEnabled||!Object.hasOwn(organizationActions,action)||(request.method!==organizationActions[action]&&request.method!=='OPTIONS')))
+      return new Response(null,{status:404,headers:{"Cache-Control":"no-store"}});
+    return transactions.handle(request,handler);
   };
   return auth;
 }
