@@ -10,6 +10,7 @@ import type { Organization, Page, Project } from '../../api';
 import { Empty, PageHeading } from '../../shared/ui';
 import { Invitations } from './Invitations';
 import { AICredits } from '../ai/AICredits';
+import { ServicePlans } from './ServicePlans';
 
 type Member = { user_id: string; username: string; role: string };
 type Key = {
@@ -115,6 +116,7 @@ export function Organizations({
       <HistoryPolicy />
       {organization && isAdmin && (
         <>
+          <ServicePlans key={'plans:' + organization.id} organizationId={organization.id} />
           <AICredits key={organization.id} organizationId={organization.id} />
           <AIOrganizationProviders
             key={'byok-' + organization.id}

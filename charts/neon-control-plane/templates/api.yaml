@@ -68,6 +68,9 @@ spec:
             - {name: NEON_V2_BIND, value: ':8788'}
             - {name: NEON_V2_SQL_HISTORY_ENABLED, value: {{ .Values.sqlHistory.enabled | quote }}}
             - {name: NEON_V2_ADMIN_PASSWORD_FILE, value: /run/neon-secrets/admin-password}
+            {{- if .Values.platformManagement.enabled }}
+            - {name: NEON_PLATFORM_POLICY_FILE, value: /run/platform-policy/config.json}
+            {{- end }}
             {{- if .Values.consoleSSO.enabled }}
             - {name: NEON_CONSOLE_OIDC_CONFIG_FILE, value: /run/console-oidc/config.json}
             {{- end }}
@@ -83,6 +86,9 @@ spec:
             {{- end }}
             {{- include "neonControl.runtimeEnv" . | nindent 12 }}
           volumeMounts:
+            {{- if .Values.platformManagement.enabled }}
+            - {name: platform-policy, mountPath: /run/platform-policy, readOnly: true}
+            {{- end }}
             {{- if .Values.consoleSSO.enabled }}
             - {name: console-oidc, mountPath: /run/console-oidc, readOnly: true}
             {{- end }}
@@ -106,6 +112,13 @@ spec:
           readinessProbe: {httpGet: {path: /readyz, port: http}, periodSeconds: 10, timeoutSeconds: 4, failureThreshold: 3}
           livenessProbe: {httpGet: {path: /healthz, port: http}, periodSeconds: 15, timeoutSeconds: 3, failureThreshold: 3}
       volumes:
+        {{- if .Values.platformManagement.enabled }}
+        - name: platform-policy
+          configMap:
+            name: {{ include "neonControl.platformPolicyName" . }}
+            defaultMode: 0444
+            items: [{key: config.json, path: config.json}]
+        {{- end }}
         {{- if .Values.consoleSSO.enabled }}
         - name: console-oidc
           secret:

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.85.0",
+    "version": "0.86.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -9097,6 +9097,83 @@
           },
           "previous_response_id": {
             "type": "string"
+          }
+        }
+      },
+      "ServicePlanInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "name",
+          "max_projects",
+          "max_endpoints"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 999999999999
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "max_projects": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000
+          },
+          "max_endpoints": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 10000
+          }
+        }
+      },
+      "ServicePlanStateInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "state"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 999999999999
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "active",
+              "disabled"
+            ]
+          }
+        }
+      },
+      "ServicePlanAssignmentInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "version",
+          "revision_id"
+        ],
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 999999999999
+          },
+          "revision_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^plv_[a-f0-9]{24}$",
+            "description": "Explicit immutable revision; null restores the quotas retained before first assignment. Omission is rejected."
           }
         }
       }
@@ -35504,6 +35581,626 @@
             "$ref": "#/components/responses/Error"
           },
           "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/service-plans": {
+      "get": {
+        "operationId": "listServicePlans",
+        "tags": [
+          "Organizations"
+        ],
+        "parameters": [],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Self-hosted resource entitlements; no payment, renewal or credit grant is implied. Platform writes require a current Console session, explicit independent operator approval and organization allowlist. Organization reads require Admin membership. Immutable revisions do not move existing assignments; disabled plans keep existing entitlements. Switching rejects quotas below current resource usage and commits the binding, effective quotas and immutable history atomically.",
+        "responses": {
+          "200": {
+            "description": "Versioned service plan or resource entitlement receipt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/service-plans/{servicePlan}": {
+      "get": {
+        "operationId": "getServicePlan",
+        "tags": [
+          "Organizations"
+        ],
+        "parameters": [
+          {
+            "name": "servicePlan",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Self-hosted resource entitlements; no payment, renewal or credit grant is implied. Platform writes require a current Console session, explicit independent operator approval and organization allowlist. Organization reads require Admin membership. Immutable revisions do not move existing assignments; disabled plans keep existing entitlements. Switching rejects quotas below current resource usage and commits the binding, effective quotas and immutable history atomically.",
+        "responses": {
+          "200": {
+            "description": "Versioned service plan or resource entitlement receipt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/platform/service-plans": {
+      "get": {
+        "operationId": "listPlatformServicePlans",
+        "tags": [
+          "Organizations"
+        ],
+        "parameters": [],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Self-hosted resource entitlements; no payment, renewal or credit grant is implied. Platform writes require a current Console session, explicit independent operator approval and organization allowlist. Organization reads require Admin membership. Immutable revisions do not move existing assignments; disabled plans keep existing entitlements. Switching rejects quotas below current resource usage and commits the binding, effective quotas and immutable history atomically.",
+        "responses": {
+          "200": {
+            "description": "Versioned service plan or resource entitlement receipt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "post": {
+        "operationId": "createServicePlan",
+        "tags": [
+          "Organizations"
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Self-hosted resource entitlements; no payment, renewal or credit grant is implied. Platform writes require a current Console session, explicit independent operator approval and organization allowlist. Organization reads require Admin membership. Immutable revisions do not move existing assignments; disabled plans keep existing entitlements. Switching rejects quotas below current resource usage and commits the binding, effective quotas and immutable history atomically.",
+        "responses": {
+          "201": {
+            "description": "Versioned service plan or resource entitlement receipt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServicePlanInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/service-plans/{servicePlan}": {
+      "get": {
+        "operationId": "getPlatformServicePlan",
+        "tags": [
+          "Organizations"
+        ],
+        "parameters": [
+          {
+            "name": "servicePlan",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Self-hosted resource entitlements; no payment, renewal or credit grant is implied. Platform writes require a current Console session, explicit independent operator approval and organization allowlist. Organization reads require Admin membership. Immutable revisions do not move existing assignments; disabled plans keep existing entitlements. Switching rejects quotas below current resource usage and commits the binding, effective quotas and immutable history atomically.",
+        "responses": {
+          "200": {
+            "description": "Versioned service plan or resource entitlement receipt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/platform/service-plans/{servicePlan}/revisions": {
+      "post": {
+        "operationId": "publishServicePlanRevision",
+        "tags": [
+          "Organizations"
+        ],
+        "parameters": [
+          {
+            "name": "servicePlan",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Self-hosted resource entitlements; no payment, renewal or credit grant is implied. Platform writes require a current Console session, explicit independent operator approval and organization allowlist. Organization reads require Admin membership. Immutable revisions do not move existing assignments; disabled plans keep existing entitlements. Switching rejects quotas below current resource usage and commits the binding, effective quotas and immutable history atomically.",
+        "responses": {
+          "200": {
+            "description": "Versioned service plan or resource entitlement receipt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServicePlanInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/service-plans/{servicePlan}/state": {
+      "put": {
+        "operationId": "setServicePlanState",
+        "tags": [
+          "Organizations"
+        ],
+        "parameters": [
+          {
+            "name": "servicePlan",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Self-hosted resource entitlements; no payment, renewal or credit grant is implied. Platform writes require a current Console session, explicit independent operator approval and organization allowlist. Organization reads require Admin membership. Immutable revisions do not move existing assignments; disabled plans keep existing entitlements. Switching rejects quotas below current resource usage and commits the binding, effective quotas and immutable history atomically.",
+        "responses": {
+          "200": {
+            "description": "Versioned service plan or resource entitlement receipt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServicePlanStateInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/organizations/{planOrg}/service-plan": {
+      "get": {
+        "operationId": "getPlatformOrganizationServicePlan",
+        "tags": [
+          "Organizations"
+        ],
+        "parameters": [
+          {
+            "name": "planOrg",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Self-hosted resource entitlements; no payment, renewal or credit grant is implied. Platform writes require a current Console session, explicit independent operator approval and organization allowlist. Organization reads require Admin membership. Immutable revisions do not move existing assignments; disabled plans keep existing entitlements. Switching rejects quotas below current resource usage and commits the binding, effective quotas and immutable history atomically.",
+        "responses": {
+          "200": {
+            "description": "Versioned service plan or resource entitlement receipt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "put": {
+        "operationId": "assignOrganizationServicePlan",
+        "tags": [
+          "Organizations"
+        ],
+        "parameters": [
+          {
+            "name": "planOrg",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Self-hosted resource entitlements; no payment, renewal or credit grant is implied. Platform writes require a current Console session, explicit independent operator approval and organization allowlist. Organization reads require Admin membership. Immutable revisions do not move existing assignments; disabled plans keep existing entitlements. Switching rejects quotas below current resource usage and commits the binding, effective quotas and immutable history atomically.",
+        "responses": {
+          "200": {
+            "description": "Versioned service plan or resource entitlement receipt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ServicePlanAssignmentInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/{org}/service-plan": {
+      "get": {
+        "operationId": "getOrganizationServicePlan",
+        "tags": [
+          "Organizations"
+        ],
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Self-hosted resource entitlements; no payment, renewal or credit grant is implied. Platform writes require a current Console session, explicit independent operator approval and organization allowlist. Organization reads require Admin membership. Immutable revisions do not move existing assignments; disabled plans keep existing entitlements. Switching rejects quotas below current resource usage and commits the binding, effective quotas and immutable history atomically.",
+        "responses": {
+          "200": {
+            "description": "Versioned service plan or resource entitlement receipt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
             "$ref": "#/components/responses/Error"
           },
           "503": {

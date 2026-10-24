@@ -1,7 +1,7 @@
 # 实际 API 合同
 
 OpenAPI 3 合同的权威源是 [openapi-v1.json](../contracts/openapi-v1.json)。
-版本 0.85.0，198 个路径、283 个操作，全部拥有稳定且唯一的 operationId。
+版本 0.86.0，206 个路径、293 个操作，全部拥有稳定且唯一的 operationId。
 运行 Swagger 位于 `/api/docs`，JSON 位于 `/api/openapi.json`。
 本合同是自托管 `/api/v1`，不声称兼容 Neon SaaS `/api/v2`。
 
@@ -307,6 +307,16 @@ request_id/operation_id/error_code，再由显式 retry 接口恢复可重试操
 | GET | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/openai/v1/conversations/{providerConversation}/items/{providerItem}` | `aiProviderStateConsoleOpenAI12` | 200 |
 | DELETE | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/openai/v1/conversations/{providerConversation}/items/{providerItem}` | `aiProviderStateConsoleOpenAI13` | 200 |
 | GET | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/provider-state` | `listBranchAIProviderState` | 200 |
+| GET | `/api/v1/service-plans` | `listServicePlans` | 200 |
+| GET | `/api/v1/service-plans/{servicePlan}` | `getServicePlan` | 200 |
+| GET | `/api/v1/platform/service-plans` | `listPlatformServicePlans` | 200 |
+| POST | `/api/v1/platform/service-plans` | `createServicePlan` | 201 |
+| GET | `/api/v1/platform/service-plans/{servicePlan}` | `getPlatformServicePlan` | 200 |
+| POST | `/api/v1/platform/service-plans/{servicePlan}/revisions` | `publishServicePlanRevision` | 200 |
+| PUT | `/api/v1/platform/service-plans/{servicePlan}/state` | `setServicePlanState` | 200 |
+| GET | `/api/v1/platform/organizations/{planOrg}/service-plan` | `getPlatformOrganizationServicePlan` | 200 |
+| PUT | `/api/v1/platform/organizations/{planOrg}/service-plan` | `assignOrganizationServicePlan` | 200 |
+| GET | `/api/v1/organizations/{org}/service-plan` | `getOrganizationServicePlan` | 200 |
 
 ## 3. 实现映射与演进
 
