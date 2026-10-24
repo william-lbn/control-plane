@@ -189,5 +189,20 @@ export function createMailer(c: MailConfig, branch: string, baseURL: string) {
       throw new Error("Auth mail transport unavailable");
     }
   }
-  return { send, sendOTP, close: () => transport.close() };
+  async function sendOrganizationInvitation(email:string,invitationId:string,applicationURL:string) {
+    // The fixed application URL was validated against the branch's trusted
+    // origins. Neither request input nor an organization name chooses SMTP.
+    const target=new URL(applicationURL);
+    if (applicationURL.length>2048||target.username||target.password||target.search||target.hash||
+      !["https:",...(base.protocol==="http:"?["http:"]:[])].includes(target.protocol)||
+      !/^[a-zA-Z0-9_-]{1,128}$/.test(invitationId)||typeof email!=="string"||email.length>254||/[\r\n\0<>,;]/.test(email))
+      throw new Error("Invalid organization invitation destination");
+    target.searchParams.set("invitationId",invitationId);target.searchParams.set("branchId",branch);
+    try {
+      await transport.sendMail({from:c.from,to:{name:"",address:email},subject:"Invitation to your application organization",
+        text:"Sign in with your verified application account to review this invitation.\n\n"+target.href+"\n\nIf you did not expect this invitation, ignore it.",
+        headers:{"X-Neon-Auth-Branch":branch,"X-Neon-Auth-Event":"organization-invitation"},disableFileAccess:true,disableUrlAccess:true});
+    }catch{throw new Error("Auth mail transport unavailable")}
+  }
+  return { send, sendOTP, sendOrganizationInvitation, close: () => transport.close() };
 }

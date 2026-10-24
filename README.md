@@ -7,7 +7,7 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 
 功能进度与当前优先级见 [已验收/剩余清单](docs/FUNCTIONAL-STATUS-2026-10-21.md)：16 组基础已有回执；五组专项后置，14 组尚未整体闭环。后续优先业务功能，复用来源未变的既有验收。
 
-最新状态：2026-10-24 应用 Admin：[管理员功能与实际页面](docs/DELIVERY-2026-10-24-AUTH-ADMIN.md)通过 2 组新增/7 组受影响 Go、1 组新增/5 组受影响维护库 PostgreSQL 检查，以及 11 个累计实机检查点。显式授权、角色、封禁、会话、改密/删除及一小时身份代入闭环；原已过步骤及改密未重做。Core Helm 172 / schema 065 / Auth 协议 0.26.0；原目录和凭据身份保留，三节点、三个 Safekeeper Ready，VM 0。A03 的 OAuth、组织、手机号、事件继续；全项目仍有 11 个业务和 3 个其他组未整体闭环。
+最新状态：2026-10-24 应用组织：[组织、成员与邀请](docs/DELIVERY-2026-10-24-AUTH-ORGANIZATIONS.md)完成 22 个接口和控制台操作；2 组新增/7 组受影响 Go、3 组新增维护库 PostgreSQL、1 组受影响 Admin 及 9 个累计实机检查点通过。配额和最后管理者原子保护、验证收件人、当前 JWT 及复制分支邀请隔离通过；复用原创建 Operation 完成续验。Core Helm 174 / schema 065 / 应用协议 0.27.0，原目录与凭据身份保留，最终三节点、三个 Safekeeper Ready，VM 0。A03 的 OAuth、手机号和事件继续，整体仍有 11 个业务和 3 个其他组未闭环。
 
 此前增量：[应用 TOTP 双重认证](docs/DELIVERY-2026-10-15-AUTH-TOTP.md)八项 UI 与[项目共享查询](docs/DELIVERY-2026-10-15-SHARED-QUERIES.md)六项 UI 均通过；该批基线为 API 0.33 / Chart 0.9.17 / migration 031。
 

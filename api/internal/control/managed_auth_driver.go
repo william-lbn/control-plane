@@ -58,7 +58,18 @@ func (s *server) reserveManagedAuth(ctx context.Context, p managedAuthPayload) e
 			return err
 		}
 	}
-	config, _ := json.Marshal(record{"version": 1, "branchID": p.BranchID, "baseURL": managedAuthBase(p.BranchID), "databaseURL": dsn.String(), "databaseTLS": record{"caFile": "/run/auth-ca/ca.crt", "serverName": env("NEON_AUTH_PG_SERVER_NAME", "")}, "secret": authSecret, "trustedOrigins": p.Spec.AllowedOrigins, "allowLabHTTP": true, "requireEmailVerification": p.Spec.RequireEmailVerification, "emailOTPEnabled": p.Spec.EmailOTPEnabled, "magicLinkEnabled": p.Spec.MagicLinkEnabled, "magicLinkExpiresIn": p.Spec.MagicLinkExpiresIn, "magicLinkAllowRegistration": p.Spec.MagicLinkAllowRegistration, "twoFactorEnabled": p.Spec.TwoFactorEnabled, "adminEnabled": p.Spec.AdminEnabled})
+	configValue := record{"version": 1, "branchID": p.BranchID, "baseURL": managedAuthBase(p.BranchID), "databaseURL": dsn.String(), "databaseTLS": record{"caFile": "/run/auth-ca/ca.crt", "serverName": env("NEON_AUTH_PG_SERVER_NAME", "")}, "secret": authSecret, "trustedOrigins": p.Spec.AllowedOrigins, "allowLabHTTP": true, "requireEmailVerification": p.Spec.RequireEmailVerification, "emailOTPEnabled": p.Spec.EmailOTPEnabled, "magicLinkEnabled": p.Spec.MagicLinkEnabled, "magicLinkExpiresIn": p.Spec.MagicLinkExpiresIn, "magicLinkAllowRegistration": p.Spec.MagicLinkAllowRegistration, "twoFactorEnabled": p.Spec.TwoFactorEnabled, "adminEnabled": p.Spec.AdminEnabled, "organizationEnabled": p.Spec.OrganizationEnabled}
+	if p.Spec.OrganizationEnabled {
+		users, members, creator := managedAuthOrganizationLimits(p.Spec)
+		configValue["organizationLimit"] = users
+		configValue["organizationMembershipLimit"] = members
+		configValue["organizationCreatorRole"] = creator
+		configValue["organizationInvitationEmail"] = p.Spec.OrganizationInvitationEmail
+		if p.Spec.OrganizationInvitationURL != "" {
+			configValue["organizationInvitationURL"] = p.Spec.OrganizationInvitationURL
+		}
+	}
+	config, _ := json.Marshal(configValue)
 	_, err = s.kube.createOwned(ctx, "secret", record{"apiVersion": "v1", "kind": "Secret", "type": "Opaque", "immutable": true, "metadata": record{"name": p.SecretRef, "labels": managedAuthLabels(p)}, "stringData": map[string]string{"config.json": string(config), "password": password, "verifier": verifier}}, p.ProjectID, p.EndpointID)
 	return err
 }
@@ -137,6 +148,9 @@ func applyManagedAuthSQLWithFactorsTx(ctx context.Context, tx pgx.Tx, p managedA
 	if _, err = tx.Exec(ctx, managedAuthAdminSchema, pgx.QueryExecModeSimpleProtocol); err != nil {
 		return err
 	}
+	if err = applyManagedAuthOrganizationsTx(ctx, tx, p, generation == 0); err != nil {
+		return err
+	}
 	if generation < p.Generation {
 		// The explicit grant is part of this durable generation, not a standing
 		// runtime bypass. A retried installation never re-grants a removed role.
@@ -199,6 +213,9 @@ func applyManagedAuthSQLWithFactorsTx(ctx context.Context, tx pgx.Tx, p managedA
 		if _, err = tx.Exec(ctx, "GRANT SELECT,INSERT,UPDATE,DELETE ON TABLE neon_auth."+pgQuote(table)+" TO "+pgQuote(login)); err != nil {
 			return err
 		}
+	}
+	if err = grantManagedAuthOrganizationsTx(ctx, tx, login, p.Spec); err != nil {
+		return err
 	}
 	var safe bool
 	err = tx.QueryRow(ctx, `SELECT NOT rolsuper AND NOT rolbypassrls AND NOT rolcreatedb AND NOT rolcreaterole AND NOT rolreplication AND NOT rolinherit AND NOT EXISTS(SELECT 1 FROM pg_auth_members WHERE member=pg_roles.oid) FROM pg_roles WHERE rolname=$1`, login).Scan(&safe)

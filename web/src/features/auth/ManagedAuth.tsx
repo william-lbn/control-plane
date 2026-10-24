@@ -10,6 +10,7 @@ import { AuthOTPPanel } from './AuthOTPPanel';
 import { AuthMagicLinkPanel } from './AuthMagicLinkPanel';
 import { AuthTOTPPanel } from './AuthTOTPPanel';
 import { AuthAdminPanel } from './AuthAdminPanel';
+import { AuthOrganizationPanel } from './AuthOrganizationPanel';
 
 type Instance = {
   branch_id: string;
@@ -31,6 +32,12 @@ type Instance = {
     inherit_two_factor?: boolean;
     admin_enabled?: boolean;
     admin_bootstrap_user_id?: string;
+    organization_enabled?: boolean;
+    organization_limit?: number;
+    organization_membership_limit?: number;
+    organization_creator_role?: string;
+    organization_invitation_email?: boolean;
+    organization_invitation_url?: string;
   } | null;
   factor_migration?: {
     migrated_factors: number;
@@ -80,6 +87,12 @@ export function ManagedAuth({
   const [inheritTwoFactor, setInheritTwoFactor] = useState(false);
   const [adminEnabled, setAdminEnabled] = useState(false);
   const [adminBootstrapUserID, setAdminBootstrapUserID] = useState('');
+  const [organizationEnabled, setOrganizationEnabled] = useState(false);
+  const [organizationLimit, setOrganizationLimit] = useState(10);
+  const [organizationMembershipLimit, setOrganizationMembershipLimit] = useState(100);
+  const [organizationCreatorRole, setOrganizationCreatorRole] = useState('owner');
+  const [organizationInvitationEmail, setOrganizationInvitationEmail] = useState(false);
+  const [organizationInvitationURL, setOrganizationInvitationURL] = useState('');
   const [magicLinkEnabled, setMagicLinkEnabled] = useState(false);
   const [magicLinkExpiresIn, setMagicLinkExpiresIn] = useState(300);
   const [magicLinkAllowRegistration, setMagicLinkAllowRegistration] = useState(false);
@@ -114,6 +127,12 @@ export function ManagedAuth({
       // A grant is an explicit command for the next publication, never a
       // standing selection silently copied into a later configuration.
       setAdminBootstrapUserID('');
+      setOrganizationEnabled(value.spec.organization_enabled ?? false);
+      setOrganizationLimit(value.spec.organization_limit || 10);
+      setOrganizationMembershipLimit(value.spec.organization_membership_limit || 100);
+      setOrganizationCreatorRole(value.spec.organization_creator_role || 'owner');
+      setOrganizationInvitationEmail(value.spec.organization_invitation_email ?? false);
+      setOrganizationInvitationURL(value.spec.organization_invitation_url || '');
       setMagicLinkEnabled(value.spec.magic_link_enabled ?? false);
       setMagicLinkExpiresIn(value.spec.magic_link_expires_in || 300);
       setMagicLinkAllowRegistration(value.spec.magic_link_allow_registration ?? false);
@@ -139,6 +158,12 @@ export function ManagedAuth({
     setInheritTwoFactor(false);
     setAdminEnabled(false);
     setAdminBootstrapUserID('');
+    setOrganizationEnabled(false);
+    setOrganizationLimit(10);
+    setOrganizationMembershipLimit(100);
+    setOrganizationCreatorRole('owner');
+    setOrganizationInvitationEmail(false);
+    setOrganizationInvitationURL('');
     setMagicLinkEnabled(false);
     setMagicLinkExpiresIn(300);
     setMagicLinkAllowRegistration(false);
@@ -175,6 +200,20 @@ export function ManagedAuth({
                 magic_link_enabled: true,
                 magic_link_expires_in: magicLinkExpiresIn,
                 ...(magicLinkAllowRegistration ? { magic_link_allow_registration: true } : {}),
+              }
+            : {}),
+          ...(organizationEnabled
+            ? {
+                organization_enabled: true,
+                organization_limit: organizationLimit,
+                organization_membership_limit: organizationMembershipLimit,
+                organization_creator_role: organizationCreatorRole,
+                ...(organizationInvitationEmail
+                  ? {
+                      organization_invitation_email: true,
+                      organization_invitation_url: organizationInvitationURL.trim(),
+                    }
+                  : {}),
               }
             : {}),
         };
@@ -462,6 +501,88 @@ export function ManagedAuth({
               </span>
             </label>
           )}
+          <label className="auth-mail-policy backend-wide">
+            <input
+              aria-label="启用应用组织管理"
+              type="checkbox"
+              checked={organizationEnabled}
+              disabled={busy || active}
+              onChange={(e) => setOrganizationEnabled(e.target.checked)}
+            />
+            允许应用用户创建组织、邀请成员和管理组织角色
+          </label>
+          {organizationEnabled && (
+            <>
+              <label>
+                每位用户最多加入组织数
+                <input
+                  aria-label="应用组织用户配额"
+                  type="number"
+                  min={1}
+                  max={100}
+                  required
+                  value={organizationLimit}
+                  disabled={busy || active}
+                  onChange={(e) => setOrganizationLimit(Number(e.target.value))}
+                />
+              </label>
+              <label>
+                每个组织最多成员数
+                <input
+                  aria-label="应用组织成员配额"
+                  type="number"
+                  min={1}
+                  max={1000}
+                  required
+                  value={organizationMembershipLimit}
+                  disabled={busy || active}
+                  onChange={(e) => setOrganizationMembershipLimit(Number(e.target.value))}
+                />
+              </label>
+              <label>
+                组织创建者角色
+                <select
+                  aria-label="应用组织创建者角色"
+                  value={organizationCreatorRole}
+                  disabled={busy || active}
+                  onChange={(e) => setOrganizationCreatorRole(e.target.value)}
+                >
+                  <option value="owner">Owner</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </label>
+              <label className="auth-mail-policy backend-wide">
+                <input
+                  aria-label="发送应用组织邀请邮件"
+                  type="checkbox"
+                  checked={organizationInvitationEmail}
+                  disabled={
+                    busy || active || !instance?.mail_operator_enabled || !requireEmailVerification
+                  }
+                  onChange={(e) => setOrganizationInvitationEmail(e.target.checked)}
+                />
+                通过邮件发送组织邀请（需要邮箱验证与邮件服务）
+              </label>
+              {organizationInvitationEmail && (
+                <label className="backend-wide">
+                  应用接受邀请页面 URL
+                  <input
+                    aria-label="应用组织邀请页面"
+                    type="url"
+                    required
+                    maxLength={2048}
+                    value={organizationInvitationURL}
+                    disabled={busy || active}
+                    onChange={(e) => setOrganizationInvitationURL(e.target.value)}
+                  />
+                  <span className="subtle-note">
+                    填写可信来源下的应用页面，不带查询参数；页面需读取 invitationId
+                    并由已验证邮箱的用户接受邀请。
+                  </span>
+                </label>
+              )}
+            </>
+          )}
           {magicLinkEnabled && (
             <>
               <label>
@@ -748,6 +869,12 @@ export function ManagedAuth({
       </section>
       {active && instance?.spec?.admin_enabled && (
         <AuthAdminPanel key={branch + '/admin'} branch={branch} />
+      )}
+      {active && instance?.spec?.organization_enabled && (
+        <AuthOrganizationPanel
+          key={`${branch}/${session?.id || 'anonymous'}/organizations`}
+          branch={branch}
+        />
       )}
     </div>
   );

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.82.0",
+    "version": "0.83.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -2611,6 +2611,44 @@
             "maxLength": 128,
             "pattern": "^[a-zA-Z0-9_-]{1,128}$",
             "description": "Optional explicit grant to an existing unbanned application user, once per newly admitted Auth generation; requires admin_enabled. Never inherited as a grant command."
+          },
+          "organization_enabled": {
+            "type": "boolean",
+            "default": false,
+            "description": "Enable application organizations, independent from Console organizations and global application admin."
+          },
+          "organization_limit": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "default": 0,
+            "description": "Maximum created or joined organizations per user; zero or omitted selects 10. Existing memberships are preserved."
+          },
+          "organization_membership_limit": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000,
+            "default": 0,
+            "description": "Maximum members per organization; zero or omitted selects 100. Future admissions are guarded atomically."
+          },
+          "organization_creator_role": {
+            "type": "string",
+            "enum": [
+              "owner",
+              "admin"
+            ],
+            "description": "New organization creator role; omitted selects owner. Admin cannot delete organizations."
+          },
+          "organization_invitation_email": {
+            "type": "boolean",
+            "default": false,
+            "description": "Send organization invitations using operator SMTP; requires organization_enabled and require_email_verification."
+          },
+          "organization_invitation_url": {
+            "type": "string",
+            "format": "uri",
+            "maxLength": 2048,
+            "description": "Fixed application invitation page within a trusted origin; requires invitation email. No query, fragment or userinfo. Receives invitationId and branchId."
           }
         }
       },

@@ -16,15 +16,21 @@ type ManagedAuthSpec struct {
 	Database       string   `json:"database"`
 	AllowedOrigins []string `json:"allowed_origins"`
 	// Omit false to preserve existing durable request hashes and old specs.
-	RequireEmailVerification   bool   `json:"require_email_verification,omitempty"`
-	EmailOTPEnabled            bool   `json:"email_otp_enabled,omitempty"`
-	MagicLinkEnabled           bool   `json:"magic_link_enabled,omitempty"`
-	MagicLinkExpiresIn         int    `json:"magic_link_expires_in,omitempty"`
-	MagicLinkAllowRegistration bool   `json:"magic_link_allow_registration,omitempty"`
-	TwoFactorEnabled           bool   `json:"two_factor_enabled,omitempty"`
-	InheritTwoFactor           bool   `json:"inherit_two_factor,omitempty"`
-	AdminEnabled               bool   `json:"admin_enabled,omitempty"`
-	AdminBootstrapUserID       string `json:"admin_bootstrap_user_id,omitempty"`
+	RequireEmailVerification    bool   `json:"require_email_verification,omitempty"`
+	EmailOTPEnabled             bool   `json:"email_otp_enabled,omitempty"`
+	MagicLinkEnabled            bool   `json:"magic_link_enabled,omitempty"`
+	MagicLinkExpiresIn          int    `json:"magic_link_expires_in,omitempty"`
+	MagicLinkAllowRegistration  bool   `json:"magic_link_allow_registration,omitempty"`
+	TwoFactorEnabled            bool   `json:"two_factor_enabled,omitempty"`
+	InheritTwoFactor            bool   `json:"inherit_two_factor,omitempty"`
+	AdminEnabled                bool   `json:"admin_enabled,omitempty"`
+	AdminBootstrapUserID        string `json:"admin_bootstrap_user_id,omitempty"`
+	OrganizationEnabled         bool   `json:"organization_enabled,omitempty"`
+	OrganizationLimit           int    `json:"organization_limit,omitempty"`
+	OrganizationMembershipLimit int    `json:"organization_membership_limit,omitempty"`
+	OrganizationCreatorRole     string `json:"organization_creator_role,omitempty"`
+	OrganizationInvitationEmail bool   `json:"organization_invitation_email,omitempty"`
+	OrganizationInvitationURL   string `json:"organization_invitation_url,omitempty"`
 }
 type managedAuthPayload struct {
 	FactorSourceBranchID string          `json:"factor_source_branch_id,omitempty"`
@@ -64,6 +70,9 @@ func validAuthOrigin(origin string) bool {
 	return e == nil && u.Host != "" && !strings.Contains(u.Host, "*") && u.User == nil && u.Path == "" && u.RawQuery == "" && u.Fragment == "" && (u.Scheme == "https" || (os.Getenv("NEON_AUTH_LAB_HTTP") == "true" && u.Scheme == "http"))
 }
 func validateManagedAuth(p managedAuthPayload) error {
+	if err := validateManagedAuthOrganization(p.Spec); err != nil {
+		return err
+	}
 	if p.Spec.AdminBootstrapUserID != "" && (!p.Spec.AdminEnabled || !regexp.MustCompile(`^[a-zA-Z0-9_-]{1,128}$`).MatchString(p.Spec.AdminBootstrapUserID)) {
 		return errors.New("admin bootstrap requires the admin plugin and an exact existing application user ID")
 	}
