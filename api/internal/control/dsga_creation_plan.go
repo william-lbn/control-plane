@@ -189,7 +189,7 @@ func makeDSGACreationPlan(p createPayload, policy dsgaCreationPolicy, now time.T
 	uuid := hex.EncodeToString(entropy[32:])
 	plan := dsgaCreationPlan{dsgaCreationIdentity: dsgaCreationIdentity{1, 17, policy.Namespace, hex.EncodeToString(entropy[:16]), "ci_" + hex.EncodeToString(entropy[16:32])},
 		Image: policy.Image, OperationUUID: fmt.Sprintf("%s-%s-%s-%s-%s", uuid[:8], uuid[8:12], uuid[12:16], uuid[16:20], uuid[20:]),
-		AcceptedAt: now.UTC().Format(time.RFC3339Nano), MemorySlotBytes: policy.MemorySlotBytes, Budget: policy.Budget, VM: policy.VM, Storage: policy.Storage}
+		AcceptedAt: now.UTC().Format(time.RFC3339Nano), MemorySlotBytes: policy.MemorySlotBytes, Budget: policy.Budget, VM: policy.VM.clone(), Storage: policy.Storage}
 	if err := plan.validate(p); err != nil {
 		return dsgaCreationPlan{}, err
 	}

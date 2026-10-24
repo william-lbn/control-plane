@@ -77,7 +77,8 @@ func snapshotDSGACredentials(secret *core.Secret, namespace, name, project, endp
 // renderDSGABootstrap为真实typed创建执行器的Render回调：读取原计划和当前owned
 // immutable凭据，先生成无副作用的确定性文档，再在Operation锁内固定/比对来源。
 // Kube/计划读取/渲染均不持SQL锁。输入缺失不创建Secret、不轮转seed、不回落到旧
-// adminVerifier/cloud_admin路径。返回仅config.json，签名seed永不进入Guest。
+// adminVerifier/cloud_admin路径。返回同一immutable Secret的config.json及原资源
+// 来源resource.json；后者由Controller直接读原UID后放只读ISO，签名seed不进Guest。
 // 调用方仍须用同一binding.bindConfig及UID/RV释放；这里没有预算/SQL/VM许可。
 func (binding *dsgaCreationBinding) renderDSGABootstrap(ctx context.Context, vm *vmv1.VirtualMachine) (map[string][]byte, error) {
 	if err := binding.validateVM(vm); err != nil {
@@ -109,14 +110,14 @@ func (binding *dsgaCreationBinding) renderDSGABootstrap(ctx context.Context, vm 
 	if snapshot.reference() != plan.Credentials || !dsgaCredentialProvenance(secret, binding.operationID, plan) {
 		return nil, errDSGACredentialSource
 	}
-	config, err := renderDSGAComputeBootstrap(binding.intent.createPayload, plan, string(vm.UID), snapshot.credentials)
+	data, err := renderDSGABootstrapFiles(binding.intent.createPayload, plan, string(vm.UID), snapshot.credentials)
 	if err != nil {
 		return nil, err
 	}
 	if err := binding.confirmCredentialSource(ctx, vm, snapshot); err != nil {
 		return nil, err
 	}
-	return map[string][]byte{"config.json": config}, nil
+	return data, nil
 }
 
 // 锁序固定Operation→绑定→来源；不跨Kube/Secret/渲染持锁。首次固定只限原VM

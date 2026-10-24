@@ -67,7 +67,7 @@ func readDSGAProjectPolicy(namespace string) (dsgaProjectPolicy, error) {
 	var policy dsgaProjectPolicy
 	if decodeDSGAObject([]byte(os.Getenv("NEON_DSGA_CREATION_POLICY")), &policy) != nil || policy.ProtocolVersion != 1 ||
 		policy.Creation.Namespace != namespace || policy.Region == "" || len(policy.Region) > 128 || strings.TrimSpace(policy.Region) != policy.Region ||
-		policy.Creation.VM.validate() != nil || policy.Creation.Storage.validate(namespace) != nil || !dsgaPinnedImage.MatchString(policy.Creation.Image) || len(namespace) > 63 || !dsgaPlanNamespace.MatchString(namespace) || policy.Bounds.MinCPU < 250 || policy.Bounds.MinCPU%250 != 0 || policy.Bounds.MaxCPU < policy.Bounds.MinCPU || policy.Bounds.MaxCPU%250 != 0 || policy.Bounds.MaxCPU > 1<<31-1 ||
+		policy.Creation.VM.validateResourceBudget(policy.Creation.Budget) != nil || policy.Creation.Storage.validate(namespace) != nil || !dsgaPinnedImage.MatchString(policy.Creation.Image) || len(namespace) > 63 || !dsgaPlanNamespace.MatchString(namespace) || policy.Bounds.MinCPU < 250 || policy.Bounds.MinCPU%250 != 0 || policy.Bounds.MaxCPU < policy.Bounds.MinCPU || policy.Bounds.MaxCPU%250 != 0 || policy.Bounds.MaxCPU > 1<<31-1 ||
 		policy.Bounds.MinMem <= 0 || policy.Bounds.MaxMem < policy.Bounds.MinMem || policy.Bounds.MaxMem > 1<<31-1 {
 		return policy, errDSGACreationPlan
 	}
@@ -150,7 +150,7 @@ func readDSGAReservation(ctx context.Context, tx pgx.Tx, actor, keyDigest string
 		return r, err
 	}
 	if base != "create_project" || decodeDSGAObject(raw, &r.Draft) != nil || r.Draft.ProtocolVersion != 1 || r.Draft.Plan.validate(r.Draft.Payload) != nil ||
-		r.Draft.Plan.VM.validate() != nil || r.Draft.Plan.Credentials != (dsgaCredentialReference{}) || dsgapi.ValidateID(r.Operation, "reserved Operation") != nil {
+		r.Draft.Plan.VM.validateResourceBudget(r.Draft.Plan.Budget) != nil || r.Draft.Plan.Credentials != (dsgaCredentialReference{}) || dsgapi.ValidateID(r.Operation, "reserved Operation") != nil {
 		return r, errDSGACreationPlan
 	}
 	if len(reference) > 0 && (decodeDSGAObject(reference, &r.Credentials) != nil || r.Credentials.validate() != nil) {

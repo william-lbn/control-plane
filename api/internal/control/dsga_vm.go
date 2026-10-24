@@ -3,6 +3,7 @@ package control
 import (
 	"context"
 	"encoding/json"
+	"github.com/neondatabase/autoscaling/pkg/dsga/resourceguard"
 	"strconv"
 	"time"
 
@@ -27,10 +28,13 @@ type dsgaVMProfile struct {
 	SchedulerName    string `json:"scheduler_name"`
 	ServiceAccount   string `json:"service_account"`
 	TLSClusterIssuer string `json:"tls_cluster_issuer"`
+	// v2显式冻结整个Guest初始聚合额度，不从RSS或固定比例猜预算。v1仅供历史
+	// 只读解码；新生产/恢复启动必须有v2，不能从当前env补入旧计划。
+	ResourceLimits *resourceguard.Limits `json:"resource_limits,omitempty"`
 }
 
 func (v dsgaVMProfile) validate() error {
-	if v.ProtocolVersion != 1 || (v.Architecture != "amd64" && v.Architecture != "arm64") ||
+	if (v.ProtocolVersion != 1 && v.ProtocolVersion != 2) || (v.Architecture != "amd64" && v.Architecture != "arm64") ||
 		!dsgaPinnedImage.MatchString(v.RunnerImage) || !dsgaPinnedImage.MatchString(v.KernelImage) ||
 		v.RootDiskBytes < 1<<30 || v.RootDiskBytes > 1<<63-1 || v.RootDiskBytes%(1<<20) != 0 {
 		return errDSGACreationPlan
@@ -40,7 +44,36 @@ func (v dsgaVMProfile) validate() error {
 			return errDSGACreationPlan
 		}
 	}
+	if v.ProtocolVersion == 1 {
+		if v.ResourceLimits != nil {
+			return errDSGACreationPlan
+		}
+		return nil
+	}
+	if v.ResourceLimits == nil || v.ResourceLimits.Validate() != nil || uint64(v.ResourceLimits.MemoryMaxBytes)%(64<<10) != 0 {
+		return errDSGACreationPlan
+	}
 	return nil
+}
+
+func (v dsgaVMProfile) validateResourceBudget(b dsgaBootstrapBudget) error {
+	if v.validate() != nil || v.ProtocolVersion != 2 || v.ResourceLimits == nil || b.validate() != nil {
+		return errDSGACreationPlan
+	}
+	upper, err := v.ResourceLimits.TotalUpperBytes()
+	if err != nil || upper > b.MinimumGuestMemoryBytes || uint64(v.ResourceLimits.MemoryMaxBytes) < b.BootstrapBufferBytes {
+		return errDSGACreationPlan
+	}
+	return nil
+}
+
+func (v dsgaVMProfile) clone() dsgaVMProfile {
+	if v.ResourceLimits != nil {
+		copy := *v.ResourceLimits
+		copy.HugePools = append([]resourceguard.HugePool(nil), copy.HugePools...)
+		v.ResourceLimits = &copy
+	}
+	return v
 }
 
 const dsgaConfigMount = "/run/neon/config"
@@ -53,7 +86,7 @@ const dsgaTLSCert = dsgaTLSMount + "/tls.crt"
 // bytes→slot先由plan核验整除，按CRD真实上限512而非仅int32上限验证。CPU
 // 按整数milliCPU传递，不经float；启动Use为原最小规格，运行期另经唯一闭环。
 func renderDSGAVM(p createPayload, plan dsgaCreationPlan) (*vmv1.VirtualMachine, error) {
-	if plan.validate(p) != nil || plan.VM.validate() != nil || plan.Credentials.validate() != nil {
+	if plan.validate(p) != nil || plan.VM.validateResourceBudget(plan.Budget) != nil || plan.Credentials.validate() != nil {
 		return nil, errDSGACreationPlan
 	}
 	name := kubeName(p.EndpointID)

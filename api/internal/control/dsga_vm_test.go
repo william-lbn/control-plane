@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/neondatabase/autoscaling/pkg/dsga/resourceguard"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -19,9 +20,9 @@ import (
 // digest仅为显式测试输入，不声明镜像已构建/可运行；Linux使用实际自有发行
 // digest。这个fixture不接触集群、不生成部署清单，直接测试生产VM构造函数。
 func dsgaVMProfileFixture() dsgaVMProfile {
-	return dsgaVMProfile{ProtocolVersion: 1, Architecture: "amd64", RunnerImage: "ghcr.io/william-lbn/neonvm-runner@sha256:" + strings.Repeat("b", 64),
+	return dsgaVMProfile{ProtocolVersion: 2, Architecture: "amd64", RunnerImage: "ghcr.io/william-lbn/neonvm-runner@sha256:" + strings.Repeat("b", 64),
 		KernelImage: "ghcr.io/william-lbn/neonvm-kernel@sha256:" + strings.Repeat("c", 64), RootDiskBytes: 8 << 30,
-		SchedulerName: "autoscale-scheduler", ServiceAccount: "neonvm-runner", TLSClusterIssuer: "neon-compute-issuer"}
+		SchedulerName: "autoscale-scheduler", ServiceAccount: "neonvm-runner", TLSClusterIssuer: "neon-compute-issuer", ResourceLimits: &resourceguard.Limits{MemoryMaxBytes: 512 << 20, OutsideUpperBytes: 128 << 20, HugePools: []resourceguard.HugePool{{PageSizeKB: 2048, Pages: 64}, {PageSizeKB: 1048576, Pages: 0}}}}
 }
 
 func dsgaVMFixture(t *testing.T) (createPayload, dsgaCreationPlan) {
