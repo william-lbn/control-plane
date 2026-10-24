@@ -34,7 +34,7 @@ website 文档快照 `c0d49cbb6979b2ce79ea502d62dbc40780a923b0`（提交时间
 | S05 | 独立 Storage gateway / 可信计量 | 当前 S3 同 API 进程；last_used_at 不等于计费 | 最小权限独立部署、配额/物理容量、租户并发与用量 |
 | A01 | Console MFA | 基础自助已完成：标准 TOTP、恢复码、密码/重放、启用/关闭的其他会话撤销及 UI/PG 已验收 | [当前交付](DELIVERY-2026-10-16-CURRENT.md)；组织强制/WebAuthn/正式恢复流程仍是扩展门槛 |
 | A02 | Console OIDC/SSO | 固定本地协议、显式绑定、组织策略、本地 MFA 与 UI 基础闭环 | [合同](CONSOLE-SSO.md)与[验收](DELIVERY-2026-10-24-CONSOLE-SSO.md)；跨 authority 需代码扩展，商业 IdP 接入未认证，SAML/SCIM/WebAuthn 未提供 |
-| A03 | 应用 Auth OAuth/Admin/组织/手机号/事件 | [Admin](DELIVERY-2026-10-24-AUTH-ADMIN.md)和[组织](DELIVERY-2026-10-24-AUTH-ORGANIZATIONS.md)增量已验收；原邮件/密码/OTP/Magic/TOTP 回执复用 | OAuth、手机号、事件继续；原无状态 JWT 五分钟边界保留 |
+| A03 | 应用 Auth OAuth/Admin/组织/手机号/事件 | 固定本地 OAuth、手机、七类签名事件、Admin 和组织基线已验收；原邮件/密码/OTP/Magic/TOTP 回执复用 | [合同](AUTH-INTEGRATIONS.md)与[交付](DELIVERY-2026-10-24-AUTH-INTEGRATIONS.md)；商业接入、A05 生命周期与 T01 可信 TLS 单列，原无状态 JWT 五分钟边界保留 |
 | A04 | Auth 分支第二因素 | 显式物理迁移、独立重封装、会话/绑定清除、恢复码隔离和验证器恢复基础已验收 | [交付](DELIVERY-2026-10-22-AUTH-FACTOR-MIGRATION.md)；生命周期恢复与在线根密钥轮换保留独立门槛 |
 | A05 | Auth 完整删除/恢复/隔离 | 独立门槛 | 原账号/会话/JWKS/密钥与分支生命周期一致性矩阵 |
 | C01 | 数据库/角色 rename | 自定义受管理非系统对象的异步 API/UI、原 OID/SCRAM/数据、所有现存配置/Proxy CAS、未知结果恢复和 Writer/原 Reader 冷醒基础通过 | [合同](CATALOG-RENAME.md)与[交付](DELIVERY-2026-10-17-CATALOG-RENAME.md)；默认身份、Backend 依赖迁移和未知外部 DDL 归 C02 |
@@ -132,3 +132,5 @@ fixture、失败、日志、密码保护输入和所有业务字节。测试完�
 2026-10-24 应用 Admin：[管理员功能与实际页面](DELIVERY-2026-10-24-AUTH-ADMIN.md)通过 2 组新增/7 组受影响 Go、1 组新增/5 组受影响维护库 PostgreSQL 检查，以及 11 个累计实机检查点。显式授权、角色、封禁、会话、改密/删除及一小时身份代入闭环；原已过步骤及改密未重做。Core Helm 172 / schema 065 / Auth 协议 0.26.0；原目录和凭据身份保留，三节点、三个 Safekeeper Ready，VM 0。A03 的 OAuth、组织、手机号、事件继续；全项目仍有 11 个业务和 3 个其他组未整体闭环。
 
 2026-10-24 应用组织：[组织、成员与邀请](DELIVERY-2026-10-24-AUTH-ORGANIZATIONS.md)完成 22 个接口和控制台操作；2 组新增/7 组受影响 Go、3 组新增维护库 PostgreSQL、1 组受影响 Admin 及 9 个累计实机检查点通过。配额和最后管理者原子保护、验证收件人、当前 JWT 及复制分支邀请隔离通过；复用原创建 Operation 完成续验。Core Helm 174 / schema 065 / 应用协议 0.27.0，原目录与凭据身份保留，最终三节点、三个 Safekeeper Ready，VM 0。A03 的 OAuth、手机号和事件继续，整体仍有 11 个业务和 3 个其他组未闭环。
+
+2026-10-24 应用 Auth 高级功能：[OAuth、手机和签名事件](DELIVERY-2026-10-24-AUTH-INTEGRATIONS.md)完成固定本地 A03 基线。25 个唯一维护库综合组、2 组新增/6 组受影响 Go、2 组协议和十个累计浏览器检查点通过；已过检查从原进度续验。Core Helm 178 / schema 065 / 应用协议 0.28.0；原目录、PVC 和 Secret 身份保留，三节点、三个 Safekeeper Ready，VM 0。当前 17 组基础有回执，10 个业务和 3 个其他组继续；商业 OAuth/短信接入、可信 TLS 与后置专项未冒充已过。

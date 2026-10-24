@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 )
@@ -42,6 +43,15 @@ func managedAuthRelayCookieAllowed(name, branch string, twoFactor bool, admin ..
 }
 
 func managedAuthAllowedAction(action, method string) bool {
+	if action == ".well-known/jwks.json" || action == "webhooks/events" || action == "list-accounts" {
+		return method == "GET" || method == "OPTIONS"
+	}
+	if action == "webhooks/drain" || action == "phone-number/send-otp" || action == "phone-number/verify" || action == "sign-in/social" || action == "link-social" || action == "unlink-account" {
+		return method == "POST" || method == "OPTIONS"
+	}
+	if regexp.MustCompile(`^callback/[a-z][a-z0-9_-]{0,47}$`).MatchString(action) {
+		return method == "GET"
+	}
 	if required, ok := managedAuthOrganizationActions[action]; ok {
 		return method == required || method == "OPTIONS"
 	}
@@ -54,7 +64,7 @@ func managedAuthAllowedAction(action, method string) bool {
 	if managedAuthTwoFactorActions[action] {
 		return method == "POST" || method == "OPTIONS"
 	}
-	if !managedAuthMailConfigured() {
+	if !managedAuthMailConfigured() && os.Getenv("NEON_AUTH_INTEGRATIONS_SECRET") == "" {
 		return false
 	}
 	if action == "sign-in/magic-link" {
@@ -168,6 +178,21 @@ func (s *server) managedAuthRelay(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 503, "auth_unavailable", "Branch Auth configuration unavailable")
 		return
 	}
+	action := r.PathValue("rest")
+	if (strings.HasPrefix(action, "phone-number/") && !spec.PhoneNumberEnabled) || ((strings.HasPrefix(action, "webhooks/") || action == ".well-known/jwks.json") && spec.WebhookID == "") || (strings.HasPrefix(action, "webhooks/") && !spec.AdminEnabled) {
+		http.NotFound(w, r)
+		return
+	}
+	if strings.HasPrefix(action, "callback/") {
+		if !slices.Contains(spec.OAuthProviders, strings.TrimPrefix(action, "callback/")) {
+			http.NotFound(w, r)
+			return
+		}
+	}
+	if (action == "sign-in/social" || action == "link-social" || action == "list-accounts" || action == "unlink-account") && len(spec.OAuthProviders) == 0 {
+		http.NotFound(w, r)
+		return
+	}
 	if _, adminAction := managedAuthAdminActions[r.PathValue("rest")]; adminAction && !spec.AdminEnabled {
 		http.NotFound(w, r)
 		return
@@ -227,7 +252,9 @@ func (s *server) managedAuthRelay(w http.ResponseWriter, r *http.Request) {
 	target, _ := url.Parse("http://" + managedAuthName(branch) + "." + s.kube.namespace + ".svc.cluster.local:9082")
 	base, _ := url.Parse(managedAuthBase(branch))
 	cookieAllowed := func(name string) bool {
-		return managedAuthRelayCookieAllowed(name, branch, spec.TwoFactorEnabled, spec.AdminEnabled)
+		base := strings.TrimPrefix(name, "__Secure-")
+		prefix := "neon_app_" + branch + "."
+		return managedAuthRelayCookieAllowed(name, branch, spec.TwoFactorEnabled, spec.AdminEnabled) || len(spec.OAuthProviders) > 0 && (base == prefix+"state" || base == prefix+"oauth_state")
 	}
 	proxy := &httputil.ReverseProxy{Rewrite: func(pr *httputil.ProxyRequest) {
 		pr.SetURL(target)
@@ -266,6 +293,10 @@ func (s *server) managedAuthRelay(w http.ResponseWriter, r *http.Request) {
 		}, ErrorHandler: func(w http.ResponseWriter, r *http.Request, _ error) {
 			fail(w, r, 503, "auth_unavailable", "Managed Auth runtime unavailable")
 		}}
+	if action == ".well-known/jwks.json" {
+		proxy.ServeHTTP(w, r)
+		return
+	}
 	release, err := s.acquireProbeGate(r.Context(), endpoint, true)
 	if err != nil {
 		fail(w, r, 503, "auth_unavailable", "Could not admit Auth request")

@@ -2,6 +2,11 @@ import { AsyncLocalStorage } from "node:async_hooks";
 import type { Pool, PoolClient } from "pg";
 
 type Scope = {
+  transactional: boolean;
+  phone?: string;
+  phoneAction?: string;
+  accountAction?: boolean;
+  phoneRejected?: boolean;
   client?: PoolClient;
   savepoints: string[];
   nextSavepoint: number;
@@ -27,7 +32,7 @@ export function transactionalAuthDatabase(pool: Pool) {
   const database = new Proxy(pool, {
     get(target, property) {
       if (property === "query") return async (...args: any[]) => {
-        if (!scopes.getStore() || scopes.getStore()?.closed) return (target.query as any)(...args);
+        if (!scopes.getStore()?.transactional || scopes.getStore()?.closed) return (target.query as any)(...args);
         const client = await database.connect();
         try { return await (client.query as any)(...args); }
         finally { client.release(); }
@@ -38,7 +43,7 @@ export function transactionalAuthDatabase(pool: Pool) {
       }
       return async () => {
         const scope = scopes.getStore();
-        if (!scope || scope.closed) return target.connect();
+        if (!scope?.transactional || scope.closed) return target.connect();
         let client = scope.client || await target.connect();
         let released = false;
         return new Proxy(client, {
@@ -69,6 +74,10 @@ export function transactionalAuthDatabase(pool: Pool) {
               if (!scope.client) {
                 scope.client = connection;
                 await connection.query("BEGIN");
+                if (scope.phone) {
+                  await connection.query("SELECT pg_advisory_xact_lock(hashtextextended('neon-auth-phone:'||current_schema()||':'||$1,922751)),set_config('neon_control.auth_action',$2,true)", [scope.phone,scope.phoneAction]);
+                }
+                if(scope.accountAction)await connection.query("SELECT pg_advisory_xact_lock(hashtextextended('neon-auth-account:'||current_schema(),922751))");
               } else if (scope.client !== connection && !released) {
                 released = true;
                 connection.release();
@@ -106,16 +115,23 @@ export function transactionalAuthDatabase(pool: Pool) {
   });
   async function handle(request: Request, handler: (request: Request) => Promise<Response>) {
     const action = new URL(request.url).pathname;
-    if (request.method !== "POST" || (!action.includes("/organization/") && !action.endsWith("/admin/remove-user")))
-      return handler(request);
-    const scope: Scope = { savepoints: [], nextSavepoint: 0, mailTasks: [] };
+    const phoneAction = action.endsWith('/phone-number/send-otp') ? 'phone-number/send-otp' : action.endsWith('/phone-number/verify') ? 'phone-number/verify' : undefined;
+    const accountAction=action.endsWith('/unlink-account');
+    const transactional = request.method === 'POST' && (!!phoneAction || accountAction || action.includes('/organization/') || action.endsWith('/admin/remove-user'));
+    let phone: string | undefined;
+    if (phoneAction && request.method === 'POST') {
+      try { const body = await request.clone().json(); if (typeof body?.phoneNumber === 'string' && /^\+[1-9][0-9]{7,14}$/.test(body.phoneNumber)) phone=body.phoneNumber; }
+      catch { /* The maintained endpoint returns its bounded validation error. */ }
+    }
+    const scope: Scope = { transactional, phone, phoneAction, accountAction, savepoints: [], nextSavepoint: 0, mailTasks: [] };
     return scopes.run(scope, async () => {
       let connectionError: Error | undefined;
       try {
         const response = await handler(request);
         const mailFailed=scope.mailTasks.length>0&&!(await Promise.all(scope.mailTasks)).every(Boolean);
-        if (scope.client) await scope.client.query(response.status >= 400 || scope.rejection || mailFailed ? "ROLLBACK" : "COMMIT");
-        if(mailFailed)return Response.json({code:"organization_mail_unavailable",message:"Invitation delivery could not be confirmed"},{status:503,headers:{"Cache-Control":"no-store"}});
+        const preservePhoneAttempt = scope.phoneAction === 'phone-number/verify' && scope.phoneRejected && response.status === 400;
+        if (scope.client) await scope.client.query((response.status >= 400 && !preservePhoneAttempt) || scope.rejection || mailFailed ? "ROLLBACK" : "COMMIT");
+        if(mailFailed)return Response.json(action.includes('/organization/') ? {code:"organization_mail_unavailable",message:"Invitation delivery could not be confirmed"} : {code:"auth_delivery_unavailable",message:"Authentication message delivery could not be confirmed"},{status:503,headers:{"Cache-Control":"no-store"}});
         if (scope.rejection) {
           const rejection = rejections[scope.rejection];
           return Response.json({code:rejection.code,message:rejection.message},{status:rejection.status,headers:{"Cache-Control":"no-store"}});
@@ -136,5 +152,10 @@ export function transactionalAuthDatabase(pool: Pool) {
     if(scope&&!scope.closed)scope.mailTasks.push(task.then(()=>true,()=>false));
     return task;
   }
-  return { database, handle, trackOrganizationMail };
+  function markPhoneRejectedAttempt() {
+    const scope = scopes.getStore();
+    if (!scope?.transactional || scope.phoneAction !== 'phone-number/verify') throw new Error('Phone verification request scope required');
+    scope.phoneRejected = true;
+  }
+  return { database, handle, trackOrganizationMail, trackBlockingDelivery: trackOrganizationMail, markPhoneRejectedAttempt };
 }

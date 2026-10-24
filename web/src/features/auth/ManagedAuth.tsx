@@ -11,6 +11,12 @@ import { AuthMagicLinkPanel } from './AuthMagicLinkPanel';
 import { AuthTOTPPanel } from './AuthTOTPPanel';
 import { AuthAdminPanel } from './AuthAdminPanel';
 import { AuthOrganizationPanel } from './AuthOrganizationPanel';
+import {
+  AuthIntegrationPolicy,
+  type AuthIntegrationSpec,
+  type AuthIntegrations,
+} from './AuthIntegrationPolicy';
+import { AuthAdvancedPanel } from './AuthAdvancedPanel';
 
 type Instance = {
   branch_id: string;
@@ -20,25 +26,28 @@ type Instance = {
   public_endpoint: string;
   issuer: string;
   audience: string;
-  spec: {
-    database: string;
-    allowed_origins: string[];
-    require_email_verification?: boolean;
-    email_otp_enabled?: boolean;
-    magic_link_enabled?: boolean;
-    magic_link_expires_in?: number;
-    magic_link_allow_registration?: boolean;
-    two_factor_enabled?: boolean;
-    inherit_two_factor?: boolean;
-    admin_enabled?: boolean;
-    admin_bootstrap_user_id?: string;
-    organization_enabled?: boolean;
-    organization_limit?: number;
-    organization_membership_limit?: number;
-    organization_creator_role?: string;
-    organization_invitation_email?: boolean;
-    organization_invitation_url?: string;
-  } | null;
+  integrations?: AuthIntegrations;
+  spec:
+    | (AuthIntegrationSpec & {
+        database: string;
+        allowed_origins: string[];
+        require_email_verification?: boolean;
+        email_otp_enabled?: boolean;
+        magic_link_enabled?: boolean;
+        magic_link_expires_in?: number;
+        magic_link_allow_registration?: boolean;
+        two_factor_enabled?: boolean;
+        inherit_two_factor?: boolean;
+        admin_enabled?: boolean;
+        admin_bootstrap_user_id?: string;
+        organization_enabled?: boolean;
+        organization_limit?: number;
+        organization_membership_limit?: number;
+        organization_creator_role?: string;
+        organization_invitation_email?: boolean;
+        organization_invitation_url?: string;
+      })
+    | null;
   factor_migration?: {
     migrated_factors: number;
     pending_enrollments_removed: number;
@@ -93,6 +102,7 @@ export function ManagedAuth({
   const [organizationCreatorRole, setOrganizationCreatorRole] = useState('owner');
   const [organizationInvitationEmail, setOrganizationInvitationEmail] = useState(false);
   const [organizationInvitationURL, setOrganizationInvitationURL] = useState('');
+  const [integrationSpec, setIntegrationSpec] = useState<AuthIntegrationSpec>({});
   const [magicLinkEnabled, setMagicLinkEnabled] = useState(false);
   const [magicLinkExpiresIn, setMagicLinkExpiresIn] = useState(300);
   const [magicLinkAllowRegistration, setMagicLinkAllowRegistration] = useState(false);
@@ -133,6 +143,14 @@ export function ManagedAuth({
       setOrganizationCreatorRole(value.spec.organization_creator_role || 'owner');
       setOrganizationInvitationEmail(value.spec.organization_invitation_email ?? false);
       setOrganizationInvitationURL(value.spec.organization_invitation_url || '');
+      setIntegrationSpec({
+        oauth_providers: value.spec.oauth_providers || [],
+        webhook_id: value.spec.webhook_id,
+        webhook_events: value.spec.webhook_events || [],
+        webhook_timeout_seconds: value.spec.webhook_timeout_seconds || 5,
+        phone_number_enabled: value.spec.phone_number_enabled || false,
+        phone_number_expires_in: value.spec.phone_number_expires_in || 300,
+      });
       setMagicLinkEnabled(value.spec.magic_link_enabled ?? false);
       setMagicLinkExpiresIn(value.spec.magic_link_expires_in || 300);
       setMagicLinkAllowRegistration(value.spec.magic_link_allow_registration ?? false);
@@ -164,6 +182,7 @@ export function ManagedAuth({
     setOrganizationCreatorRole('owner');
     setOrganizationInvitationEmail(false);
     setOrganizationInvitationURL('');
+    setIntegrationSpec({});
     setMagicLinkEnabled(false);
     setMagicLinkExpiresIn(300);
     setMagicLinkAllowRegistration(false);
@@ -185,6 +204,22 @@ export function ManagedAuth({
             .filter(Boolean),
           ...(requireEmailVerification ? { require_email_verification: true } : {}),
           ...(emailOTPEnabled ? { email_otp_enabled: true } : {}),
+          ...(integrationSpec.oauth_providers?.length
+            ? { oauth_providers: integrationSpec.oauth_providers }
+            : {}),
+          ...(integrationSpec.webhook_id
+            ? {
+                webhook_id: integrationSpec.webhook_id,
+                webhook_events: integrationSpec.webhook_events || [],
+                webhook_timeout_seconds: integrationSpec.webhook_timeout_seconds || 5,
+              }
+            : {}),
+          ...(integrationSpec.phone_number_enabled
+            ? {
+                phone_number_enabled: true,
+                phone_number_expires_in: integrationSpec.phone_number_expires_in || 300,
+              }
+            : {}),
           ...(twoFactorEnabled ? { two_factor_enabled: true } : {}),
           ...(twoFactorEnabled && inheritTwoFactor ? { inherit_two_factor: true } : {}),
           ...(adminEnabled
@@ -387,7 +422,7 @@ export function ManagedAuth({
         <p>
           注册、登录、会话撤销与短期 JWT/JWKS 已提供。本版本需要显式启用实验室
           HTTP；邮箱链接验证与密码找回已有本地验收；OTP/Magic Link 已有本地验收；TOTP
-          本阶段独立验证，OAuth 和全链路可信 TLS 仍有门槛。
+          与应用组织可按分支配置；第三方登录、手机号与事件需要配置运维批准的服务。
         </p>
         <p className="subtle-note">
           首次启用前，由数据库所有者通过 SQL 工作台执行权限委托。已有同名业务 schema 不会被接管。
@@ -427,7 +462,12 @@ export function ManagedAuth({
               aria-label="要求应用邮箱验证"
               type="checkbox"
               checked={requireEmailVerification}
-              disabled={busy || active || !instance?.mail_operator_enabled}
+              disabled={
+                busy ||
+                active ||
+                (!instance?.mail_operator_enabled &&
+                  !integrationSpec.webhook_events?.includes('send.magic_link'))
+              }
               onChange={(e) => setRequireEmailVerification(e.target.checked)}
             />
             要求邮箱验证后才能登录（需要已配置的邮件服务）
@@ -437,7 +477,12 @@ export function ManagedAuth({
               aria-label="启用应用邮箱验证码"
               type="checkbox"
               checked={emailOTPEnabled}
-              disabled={busy || active || !instance?.mail_operator_enabled}
+              disabled={
+                busy ||
+                active ||
+                (!instance?.mail_operator_enabled &&
+                  !integrationSpec.webhook_events?.includes('send.otp'))
+              }
               onChange={(e) => setEmailOTPEnabled(e.target.checked)}
             />
             允许通过邮件验证码登录、注册、验证邮箱和找回密码
@@ -469,7 +514,12 @@ export function ManagedAuth({
               aria-label="启用应用 Magic Link"
               type="checkbox"
               checked={magicLinkEnabled}
-              disabled={busy || active || !instance?.mail_operator_enabled}
+              disabled={
+                busy ||
+                active ||
+                (!instance?.mail_operator_enabled &&
+                  !integrationSpec.webhook_events?.includes('send.magic_link'))
+              }
               onChange={(e) => setMagicLinkEnabled(e.target.checked)}
             />
             邮箱免密码登录（Magic Link）
@@ -611,6 +661,12 @@ export function ManagedAuth({
             </>
           )}
           <div className="backend-wide button-row">
+            <AuthIntegrationPolicy
+              value={integrationSpec}
+              onChange={setIntegrationSpec}
+              available={instance?.integrations}
+              disabled={busy || active}
+            />
             <button
               className="button primary"
               disabled={busy || !instance?.driver_enabled || instance.state !== 'disabled'}
@@ -774,34 +830,38 @@ export function ManagedAuth({
           {appNotice}
         </div>
       </section>
-      {active && instance?.mail_runtime_enabled && (
-        <AuthRecoveryPanel
-          key={`${branch}/recovery`}
-          branch={branch}
-          projectId={projectId}
-          emailHint={session?.email}
-          onChanged={() => {
-            setSession(null);
-            token.current = '';
-            setTokenReady(false);
-          }}
-        />
-      )}
-      {active && instance?.mail_runtime_enabled && instance.spec?.email_otp_enabled && (
-        <AuthOTPPanel
-          key={`${branch}/otp`}
-          branch={branch}
-          emailHint={session?.email}
-          onUser={(user) => {
-            setSession(user);
-            token.current = '';
-            setTokenReady(false);
-            setAppNotice(
-              user ? '已通过邮箱验证码登录' : '应用身份状态已更新，请检查会话或重新登录',
-            );
-          }}
-        />
-      )}
+      {active &&
+        (instance?.mail_runtime_enabled ||
+          instance?.spec?.webhook_events?.includes('send.magic_link')) && (
+          <AuthRecoveryPanel
+            key={`${branch}/recovery`}
+            branch={branch}
+            projectId={projectId}
+            emailHint={session?.email}
+            onChanged={() => {
+              setSession(null);
+              token.current = '';
+              setTokenReady(false);
+            }}
+          />
+        )}
+      {active &&
+        (instance?.mail_runtime_enabled || instance?.spec?.webhook_events?.includes('send.otp')) &&
+        instance?.spec?.email_otp_enabled && (
+          <AuthOTPPanel
+            key={`${branch}/otp`}
+            branch={branch}
+            emailHint={session?.email}
+            onUser={(user) => {
+              setSession(user);
+              token.current = '';
+              setTokenReady(false);
+              setAppNotice(
+                user ? '已通过邮箱验证码登录' : '应用身份状态已更新，请检查会话或重新登录',
+              );
+            }}
+          />
+        )}
       {active && instance?.spec?.two_factor_enabled && (
         <AuthTOTPPanel
           key={`${branch}/totp`}
@@ -816,20 +876,23 @@ export function ManagedAuth({
           }}
         />
       )}
-      {active && instance?.mail_runtime_enabled && instance.spec?.magic_link_enabled && (
-        <AuthMagicLinkPanel
-          key={`${branch}/magic-link`}
-          branch={branch}
-          projectId={projectId}
-          emailHint={session?.email}
-          onUser={(user) => {
-            setSession(user);
-            token.current = '';
-            setTokenReady(false);
-            setAppNotice(user ? '已通过邮箱链接登录' : '应用会话未建立，请检查邮件链接结果');
-          }}
-        />
-      )}
+      {active &&
+        (instance?.mail_runtime_enabled ||
+          instance?.spec?.webhook_events?.includes('send.magic_link')) &&
+        instance?.spec?.magic_link_enabled && (
+          <AuthMagicLinkPanel
+            key={`${branch}/magic-link`}
+            branch={branch}
+            projectId={projectId}
+            emailHint={session?.email}
+            onUser={(user) => {
+              setSession(user);
+              token.current = '';
+              setTokenReady(false);
+              setAppNotice(user ? '已通过邮箱链接登录' : '应用会话未建立，请检查邮件链接结果');
+            }}
+          />
+        )}
       <section className="table-card backend-panel" style={{ padding: 24 }}>
         <div className="section-header">
           <h3>应用用户</h3>
@@ -876,6 +939,26 @@ export function ManagedAuth({
           branch={branch}
         />
       )}
+      {active &&
+        instance?.spec &&
+        (instance.spec.webhook_id ||
+          instance.spec.phone_number_enabled ||
+          instance.spec.oauth_providers?.length) && (
+          <AuthAdvancedPanel
+            key={`${branch}/${session?.id || 'anonymous'}/advanced`}
+            branch={branch}
+            providers={instance.spec.oauth_providers || []}
+            phoneEnabled={!!instance.spec.phone_number_enabled}
+            hooksEnabled={!!instance.spec.webhook_id}
+            user={session}
+            onUser={(user) => {
+              setSession(user);
+              token.current = '';
+              setTokenReady(false);
+              setAppNotice('应用身份状态已更新');
+            }}
+          />
+        )}
     </div>
   );
 }

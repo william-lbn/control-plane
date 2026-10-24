@@ -5,9 +5,9 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 
 **发行状态：预览版本。已经验证的实验环境功能不等于生产认证，也不等于 Neon 官网全部 Backend 服务。**
 
-功能进度与当前优先级见 [已验收/剩余清单](docs/FUNCTIONAL-STATUS-2026-10-21.md)：16 组基础已有回执；五组专项后置，14 组尚未整体闭环。后续优先业务功能，复用来源未变的既有验收。
+功能进度与当前优先级见 [已验收/剩余清单](docs/FUNCTIONAL-STATUS-2026-10-21.md)：17 组基础已有回执；五组专项后置，13 组尚未整体闭环。后续优先业务功能，复用来源未变的既有验收。
 
-最新状态：2026-10-24 应用组织：[组织、成员与邀请](docs/DELIVERY-2026-10-24-AUTH-ORGANIZATIONS.md)完成 22 个接口和控制台操作；2 组新增/7 组受影响 Go、3 组新增维护库 PostgreSQL、1 组受影响 Admin 及 9 个累计实机检查点通过。配额和最后管理者原子保护、验证收件人、当前 JWT 及复制分支邀请隔离通过；复用原创建 Operation 完成续验。Core Helm 174 / schema 065 / 应用协议 0.27.0，原目录与凭据身份保留，最终三节点、三个 Safekeeper Ready，VM 0。A03 的 OAuth、手机号和事件继续，整体仍有 11 个业务和 3 个其他组未闭环。
+最新状态：2026-10-24 应用 Auth 高级功能：[OAuth、手机和签名事件](docs/DELIVERY-2026-10-24-AUTH-INTEGRATIONS.md)完成固定本地 A03 基线。25 个唯一维护库综合组、2 组新增/6 组受影响 Go、2 组协议和十个累计浏览器检查点通过；已过检查从原进度续验。Core Helm 178 / schema 065 / 应用协议 0.28.0；原目录、PVC 和 Secret 身份保留，三节点、三个 Safekeeper Ready，VM 0。当前 17 组基础有回执，10 个业务和 3 个其他组继续；商业 OAuth/短信接入、可信 TLS 与后置专项未冒充已过。
 
 此前增量：[应用 TOTP 双重认证](docs/DELIVERY-2026-10-15-AUTH-TOTP.md)八项 UI 与[项目共享查询](docs/DELIVERY-2026-10-15-SHARED-QUERIES.md)六项 UI 均通过；该批基线为 API 0.33 / Chart 0.9.17 / migration 031。
 
@@ -42,7 +42,7 @@ S3 的 test-only `875e48b` 只修正选择器和原 checkpoint 续测，不改�
 | 数据库、角色与密码轮换 | 分支目录、Compute 原生配置、Proxy spec 调谐；自定义库 Owner 变更和受管理库/角色 rename 已通过实际 UI、原 OID/密码/数据及 Writer/Reader 冷醒 | 默认/系统身份和未知外部 DDL 恢复未完成；见 [Owner 合同](docs/DATABASE-OWNER.md)和[重命名回执](docs/DELIVERY-2026-10-17-CATALOG-RENAME.md) |
 | CPU / 内存边界、自动休眠、连接唤醒 | 已实现实验环境控制路径 | 整数 CPU 和实际 QEMU 250→500→250m、SQL/冷醒已验收；严格 Guest 隔离、完整物理内存归还、跨实例外部栅栏仍未通过 |
 | 监控、Operation 步骤、错误与重试 | 已实现 | 长期指标持久化、SLO 告警、完整审计导出未完成 |
-| 分支 Managed Auth | Go/TS/React、真实 PG 与 Neon UI 注册/会话/JWT/克隆隔离/RLS/自动缩零通过 | 密码/会话、真实本地邮件、OTP/Magic Link 与应用 TOTP 已独立验收；OAuth/完整身份管理、factor 分支重绑、密钥轮换、全链路 TLS/HA 仍缺；见对应交付 |
+| 分支 Managed Auth | Go/TS/React、真实 PG 与 Neon UI 注册/会话/JWT/克隆隔离/RLS/自动缩零通过 | 密码/会话、邮件、OTP/Magic Link、TOTP、Admin/组织与固定本地 OAuth/手机/签名事件已分别验收；完整删除/恢复/密钥生命周期、商业接入及可信 TLS/HA 继续；见对应交付 |
 | 时间点恢复到新分支 | 原生时间戳/LSN、存储保留租约、异步调谐、历史目录隔离、React UI | 默认禁用；仅受管理分支；原地恢复、Time Travel Assist、完整 Backend 一致性恢复未实现 |
 | 项目/分支保留删除与独立 Compute 删除 | 保护/依赖图、关闭 Proxy 和服务、正常 Runner 回收、held tombstone、项目恢复、原密码重建与 React UI | 分支 TTL 和唯一原失败创建保留清理已验收；物理 GC 与跨实例栅栏后置；详见 [删除手册](docs/RETAINED-DELETION.md)和本版交付 |
 | HA / DR | 部分租约与恢复工具 | 未通过独立故障域 HA/DR；历史新分支恢复不等于完整 DR |

@@ -26,6 +26,9 @@ func TestManagedAuthProtocolContractAndDocumentationHaveNoDatabaseEffect(t *test
 		if action == "reset-password/{token}" {
 			action = "reset-password/abcdefghijklmnopqrstuvwxyz"
 		}
+		if action == "callback/{provider}" {
+			action = "callback/google"
+		}
 		for method := range entry.(map[string]any) {
 			if !managedAuthAllowedAction(action, strings.ToUpper(method)) {
 				t.Fatal("Contract describes unallowlisted route", path, method)

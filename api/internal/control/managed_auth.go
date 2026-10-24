@@ -16,31 +16,39 @@ type ManagedAuthSpec struct {
 	Database       string   `json:"database"`
 	AllowedOrigins []string `json:"allowed_origins"`
 	// Omit false to preserve existing durable request hashes and old specs.
-	RequireEmailVerification    bool   `json:"require_email_verification,omitempty"`
-	EmailOTPEnabled             bool   `json:"email_otp_enabled,omitempty"`
-	MagicLinkEnabled            bool   `json:"magic_link_enabled,omitempty"`
-	MagicLinkExpiresIn          int    `json:"magic_link_expires_in,omitempty"`
-	MagicLinkAllowRegistration  bool   `json:"magic_link_allow_registration,omitempty"`
-	TwoFactorEnabled            bool   `json:"two_factor_enabled,omitempty"`
-	InheritTwoFactor            bool   `json:"inherit_two_factor,omitempty"`
-	AdminEnabled                bool   `json:"admin_enabled,omitempty"`
-	AdminBootstrapUserID        string `json:"admin_bootstrap_user_id,omitempty"`
-	OrganizationEnabled         bool   `json:"organization_enabled,omitempty"`
-	OrganizationLimit           int    `json:"organization_limit,omitempty"`
-	OrganizationMembershipLimit int    `json:"organization_membership_limit,omitempty"`
-	OrganizationCreatorRole     string `json:"organization_creator_role,omitempty"`
-	OrganizationInvitationEmail bool   `json:"organization_invitation_email,omitempty"`
-	OrganizationInvitationURL   string `json:"organization_invitation_url,omitempty"`
+	RequireEmailVerification    bool     `json:"require_email_verification,omitempty"`
+	EmailOTPEnabled             bool     `json:"email_otp_enabled,omitempty"`
+	MagicLinkEnabled            bool     `json:"magic_link_enabled,omitempty"`
+	MagicLinkExpiresIn          int      `json:"magic_link_expires_in,omitempty"`
+	MagicLinkAllowRegistration  bool     `json:"magic_link_allow_registration,omitempty"`
+	TwoFactorEnabled            bool     `json:"two_factor_enabled,omitempty"`
+	InheritTwoFactor            bool     `json:"inherit_two_factor,omitempty"`
+	AdminEnabled                bool     `json:"admin_enabled,omitempty"`
+	AdminBootstrapUserID        string   `json:"admin_bootstrap_user_id,omitempty"`
+	OrganizationEnabled         bool     `json:"organization_enabled,omitempty"`
+	OrganizationLimit           int      `json:"organization_limit,omitempty"`
+	OrganizationMembershipLimit int      `json:"organization_membership_limit,omitempty"`
+	OrganizationCreatorRole     string   `json:"organization_creator_role,omitempty"`
+	OrganizationInvitationEmail bool     `json:"organization_invitation_email,omitempty"`
+	OrganizationInvitationURL   string   `json:"organization_invitation_url,omitempty"`
+	PhoneNumberEnabled          bool     `json:"phone_number_enabled,omitempty"`
+	PhoneNumberExpiresIn        int      `json:"phone_number_expires_in,omitempty"`
+	WebhookID                   string   `json:"webhook_id,omitempty"`
+	WebhookEvents               []string `json:"webhook_events,omitempty"`
+	WebhookTimeoutSeconds       int      `json:"webhook_timeout_seconds,omitempty"`
+	OAuthProviders              []string `json:"oauth_providers,omitempty"`
 }
 type managedAuthPayload struct {
-	FactorSourceBranchID string          `json:"factor_source_branch_id,omitempty"`
-	FactorOperationID    string          `json:"factor_operation_id,omitempty"`
-	ProjectID            string          `json:"project_id"`
-	BranchID             string          `json:"branch_id"`
-	EndpointID           string          `json:"endpoint_id"`
-	Generation           int64           `json:"generation"`
-	SecretRef            string          `json:"secret_ref"`
-	Spec                 ManagedAuthSpec `json:"spec"`
+	IntegrationsSecretName string          `json:"integrations_secret_name,omitempty"`
+	IntegrationsSecretUID  string          `json:"integrations_secret_uid,omitempty"`
+	FactorSourceBranchID   string          `json:"factor_source_branch_id,omitempty"`
+	FactorOperationID      string          `json:"factor_operation_id,omitempty"`
+	ProjectID              string          `json:"project_id"`
+	BranchID               string          `json:"branch_id"`
+	EndpointID             string          `json:"endpoint_id"`
+	Generation             int64           `json:"generation"`
+	SecretRef              string          `json:"secret_ref"`
+	Spec                   ManagedAuthSpec `json:"spec"`
 }
 
 func managedAuthName(branch string) string { return "neon-auth-" + strings.TrimPrefix(branch, "br_") }
@@ -70,6 +78,9 @@ func validAuthOrigin(origin string) bool {
 	return e == nil && u.Host != "" && !strings.Contains(u.Host, "*") && u.User == nil && u.Path == "" && u.RawQuery == "" && u.Fragment == "" && (u.Scheme == "https" || (os.Getenv("NEON_AUTH_LAB_HTTP") == "true" && u.Scheme == "http"))
 }
 func validateManagedAuth(p managedAuthPayload) error {
+	if err := validateManagedAuthIntegrations(p.Spec); err != nil {
+		return err
+	}
 	if err := validateManagedAuthOrganization(p.Spec); err != nil {
 		return err
 	}
@@ -79,7 +90,7 @@ func validateManagedAuth(p managedAuthPayload) error {
 	if p.Spec.InheritTwoFactor && !p.Spec.TwoFactorEnabled {
 		return errors.New("factor inheritance requires TOTP to remain enabled")
 	}
-	if (p.Spec.RequireEmailVerification || p.Spec.EmailOTPEnabled || p.Spec.MagicLinkEnabled) && !managedAuthMailConfigured() {
+	if ((p.Spec.RequireEmailVerification || p.Spec.MagicLinkEnabled) && !managedAuthHookSelected(p.Spec, "send.magic_link") || p.Spec.EmailOTPEnabled && !managedAuthHookSelected(p.Spec, "send.otp")) && !managedAuthMailConfigured() {
 		return errors.New("email authentication requires the operator mail transport")
 	}
 	if p.Spec.MagicLinkExpiresIn != 0 && (p.Spec.MagicLinkExpiresIn < 300 || p.Spec.MagicLinkExpiresIn > 86400) {
@@ -137,6 +148,7 @@ func (s *server) managedAuthRead(w http.ResponseWriter, r *http.Request) {
 	}
 	item["driver_enabled"] = managedAuthEnabled()
 	item["mail_operator_enabled"] = managedAuthMailConfigured()
+	item["integrations"] = s.availableManagedAuthIntegrations(r.Context(), managedAuthPayload{ProjectID: r.PathValue("project"), BranchID: stringVal(branch["id"])})
 	item["mail_runtime_enabled"] = false
 	item["issuer"] = managedAuthBase(stringVal(branch["id"]))
 	item["audience"] = branch["id"]
@@ -215,6 +227,15 @@ func (s *server) managedAuthMutate(w http.ResponseWriter, r *http.Request) {
 	hash := s.createRequestHash(action+":"+p.ProjectID+":"+p.BranchID, map[string]any{"spec": p.Spec, "generation": version})
 	if s.replayManagedAuth(w, r, key, hash) {
 		return
+	}
+	if action == "enable_managed_auth" && managedAuthUsesIntegrations(p.Spec) {
+		p.IntegrationsSecretName = os.Getenv("NEON_AUTH_INTEGRATIONS_SECRET")
+		_, uid, integrationErr := s.selectedManagedAuthIntegrations(r.Context(), p)
+		if integrationErr != nil {
+			fail(w, r, 422, "auth_integration_unavailable", "Choose operator-approved integrations for this project and branch")
+			return
+		}
+		p.IntegrationsSecretUID = uid
 	}
 	tx, err := s.db.Begin(r.Context())
 	if err != nil {

@@ -27,7 +27,7 @@ func TestApplicationFactorChallengeCookieContract(t *testing.T) {
 	if len(security) != 2 {
 		t.Fatal("session and pending challenge alternatives required")
 	}
-	if nested(doc, "info", "version") != "0.27.0" {
+	if nested(doc, "info", "version") != "0.28.0" {
 		t.Fatal("contract correction version missing")
 	}
 }

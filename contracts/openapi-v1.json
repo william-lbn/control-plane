@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.83.0",
+    "version": "0.84.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -2649,6 +2649,58 @@
             "format": "uri",
             "maxLength": 2048,
             "description": "Fixed application invitation page within a trusted origin; requires invitation email. No query, fragment or userinfo. Receives invitationId and branchId."
+          },
+          "phone_number_enabled": {
+            "type": "boolean",
+            "default": false,
+            "description": "Verified phone sign-in for existing application users; current users may bind a phone. Requires subscribed send.otp approved delivery."
+          },
+          "phone_number_expires_in": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 600,
+            "default": 0,
+            "description": "SMS OTP lifetime: 60 through 600 seconds; zero or omitted selects 300."
+          },
+          "webhook_id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_-]{0,47}$",
+            "description": "Operator-approved project/branch delivery alias. Caller cannot supply a URL, CA, DNS pin, proxy or signing key."
+          },
+          "webhook_events": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 7,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "enum": [
+                "send.otp",
+                "send.magic_link",
+                "user.before_create",
+                "user.created",
+                "phone_number.verified",
+                "organization.invitation.created",
+                "organization.invitation.accepted"
+              ]
+            }
+          },
+          "webhook_timeout_seconds": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 10,
+            "default": 0,
+            "description": "One attempt timeout: 1 through 10 seconds; zero or omitted selects 5. At most three HTTP attempts within 15 seconds."
+          },
+          "oauth_providers": {
+            "type": "array",
+            "maxItems": 8,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_-]{0,47}$"
+            },
+            "description": "Approved provider IDs. Authorization code + PKCE; OIDC requires verified signature, issuer, audience, expiry and nonce. Existing email accounts need explicit authenticated linking. Provider tokens are not retained."
           }
         }
       },
