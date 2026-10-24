@@ -37,6 +37,14 @@ func (s *server) managedAuthTOTPSecret(p managedAuthPayload) (string, error) {
 }
 
 func (s *server) reserveManagedAuth(ctx context.Context, p managedAuthPayload) error {
+	if existing, err := s.kube.request(ctx, http.MethodGet, s.kube.path("secret", p.SecretRef), nil); err == nil {
+		if !ownedManagedAuth(existing, p) || existing["immutable"] != true {
+			return errors.New("Managed Auth Secret ownership mismatch")
+		}
+		return nil
+	} else if !kubeStatusIs(err, 404) {
+		return err
+	}
 	if err := s.validateManagedAuthMailSecret(ctx); err != nil {
 		return err
 	}
@@ -59,6 +67,30 @@ func (s *server) reserveManagedAuth(ctx context.Context, p managedAuthPayload) e
 		}
 	}
 	configValue := record{"version": 1, "branchID": p.BranchID, "baseURL": managedAuthBase(p.BranchID), "databaseURL": dsn.String(), "databaseTLS": record{"caFile": "/run/auth-ca/ca.crt", "serverName": env("NEON_AUTH_PG_SERVER_NAME", "")}, "secret": authSecret, "trustedOrigins": p.Spec.AllowedOrigins, "allowLabHTTP": true, "requireEmailVerification": p.Spec.RequireEmailVerification, "emailOTPEnabled": p.Spec.EmailOTPEnabled, "magicLinkEnabled": p.Spec.MagicLinkEnabled, "magicLinkExpiresIn": p.Spec.MagicLinkExpiresIn, "magicLinkAllowRegistration": p.Spec.MagicLinkAllowRegistration, "twoFactorEnabled": p.Spec.TwoFactorEnabled, "adminEnabled": p.Spec.AdminEnabled, "organizationEnabled": p.Spec.OrganizationEnabled}
+	selected, _, err := s.selectedManagedAuthIntegrations(ctx, p)
+	if err != nil {
+		return err
+	}
+	for key, value := range selected {
+		configValue[key] = value
+	}
+	if managedAuthUsesIntegrations(p.Spec) {
+		configValue["projectID"] = p.ProjectID
+		configValue["endpointID"] = p.EndpointID
+	}
+	if p.Spec.PhoneNumberEnabled {
+		key, err := s.managedAuthIntegrationKey(p, "phone.otp")
+		if err != nil {
+			return err
+		}
+		ttl := p.Spec.PhoneNumberExpiresIn
+		if ttl == 0 {
+			ttl = 300
+		}
+		configValue["phoneNumberEnabled"] = true
+		configValue["phoneNumberExpiresIn"] = ttl
+		configValue["phoneNumberSecret"] = key
+	}
 	if p.Spec.OrganizationEnabled {
 		users, members, creator := managedAuthOrganizationLimits(p.Spec)
 		configValue["organizationLimit"] = users
@@ -151,6 +183,9 @@ func applyManagedAuthSQLWithFactorsTx(ctx context.Context, tx pgx.Tx, p managedA
 	if err = applyManagedAuthOrganizationsTx(ctx, tx, p, generation == 0); err != nil {
 		return err
 	}
+	if err = applyManagedAuthIntegrationsTx(ctx, tx, p, generation < p.Generation); err != nil {
+		return err
+	}
 	if generation < p.Generation {
 		// The explicit grant is part of this durable generation, not a standing
 		// runtime bypass. A retried installation never re-grants a removed role.
@@ -215,6 +250,9 @@ func applyManagedAuthSQLWithFactorsTx(ctx context.Context, tx pgx.Tx, p managedA
 		}
 	}
 	if err = grantManagedAuthOrganizationsTx(ctx, tx, login, p.Spec); err != nil {
+		return err
+	}
+	if err = grantManagedAuthIntegrationsTx(ctx, tx, login, p.Spec); err != nil {
 		return err
 	}
 	var safe bool
@@ -331,7 +369,9 @@ func (s *server) reconcileManagedAuthWorkload(ctx context.Context, p managedAuth
 	}
 }
 func (s *server) reconcileManagedAuth(ctx context.Context, id, worker, action string, p managedAuthPayload) error {
-	if !managedAuthEnabled() || validateManagedAuth(p) != nil {
+	// Retiring an existing identity must remain possible when its optional
+	// operator delivery/provider configuration has been withdrawn.
+	if !managedAuthEnabled() || action == "enable_managed_auth" && validateManagedAuth(p) != nil {
 		return errors.New("Managed Auth Driver unavailable")
 	}
 	var generation int64

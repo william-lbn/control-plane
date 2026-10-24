@@ -1,5 +1,7 @@
 import { readFileSync } from "node:fs";
 import { loadMailConfig, type MailConfig } from "./mail.ts";
+import { validateAuthWebhook, type AuthWebhookConfig } from "./webhooks.ts";
+import { validateAuthOAuthProviders, type AuthOAuthProvider } from "./oauth.ts";
 
 export interface AuthConfig {
   version: 1;
@@ -24,7 +26,17 @@ export interface AuthConfig {
   organizationCreatorRole?: "owner" | "admin";
   organizationInvitationEmail?: boolean;
   organizationInvitationURL?: string;
+  projectID?: string;
+  endpointID?: string;
+  webhook?: AuthWebhookConfig;
+  phoneNumberEnabled?: boolean;
+  phoneNumberExpiresIn?: number;
+  phoneNumberSecret?: string;
+  oauthProviders?: AuthOAuthProvider[];
 }
+
+export const authLinkDeliveryEnabled = (config: AuthConfig) => !!config.mail || !!config.webhook?.events.includes("send.magic_link");
+export const authOTPDeliveryEnabled = (config: AuthConfig) => !!config.mail || !!config.webhook?.events.includes("send.otp");
 
 // Both the URL and SQL credential come from an immutable, owned Secret file.
 // Request headers can never choose an issuer, audience, SQL route or database.
@@ -32,6 +44,17 @@ export function parseConfig(value: unknown): AuthConfig {
   if (!value || typeof value !== "object")
     throw new Error("Invalid Auth configuration");
   const c = value as AuthConfig;
+  if(c.oauthProviders!==undefined)validateAuthOAuthProviders(c.oauthProviders,c.allowLabHTTP);
+  if (c.webhook !== undefined) validateAuthWebhook(c.webhook);
+  if ((c.projectID !== undefined && !/^prj_[a-f0-9]{16}$/.test(c.projectID)) ||
+    (c.endpointID !== undefined && !/^ep_[a-f0-9]{16}$/.test(c.endpointID)) ||
+    (c.phoneNumberEnabled !== undefined && typeof c.phoneNumberEnabled !== "boolean") ||
+    (!c.phoneNumberEnabled && (c.phoneNumberExpiresIn !== undefined || c.phoneNumberSecret !== undefined)) ||
+    (c.webhook?.destination.allowLabHTTP && !c.allowLabHTTP)) throw new Error("Invalid branch integration policy");
+  if (c.phoneNumberEnabled && (!c.webhook?.events.includes("send.otp") || !Number.isInteger(c.phoneNumberExpiresIn) ||
+    c.phoneNumberExpiresIn! < 60 || c.phoneNumberExpiresIn! > 600 || typeof c.phoneNumberSecret !== "string" ||
+    !/^[A-Za-z0-9_-]{43}$/.test(c.phoneNumberSecret) || Buffer.from(c.phoneNumberSecret,"base64url").toString("base64url") !== c.phoneNumberSecret))
+    throw new Error("Phone login requires approved SMS delivery and a branch phone key");
   if (c.adminEnabled !== undefined && typeof c.adminEnabled !== "boolean")
     throw new Error("Invalid application admin policy");
   if (c.organizationEnabled !== undefined && typeof c.organizationEnabled !== "boolean")
@@ -145,10 +168,9 @@ export function loadConfig(): AuthConfig {
   const config = parseConfig(JSON.parse(readFileSync(file, "utf8")));
   config.mail = loadMailConfig();
   if (
-    (config.requireEmailVerification ||
-      config.emailOTPEnabled ||
-      config.magicLinkEnabled) &&
-    !config.mail
+    ((config.requireEmailVerification || config.magicLinkEnabled) && !authLinkDeliveryEnabled(config)) ||
+    (config.emailOTPEnabled && !authOTPDeliveryEnabled(config)) ||
+    (config.organizationInvitationEmail && !config.mail)
   )
     throw new Error("Email verification requires a mail transport");
   return config;

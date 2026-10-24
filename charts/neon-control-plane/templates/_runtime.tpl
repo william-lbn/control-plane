@@ -69,6 +69,9 @@
 {{- end }}
 {{- end }}
 {{- if .Values.managedAuth.enabled }}
+{{- if .Values.managedAuth.integrationsSecret }}
+- {name: NEON_AUTH_INTEGRATIONS_SECRET, value: {{ .Values.managedAuth.integrationsSecret | quote }}}
+{{- end }}
 {{- if .Values.managedAuth.mail.enabled }}
 - {name: NEON_AUTH_MAIL_ENABLED, value: 'true'}
 - {name: NEON_AUTH_MAIL_SECRET, value: {{ required "Auth mail requires managedAuth.mail.existingSecret" .Values.managedAuth.mail.existingSecret | quote }}}

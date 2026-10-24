@@ -63,6 +63,9 @@ functions:
   proxyCAKey: ca.crt
 managedAuth:
   enabled: false
+  # Immutable operator registry; only authorized selected entries are copied
+  # into an owned branch Secret. The global registry is never mounted there.
+  integrationsSecret: ''
   # SMTP operator identity is external and immutable. It is mounted only into
   # branch Auth runtimes; never into Web or metadata responses.
   mail:

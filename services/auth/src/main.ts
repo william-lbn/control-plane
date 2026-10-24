@@ -4,9 +4,11 @@ import { toNodeHandler } from "better-auth/node";
 import pg from "pg";
 import { createAuth } from "./auth.ts";
 import { loadConfig } from "./config.ts";
+import { authLinkDeliveryEnabled, authOTPDeliveryEnabled } from "./config.ts";
 import { databaseOptions } from "./database.ts";
 import { adminActions } from "./admin.ts";
 import { organizationActions } from "./organization.ts";
+import { phoneActions } from "./phone.ts";
 
 const config = loadConfig();
 // max=1 and a one-second idle lifetime leave no permanent database session.
@@ -34,10 +36,10 @@ const allowed = new Set([
   "change-password",
   "update-user",
   ...(config.twoFactorEnabled ? ["two-factor/enable","two-factor/disable","two-factor/get-totp-uri","two-factor/verify-totp","two-factor/verify-backup-code","two-factor/generate-backup-codes"] : []),
-  ...(config.mail && config.magicLinkEnabled
+  ...(authLinkDeliveryEnabled(config) && config.magicLinkEnabled
     ? ["sign-in/magic-link", "magic-link/verify"]
     : []),
-  ...(config.mail && config.emailOTPEnabled
+  ...(authOTPDeliveryEnabled(config) && config.emailOTPEnabled
     ? [
         "email-otp/send-verification-otp",
         "email-otp/check-verification-otp",
@@ -47,7 +49,7 @@ const allowed = new Set([
         "sign-in/email-otp",
       ]
     : []),
-  ...(config.mail
+  ...(authLinkDeliveryEnabled(config)
     ? [
         "request-password-reset",
         "reset-password",
@@ -68,13 +70,17 @@ const server = createServer(async (req, res) => {
     (req.method===adminActions[action] || req.method==="OPTIONS");
   const organizationAction = config.organizationEnabled && Object.hasOwn(organizationActions,action) &&
     (req.method===organizationActions[action] || req.method==="OPTIONS");
+  const phoneAction = config.phoneNumberEnabled && Object.hasOwn(phoneActions,action) && (req.method==='POST'||req.method==='OPTIONS');
+  const hookKeys = !!config.webhook && action==='.well-known/jwks.json' && req.method==='GET';
+  const hookManagement = !!config.webhook && config.adminEnabled && ((action==='webhooks/events'&&req.method==='GET')||(action==='webhooks/drain'&&req.method==='POST'));
+  const oauthAction=!!config.oauthProviders?.length&&((['sign-in/social','link-social','unlink-account'].includes(action)&&['POST','OPTIONS'].includes(req.method||''))||(action==='list-accounts'&&req.method==='GET')||(config.oauthProviders.some(p=>action==='callback/'+p.id)&&req.method==='GET'));
   const resetCallback =
-    !!config.mail &&
+    authLinkDeliveryEnabled(config) &&
     /^reset-password\/[a-zA-Z0-9_-]{20,128}$/.test(action) &&
     req.method === "GET";
   if (
     !path.startsWith(`/auth/v1/${config.branchID}/`) ||
-    (!allowed.has(action) && !resetCallback && !adminAction && !organizationAction) ||
+    (!allowed.has(action) && !resetCallback && !adminAction && !organizationAction && !phoneAction && !hookKeys && !hookManagement && !oauthAction) ||
     !["GET", "POST", "OPTIONS"].includes(req.method || "")
   ) {
     res.writeHead(404).end();
