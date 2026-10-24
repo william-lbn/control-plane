@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.84.0",
+    "version": "0.85.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -3896,6 +3896,11 @@
                 "video"
               ]
             }
+          },
+          "allow_provider_state": {
+            "type": "boolean",
+            "default": false,
+            "description": "Explicit operator approval for supplier-side retention and branch-scoped Responses/Conversations handles. Requires Responses; disabled by default."
           }
         }
       },
@@ -6515,6 +6520,11 @@
                 "video"
               ]
             }
+          },
+          "allow_provider_state": {
+            "type": "boolean",
+            "default": false,
+            "description": "Explicit operator approval for supplier-side retention and branch-scoped Responses/Conversations handles. Requires Responses; disabled by default."
           }
         },
         "required": [
@@ -7641,7 +7651,9 @@
             "type": "object"
           },
           "store": {
-            "const": false
+            "type": "boolean",
+            "default": false,
+            "description": "Opt-in supplier retention; no retention unless explicitly true. Requires an approved model capability."
           },
           "background": {
             "const": false
@@ -7654,9 +7666,51 @@
           },
           "truncation": {
             "type": "string"
+          },
+          "previous_response_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "pattern": "^nrp_[a-f0-9]{24}$",
+            "description": "Owned branch response handle; cannot be combined with conversation. Historical input remains billable."
+          },
+          "conversation": {
+            "oneOf": [
+              {
+                "type": "string",
+                "pattern": "^ncv_[a-f0-9]{24}$"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "id"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^ncv_[a-f0-9]{24}$"
+                  }
+                }
+              }
+            ]
+          },
+          "metadata": {
+            "type": "object",
+            "maxProperties": 15,
+            "propertyNames": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^(?!_[nN][eE][oO][nN]_).*$"
+            },
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 512
+            }
           }
         },
-        "description": "Stateless bounded native request, at most 32768 bytes. No provider-owned file/conversation handles or hosted tools; inline images and custom function tools only."
+        "description": "Bounded inline native Responses input. Provider state is separately approved; raw supplier IDs, hosted tools and background inference are rejected."
       },
       "AIEmbeddingsRequest": {
         "type": "object",
@@ -8934,6 +8988,118 @@
           "sha256",
           "settings"
         ]
+      },
+      "AIConversationMutation": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "metadata": {
+            "type": "object",
+            "maxProperties": 15,
+            "propertyNames": {
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^(?!_[nN][eE][oO][nN]_).*$"
+            },
+            "additionalProperties": {
+              "type": "string",
+              "maxLength": 512
+            }
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 20,
+            "items": {
+              "type": "object"
+            },
+            "description": "Bounded inline message/function tool items only; remote item/file/vector-store references are rejected."
+          }
+        }
+      },
+      "AIProviderStateReconciliation": {
+        "type": "object",
+        "required": [
+          "resolution",
+          "evidence_sha256"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "remote_id": {
+            "type": "string",
+            "maxLength": 197,
+            "description": "Original candidate ID from supplier records, accepted only after verification of the original ownership HMAC."
+          },
+          "resolution": {
+            "type": "string",
+            "enum": [
+              "adopted",
+              "confirmed_applied",
+              "confirmed_not_accepted",
+              "deleted"
+            ]
+          },
+          "evidence_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      },
+      "AIProviderHandle": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "state",
+          "model_id",
+          "expires_at"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^(nrp|ncv)_[a-f0-9]{24}$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "response",
+              "conversation"
+            ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "pending",
+              "ready",
+              "uncertain",
+              "deleting",
+              "deleted",
+              "revoked"
+            ]
+          },
+          "model_id": {
+            "type": "string"
+          },
+          "provider_status": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "version": {
+            "type": "integer"
+          },
+          "conversation": {
+            "type": "string"
+          },
+          "previous_response_id": {
+            "type": "string"
+          }
+        }
       }
     },
     "responses": {
@@ -30320,6 +30486,5031 @@
             }
           }
         ]
+      }
+    },
+    "/ai/v1/{aiBranch}/v1/responses/{providerResponse}": {
+      "get": {
+        "operationId": "aiProviderStatePublicNative1",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "aiBranch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerResponse",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          }
+        ],
+        "security": [
+          {
+            "backendCredential": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "aiProviderStatePublicNative2",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "aiBranch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerResponse",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "backendCredential": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/ai/v1/{aiBranch}/v1/responses/{providerResponse}/input_items": {
+      "get": {
+        "operationId": "aiProviderStatePublicNative3",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "aiBranch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerResponse",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^nit_"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^nit_"
+            }
+          }
+        ],
+        "security": [
+          {
+            "backendCredential": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/ai/v1/{aiBranch}/v1/conversations": {
+      "post": {
+        "operationId": "aiProviderStatePublicNative5",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "aiBranch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "backendCredential": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIConversationMutation"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai/v1/{aiBranch}/v1/conversations/{providerConversation}": {
+      "get": {
+        "operationId": "aiProviderStatePublicNative6",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "aiBranch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerConversation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          }
+        ],
+        "security": [
+          {
+            "backendCredential": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "post": {
+        "operationId": "aiProviderStatePublicNative7",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "aiBranch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerConversation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "backendCredential": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIConversationMutation"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "aiProviderStatePublicNative8",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "aiBranch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerConversation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "backendCredential": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/ai/v1/{aiBranch}/v1/conversations/{providerConversation}/items": {
+      "post": {
+        "operationId": "aiProviderStatePublicNative10",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "aiBranch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerConversation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "backendCredential": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIConversationMutation"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "aiProviderStatePublicNative11",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "aiBranch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerConversation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^nit_"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^nit_"
+            }
+          }
+        ],
+        "security": [
+          {
+            "backendCredential": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/ai/v1/{aiBranch}/v1/conversations/{providerConversation}/items/{providerItem}": {
+      "get": {
+        "operationId": "aiProviderStatePublicNative12",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "aiBranch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerConversation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerItem",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          }
+        ],
+        "security": [
+          {
+            "backendCredential": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "aiProviderStatePublicNative13",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "aiBranch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerConversation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerItem",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "backendCredential": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/ai/v1/{aiBranch}/openai/v1/responses/{providerResponse}": {
+      "get": {
+        "operationId": "aiProviderStatePublicOpenAI1",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "aiBranch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerResponse",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          }
+        ],
+        "security": [
+          {
+            "backendCredential": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "aiProviderStatePublicOpenAI2",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "aiBranch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerResponse",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "backendCredential": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/ai/v1/{aiBranch}/openai/v1/responses/{providerResponse}/input_items": {
+      "get": {
+        "operationId": "aiProviderStatePublicOpenAI3",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "aiBranch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerResponse",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^nit_"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^nit_"
+            }
+          }
+        ],
+        "security": [
+          {
+            "backendCredential": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/ai/v1/{aiBranch}/openai/v1/conversations": {
+      "post": {
+        "operationId": "aiProviderStatePublicOpenAI5",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "aiBranch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "backendCredential": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIConversationMutation"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/ai/v1/{aiBranch}/openai/v1/conversations/{providerConversation}": {
+      "get": {
+        "operationId": "aiProviderStatePublicOpenAI6",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "aiBranch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerConversation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          }
+        ],
+        "security": [
+          {
+            "backendCredential": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "post": {
+        "operationId": "aiProviderStatePublicOpenAI7",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "aiBranch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerConversation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "backendCredential": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIConversationMutation"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "aiProviderStatePublicOpenAI8",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "aiBranch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerConversation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "backendCredential": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/ai/v1/{aiBranch}/openai/v1/conversations/{providerConversation}/items": {
+      "post": {
+        "operationId": "aiProviderStatePublicOpenAI10",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "aiBranch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerConversation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "backendCredential": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIConversationMutation"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "aiProviderStatePublicOpenAI11",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "aiBranch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerConversation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^nit_"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^nit_"
+            }
+          }
+        ],
+        "security": [
+          {
+            "backendCredential": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/ai/v1/{aiBranch}/openai/v1/conversations/{providerConversation}/items/{providerItem}": {
+      "get": {
+        "operationId": "aiProviderStatePublicOpenAI12",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "aiBranch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerConversation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerItem",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          }
+        ],
+        "security": [
+          {
+            "backendCredential": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "aiProviderStatePublicOpenAI13",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "aiBranch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerConversation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerItem",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "backendCredential": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/v1/responses/{providerResponse}": {
+      "get": {
+        "operationId": "aiProviderStateConsoleNative1",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerResponse",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "aiProviderStateConsoleNative2",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerResponse",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/v1/responses/{providerResponse}/input_items": {
+      "get": {
+        "operationId": "aiProviderStateConsoleNative3",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerResponse",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^nit_"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^nit_"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/v1/responses/{providerResponse}/reconcile": {
+      "post": {
+        "operationId": "aiProviderStateConsoleNative4",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerResponse",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIProviderStateReconciliation"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/v1/conversations": {
+      "post": {
+        "operationId": "aiProviderStateConsoleNative5",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIConversationMutation"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/v1/conversations/{providerConversation}": {
+      "get": {
+        "operationId": "aiProviderStateConsoleNative6",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerConversation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "post": {
+        "operationId": "aiProviderStateConsoleNative7",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerConversation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIConversationMutation"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "aiProviderStateConsoleNative8",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerConversation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/v1/conversations/{providerConversation}/reconcile": {
+      "post": {
+        "operationId": "aiProviderStateConsoleNative9",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerConversation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIProviderStateReconciliation"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/v1/conversations/{providerConversation}/items": {
+      "post": {
+        "operationId": "aiProviderStateConsoleNative10",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerConversation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIConversationMutation"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "aiProviderStateConsoleNative11",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerConversation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^nit_"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^nit_"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/v1/conversations/{providerConversation}/items/{providerItem}": {
+      "get": {
+        "operationId": "aiProviderStateConsoleNative12",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerConversation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerItem",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "aiProviderStateConsoleNative13",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerConversation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerItem",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/openai/v1/responses/{providerResponse}": {
+      "get": {
+        "operationId": "aiProviderStateConsoleOpenAI1",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerResponse",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "aiProviderStateConsoleOpenAI2",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerResponse",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/openai/v1/responses/{providerResponse}/input_items": {
+      "get": {
+        "operationId": "aiProviderStateConsoleOpenAI3",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerResponse",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^nit_"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^nit_"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/openai/v1/responses/{providerResponse}/reconcile": {
+      "post": {
+        "operationId": "aiProviderStateConsoleOpenAI4",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerResponse",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIProviderStateReconciliation"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/openai/v1/conversations": {
+      "post": {
+        "operationId": "aiProviderStateConsoleOpenAI5",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIConversationMutation"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/openai/v1/conversations/{providerConversation}": {
+      "get": {
+        "operationId": "aiProviderStateConsoleOpenAI6",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerConversation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "post": {
+        "operationId": "aiProviderStateConsoleOpenAI7",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerConversation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIConversationMutation"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "aiProviderStateConsoleOpenAI8",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerConversation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/openai/v1/conversations/{providerConversation}/reconcile": {
+      "post": {
+        "operationId": "aiProviderStateConsoleOpenAI9",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerConversation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIProviderStateReconciliation"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/openai/v1/conversations/{providerConversation}/items": {
+      "post": {
+        "operationId": "aiProviderStateConsoleOpenAI10",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerConversation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AIConversationMutation"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "aiProviderStateConsoleOpenAI11",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerConversation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            }
+          },
+          {
+            "name": "order",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "asc",
+                "desc"
+              ]
+            }
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^nit_"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^nit_"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/openai/v1/conversations/{providerConversation}/items/{providerItem}": {
+      "get": {
+        "operationId": "aiProviderStateConsoleOpenAI12",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerConversation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerItem",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "aiProviderStateConsoleOpenAI13",
+        "tags": [
+          "AI Gateway"
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerConversation",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "providerItem",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-Neon-Model",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 128
+            },
+            "description": "An explicitly approved model alias selects the current supplier account and credential scope."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "description": "Branch-scoped supplier state. Exactly one supplier attempt; mutations whose outcome is unknown are retained and never automatically replayed. IDs and cursors are opaque scoped handles. Supplier redirects and process proxies are ignored; approved WAN egress policy is retained. Responses expire locally after 30 days; conversation expiration does not prove supplier deletion. Reconciliation requires a Console project administrator and separate evidence; it only reads the supplier and does not settle financial reservations.",
+        "responses": {
+          "200": {
+            "description": "Verified supplier result with platform handles or a durable reconciliation receipt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "502": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/ai-gateway/provider-state": {
+      "get": {
+        "operationId": "listBranchAIProviderState",
+        "tags": [
+          "AI Gateway"
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Lists at most 100 recent local references for project editors. Supplier IDs and prompt/reply content are not included.",
+        "responses": {
+          "200": {
+            "description": "Local provider state history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "maxItems": 100,
+                      "items": {
+                        "$ref": "#/components/schemas/AIProviderHandle"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
       }
     }
   }

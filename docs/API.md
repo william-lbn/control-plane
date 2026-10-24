@@ -1,7 +1,7 @@
 # 实际 API 合同
 
 OpenAPI 3 合同的权威源是 [openapi-v1.json](../contracts/openapi-v1.json)。
-版本 0.84.0，169 个路径、234 个操作，全部拥有稳定且唯一的 operationId。
+版本 0.85.0，198 个路径、283 个操作，全部拥有稳定且唯一的 operationId。
 运行 Swagger 位于 `/api/docs`，JSON 位于 `/api/openapi.json`。
 本合同是自托管 `/api/v1`，不声称兼容 Neon SaaS `/api/v2`。
 
@@ -258,6 +258,55 @@ request_id/operation_id/error_code，再由显式 retry 接口恢复可重试操
 | PUT | `/api/v1/organizations/{org}/sso` | `setOrganizationConsoleSSO` | 200 |
 | POST | `/api/v1/organizations/{org}/sso/link` | `linkOwnConsoleSSO` | 200 |
 | DELETE | `/api/v1/organizations/{org}/sso/bindings/{binding}` | `revokeOwnConsoleSSO` | 200 |
+| GET | `/ai/v1/{aiBranch}/v1/responses/{providerResponse}` | `aiProviderStatePublicNative1` | 200 |
+| DELETE | `/ai/v1/{aiBranch}/v1/responses/{providerResponse}` | `aiProviderStatePublicNative2` | 200 |
+| GET | `/ai/v1/{aiBranch}/v1/responses/{providerResponse}/input_items` | `aiProviderStatePublicNative3` | 200 |
+| POST | `/ai/v1/{aiBranch}/v1/conversations` | `aiProviderStatePublicNative5` | 200 |
+| GET | `/ai/v1/{aiBranch}/v1/conversations/{providerConversation}` | `aiProviderStatePublicNative6` | 200 |
+| POST | `/ai/v1/{aiBranch}/v1/conversations/{providerConversation}` | `aiProviderStatePublicNative7` | 200 |
+| DELETE | `/ai/v1/{aiBranch}/v1/conversations/{providerConversation}` | `aiProviderStatePublicNative8` | 200 |
+| GET | `/ai/v1/{aiBranch}/v1/conversations/{providerConversation}/items` | `aiProviderStatePublicNative11` | 200 |
+| POST | `/ai/v1/{aiBranch}/v1/conversations/{providerConversation}/items` | `aiProviderStatePublicNative10` | 200 |
+| GET | `/ai/v1/{aiBranch}/v1/conversations/{providerConversation}/items/{providerItem}` | `aiProviderStatePublicNative12` | 200 |
+| DELETE | `/ai/v1/{aiBranch}/v1/conversations/{providerConversation}/items/{providerItem}` | `aiProviderStatePublicNative13` | 200 |
+| GET | `/ai/v1/{aiBranch}/openai/v1/responses/{providerResponse}` | `aiProviderStatePublicOpenAI1` | 200 |
+| DELETE | `/ai/v1/{aiBranch}/openai/v1/responses/{providerResponse}` | `aiProviderStatePublicOpenAI2` | 200 |
+| GET | `/ai/v1/{aiBranch}/openai/v1/responses/{providerResponse}/input_items` | `aiProviderStatePublicOpenAI3` | 200 |
+| POST | `/ai/v1/{aiBranch}/openai/v1/conversations` | `aiProviderStatePublicOpenAI5` | 200 |
+| GET | `/ai/v1/{aiBranch}/openai/v1/conversations/{providerConversation}` | `aiProviderStatePublicOpenAI6` | 200 |
+| POST | `/ai/v1/{aiBranch}/openai/v1/conversations/{providerConversation}` | `aiProviderStatePublicOpenAI7` | 200 |
+| DELETE | `/ai/v1/{aiBranch}/openai/v1/conversations/{providerConversation}` | `aiProviderStatePublicOpenAI8` | 200 |
+| GET | `/ai/v1/{aiBranch}/openai/v1/conversations/{providerConversation}/items` | `aiProviderStatePublicOpenAI11` | 200 |
+| POST | `/ai/v1/{aiBranch}/openai/v1/conversations/{providerConversation}/items` | `aiProviderStatePublicOpenAI10` | 200 |
+| GET | `/ai/v1/{aiBranch}/openai/v1/conversations/{providerConversation}/items/{providerItem}` | `aiProviderStatePublicOpenAI12` | 200 |
+| DELETE | `/ai/v1/{aiBranch}/openai/v1/conversations/{providerConversation}/items/{providerItem}` | `aiProviderStatePublicOpenAI13` | 200 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/v1/responses/{providerResponse}` | `aiProviderStateConsoleNative1` | 200 |
+| DELETE | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/v1/responses/{providerResponse}` | `aiProviderStateConsoleNative2` | 200 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/v1/responses/{providerResponse}/input_items` | `aiProviderStateConsoleNative3` | 200 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/v1/responses/{providerResponse}/reconcile` | `aiProviderStateConsoleNative4` | 200 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/v1/conversations` | `aiProviderStateConsoleNative5` | 200 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/v1/conversations/{providerConversation}` | `aiProviderStateConsoleNative6` | 200 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/v1/conversations/{providerConversation}` | `aiProviderStateConsoleNative7` | 200 |
+| DELETE | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/v1/conversations/{providerConversation}` | `aiProviderStateConsoleNative8` | 200 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/v1/conversations/{providerConversation}/reconcile` | `aiProviderStateConsoleNative9` | 200 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/v1/conversations/{providerConversation}/items` | `aiProviderStateConsoleNative11` | 200 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/v1/conversations/{providerConversation}/items` | `aiProviderStateConsoleNative10` | 200 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/v1/conversations/{providerConversation}/items/{providerItem}` | `aiProviderStateConsoleNative12` | 200 |
+| DELETE | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/v1/conversations/{providerConversation}/items/{providerItem}` | `aiProviderStateConsoleNative13` | 200 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/openai/v1/responses/{providerResponse}` | `aiProviderStateConsoleOpenAI1` | 200 |
+| DELETE | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/openai/v1/responses/{providerResponse}` | `aiProviderStateConsoleOpenAI2` | 200 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/openai/v1/responses/{providerResponse}/input_items` | `aiProviderStateConsoleOpenAI3` | 200 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/openai/v1/responses/{providerResponse}/reconcile` | `aiProviderStateConsoleOpenAI4` | 200 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/openai/v1/conversations` | `aiProviderStateConsoleOpenAI5` | 200 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/openai/v1/conversations/{providerConversation}` | `aiProviderStateConsoleOpenAI6` | 200 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/openai/v1/conversations/{providerConversation}` | `aiProviderStateConsoleOpenAI7` | 200 |
+| DELETE | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/openai/v1/conversations/{providerConversation}` | `aiProviderStateConsoleOpenAI8` | 200 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/openai/v1/conversations/{providerConversation}/reconcile` | `aiProviderStateConsoleOpenAI9` | 200 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/openai/v1/conversations/{providerConversation}/items` | `aiProviderStateConsoleOpenAI11` | 200 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/openai/v1/conversations/{providerConversation}/items` | `aiProviderStateConsoleOpenAI10` | 200 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/openai/v1/conversations/{providerConversation}/items/{providerItem}` | `aiProviderStateConsoleOpenAI12` | 200 |
+| DELETE | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/state/openai/v1/conversations/{providerConversation}/items/{providerItem}` | `aiProviderStateConsoleOpenAI13` | 200 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/ai-gateway/provider-state` | `listBranchAIProviderState` | 200 |
 
 ## 3. 实现映射与演进
 

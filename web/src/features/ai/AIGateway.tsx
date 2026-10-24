@@ -1,4 +1,5 @@
 import { AIInputFiles } from './AIInputFiles';
+import { AIProviderState, type AIStateReference } from './AIProviderState';
 import type { AIInputFile } from './AIInputFiles';
 import { attachInputFiles, supportedInputTypes } from './inputFiles';
 import { useEffect, useRef, useState } from 'react';
@@ -16,6 +17,7 @@ import type { AIProtocol } from './protocols';
 import { newRequestKey } from '../../shared/requestKey';
 
 type Model = {
+  allow_provider_state?: boolean;
   id: string;
   name: string;
   max_output_tokens: number;
@@ -64,10 +66,12 @@ export function AIGateway({
   projectId,
   branches,
   canEdit,
+  canAdmin,
 }: {
   projectId: string;
   branches: Branch[];
   canEdit: boolean;
+  canAdmin: boolean;
 }) {
   const [branch, setBranch] = useState(
     branches.find((b) => b.is_default)?.id || branches[0]?.id || '',
@@ -80,6 +84,9 @@ export function AIGateway({
   const [stream, setStream] = useState(true);
   const [protocol, setProtocol] = useState<AIProtocol>('chat_completions');
   const [advanced, setAdvanced] = useState(false);
+  const [providerReference, setProviderReference] = useState<AIStateReference | null>(null);
+  const [storeResponse, setStoreResponse] = useState(false);
+  const [stateRefresh, setStateRefresh] = useState(0);
   const [requestJSON, setRequestJSON] = useState('');
   const [inputFiles, setInputFiles] = useState<AIInputFile[]>([]);
   const [budget, setBudget] = useState<Budget | null>(null);
@@ -106,6 +113,8 @@ export function AIGateway({
     setReconcileRequest('');
     pendingBudget.current = null;
     setPrompt('');
+    setProviderReference(null);
+    setStoreResponse(false);
     setInputFiles([]);
     setAnswer('');
     setError('');
@@ -188,6 +197,8 @@ export function AIGateway({
     if (selected && !selected.protocols.includes(protocol))
       setProtocol((selected.protocols[0] || 'chat_completions') as AIProtocol);
     setAdvanced(false);
+    setProviderReference(null);
+    setStoreResponse(false);
     setRequestJSON('');
     setInputFiles([]);
   }, [catalog, model, protocol]);
@@ -215,6 +226,12 @@ export function AIGateway({
         inputFiles,
         selected?.input_modalities || ['text', 'image'],
       );
+      if (protocol === 'responses' && selected?.allow_provider_state && !advanced) {
+        payload.store = storeResponse;
+        if (providerReference)
+          payload[providerReference.kind === 'response' ? 'previous_response_id' : 'conversation'] =
+            providerReference.id;
+      }
       if (payload.model !== model) throw new Error('请求 JSON 的 model 必须与当前模型一致');
       if (Boolean(payload.stream) !== streaming)
         throw new Error('请求 JSON 的 stream 必须与流式选项一致');
@@ -271,6 +288,7 @@ export function AIGateway({
         if (!done) throw new Error('推理流未正常结束；不会自动重试');
       }
       setUsage(await api<Usage>(prefix + '/usage'));
+      setStateRefresh((value) => value + 1);
       setBudget(await api<Budget>(prefix + '/budget'));
     } catch (e) {
       if (!controller.signal.aborted) setError(e instanceof Error ? e.message : String(e));
@@ -362,6 +380,32 @@ export function AIGateway({
               )}
             />
           )}
+          {canEdit &&
+            protocol === 'responses' &&
+            catalog.models.find((m) => m.id === model)?.allow_provider_state && (
+              <>
+                <AIProviderState
+                  key={prefix + ':' + model}
+                  prefix={prefix}
+                  model={model}
+                  reference={providerReference}
+                  onSelect={setProviderReference}
+                  refresh={stateRefresh}
+                  busy={busy}
+                  canAdmin={canAdmin}
+                />
+                <label>
+                  <input
+                    type="checkbox"
+                    aria-label="保存本次响应"
+                    checked={storeResponse}
+                    disabled={busy || advanced}
+                    onChange={(e) => setStoreResponse(e.target.checked)}
+                  />
+                  保存本次响应到供应商（可用于后续请求）
+                </label>
+              </>
+            )}
           <section className="panel ai-playground">
             <div className="panel-heading">
               <h2>Playground</h2>
@@ -661,7 +705,7 @@ export function AIGateway({
           )}
           <div className="subtle-note">
             仅可调用模型目录明确发布的协议。工具返回显示原始对象，由应用决定是否执行。
-            内联图片受请求大小限制；供应商侧会话、文件引用和托管工具尚未开放。
+            内联图片受请求大小限制；持久响应和会话需模型管理员明确批准。托管工具尚未开放。
           </div>
         </>
       )}

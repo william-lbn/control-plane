@@ -182,7 +182,9 @@ export function ProjectWorkspace({
   if (page === 'functions')
     return <Functions projectId={projectId} branches={branches} canEdit={canEdit} />;
   if (page === 'ai-gateway')
-    return <AIGateway projectId={projectId} branches={branches} canEdit={canEdit} />;
+    return (
+      <AIGateway projectId={projectId} branches={branches} canEdit={canEdit} canAdmin={canAdmin} />
+    );
   if (page === 'storage')
     return (
       <ObjectStorage

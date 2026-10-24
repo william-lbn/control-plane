@@ -84,6 +84,7 @@ func (s *server) aiCatalogForOrganization(ctx context.Context, open bool, org st
 			}
 			seen[model.ID] = true
 			route := aigateway.Route{OwnerOrgID: ownerOrg, ProviderID: provider, RevisionID: revision, ID: model.ID, Name: model.Name, Provider: "openai_compatible", ProviderType: kind, BaseURL: base, UpstreamModel: model.UpstreamModel, AllowedIPs: append([]string(nil), network.AllowedIPs...), LabHTTP: network.LabHTTP, MaxOutputTokens: model.MaxOutputTokens, InputModalities: append([]string(nil), model.InputModalities...), Protocols: append([]string(nil), model.Protocols...), Price: model.Price}
+			route.AllowProviderState = model.AllowProviderState
 			if !unavailable {
 				route, err = s.aiProviders.network.ConfigureRoute(network, route, secret)
 				if err != nil {

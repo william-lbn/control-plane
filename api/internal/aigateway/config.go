@@ -14,24 +14,25 @@ import (
 )
 
 type Route struct {
-	InputModalities []string `json:"input_modalities,omitempty"`
-	OwnerOrgID      string   `json:"-"`
-	ProviderID      string   `json:"-"`
-	RevisionID      string   `json:"-"`
-	ProviderType    string   `json:"provider_type,omitempty"`
-	ID              string   `json:"id"`
-	Name            string   `json:"name"`
-	Provider        string   `json:"provider"`
-	BaseURL         string   `json:"base_url"`
-	UpstreamModel   string   `json:"upstream_model"`
-	APIKeyFile      string   `json:"api_key_file,omitempty"`
-	AllowedIPs      []string `json:"allowed_ips"`
-	LabHTTP         bool     `json:"lab_allow_http"`
-	MaxOutputTokens int      `json:"max_output_tokens"`
-	Protocols       []string `json:"protocols,omitempty"`
-	Price           *Price   `json:"price,omitempty"`
-	key             string
-	egressProxy     string
+	AllowProviderState bool     `json:"allow_provider_state,omitempty"`
+	InputModalities    []string `json:"input_modalities,omitempty"`
+	OwnerOrgID         string   `json:"-"`
+	ProviderID         string   `json:"-"`
+	RevisionID         string   `json:"-"`
+	ProviderType       string   `json:"provider_type,omitempty"`
+	ID                 string   `json:"id"`
+	Name               string   `json:"name"`
+	Provider           string   `json:"provider"`
+	BaseURL            string   `json:"base_url"`
+	UpstreamModel      string   `json:"upstream_model"`
+	APIKeyFile         string   `json:"api_key_file,omitempty"`
+	AllowedIPs         []string `json:"allowed_ips"`
+	LabHTTP            bool     `json:"lab_allow_http"`
+	MaxOutputTokens    int      `json:"max_output_tokens"`
+	Protocols          []string `json:"protocols,omitempty"`
+	Price              *Price   `json:"price,omitempty"`
+	key                string
+	egressProxy        string
 }
 type Config struct {
 	Version                int     `json:"version"`
@@ -115,6 +116,9 @@ func (c *Config) Validate() error {
 		if err := ValidateProtocols(r.Protocols); err != nil {
 			return err
 		}
+		if r.AllowProviderState && !r.Supports(Responses) {
+			return errors.New("provider state requires the Responses protocol")
+		}
 		if r.Price != nil && r.Price.Validate() != nil {
 			return errors.New("invalid AI route tariff")
 		}
@@ -136,7 +140,11 @@ func (c *Config) PublicModels() []map[string]any {
 		if r.OwnerOrgID != "" {
 			owner = "organization_byok"
 		}
-		items = append(items, map[string]any{"billing_owner": owner, "input_modalities": r.InputTypes(), "id": r.ID, "object": "model", "name": r.Name, "owned_by": ProviderType(r.ProviderType), "protocols": r.SupportedProtocols(), "max_output_tokens": r.MaxOutputTokens, "price": r.Price})
+		item := map[string]any{"billing_owner": owner, "input_modalities": r.InputTypes(), "id": r.ID, "object": "model", "name": r.Name, "owned_by": ProviderType(r.ProviderType), "protocols": r.SupportedProtocols(), "max_output_tokens": r.MaxOutputTokens, "price": r.Price}
+		if r.AllowProviderState {
+			item["allow_provider_state"] = true
+		}
+		items = append(items, item)
 	}
 	return items
 }
