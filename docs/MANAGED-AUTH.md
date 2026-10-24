@@ -10,7 +10,7 @@
 
 `2dcd7d2` 的 Linux 开发验收包括 354 个 Go 测试（race/vet、零跳过）、13 个前端测试、5 个 Auth 测试和 1 个原生 TLS 测试，以及真实 PostgreSQL 的 Auth 库集成和 Helm 渲染/拒绝测试。真实 Neon 的 React UI 已通过 23 个检查，覆盖注册登录、分支身份、JWT/RLS、自动缩零和冷唤醒；见 [本次交付](DELIVERY-2026-10-08-MANAGED-AUTH.md)。这些结果不等于完整生产准入。
 
-尚未验收或实现：SMTP、邮箱所有权验证/重置投递、OAuth、MFA/SSO、定制 Auth 域名、完整用户分页/管理员生命周期、KMS 密钥轮换、动态 Data API JWKS 刷新、分布式入口限流认证、全链路可信 TLS、HA/DR、外部 SQL 缩零栅栏。注册成功不代表邮箱已验证。
+当前增量已验收的邮件、OAuth、MFA、Admin/组织和手机/事件见 [高级身份交付](DELIVERY-2026-10-24-AUTH-INTEGRATIONS.md)，删除/恢复与身份代次见 [生命周期交付](DELIVERY-2026-10-25-AUTH-LIFECYCLE.md)。商业接入、定制 Auth 域名、KMS 根轮换、动态 Data API JWKS 刷新、可信 TLS、HA/DR 和外部缩零栅栏仍有独立门槛。注册成功不代表邮箱已验证。
 
 ## 2. 架构与数据边界
 

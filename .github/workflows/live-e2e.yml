@@ -20,7 +20,7 @@ on:
       catalog_suite:
         description: Catalog identity acceptance
         type: choice
-        options: [none, auth-integrations.spec.ts, auth-organizations.spec.ts, auth-admin.spec.ts, console-sso.spec.ts, s3-capabilities.spec.ts, s3-attributes.spec.ts, s3-settings.spec.ts, ai-native-protocols.spec.ts, auth-factor-rebind.spec.ts, storage-large-objects.spec.ts, catalog-object-bindings.spec.ts, catalog-inheritance.spec.ts, catalog-current-observation.spec.ts, catalog-current-inventory.spec.ts, ai-native-providers.spec.ts, ai-credits.spec.ts, ai-organization-byok.spec.ts, ai-input-files.spec.ts]
+        options: [none, auth-lifecycle.spec.ts, auth-integrations.spec.ts, auth-organizations.spec.ts, auth-admin.spec.ts, console-sso.spec.ts, s3-capabilities.spec.ts, s3-attributes.spec.ts, s3-settings.spec.ts, ai-native-protocols.spec.ts, auth-factor-rebind.spec.ts, storage-large-objects.spec.ts, catalog-object-bindings.spec.ts, catalog-inheritance.spec.ts, catalog-current-observation.spec.ts, catalog-current-inventory.spec.ts, ai-native-providers.spec.ts, ai-credits.spec.ts, ai-organization-byok.spec.ts, ai-input-files.spec.ts]
         default: none
       failed_parent_kind:
         description: Exact parent create failure to validate (branch or project)
@@ -83,7 +83,7 @@ jobs:
             catalog-current-observation.spec.ts|catalog-current-inventory.spec.ts|catalog-inheritance.spec.ts|catalog-object-bindings.spec.ts|compute-catalog-bootstrap.spec.ts|catalog-rename-results.spec.ts|catalog-mutation-results.spec.ts|default-database-owner.spec.ts|catalog-identity-restore.spec.ts|catalog-identities.spec.ts|connection-defaults.spec.ts) test -f "$NEON_E2E_CONNECTION_DEFAULTS_FIXTURE" ;;
             ai-providers.spec.ts) test -f "$NEON_E2E_AI_PROVIDER_FIXTURE"; test -f "$NEON_E2E_AI_PROVIDER_KEY_FILE" ;;
             console-session-feedback.spec.ts|history-policy.spec.ts) test -f "$NEON_E2E_CONSOLE_ACCOUNT_FIXTURE" ;;
-            native-product.spec.ts|restore.spec.ts|lifecycle.spec.ts|endpoint-deletion.spec.ts|data-api.spec.ts|console-invitations.spec.ts|console-mfa.spec.ts|console-sessions.spec.ts|managed-auth.spec.ts|object-storage.spec.ts|functions-native.spec.ts) ;;
+            native-product.spec.ts|restore.spec.ts|lifecycle.spec.ts|auth-lifecycle.spec.ts|endpoint-deletion.spec.ts|data-api.spec.ts|console-invitations.spec.ts|console-mfa.spec.ts|console-sessions.spec.ts|managed-auth.spec.ts|object-storage.spec.ts|functions-native.spec.ts) ;;
             functions-manager-identity.spec.ts|functions-branches.spec.ts|functions-output.spec.ts|functions-object-events.spec.ts|functions-websocket.spec.ts|branch-expiration.spec.ts|failed-parent-cleanup.spec.ts|failed-endpoint-cleanup.spec.ts|functions-unhealthy-idle.spec.ts|functions-schedules-finalize.spec.ts|functions-runtime-recovery.spec.ts|functions-schedules.spec.ts|functions-request-logs.spec.ts|functions-http.spec.ts|functions-observation.spec.ts|functions-wake.spec.ts|functions-rollback.spec.ts) test -f "$NEON_E2E_FUNCTIONS_MONITOR_FIXTURE" ;;
             catalog-rename.spec.ts) test -f "$NEON_E2E_CATALOG_RENAME_FIXTURE" ;;
             database-owner.spec.ts) test -f "$NEON_E2E_CATALOG_OWNER_FIXTURE" ;;
