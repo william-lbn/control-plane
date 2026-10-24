@@ -45,12 +45,15 @@ func (r Route) Supports(protocol string) bool {
 // NativeRequest preserves the vendor's wire objects. No Chat-to-vendor
 // conversion, remote file lookup, conversation store, or hosted tool execution.
 type NativeRequest struct {
-	RequestID string
-	Model     string
-	Protocol  string
-	Stream    bool
-	MaxTokens int
-	body      map[string]any
+	RequestID       string
+	Model           string
+	Protocol        string
+	Stream          bool
+	MaxTokens       int
+	body            map[string]any
+	providerState   *ProviderStateBinding
+	stateRequested  bool
+	stateIntentHash string
 }
 
 var errNativeRequest = errors.New("invalid or unsupported native protocol request")

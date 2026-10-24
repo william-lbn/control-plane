@@ -94,6 +94,12 @@ func nativeResponse(raw []byte, q NativeRequest, route Route) ([]byte, *Usage, e
 			return nil, nil, errNativeRequest
 		}
 		v["model"] = route.ID
+		if err := q.rewriteProviderState(v); err != nil {
+			if errors.Is(err, errProviderStateReceipt) {
+				return nil, nativeUsage(v, q.Protocol), err
+			}
+			return nil, nil, err
+		}
 	case Embeddings:
 		if v["object"] != "list" {
 			return nil, nil, errNativeRequest
@@ -137,6 +143,10 @@ func nativeObjectResponse(raw []byte) (map[string]any, error) {
 // multimodal objects are retained; stored-response APIs are deliberately absent.
 func ForwardNative(ctx context.Context, w http.ResponseWriter, q NativeRequest, route Route, timeout time.Duration) Outcome {
 	outcome := Outcome{Status: "failed"}
+	if q.stateRequested && q.providerState == nil {
+		writeError(w, 503, "provider_state_unavailable")
+		return outcome
+	}
 	started := time.Now()
 	target, payload := q.upstream(route)
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, target, bytes.NewReader(payload))
@@ -191,6 +201,7 @@ func ForwardNative(ctx context.Context, w http.ResponseWriter, q NativeRequest, 
 			return outcome
 		}
 		out, usage, e := nativeResponse(raw, q, route)
+		outcome.Usage = usage
 		if e != nil {
 			writeError(w, 502, "invalid_provider_response")
 			return outcome
@@ -281,11 +292,20 @@ func ForwardNative(ctx context.Context, w http.ResponseWriter, q NativeRequest, 
 					return false
 				}
 				resp["model"] = route.ID
+				if err := q.rewriteProviderState(resp); err != nil {
+					if errors.Is(err, errProviderStateReceipt) && (kind == "response.completed" || kind == "response.incomplete") {
+						outcome.Usage = nativeUsage(resp, Responses)
+					}
+					return false
+				}
 				if kind == "response.completed" || kind == "response.incomplete" {
 					outcome.Usage = nativeUsage(resp, Responses)
 				}
 			}
 			terminal = kind == "response.completed" || kind == "response.incomplete" || kind == "response.failed"
+			if err := q.rewriteProviderEvent(v); err != nil {
+				return false
+			}
 			failed = kind == "response.failed" || kind == "response.incomplete"
 		case Messages:
 			if kind == "message_start" {

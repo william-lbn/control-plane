@@ -46,7 +46,7 @@ website 文档快照 `c0d49cbb6979b2ce79ea502d62dbc40780a923b0`（提交时间
 | Q02 | 项目共享 SQL 历史 | 基础已实现并验收：逐条确认、密文引用、撤回、当前作者/读者授权、删除/到期失效、分页与多账号 UI | [共享合同](SHARED-SQL-HISTORY.md)与[当前交付](DELIVERY-2026-10-16-CURRENT.md)；不含外部公开链接/已复制内容召回 |
 | Q03 | SQL AI、计划比较/建议 | 计划比较、受控 Schema/SQL AI 草稿、真实本地模型与人工执行、计划建议通路已验收；AI 修错及个人加密名称/显式 AI 命名也已验收；默认自动命名/长期授权和建议准确性仍有扩展门槛 | [比较合同](SQL-PLAN-COMPARISON.md)、[助手合同](SQL-ASSISTANT.md)；模型建议准确性独立，[修错合同](SQL-AI-REPAIR.md)、[命名合同](SQL-HISTORY-NAMES.md)；默认自动授权/全自动命名另验 |
 | I01 | AI 动态供应商配置 UI | 明确 operator、密文/固定 UID 来源、原幂等操作、受限模型发现、显式别名发布、失败更新保留旧版、有效凭据更新、停用及实际 Console/本地模型基础已验收 | [合同](AI-PROVIDERS.md)及[交付](DELIVERY-2026-10-20-AI-PROVIDERS.md)；商业供应商正式输入、其他协议/预算和生产 TLS 独立继续 |
-| I02 | AI 更多协议/预算 | 原生 Responses/Embeddings/Messages/Gemini、SSE、累计预算/取消/对账已验收 | Anthropic/Gemini 发现发布已通过[0.74 交付](DELIVERY-2026-10-23-AI-NATIVE-PROVIDERS.md)；组织手工额度已通过[0.75 交付](DELIVERY-2026-10-23-AI-ORGANIZATION-CREDITS.md)；组织 BYOK 已通过[0.76 交付](DELIVERY-2026-10-23-AI-ORGANIZATION-BYOK.md)；完整多模态/持久引用、外部账单/支付等继续；[本批交付](DELIVERY-2026-10-22-AI-NATIVE-BUDGETS.md) |
+| I02 | AI 原生协议/预算/持久状态 | 原生协议、预算/取消/对账、供应商发现、组织额度/BYOK、分支文件和持久响应/会话基线已验收 | [持久状态交付](DELIVERY-2026-10-25-AI-PROVIDER-STATE.md)；外部账单/支付仍与 O03 继续，不冒充商业供应商验收 |
 | R01 | 严格 Guest 小数 CPU | QEMU 实际 250/500m 已验收；四倍预算保留 | Guest 隔离、公平性/计量；公开修复 runner 及统一锁待发行 |
 | R02 | 完整物理内存归还 | VM status 缩回已有；物理 RAM/OOM 未通过 | Guest/宿主联合采样、压力与 SQL/coldboot；硬件压力后置单列 |
 | X01 | 跨实例缩零栅栏 | 缺完整短连接 ledger / 外部 epoch fence | 多 API/Proxy、旧 Worker、分区、新连接/删除竞争；不能用 DB 租约代替 |
@@ -136,3 +136,5 @@ fixture、失败、日志、密码保护输入和所有业务字节。测试完�
 2026-10-24 应用 Auth 高级功能：[OAuth、手机和签名事件](DELIVERY-2026-10-24-AUTH-INTEGRATIONS.md)完成固定本地 A03 基线。25 个唯一维护库综合组、2 组新增/6 组受影响 Go、2 组协议和十个累计浏览器检查点通过；已过检查从原进度续验。Core Helm 178 / schema 065 / 应用协议 0.28.0；原目录、PVC 和 Secret 身份保留，三节点、三个 Safekeeper Ready，VM 0。当前 17 组基础有回执，10 个业务和 3 个其他组继续；商业 OAuth/短信接入、可信 TLS 与后置专项未冒充已过。
 
 2026-10-25 Auth 生命周期：[保留删除、恢复与身份一致性](DELIVERY-2026-10-25-AUTH-LIFECYCLE.md)通过两组新增 Go 和八个累计实机检查点；前四项与原 Cookie 保留后只续验余项。恢复后 Auth 保持关闭，显式新代次拒绝旧会话/JWKS 并保留原账号、密码和 SQL 数据。复用 0.84 镜像，Core Helm 178 / schema 065 不变；原目录、945 个续验前持久 Secret UID 和 9 PVC 保留，三节点、三个 Safekeeper Ready，VM 0。A05 保留生命周期基线完成；当前 18 组基础、9 个业务和 3 个其他组继续。
+
+2026-10-25 AI 持久状态：[供应商响应与会话](DELIVERY-2026-10-25-AI-PROVIDER-STATE.md)通过 15 组新增 Go/PG、4 组受影响检查和 6 个累计实机检查点；复用前三项和原已完成 SSE，未重复推理。原生 JSON/SSE、响应续接、会话/条目、不可变加密引用及未知结果核对通过。API/Worker/AI 0.85.0，Web 重建，schema 066 / Chart 0.9.82 / Core Helm 180；原 17 张目录表、946 个持久 Secret UID、9 PVC 和另外六套发行配置保留，最终三节点/三个 Safekeeper Ready，VM 0。临时配置已撤下、合成服务归档后缩零。I02 外部账单/支付及其他业务继续；性能、可靠性后置。

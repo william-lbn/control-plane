@@ -36,6 +36,7 @@ type Revision = {
   error_code: string | null;
 };
 type Model = {
+  allow_provider_state?: boolean;
   id: string;
   name: string;
   upstream_model: string;
@@ -627,6 +628,8 @@ export function AIProviders({
                                   ? [...current, p]
                                   : current.filter((v) => v !== p);
                                 updateModel(index, {
+                                  allow_provider_state:
+                                    next.includes('responses') && model.allow_provider_state,
                                   protocols: next.length ? next : ['chat_completions'],
                                   input_modalities: modelInputTypes(model).filter((v) =>
                                     allowedInputTypes(
@@ -640,6 +643,19 @@ export function AIProviders({
                           </label>
                         ))}
                     </fieldset>
+                    {(model.protocols || []).includes('responses') && (
+                      <label>
+                        <input
+                          type="checkbox"
+                          aria-label={`允许供应商持久状态 ${index + 1}`}
+                          checked={Boolean(model.allow_provider_state)}
+                          onChange={(e) =>
+                            updateModel(index, { allow_provider_state: e.target.checked })
+                          }
+                        />
+                        允许供应商保存响应与会话（需确认供应商保留策略）
+                      </label>
+                    )}
                     <fieldset>
                       <legend>已批准的输入类型 {index + 1}</legend>
                       {allowedInputTypes(model.protocols).map((kind) => (

@@ -15,6 +15,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/william-lbn/control-plane/api/internal/aigateway"
 )
@@ -216,6 +217,9 @@ func (s *server) aiConsoleRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	if protocol != "" {
 		native, _, err := aigateway.DecodeNative(decodeRaw, snapshot.Config, protocol, "", false)
+		if protocol == aigateway.Responses {
+			native, _, _, err = aigateway.DecodeNativeProviderState(decodeRaw, snapshot.Config)
+		}
 		q = aigateway.ChatRequest{Model: native.Model, Stream: native.Stream, MaxTokens: native.MaxTokens, Protocol: protocol}
 		e = err
 	}
@@ -338,6 +342,7 @@ func RunAIGateway(ctx context.Context) error {
 
 	mux.HandleFunc("POST /ai/v1/{branch}/v1/chat/completions", s.aiPublic)
 	registerAINativePublic(mux, "branch", s.aiPublic)
+	registerAIProviderState(mux, "/ai/v1/{branch}", s.aiPublicProviderState)
 	httpServer := &http.Server{Addr: env("NEON_AI_BIND", ":8791"), Handler: mux, ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 15 * time.Second, WriteTimeout: time.Duration(cfg.TimeoutSeconds+10) * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 16384}
 	done := make(chan error, 1)
 	go func() { done <- httpServer.ListenAndServe() }()
@@ -436,6 +441,7 @@ func (s *server) aiPublic(w http.ResponseWriter, r *http.Request) {
 	var q aigateway.ChatRequest
 	var native aigateway.NativeRequest
 	var route aigateway.Route
+	var stateIntent aigateway.ProviderStateIntent
 	if r.Method == http.MethodPost {
 		decodeRaw, files, inputErr := s.resolveAIInputs(r.Context(), project, branch, raw, protocol)
 		if inputErr != nil {
@@ -449,6 +455,9 @@ func (s *server) aiPublic(w http.ResponseWriter, r *http.Request) {
 		}
 		if protocol != "" {
 			native, route, e = aigateway.DecodeNative(decodeRaw, cfg, protocol, pathModel, pathStream)
+			if protocol == aigateway.Responses {
+				native, route, stateIntent, e = aigateway.DecodeNativeProviderState(decodeRaw, cfg)
+			}
 			q = aigateway.ChatRequest{Model: native.Model, Stream: native.Stream, MaxTokens: native.MaxTokens, Protocol: protocol}
 		}
 		if e != nil {
@@ -484,7 +493,12 @@ func (s *server) aiPublic(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), time.Duration(cfg.TimeoutSeconds)*time.Second)
 	defer cancel()
-	admitted, e := s.reserveAIRequestFor(ctx, requestID, project, branch, actor, credential, q, cfg)
+	var stateAdmission func(pgx.Tx) error
+	var stateBinding *aigateway.ProviderStateBinding
+	if stateIntent.Requested() {
+		stateBinding, stateAdmission = s.prepareAIProviderResponse(ctx, requestID, project, branch, actor, route, stateIntent)
+	}
+	admitted, e := s.reserveAIRequestFor(ctx, requestID, project, branch, actor, credential, q, cfg, stateAdmission)
 	if e != nil {
 		var inputProblem aiProviderProblem
 		if errors.As(e, &inputProblem) {
@@ -527,7 +541,13 @@ func (s *server) aiPublic(w http.ResponseWriter, r *http.Request) {
 	q.RequestID = requestID
 	native.RequestID = requestID
 	var outcome aigateway.Outcome
-	if native.Protocol != "" {
+	if stateBinding != nil {
+		native, e = native.WithProviderState(*stateBinding)
+	}
+	if e != nil {
+		outcome.Status = "failed"
+		aigateway.Error(w, 503, "provider_state_unavailable")
+	} else if native.Protocol != "" {
 		outcome = aigateway.ForwardNative(ctx, w, native, route, time.Duration(cfg.TimeoutSeconds)*time.Second)
 	} else {
 		outcome = aigateway.Forward(ctx, w, q, route, time.Duration(cfg.TimeoutSeconds)*time.Second)
@@ -536,6 +556,14 @@ func (s *server) aiPublic(w http.ResponseWriter, r *http.Request) {
 	// the running reservation for operator recovery; never infer zero token usage.
 	settle, close := context.WithTimeout(context.Background(), 5*time.Second)
 	defer close()
+	if stateBinding != nil && stateIntent.Store {
+		// Pending means no supplier ID was durably observed. Do not replay an
+		// inference whose dispatch or supplier result may already have happened.
+		_, _ = s.db.Exec(settle, `UPDATE ai_provider_handles SET state='uncertain',version=version+1,updated_at=clock_timestamp() WHERE id=$1 AND state='pending'`, stateBinding.ResponseID)
+	}
+	if stateIntent.Conversation != "" && outcome.Dispatched && outcome.Status != "completed" && outcome.Status != "incomplete" {
+		_, _ = s.db.Exec(settle, `UPDATE ai_provider_handles SET state='uncertain',version=version+1,updated_at=clock_timestamp() WHERE id=$1 AND state='ready'`, stateIntent.Conversation)
+	}
 	if err := s.settleAIRequest(settle, requestID, branch, outcome, time.Since(started)); err != nil {
 		slog.Warn("AI request settlement unavailable; preserve reservation", "request_id", requestID)
 	}
@@ -543,7 +571,7 @@ func (s *server) aiPublic(w http.ResponseWriter, r *http.Request) {
 func (s *server) reserveAIRequest(ctx context.Context, id, project, branch, actor, credential string, q aigateway.ChatRequest) (bool, error) {
 	return s.reserveAIRequestFor(ctx, id, project, branch, actor, credential, q, s.ai)
 }
-func (s *server) reserveAIRequestFor(ctx context.Context, id, project, branch, actor, credential string, q aigateway.ChatRequest, cfg *aigateway.Config) (bool, error) {
+func (s *server) reserveAIRequestFor(ctx context.Context, id, project, branch, actor, credential string, q aigateway.ChatRequest, cfg *aigateway.Config, admission ...func(pgx.Tx) error) (bool, error) {
 	tx, e := s.db.Begin(ctx)
 	if e != nil {
 		return false, e
@@ -608,6 +636,13 @@ func (s *server) reserveAIRequestFor(ctx context.Context, id, project, branch, a
 	}
 	if e = reserveAICredits(ctx, tx, id, branch, route, q.MaxTokens); e != nil {
 		return false, e
+	}
+	for _, admit := range admission {
+		if admit != nil {
+			if e = admit(tx); e != nil {
+				return false, e
+			}
+		}
 	}
 	return true, tx.Commit(ctx)
 }
