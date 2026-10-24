@@ -157,9 +157,9 @@ func (proxy *dsgaProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	deny := func(code int) { http.Error(w, "DSGA management request rejected", code) }
 	execution, known := false, true
 	switch r.URL.Path {
-	case "/dsg/v1/capabilities", "/dsg/v1/memory", "/dsg/v1/initialization", "/dsg/v1/budget/shared":
+	case "/dsg/v1/capabilities", "/dsg/v1/memory", "/dsg/v1/initialization", "/dsg/v1/budget/shared", "/dsg/v1/resource/identity":
 		known = r.Method == http.MethodGet
-	case "/dsg/v1/resize", "/dsg/v1/issuer/fence":
+	case "/dsg/v1/resize", "/dsg/v1/issuer/fence", "/dsg/v1/resource/fence", "/dsg/v1/resource/apply", "/dsg/v1/resource/replay-original":
 		execution, known = true, r.Method == http.MethodPost
 	case "/dsg/v1/resize/status", "/dsg/v1/resize/cancel",
 		"/dsg/v1/admission", "/dsg/v1/admission/status",
@@ -167,6 +167,10 @@ func (proxy *dsgaProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// 准入写入也走独立观察连接池：关闭必须能在resize阻塞时到达PG。
 		// 这里只扩展固定路由名单，仍逐次核验原VM/Service/current owner；
 		// 原生Rust按完整请求再核对执行epoch，网关不代造预算或执行回执。
+		known = r.Method == http.MethodPost
+	case "/dsg/v1/resource/observe":
+		// Guest资源对账独立于PG boot，仍按正式TokenReview/Lease/原Service链
+		// 校验；只是固定路径转发，不能在网关代造Root限额或VM许可。
 		known = r.Method == http.MethodPost
 	default:
 		known = false

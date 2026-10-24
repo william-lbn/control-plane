@@ -186,6 +186,9 @@ func newBrokerTest(t *testing.T) (*brokerTestAPI, *journal.Store, owner.Ownershi
 	f.vm.Spec.DSGABootstrap = &vmv1.DSGABootstrap{ProtocolVersion: 1, Incarnation: strings.Repeat("a", 32), ComputeInstanceID: "compute-1", VMUID: "", ConfigSecretUID: "", Ready: false}
 	f.config = &core.Secret{ObjectMeta: metav1.ObjectMeta{Name: brokerTestWorkload + "-config", Namespace: "neon", UID: "config-uid", ResourceVersion: "1", Labels: credentialLabels("project-1", "ep_0123456789abcdef")}}
 	configOwner := true
+	// 正式原配置由创建者生成immutable Secret；CheckReady已强制此约束，夹具
+	// 也必须满足，不能为让broker测试通过而放松生产来源校验。
+	f.config.Immutable = &configOwner
 	f.config.OwnerReferences = []metav1.OwnerReference{{APIVersion: vmv1.SchemeGroupVersion.String(), Kind: "VirtualMachine", Name: brokerTestWorkload, UID: f.vm.UID, Controller: &configOwner}}
 	f.credentials = &core.Secret{ObjectMeta: metav1.ObjectMeta{Name: brokerTestWorkload + "-credentials", Namespace: "neon", UID: "credentials-uid", ResourceVersion: "1", Labels: credentialLabels("project-1", "ep_0123456789abcdef")}}
 	_, key, err := ed25519.GenerateKey(rand.Reader)
