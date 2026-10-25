@@ -7,7 +7,7 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 
 功能进度与当前优先级见 [已验收/剩余清单](docs/FUNCTIONAL-STATUS-2026-10-21.md)：18 组基础已有回执；五组专项后置，12 组尚未整体闭环。后续优先业务功能，复用来源未变的既有验收。
 
-最新状态：2026-10-25 容量配置：[5 GiB 格式与运营配置](docs/DELIVERY-2026-10-25-STORAGE-CAPACITY.md)通过七组新增 Go/PG、六组受影响检查、三组 Helm 和五个现场检查点。65 MiB 私有文件、5 GiB 元数据、64 位计数、预算/时限、默认超限拒绝及降低预算保留引用通过；5 GiB 全量字节验证后置。API/Worker 0.88.0 / Chart 0.9.85 / Core Helm 184 / schema 067 / 原生格式 6；当前仍保留 64 MiB 默认准入。原六类存储清单（含 checksum）、17 张目录表、953 Secret UID、9 PVC 和其他六套发行保留，VM 0；S02 的 multipart 扩展 checksum/COMPOSITE 协商继续。
+最新状态：2026-10-25 S02 基础闭环：[multipart checksum 协商](docs/DELIVERY-2026-10-25-MULTIPART-CHECKSUMS.md)通过九组新增 Go/PG、十组受影响检查和七种实际 SDK 组合（59 检查点）。原回执、复制/覆盖、逐分片校验、COMPOSITE、拒绝和格式 7 升级通过；原数据身份、953 Secret、9 PVC、三节点/三个 Safekeeper 保留，VM 0。API/Worker 0.89.0 / Chart 0.9.86 / Core 185 / schema 067。5 GiB 完整字节验证仍在新环境进行，当前基础计数为 19 组，剩余八组业务及三组运维/TLS/发行继续。
 
 此前状态：2026-10-25 AI 持久状态：[供应商响应与会话](docs/DELIVERY-2026-10-25-AI-PROVIDER-STATE.md)通过 15 组新增 Go/PG、4 组受影响检查和 6 个累计实机检查点；复用前三项和原已完成 SSE，未重复推理。原生 JSON/SSE、响应续接、会话/条目、不可变加密引用及未知结果核对通过。API/Worker/AI 0.85.0，Web 重建，schema 066 / Chart 0.9.82 / Core Helm 180；原 17 张目录表、946 个持久 Secret UID、9 PVC 和另外六套发行配置保留，最终三节点/三个 Safekeeper Ready，VM 0。临时配置已撤下、合成服务归档后缩零。I02 外部账单/支付及其他业务继续；性能、可靠性后置。
 

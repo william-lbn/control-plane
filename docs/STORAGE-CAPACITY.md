@@ -1,5 +1,6 @@
 # 可配置的对象容量
 
+2026-10-25 后续实现：[显式 multipart 校验、逐片字段与 COMPOSITE](STORAGE-MULTIPART-CHECKSUMS.md)现已通过[功能验收](DELIVERY-2026-10-25-MULTIPART-CHECKSUMS.md)；下面旧版本的缺口说明由新合同覆盖。5 GiB 完整字节验证继续后置。
 API/Worker 0.88.0 / Chart 0.9.85 / 原生格式 6 已实现最高 5 GiB 的对象格式与运营配置。当前环境仍使用已验收的 **单对象 64 MiB / 分支可见字节 256 MiB / 两槽临时磁盘合计 256 MiB / 150 秒传输预算**。5 GiB 配置、元数据边界、64 位计数、65 MiB 私有文件路径和基础现场验证已通过；**5 GiB 完整字节上传、下载、合并及恢复仍待目标环境验证**。
 
 格式上限和实际准入分开：OpenAPI 的最大值表示格式可表达的范围，`GET .../storage` 的 `limits.object_bytes` 才是当前写入准入，`object_format_bytes` 是 5 GiB 格式上限。调用方应读取当前准入，不能从格式上限推断运营者已提供所需磁盘。Console 既有上传流程读取动态准入，沿用分块哈希，无新增 UI 构建。

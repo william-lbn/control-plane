@@ -61,7 +61,7 @@ func (s *server) storageMultipart(w http.ResponseWriter, r *http.Request) {
 			multipartError(w, r, multipartFault(413, "EntityTooLarge"), false)
 			return
 		}
-		part, e := s.putMultipartPart(r.Context(), conn, p, principal, bucket, "", id, n, data, r.Header.Get("Content-MD5"), nil)
+		part, e := s.putMultipartPart(r.Context(), conn, p, principal, bucket, "", id, n, data, r.Header.Get("Content-MD5"), r.Header)
 		if e != nil {
 			multipartError(w, r, e, false)
 			return
@@ -84,12 +84,25 @@ func (s *server) storageMultipart(w http.ResponseWriter, r *http.Request) {
 		}
 		var input struct {
 			Parts []multipartSelection `json:"parts"`
+			multipartCompletionChecksums
 		}
 		if readJSON(r, &input) != nil {
 			multipartError(w, r, multipartFault(400, "InvalidArgument"), false)
 			return
 		}
-		u, e := s.completeMultipart(r.Context(), conn, p, principal, bucket, "", id, input.Parts, r.Header.Get("If-Match"), r.Header.Get("If-None-Match"))
+		opt, e := multipartCompletionHeaders(r.Header)
+		if e != nil {
+			multipartError(w, r, e, false)
+			return
+		}
+		if input.Type != "" || len(input.Values) != 0 || input.Size != nil {
+			if opt.Type != "" || len(opt.Values) != 0 || opt.Size != nil {
+				multipartError(w, r, multipartFault(400, "InvalidArgument"), false)
+				return
+			}
+			opt = input.multipartCompletionChecksums
+		}
+		u, e := s.completeMultipart(r.Context(), conn, p, principal, bucket, "", id, input.Parts, r.Header.Get("If-Match"), r.Header.Get("If-None-Match"), opt)
 		if e != nil {
 			multipartError(w, r, e, false)
 			return
@@ -116,7 +129,7 @@ func (s *server) storageMultipart(w http.ResponseWriter, r *http.Request) {
 	jsonResponse(w, 200, record{"upload": u, "parts": parts, "physical_gc": "held_for_branch_and_pitr_references"})
 }
 func (s *server) storageMultipartList(w http.ResponseWriter, r *http.Request, conn *pgx.Conn, p objectStoragePayload, principal, bucket string) {
-	rows, e := conn.Query(r.Context(), `SELECT id,key,content_type,metadata,expected_sha256,expected_size,state,created_at,result_sha256,result_size FROM neon_storage.multipart_uploads WHERE branch_id=$1 AND principal=$2 AND bucket=$3 AND state='uploading' ORDER BY created_at,id LIMIT 32`, p.BranchID, principal, bucket)
+	rows, e := conn.Query(r.Context(), `SELECT id,key,content_type,metadata,expected_sha256,expected_size,state,created_at,result_sha256,result_size,checksum_algorithm,checksum_type FROM neon_storage.multipart_uploads WHERE branch_id=$1 AND principal=$2 AND bucket=$3 AND state='uploading' ORDER BY created_at,id LIMIT 32`, p.BranchID, principal, bucket)
 	if e != nil {
 		multipartError(w, r, e, false)
 		return
@@ -125,7 +138,7 @@ func (s *server) storageMultipartList(w http.ResponseWriter, r *http.Request, co
 	items := []multipartUpload{}
 	for rows.Next() {
 		var u multipartUpload
-		if e = rows.Scan(&u.ID, &u.Key, &u.ContentType, &u.Metadata, &u.ExpectedSHA256, &u.ExpectedSize, &u.State, &u.Created, &u.SHA256, &u.Size); e != nil {
+		if e = rows.Scan(&u.ID, &u.Key, &u.ContentType, &u.Metadata, &u.ExpectedSHA256, &u.ExpectedSize, &u.State, &u.Created, &u.SHA256, &u.Size, &u.ChecksumAlgorithm, &u.ChecksumType); e != nil {
 			multipartError(w, r, e, false)
 			return
 		}

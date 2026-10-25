@@ -223,7 +223,7 @@ func TestStorageFullChecksumPostgresMultipartReplayAndAdditiveSchema(t *testing.
 	if e != nil {
 		t.Fatal(e)
 	}
-	selection := []multipartSelection{{1, part.ETag}}
+	selection := []multipartSelection{{Number: 1, ETag: part.ETag}}
 	first, e := s.completeMultipart(f.ctx, f.conn, f.p, "actor", "settings-bucket", u.Key, u.ID, selection, "", "*")
 	if e != nil {
 		t.Fatal(e)

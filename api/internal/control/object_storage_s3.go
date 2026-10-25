@@ -316,6 +316,26 @@ func (s *server) s3Invoke(w http.ResponseWriter, r *http.Request) {
 			s3Error(w, r, 501, "NotImplemented")
 			return
 		}
+		for raw, values := range r.Header {
+			name := http.CanonicalHeaderKey(raw)
+			if strings.HasPrefix(strings.ToLower(raw), "x-amz-checksum-") || name == "X-Amz-Sdk-Checksum-Algorithm" {
+				if name != "X-Amz-Checksum-Algorithm" {
+					s3Error(w, r, 501, "NotImplemented")
+					return
+				}
+				if len(values) != 1 || storageChecksumAlgorithms[values[0]] == "" {
+					s3Error(w, r, 400, "InvalidArgument")
+					return
+				}
+			}
+		}
+		if algorithm := r.Header.Get("X-Amz-Checksum-Algorithm"); algorithm != "" {
+			if len(replacements) == 0 {
+				replacement = storageCopyMetadata{OnlyTags: true}
+			}
+			replacement.ChecksumAlgorithm = algorithm
+			replacements = []storageCopyMetadata{replacement}
+		}
 		srcBucket, srcKey, err := parseS3CopySource(source)
 		if err != nil {
 			s3Error(w, r, 400, "InvalidArgument")
@@ -336,12 +356,18 @@ func (s *server) s3Invoke(w http.ResponseWriter, r *http.Request) {
 			}
 			return
 		}
+		checksum, err := storageAttributeChecksums(stringVal(item["sha256"]), item["checksums"].(map[string]string), item["checksum_policy"].(storageChecksumPolicy))
+		if err != nil {
+			s3Error(w, r, 503, "ServiceUnavailable")
+			return
+		}
 		s3XML(w, 200, struct {
+			storageAttributeChecksum
 			XMLName  xml.Name `xml:"CopyObjectResult"`
 			XMLNS    string   `xml:"xmlns,attr"`
 			ETag     string   `xml:"ETag"`
 			Modified string   `xml:"LastModified"`
-		}{XMLNS: s3XMLNamespace, ETag: "\"" + stringVal(item["sha256"]) + "\"", Modified: item["updated_at"].(time.Time).Format(time.RFC3339)})
+		}{storageAttributeChecksum: *checksum, XMLNS: s3XMLNamespace, ETag: "\"" + stringVal(item["sha256"]) + "\"", Modified: item["updated_at"].(time.Time).Format(time.RFC3339)})
 		return
 	}
 	if payload != nil {
@@ -355,10 +381,12 @@ func (s *server) s3Invoke(w http.ResponseWriter, r *http.Request) {
 func (s *server) serveS3Object(w http.ResponseWriter, r *http.Request, conn *pgx.Conn, p objectStoragePayload, bucket, key string) {
 	var blob, digest, contentType string
 	var metadata, responseHeaders, checksums map[string]string
+	var policy storageChecksumPolicy
+	var layout []storageObjectPart
 	var tags []storageTag
 	var size int64
 	var modified time.Time
-	e := conn.QueryRow(r.Context(), `SELECT blob_key,sha256,size,content_type,updated_at,metadata,response_headers,tags,checksums FROM neon_storage.objects WHERE bucket=$1 AND key=$2`, bucket, key).Scan(&blob, &digest, &size, &contentType, &modified, &metadata, &responseHeaders, &tags, &checksums)
+	e := conn.QueryRow(r.Context(), `SELECT blob_key,sha256,size,content_type,updated_at,metadata,response_headers,tags,checksums,checksum_policy,part_layout FROM neon_storage.objects WHERE bucket=$1 AND key=$2`, bucket, key).Scan(&blob, &digest, &size, &contentType, &modified, &metadata, &responseHeaders, &tags, &checksums, &policy, &layout)
 	if isNoRows(e) {
 		s3Error(w, r, 404, "NoSuchKey")
 		return
@@ -389,8 +417,17 @@ func (s *server) serveS3Object(w http.ResponseWriter, r *http.Request, conn *pgx
 			return
 		}
 	}
+	if e = storageValidatePolicyLayout(layout, size, declared, policy); e != nil {
+		s3Error(w, r, 503, "ServiceUnavailable")
+		return
+	}
+	visible, kind, e := storagePolicyValues(declared, policy)
+	if e != nil {
+		s3Error(w, r, 503, "ServiceUnavailable")
+		return
+	}
 	if r.Header.Get("X-Amz-Checksum-Mode") == "ENABLED" && r.Header.Get("Range") == "" {
-		writeStoredStorageChecksums(w, declared)
+		writeStoredStorageChecksums(w, visible, kind)
 	}
 	w.Header().Set("ETag", "\""+digest+"\"")
 	w.Header().Set("X-Amz-Version-Id", "null")
@@ -673,7 +710,7 @@ func (s *server) s3WritePayload(w http.ResponseWriter, r *http.Request, conn *pg
 			s3Error(w, r, 503, "ServiceUnavailable")
 			return false
 		}
-		_, e = tx.Exec(r.Context(), `INSERT INTO neon_storage.objects(bucket,key,blob_key,sha256,size,content_type,metadata,tags,response_headers,checksums) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(bucket,key) DO UPDATE SET blob_key=$3,sha256=$4,size=$5,content_type=$6,metadata=$7,tags=$8,response_headers=$9,checksums=$10,part_layout='[]'::jsonb,updated_at=now()`, bucket, key, blob, digest, data.Size, contentType, metadata, tags, responseHeaders, data.storedChecksums())
+		_, e = tx.Exec(r.Context(), `INSERT INTO neon_storage.objects(bucket,key,blob_key,sha256,size,content_type,metadata,tags,response_headers,checksums) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(bucket,key) DO UPDATE SET blob_key=$3,sha256=$4,size=$5,content_type=$6,metadata=$7,tags=$8,response_headers=$9,checksums=$10,part_layout='[]'::jsonb,checksum_policy='{}'::jsonb,updated_at=now()`, bucket, key, blob, digest, data.Size, contentType, metadata, tags, responseHeaders, data.storedChecksums())
 		if e == nil {
 			e = s.publishStorageFunctionEvent(r.Context(), tx, p, bucket, key, digest, data.Size)
 		}

@@ -1,5 +1,6 @@
 # 有界大对象与对象完整性
 
+2026-10-25 后续实现：[显式 multipart 校验、逐片字段与 COMPOSITE](STORAGE-MULTIPART-CHECKSUMS.md)现已通过[功能验收](DELIVERY-2026-10-25-MULTIPART-CHECKSUMS.md)；下面旧版本的缺口说明由新合同覆盖。5 GiB 完整字节验证继续后置。
 2026-10-25 更新：API 0.88.0 / 原生格式 6 已完成 [CRC64NVME 与完整 checksum 持久化](STORAGE-CHECKSUMS.md)及[最高 5 GiB 容量配置](STORAGE-CAPACITY.md)。当前实际准入仍为 64 MiB，下面 0.71.0 容量基线继续适用；5 GiB 全量字节验证后置，multipart 扩展协商仍缺实现，旧的缺口说明由这两个新合同覆盖。
 
 此合同从 API 0.71.0 / Chart 0.9.68 生效。验收见 [2026-10-22 交付](DELIVERY-2026-10-22-STORAGE-LARGE-OBJECTS.md)。单对象和一个上传已确认分片合计 64 MiB；每分片 8 MiB；分支可见对象 256 MiB。活动上传和分片数量、身份隔离、条件写入、完成回执和物理引用保留规则沿用原合同。此增量未实现官网快照的 5 GiB 上限，也未完成完整扩展 checksum 支持。
