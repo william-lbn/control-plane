@@ -33,13 +33,18 @@ func (s *server) catalogRenameMutation(w http.ResponseWriter, r *http.Request) {
 		p.Name = r.PathValue("role")
 	}
 	var body struct {
-		NewName string `json:"new_name"`
+		NewName        string `json:"new_name"`
+		MigrateBackend bool   `json:"migrate_backend_dependencies,omitempty"`
 	}
 	if readJSON(r, &body) != nil || !validPGIdentifier(p.Name) || !validPGIdentifier(body.NewName) || body.NewName == p.Name || (p.Kind == "role" && (protectedPGRole(p.Name) || protectedPGRole(body.NewName))) || (p.Kind == "database" && (protectedPGDatabase(p.Name) || protectedPGDatabase(body.NewName))) {
 		fail(w, r, 422, "invalid_catalog_rename", "Distinct valid non-system PostgreSQL identifiers required")
 		return
 	}
 	p.NewName = body.NewName
+	if body.MigrateBackend && (p.Kind != "database" || accessFrom(r).Level < 3) {
+		fail(w, r, 403, "forbidden", "Current project Admin and a database rename required for explicit Backend migration")
+		return
+	}
 	header := r.Header.Get("If-Match")
 	if header == "" {
 		fail(w, r, 428, "version_required", "Quoted original catalog If-Match version required")
@@ -55,7 +60,11 @@ func (s *server) catalogRenameMutation(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	hash := s.createRequestHash(r.Method+":"+r.URL.Path, record{"new_name": p.NewName, "expected_version": version})
+	hashInput := record{"new_name": p.NewName, "expected_version": version}
+	if body.MigrateBackend {
+		hashInput["migrate_backend_dependencies"] = true
+	}
+	hash := s.createRequestHash(r.Method+":"+r.URL.Path, hashInput)
 	if s.replayCatalog(w, r, key, hash) {
 		return
 	}
@@ -92,6 +101,12 @@ func (s *server) catalogRenameMutation(w http.ResponseWriter, r *http.Request) {
 		p.Owner = reference
 		if protectedPGRole(p.Owner) {
 			fail(w, r, 409, "managed_owner_required", "Non-system managed database owner required")
+			return
+		}
+	}
+	if body.MigrateBackend {
+		if err = s.captureCatalogBackendRename(r.Context(), &p); err != nil {
+			s.catalogRenameFailure(w, r, err)
 			return
 		}
 	}
@@ -212,7 +227,14 @@ func checkCatalogRenameDependencies(ctx context.Context, db catalogRenameReader,
 			return err
 		}
 	} else {
-		if err := db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM endpoints WHERE project_id=$1 AND branch_id=$2 AND database_name=$3)
+		if p.Backend != nil {
+			if err := checkCatalogBackendRenamePlan(ctx, db, p); err != nil {
+				return err
+			}
+			if err := db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM endpoints WHERE project_id=$1 AND branch_id=$2 AND database_name=$3)`, p.ProjectID, p.BranchID, p.Name).Scan(&dependency); err != nil {
+				return err
+			}
+		} else if err := db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM endpoints WHERE project_id=$1 AND branch_id=$2 AND database_name=$3)
  OR EXISTS(SELECT 1 FROM data_api_instances WHERE branch_id=$2 AND spec->>'database'=$3)
  OR EXISTS(SELECT 1 FROM managed_auth_instances WHERE branch_id=$2 AND spec->>'database'=$3)
  OR EXISTS(SELECT 1 FROM object_storage_instances WHERE branch_id=$2 AND spec->>'database'=$3)
@@ -237,7 +259,11 @@ func admitCatalogRenameTx(ctx context.Context, tx pgx.Tx, p catalogRenamePayload
 	if err != nil && !isNoRows(err) {
 		return "", err
 	}
-	if isNoRows(err) || effectivePermission(orgRole, projectRole) < 2 {
+	required := 2
+	if p.Backend != nil {
+		required = 3
+	}
+	if isNoRows(err) || effectivePermission(orgRole, projectRole) < required {
 		return "", renameFault(403, "forbidden", "Current project Editor or Admin required")
 	}
 	var pending bool

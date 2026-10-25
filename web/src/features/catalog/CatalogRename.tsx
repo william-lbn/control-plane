@@ -25,6 +25,7 @@ export function CatalogRename({
   projectId,
   roles,
   databases,
+  canAdmin,
   disabled,
   onBusy,
   onComplete,
@@ -33,6 +34,7 @@ export function CatalogRename({
   projectId: string;
   roles: Choice[];
   databases: Choice[];
+  canAdmin: boolean;
   disabled: boolean;
   onBusy: (value: boolean) => void;
   onComplete: () => Promise<void>;
@@ -40,7 +42,8 @@ export function CatalogRename({
   const [kind, setKind] = useState<'roles' | 'databases'>('databases'),
     [source, setSource] = useState(''),
     [target, setTarget] = useState(''),
-    [ack, setAck] = useState(false);
+    [ack, setAck] = useState(false),
+    [migrateBackend, setMigrateBackend] = useState(false);
   const [pending, setPending] = useState<Intent | null>(null),
     [operation, setOperation] = useState<Operation | null>(null),
     [busy, setBusy] = useState(false),
@@ -127,7 +130,12 @@ export function CatalogRename({
       return;
     const intent: Intent = {
       url: path + '/' + kind + '/' + encodeURIComponent(source) + '/rename',
-      body: JSON.stringify({ new_name: target }),
+      body: JSON.stringify({
+        new_name: target,
+        ...(kind === 'databases' && canAdmin && migrateBackend
+          ? { migrate_backend_dependencies: true }
+          : {}),
+      }),
       key: newRequestKey(),
       version: selected.version_token,
       source,
@@ -145,7 +153,8 @@ export function CatalogRename({
       </div>
       <p className="subtle-note">
         仅支持平台管理的非系统对象。数据库保留原数据，角色保留受管理密码及权限。使用旧名称的应用需要更新连接配置；仍被默认连接或
-        Backend 服务引用的对象会被拒绝。
+        Backend 服务引用的对象需要 Admin 显式选择迁移。迁移前须停用相关服务并挂起
+        Functions，原数据、密码和签名密钥保留。
       </p>
       <form onSubmit={submit}>
         <div className="identity-grid">
@@ -213,6 +222,17 @@ export function CatalogRename({
           />
           确认更新应用连接名称
         </label>
+        {canAdmin && kind === 'databases' && (
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={migrateBackend}
+              disabled={disabled || busy || !!pending}
+              onChange={(event) => setMigrateBackend(event.target.checked)}
+            />
+            同步迁移已停用 Backend 服务的数据库名称
+          </label>
+        )}
         <button
           className="button primary"
           disabled={

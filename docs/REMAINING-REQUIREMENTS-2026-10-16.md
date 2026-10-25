@@ -1,6 +1,6 @@
 # 剩余需求：源码核对与实施账本
 
-当前汇总更新至 2026-10-26：21 个固定基础组已验收，剩余六个业务组、O01/T01/O02 和五组后置专项。历史计数保留其原日期，当前状态以[功能清单](FUNCTIONAL-STATUS-2026-10-21.md)为准。
+当前汇总更新至 2026-10-26：22 个固定基础组已验收，剩余五个业务组、O01/T01/O02 和五组后置专项。历史计数保留其原日期，当前状态以[功能清单](FUNCTIONAL-STATUS-2026-10-21.md)为准。
 ## 1. 核对基线
 
 审计基线为控制面 `b4ad4f4`，此前已交付 `63456a7`，最初增量 API/Worker、Web 0.48.0；并核对 Autoscaling `1720924` 和统一 Helm `648488a`，以及本地
@@ -39,7 +39,7 @@ website 文档快照 `c0d49cbb6979b2ce79ea502d62dbc40780a923b0`（提交时间
 | A04 | Auth 分支第二因素 | 显式物理迁移、独立重封装、会话/绑定清除、恢复码隔离和验证器恢复基础已验收 | [交付](DELIVERY-2026-10-22-AUTH-FACTOR-MIGRATION.md)；生命周期恢复与在线根密钥轮换保留独立门槛 |
 | A05 | Auth 保留删除/恢复/隔离 | 叶分支删除、项目保留恢复、显式新代次、原会话/JWKS 失效及账号/密码/SQL 保留基线已验收 | [矩阵](AUTH-LIFECYCLE.md)与[交付](DELIVERY-2026-10-25-AUTH-LIFECYCLE.md)；单分支恢复 API 未提供，物理 GC、KMS 根轮换、完整 Backend 时间点恢复另列 |
 | C01 | 数据库/角色 rename | 自定义受管理非系统对象的异步 API/UI、原 OID/SCRAM/数据、所有现存配置/Proxy CAS、未知结果恢复和 Writer/原 Reader 冷醒基础通过 | [合同](CATALOG-RENAME.md)与[交付](DELIVERY-2026-10-17-CATALOG-RENAME.md)；默认身份、Backend 依赖迁移和未知外部 DDL 归 C02 |
-| C02 | 默认/系统身份与外部 DDL | 默认连接/Owner、目录原结果、冷目录保留及普通 CRUD 持续 OID/凭据代际基础通过；整组未完成 | [0.70.0 交付](DELIVERY-2026-10-21-CATALOG-CURRENT-OBSERVATION.md)补齐有原证明的旧身份衔接、继承凭据背书及 Console；当前身份展示和首次启动继承沿用原验收；默认/系统漂移和 Backend 名称依赖继续 |
+| C02 | 默认/系统身份与外部 DDL | 固定本地基础通过：平台初始记录、原 OID/选项漂移、原键恢复与四类停用 Backend 名称迁移；旧身份/继承回执复用 | [0.91.0 验收](DELIVERY-2026-10-26-CATALOG-PLATFORM.md)；原 Auth 用户/小对象/Function SQL 代际 2 保留，默认 postgres 外部改名维护环境实际验证后置，未冒充通过 |
 | L01 | 失败创建清理、异常运行时回收与 TTL | 客户 Node 退出后的认证 idle 回收，以及独立 Compute、项目/分支唯一原失败创建的身份绑定清理、原失败/timeline 保留和重放已实现并验收；分支 TTL 设置/更新/取消、持久重放、自动退休及原数据/父分支保留基础已验收；节点分区后置 | [失败父资源交付](DELIVERY-2026-10-18-FAILED-PARENT-CLEANUP.md)、[失败 Compute 交付](DELIVERY-2026-10-18-FAILED-ENDPOINT-CLEANUP.md)、[异常 idle 交付](DELIVERY-2026-10-18-FUNCTION-UNHEALTHY-IDLE.md)；[TTL 交付](DELIVERY-2026-10-18-BRANCH-EXPIRATION.md)；后续节点分区/外部 fencing 归 X01，按用户要求后置 |
 | L02 | 原分支 reset / 原地 PITR | 未开发；恢复到新分支已有 | 备份分支、连接切换、GC/连接竞争、失败回退与 UI |
 | L03 | Time Travel Assist / Backend 一致恢复 | 未开发 | 查询时间点辅助、Auth/对象/函数分别描述恢复语义并校验 |

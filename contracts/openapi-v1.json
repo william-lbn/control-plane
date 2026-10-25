@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.90.0",
+    "version": "0.91.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -6291,6 +6291,11 @@
             "minLength": 1,
             "maxLength": 63,
             "description": "Distinct non-system PostgreSQL identifier, at most 63 UTF-8 bytes; control characters and surrounding whitespace rejected."
+          },
+          "migrate_backend_dependencies": {
+            "type": "boolean",
+            "default": false,
+            "description": "Database only; explicit current project Admin opt-in. Requires disabled Auth, Data API and Storage and suspended initialized Functions with all guests retired. Bind the exact original native OID, metadata snapshot and immutable credential UIDs; clone only connection paths using the original password/signing bytes, and sign a new Functions SQL credential generation while retaining original history. Default connections and protected platform objects remain excluded. No automatic enable or credential rotation."
           }
         }
       },
@@ -9713,6 +9718,173 @@
           "items",
           "limit"
         ]
+      },
+      "CatalogPlatformInitialInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "acknowledge_initial_observation",
+          "observation_sha256"
+        ],
+        "properties": {
+          "acknowledge_initial_observation": {
+            "type": "boolean",
+            "const": true
+          },
+          "observation_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      },
+      "CatalogPlatformObservedObject": {
+        "type": "object",
+        "required": [
+          "kind",
+          "name",
+          "oid"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "role",
+              "database"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "oid": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4294967295
+          },
+          "owner": {
+            "type": "string"
+          },
+          "owner_oid": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          }
+        }
+      },
+      "CatalogPlatformDifference": {
+        "type": "object",
+        "required": [
+          "kind",
+          "expected_name",
+          "expected_oid",
+          "status",
+          "changes",
+          "credentials"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "role",
+              "database"
+            ]
+          },
+          "expected_name": {
+            "type": "string"
+          },
+          "expected_oid": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4294967295
+          },
+          "observed_name": {
+            "type": "string"
+          },
+          "observed_oid": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4294967295
+          },
+          "observed_owner": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "changes": {
+            "type": "array",
+            "maxItems": 8,
+            "items": {
+              "type": "string"
+            }
+          },
+          "credentials": {
+            "enum": [
+              "not_observed"
+            ]
+          }
+        }
+      },
+      "CatalogPlatformIdentityResult": {
+        "type": "object",
+        "properties": {
+          "branch_id": {
+            "type": "string"
+          },
+          "recorded": {
+            "type": "boolean"
+          },
+          "baseline_id": {
+            "type": "string"
+          },
+          "captured_at": {
+            "type": "string"
+          },
+          "observation_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "object_count": {
+            "type": "integer",
+            "minimum": 3,
+            "maximum": 5
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 5,
+            "items": {
+              "$ref": "#/components/schemas/CatalogPlatformDifference"
+            }
+          },
+          "observed_objects": {
+            "type": "array",
+            "maxItems": 5,
+            "items": {
+              "$ref": "#/components/schemas/CatalogPlatformObservedObject"
+            }
+          },
+          "credentials": {
+            "enum": [
+              "not_observed"
+            ]
+          },
+          "basis": {
+            "enum": [
+              "admin_initial_platform_observation",
+              "no_original_platform_observation"
+            ]
+          },
+          "protected_object_mutation": {
+            "type": "boolean",
+            "const": false
+          },
+          "source_endpoint_changed": {
+            "type": "boolean"
+          },
+          "source_backings_changed": {
+            "type": "boolean"
+          },
+          "platform_intent_changed": {
+            "type": "boolean"
+          }
+        }
       }
     },
     "responses": {
@@ -24510,7 +24682,7 @@
             "$ref": "#/components/responses/Error"
           }
         },
-        "description": "Editor/Admin and session CSRF or scoped API key. Same-key/input/version replay resolves the original durable Operation before re-observing old names. Admission captures the original PostgreSQL OID, branch marker, current metadata version and owned immutable credential/config/routes Secret UIDs. Worker performs transactional ALTER with an OID postcondition, all Writer/Reader cold configurations, Proxy credential publication and atomic final catalog/owner-reference rename. Password/verifier stays in its original immutable Secret; no object/data copy, forced disconnect, privilege escalation or name-only adoption. Target names retained by another managed catalog record are reserved. Default Endpoint identities and retained Backend database dependencies must migrate before rename; arbitrary external DDL management, cross-system fencing and uninterrupted HA remain independent gates. New rename completion atomically commits the renamed metadata and follower Owner references, immutable original result and success audit. The result binds the full original typed payload including object OID and immutable backing/credential UIDs. Original result recovery settles only its five original steps before credential/SQL/config/routes access, preserving later names and authorized password rotations even after the original Writer retires. Fresh execution and commit recheck the original lease/payload, current actor permission, parents, exact Endpoint set, dependencies and original updating metadata generation. Legacy final-looking names do not manufacture a result. This does not establish a complete current native identity lineage or distributed DDL fence.",
+        "description": "Editor/Admin and session CSRF or scoped API key. Same-key/input/version replay resolves the original durable Operation before re-observing old names. Admission captures the original PostgreSQL OID, branch marker, current metadata version and owned immutable credential/config/routes Secret UIDs. Worker performs transactional ALTER with an OID postcondition, all Writer/Reader cold configurations, Proxy credential publication and atomic final catalog/owner-reference rename. Password/verifier stays in its original immutable Secret; no object/data copy, forced disconnect, privilege escalation or name-only adoption. Target names retained by another managed catalog record are reserved. Default Endpoint identities and retained Backend database dependencies must migrate before rename; arbitrary external DDL management, cross-system fencing and uninterrupted HA remain independent gates. New rename completion atomically commits the renamed metadata and follower Owner references, immutable original result and success audit. The result binds the full original typed payload including object OID and immutable backing/credential UIDs. Original result recovery settles only its five original steps before credential/SQL/config/routes access, preserving later names and authorized password rotations even after the original Writer retires. Fresh execution and commit recheck the original lease/payload, current actor permission, parents, exact Endpoint set, dependencies and original updating metadata generation. Legacy final-looking names do not manufacture a result. This does not establish a complete current native identity lineage or distributed DDL fence. Explicit migrate_backend_dependencies=true admits an Admin-only name migration of dormant Backend dependencies bound to the original OID and exact snapshot; credentials and service data generations are preserved.",
         "requestBody": {
           "required": true,
           "content": {
@@ -37703,6 +37875,177 @@
           },
           "503": {
             "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/catalog-platform-identities": {
+      "get": {
+        "operationId": "getCatalogPlatformIdentities",
+        "summary": "getCatalogPlatformIdentities",
+        "tags": [
+          "Catalog identities"
+        ],
+        "description": "Explicit first current observation of the original Endpoint platform role, control_probe, original default database and fixed maintenance databases. Uses the owned original probe and template1, checks native tenant/timeline, and never reads customer tables, passwords or verifiers from PostgreSQL. A prior baseline compares its original OIDs even when the default database or platform role has been renamed; first capture is refused if an anchor is absent. The current observation digest binds original config/credential UIDs and complete bounded native facts. No baseline implies no earlier identity proof. Original baseline, receipt and audit commit atomically and remain immutable. This operation does not recreate, rename or repair protected SQL identities. Backend dependency migration is a separate operation. Current project Editor or Admin required; observation can use a running Writer.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current system identity observation or immutable original capture receipt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogPlatformIdentityResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "post": {
+        "operationId": "recordCatalogPlatformIdentities",
+        "summary": "recordCatalogPlatformIdentities",
+        "tags": [
+          "Catalog identities"
+        ],
+        "description": "Explicit first current observation of the original Endpoint platform role, control_probe, original default database and fixed maintenance databases. Uses the owned original probe and template1, checks native tenant/timeline, and never reads customer tables, passwords or verifiers from PostgreSQL. A prior baseline compares its original OIDs even when the default database or platform role has been renamed; first capture is refused if an anchor is absent. The current observation digest binds original config/credential UIDs and complete bounded native facts. No baseline implies no earlier identity proof. Original baseline, receipt and audit commit atomically and remain immutable. This operation does not recreate, rename or repair protected SQL identities. Backend dependency migration is a separate operation. Current project Admin required to acknowledge only this first observation.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Required for a Console cookie session."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current system identity observation or immutable original capture receipt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogPlatformIdentityResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogPlatformInitialInput"
+              }
+            }
           }
         }
       }

@@ -346,6 +346,8 @@ func (s *server) routes() *http.ServeMux {
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/connection-defaults", s.auth(http.HandlerFunc(s.connectionDefaults), false))
 	mux.Handle("PATCH /api/v1/projects/{project}/branches/{branch}/connection-defaults", s.auth(http.HandlerFunc(s.connectionDefaults), true))
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/catalog-identities", s.auth(http.HandlerFunc(s.catalogIdentities), false))
+	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/catalog-platform-identities", s.auth(http.HandlerFunc(s.catalogPlatformIdentities), false))
+	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/catalog-platform-identities", s.auth(http.HandlerFunc(s.catalogPlatformIdentities), true))
 	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/catalog-identities", s.auth(http.HandlerFunc(s.catalogIdentities), true))
 	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/catalog-identities/{binding}/restore", s.auth(http.HandlerFunc(s.catalogIdentityRestore), true))
 	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/catalog-identities/{binding}/observe-current", s.auth(http.HandlerFunc(s.catalogObserveCurrent), true))

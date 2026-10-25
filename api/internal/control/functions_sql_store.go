@@ -6,7 +6,7 @@ import (
 )
 
 func functionSQLMatchesTarget(p functionInstanceTarget, r functionSQLReference) bool {
-	return p.valid() && r.valid() && r.UID != "" && r.MAC != "" && r.Generation == 1 && r.Scope.ProvisioningRole == "control_probe" &&
+	return p.valid() && r.valid() && r.UID != "" && r.MAC != "" && r.Generation > 0 && r.Scope.ProvisioningRole == "control_probe" &&
 		r.Scope.FunctionID == p.FunctionID && r.Scope.ProjectID == p.ProjectID && r.Scope.BranchID == p.BranchID
 }
 
@@ -29,8 +29,8 @@ func (s *server) recordFunctionSQLCredential(ctx context.Context, operation, wor
 		return empty, err
 	}
 	var matches bool
-	err = tx.QueryRow(ctx, `SELECT endpoint_id=$2 AND database_name=$3 AND sql_schema=$4 AND sql_role=$5
- FROM function_definitions WHERE id=$1`, p.FunctionID, r.WriterID, r.Scope.Database, r.Scope.Schema, r.Scope.Role()).Scan(&matches)
+	err = tx.QueryRow(ctx, `SELECT endpoint_id=$2 AND database_name=$3 AND sql_schema=$4 AND sql_role=$5 AND sql_credential_generation=$6
+ FROM function_definitions WHERE id=$1`, p.FunctionID, r.WriterID, r.Scope.Database, r.Scope.Schema, r.Scope.Role(), r.Generation).Scan(&matches)
 	if err != nil || !matches {
 		return empty, errFunctionSQLSecret
 	}
@@ -78,7 +78,7 @@ func (s *server) loadFunctionSQLCredential(ctx context.Context, operation, worke
 	err = tx.QueryRow(ctx, `SELECT c.credential_generation,c.namespace,c.secret_name,c.secret_uid,c.content_mac,c.mac_key_version,
  c.writer_id,c.database_name,c.sql_schema,c.provisioning_role
  FROM function_sql_credentials c JOIN function_definitions f ON f.id=c.function_id
- WHERE c.function_id=$1 AND c.project_id=$2 AND c.branch_id=$3 AND c.credential_generation=1
+ WHERE c.function_id=$1 AND c.project_id=$2 AND c.branch_id=$3 AND c.credential_generation=f.sql_credential_generation
  AND f.endpoint_id=c.writer_id AND f.database_name=c.database_name AND f.sql_schema=c.sql_schema
  AND f.sql_role=$4`, p.FunctionID, p.ProjectID, p.BranchID, r.Scope.Role()).Scan(&r.Generation, &r.Namespace, &r.Name, &r.UID, &r.MAC, &r.MACKeyVersion,
 		&r.WriterID, &r.Scope.Database, &r.Scope.Schema, &r.Scope.ProvisioningRole)

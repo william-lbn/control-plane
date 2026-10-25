@@ -285,6 +285,10 @@ func (s *server) reconcileCatalogRename(ctx context.Context, operation, worker s
 	if err != nil {
 		return err
 	}
+	backendBackings, err := s.prepareCatalogBackendRename(ctx, p)
+	if err != nil {
+		return err
+	}
 	apply := func(ctx context.Context) error {
 		release, err := s.acquireProbeGate(ctx, p.EndpointID, true)
 		if err != nil {
@@ -323,7 +327,7 @@ func (s *server) reconcileCatalogRename(ctx context.Context, operation, worker s
 			if err = verifyCatalogRenameEndpointSet(ctx, tx, p); err != nil {
 				return err
 			}
-			if err = commitCatalogRenameResultTx(ctx, tx, operation, worker, p); err != nil {
+			if err = commitCatalogRenameResultTx(ctx, tx, operation, worker, p, backendBackings); err != nil {
 				return err
 			}
 			return tx.Commit(ctx)

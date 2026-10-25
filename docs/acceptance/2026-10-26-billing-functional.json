@@ -215,7 +215,7 @@
     "contract quality archive missing contract file",
     "initial UI organization selector"
   ],
-  "GitHub_run_state": "pending test-only follow-up commit",
+  "GitHub_run_state": "success",
   "affected_existing_CLI_catalog_groups": 1,
   "initial_GitHub_run_id": 40216666380,
   "initial_GitHub_failure": "CLI catalog test retained 293 rather than the new 305 operations",
@@ -224,5 +224,9 @@
     "sha256": "5a232b027e5c9d249b91849935b38ebd300b9c66f232154025dd6018c3492969",
     "Linux_affected_catalog_check": "pass",
     "runtime_changed": false
-  }
+  },
+  "GitHub_run_id": 40217218710,
+  "GitHub_run_url": "https://github.com/william-lbn/control-plane/actions/runs/40217218710",
+  "GitHub_source_commit": "f7df93a2dc9443f653d218960536a8e119b45645",
+  "GitHub_successful_jobs": 15
 }

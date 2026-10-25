@@ -5,9 +5,11 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 
 **发行状态：预览版本。已经验证的实验环境功能不等于生产认证，也不等于 Neon 官网全部 Backend 服务。**
 
-功能进度与当前优先级见 [已验收/剩余清单](docs/FUNCTIONAL-STATUS-2026-10-21.md)：21 组固定基础已有回执；五组专项后置，六组业务及三组运维/TLS/发行继续。复用来源未变的既有验收。
+功能进度与当前优先级见 [已验收/剩余清单](docs/FUNCTIONAL-STATUS-2026-10-21.md)：22 组固定基础已有回执；五组专项后置，五组业务及三组运维/TLS/发行继续。复用来源未变的既有验收。
 
-最新状态：2026-10-26 [付款与原订单恢复](docs/DELIVERY-2026-10-26-BILLING.md)：15 组新增 Go/PG、三组受影响合同、两组新 Helm 和七个实际页面检查点通过。固定价格、签名回执、退款/争议、组织额度及原未知订单恢复已验收；临时配置撤回，旧目录/额度账本、原 953 Secret 和九个 PVC 保留，VM 0。API/Worker 0.90.0 / Chart 0.9.87 / Core 188 / schema 068。合成验收不代表真实收费或生产认证。
+最新状态：2026-10-26 [平台身份与 Backend 名称迁移](docs/DELIVERY-2026-10-26-CATALOG-PLATFORM.md)：13 组新增 Go/PG、原页面确认/响应恢复、四类 Backend 迁移、原用户/小对象/Function SQL 代际 2 及最终保全通过。原 955 Secret、9 PVC、目录/额度摘要保留，VM 0。API/Worker 0.91.0 / Chart 0.9.88 / Core 192 / schema 069；默认 postgres 外部改名的维护环境验证单列后置。
+
+上一增量：2026-10-26 [付款与原订单恢复](docs/DELIVERY-2026-10-26-BILLING.md)：15 组新增 Go/PG、三组受影响合同、两组新 Helm 和七个实际页面检查点通过。固定价格、签名回执、退款/争议、组织额度及原未知订单恢复已验收；临时配置撤回，旧目录/额度账本、原 953 Secret 和九个 PVC 保留，VM 0。API/Worker 0.90.0 / Chart 0.9.87 / Core 188 / schema 068。合成验收不代表真实收费或生产认证。
 
 此前状态：2026-10-25 S02 基础闭环：[multipart checksum 协商](docs/DELIVERY-2026-10-25-MULTIPART-CHECKSUMS.md)通过九组新增 Go/PG、十组受影响检查和七种实际 SDK 组合（59 检查点）。原回执、复制/覆盖、逐分片校验、COMPOSITE、拒绝和格式 7 升级通过；原数据身份、953 Secret、9 PVC、三节点/三个 Safekeeper 保留，VM 0。API/Worker 0.89.0 / Chart 0.9.86 / Core 185 / schema 067。5 GiB 完整字节验证仍在新环境进行，当前基础计数为 19 组，剩余八组业务及三组运维/TLS/发行继续。
 
