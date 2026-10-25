@@ -95,4 +95,4 @@ require (
 	gopkg.in/ini.v1 v1.67.2 // indirect
 )
 
-replace github.com/neondatabase/autoscaling => github.com/william-lbn/autoscaling v0.0.0-20261025142910-a3d91b8a10bb
+replace github.com/neondatabase/autoscaling => github.com/william-lbn/autoscaling v0.0.0-20261025172233-2c9a26abac1d
