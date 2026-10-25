@@ -55,7 +55,7 @@ website 文档快照 `c0d49cbb6979b2ce79ea502d62dbc40780a923b0`（提交时间
 | T01 | 全链路可信 TLS | Auth→Proxy 有正反例；Functions 原实例管理叶自动续期已完成 TLS/PG/真实 Console/SQL 基础闭环；浏览器/元数据/Storage 等仍有例外 | [续期合同](FUNCTION-MANAGER-IDENTITY.md)及[交付](DELIVERY-2026-10-19-FUNCTION-MANAGER-IDENTITY.md)；根 CA 轮换、全链路本地 CA/IP SAN/verify-full 与网络策略继续，公网输入后置 |
 | O01 | 长期监控/告警/审计/预算 | UI 瞬时/基础指标已有；长期运营不全 | TSDB 保留、SLO/告警闭环、容量/错误预算和审计导出 |
 | O02 | 供应链消费策略与统一发行 | digest/source 锁已有；最新本地镜像尚未统一公开 | 同源发布、签名/SBOM/provenance 验证、版本锁/回滚和独立安装 |
-| O03 | 官网运营集成 | 计费/充值、服务计划、CLI/MCP 全覆盖非当前完整实现 | 先固定自托管 API/配额合同；外部支付/正式运营输入另列 |
+| O03 | 官网运营集成 | 自托管服务计划/配额与 CLI/MCP 固定基线已验收；计费/充值仍缺 | [CLI/MCP](DELIVERY-2026-10-25-CONTROL-CLIENTS.md)及[服务计划](DELIVERY-2026-10-25-SERVICE-PLANS.md)；账单接口继续，外部支付/正式运营输入另列 |
 
 ## 3. 实施和记录原则
 
@@ -140,3 +140,5 @@ fixture、失败、日志、密码保护输入和所有业务字节。测试完�
 2026-10-25 AI 持久状态：[供应商响应与会话](DELIVERY-2026-10-25-AI-PROVIDER-STATE.md)通过 15 组新增 Go/PG、4 组受影响检查和 6 个累计实机检查点；复用前三项和原已完成 SSE，未重复推理。原生 JSON/SSE、响应续接、会话/条目、不可变加密引用及未知结果核对通过。API/Worker/AI 0.85.0，Web 重建，schema 066 / Chart 0.9.82 / Core Helm 180；原 17 张目录表、946 个持久 Secret UID、9 PVC 和另外六套发行配置保留，最终三节点/三个 Safekeeper Ready，VM 0。临时配置已撤下、合成服务归档后缩零。I02 外部账单/支付及其他业务继续；性能、可靠性后置。
 
 2026-10-25 服务计划：[自托管服务计划与组织配额](DELIVERY-2026-10-25-SERVICE-PLANS.md)通过五组新增 Go/PG、三组受影响 OpenAPI、三组 Helm 和九个累计实机检查点；复用前五项，仅续验余项。不可变修订、原回执、真实准入/超额拒绝、降级原子性、禁用和恢复原配额通过。API/Worker 0.86.0，Web 重建，schema 067 / Chart 0.9.83 / Core Helm 182；原目录、36 个旧组织配额、947 个持久 Secret UID、9 PVC 和另外六套发行配置保留，最终三节点/三个 Safekeeper Ready，VM 0。临时平台审批已撤回。CLI/MCP、账单接口及其余业务继续；大对象/高容量验证按用户要求后置并单列实现缺口。
+
+2026-10-25 CLI/MCP：[CLI 与官方 MCP SDK 双协议基线](DELIVERY-2026-10-25-CONTROL-CLIENTS.md)通过 15 组新增 Linux 功能检查和七个累计真实接口检查点；两组受影响路径复验，原 Go/Web/Helm 功能不重测。创建/读取/版本更新、原键回执、冲突/跨项目拒绝及撤销后即时拒绝通过；未执行 SQL 或启动 Compute，原保存查询摘要保持一致。离线运行包复用缓存，两个终态 QA Job 已归档退休。服务端仍为 API 0.86.0 / schema 067 / Core Helm 182；O03 账单接口与外部支付继续，容量/性能验证按既定边界后置。

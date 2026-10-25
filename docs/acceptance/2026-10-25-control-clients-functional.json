@@ -1,0 +1,180 @@
+{
+  "basic_accepted_groups": [
+    "F01",
+    "F02",
+    "F03",
+    "F04",
+    "F05",
+    "S01",
+    "A01",
+    "C01",
+    "L01",
+    "Q01",
+    "Q02",
+    "Q03",
+    "I01",
+    "A04",
+    "S04",
+    "A02",
+    "A03",
+    "A05"
+  ],
+  "remaining_business_groups": [
+    "C02",
+    "S02",
+    "S03",
+    "S05",
+    "L02",
+    "L03",
+    "F06",
+    "I02",
+    "O03"
+  ],
+  "remaining_other_groups": [
+    "O01",
+    "T01",
+    "O02"
+  ],
+  "deferred_groups": [
+    "R01",
+    "R02",
+    "X01",
+    "H01",
+    "H02"
+  ],
+  "frozen_migrations": {
+    "058": "ef77ef8aa674bba9f5a75750d944ba3bb297d988b8aa9a689c1ad99dccdaf282",
+    "059": "48de708734444ab625c3955510dd28c66e772e9f536ecb2b32b10f4de7986fce",
+    "060": "f058d1417b0eb6cb72e4229777ada1248f9738c798b1fcb3664e3fb7f048d53b",
+    "061": "e8bf3d9cbce1e6d22c6a61f0e101d7ad9164aa0581be8d1bc0b2d0449fdaa4ac",
+    "062": "c7e7b0abae640799c0afc5b471c08ff043c730409d7a2edfdc6d0d20b90299a7",
+    "063": "9ddc0b968d693631ac4066f589e9f99d6741c8724d29bea4e00a02ebec5e107c",
+    "064": "3b4878bfd9506b74778e78ac67a569bfa430d8b8757d067531776635a5a69e1a",
+    "065": "b24d7ccb858a66a1a2bc42541bca9e8d53136f84c3fb5dc4f3bc263c7f1792f0",
+    "066": "253b62fd88b2a619dd4a06646fb0f2531eb4d49b0cbca7fdc8a9dbc627e55489",
+    "067": "fb5ec4e9082cdfa144cc7859ccd81c5b88a4398b8dfa8bef61cf417fa897f8c3"
+  },
+  "result": "pass",
+  "recorded_on": "2026-10-25",
+  "client_version": "0.1.0",
+  "O03_CLI_MCP_baseline_complete": true,
+  "O03_whole_group_complete": false,
+  "O03_remaining": [
+    "billing interface and external payment integration"
+  ],
+  "whole_product_complete": false,
+  "production_qualified": false,
+  "api_version": "0.86.0",
+  "chart_version": "0.9.83",
+  "schema": 67,
+  "helm_revision": 182,
+  "server_runtime_changed": false,
+  "new_runtime_images_built": false,
+  "source_parent_revision": "b1fbd5ce106c5e4e8668585e83ca742601f0a62b",
+  "new_unique_Node_functional_groups": 15,
+  "new_unique_Node_functional_case_names": [
+    "Catalog covers the exact API once and cursors bind filter and source",
+    "Fixed origin, current credentials, parameter encoding and mutation approval are enforced",
+    "A lost mutation reply has one attempt and an explicit same-key replay keeps one resource",
+    "Redirects never forward credentials and cancellation does not resend",
+    "Private output streams bytes completely and refuses existing destinations",
+    "LAN always bypasses a proxy; WAN uses only its configured proxy",
+    "HTTPS verifies the server before sending credentials and accepts only the configured CA",
+    "Official SDK 2025 initialize enforces separate read/write tools and private credentials",
+    "Official SDK 2026 stateless discovery enforces separate read/write tools and private credentials",
+    "CLI searches without credentials, emits JSON and rejects unapproved writes",
+    "Read-only operator configuration never advertises a mutation tool",
+    "Binary tool replies cannot expose configured credentials through base64",
+    "Official MCP cancellation 2025 aborts the original API read without a second request",
+    "Official MCP cancellation 2026 aborts the original API read without a second request",
+    "Console session profiles preserve same-origin CSRF and reject credential header overrides"
+  ],
+  "affected_Node_groups_rechecked": 2,
+  "empty_file_containers_counted": false,
+  "live_functional_unique_checkpoints": [
+    "CLI_and_MCP_read_the_exact_owned_scope",
+    "CLI_create_and_explicit_same_key_receipt_replay",
+    "MCP_reads_original_SQL_and_performs_versioned_update",
+    "stale_version_and_changed_same_key_rejected_without_partial_mutation",
+    "current_server_project_scope_rejects_another_owned_project",
+    "CLI_deletes_only_its_query_and_MCP_observes_absence",
+    "CLI_and_MCP_recheck_revoked_key_on_current_server"
+  ],
+  "CLI_and_MCP_current_revocation": "401",
+  "official_SDK_server": "2.4.0",
+  "official_SDK_client_test_only": "2.4.0",
+  "MCP_protocol_modes_tested": [
+    "2025 initialize",
+    "2026 stateless discovery"
+  ],
+  "tested_node": "24.20.0",
+  "Windows_runtime_qualified": false,
+  "contract_paths": 206,
+  "contract_operations_searchable": 293,
+  "all_contract_operations_individually_live_tested": false,
+  "source_proof": {
+    "result": "pass",
+    "quality_snapshot_matches": 11,
+    "runtime_and_lockfile_match_live": true,
+    "only_test_change_after_live": [
+      "clients/test/client.test.mjs"
+    ],
+    "public_file_sha256": {
+      "clients/catalog.mjs": "57b92387671f0eec3984388dcba4e1510cf25e5b7d2eafb97d8349120ea1f9c2",
+      "clients/cli.mjs": "08313cb00a98b9706637161059a339d26aa2616ce8db400a4c625b0aff58007f",
+      "clients/client.mjs": "31ee2f1d62c0e87d13a358bdf639517681e082a4c239063c2338b9504e7b588d",
+      "clients/mcp.mjs": "74f7e3b935827542fcbedd20787ce68ba13e62b97606b1137a24ae9101afc4db",
+      "clients/package-lock.json": "eaa43fb2cf0b22725832e01cf0d871c88c51314b253ae5ddfb39c2981b818a74",
+      "clients/package.json": "ebb808132097a30bfa7a6b99702170e318de4ead40179337f9770d98ebe58397",
+      "clients/test/client.test.mjs": "2682cc27fbe2af6f78f7ad36dcfac70a8911ee0bbff0ad9b893620939fce6cfc",
+      "clients/test/live-control.mjs": "debb6b02d528cfa8a000503f0bc588c68f928b1cc9845cb9e8ea6f37be9dbe8b",
+      "clients/test/live-revoked.mjs": "eae8f3f58452a9fdcb8d57e676981fa3638a7b49cbf66bf098fe465737e6f9fe",
+      "clients/test/mcp.test.mjs": "341591f7169562a0f19b46594ca269b5f0ab0637a19e4def4ce48bf6ccc39099",
+      "contracts/openapi-v1.json": "93e482985eb117bae72478a218ef182ac6d6d7255bf72892dd6d16eaaa8ad8d3"
+    },
+    "quality_archive_sha256": "d4cdf080505615b7536f60ed7c7608249ed3ecfa8770a9485b9d705211424ba5",
+    "live_archive_sha256": "c3a51caa8c0bfc170871b9364af1766943330f87eae31fd5205121b3a1570274",
+    "runtime_images_rebuilt": false
+  },
+  "owned_key_revoked": true,
+  "owned_saved_query_retained_deleted": true,
+  "original_saved_queries_unchanged": true,
+  "SQL_executed": false,
+  "Compute_created": false,
+  "commercial_calls": false,
+  "private_credentials_exported": false,
+  "source_dependency_downloads": "one cached Linux install; subsequent phases reused cache",
+  "offline_artifact": {
+    "sha256": "3a261be2c61084df87ac0e699419e357cf0e8abd5b9389ae491390ab415287a5",
+    "bytes": 2912343,
+    "packaged_files": 1003,
+    "no_native_binaries": true,
+    "private_profiles_included": false,
+    "CLI_artifact_smoke": "pass",
+    "MCP_artifact_smoke": "pass",
+    "lockfile_offline_production_install": "pass"
+  },
+  "owned_terminal_jobs_retired": [
+    {
+      "name": "control-clients-deps-20261024235216",
+      "uid": "d167728c-b200-4f1d-93d6-464847329989",
+      "pod_uid": "1bb53742-7e6e-4bdd-8870-7b9ed799a48b",
+      "archive_sha256": "294e40eaac620ce9a142a3c22421c0c01cc61e2e221d5fed617ef0bcf3f1c6ed"
+    },
+    {
+      "name": "control-clients-offline-20261025002033",
+      "uid": "e0d43e21-9a87-4408-ad8f-3865c5ca40ff",
+      "pod_uid": "9813b7fb-8ddd-42f7-a14d-f500f6c6f401",
+      "archive_sha256": "74ef28dea63b2ce3183d69a87bd05bf148c540b160b9fb963bfd6bd37d9f1312"
+    }
+  ],
+  "failed_attempts_retained": [
+    "SDK cancellation context signal fixed and both protocol cases rechecked",
+    "live receipt expected status fixed from 201 to 200; original query observed and same-key resumed"
+  ],
+  "old_functional_tests_repeated": false,
+  "performance_reliability_campaign": false,
+  "capacity_validation": "deferred to suitable environment; 5 GiB client and server implementation still missing",
+  "required_GitHub_jobs": 15,
+  "GitHub_run_state": "pending after this commit"
+}
