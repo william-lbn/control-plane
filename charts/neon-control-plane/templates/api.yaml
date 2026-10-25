@@ -85,6 +85,7 @@ spec:
             - {name: NEON_BACKEND_CREDENTIAL_KEYS_FILE, value: /run/backend-keys/keyring.json}
             {{- end }}
             {{- include "neonControl.runtimeEnv" . | nindent 12 }}
+            {{- include "neonControl.storageCapacityEnv" . | nindent 12 }}
           volumeMounts:
             {{- if .Values.platformManagement.enabled }}
             - {name: platform-policy, mountPath: /run/platform-policy, readOnly: true}
@@ -142,7 +143,7 @@ spec:
             defaultMode: 0440
             items: [{key: config.json, path: config.json}]
         - name: product-storage-buffer
-          emptyDir: {sizeLimit: 256Mi}
+          emptyDir: {sizeLimit: {{ printf "%dMi" (int64 .Values.objectStorage.capacity.bufferMiB) | quote }}}
         {{- end }}
         - name: credentials
           secret: {secretName: {{ .Values.api.existingSecret }}, defaultMode: 0440}

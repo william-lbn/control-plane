@@ -135,5 +135,5 @@ func (s *server) storageMultipartList(w http.ResponseWriter, r *http.Request, co
 		multipartError(w, r, e, false)
 		return
 	}
-	jsonResponse(w, 200, record{"items": items, "object_bytes": storageObjectLimit, "part_bytes": multipartMinimumPart, "active_limit": multipartActiveLimit})
+	jsonResponse(w, 200, record{"items": items, "object_bytes": storageObjectAdmissionLimit(), "part_bytes": multipartMinimumPart, "active_limit": multipartActiveLimit})
 }

@@ -123,6 +123,9 @@ func copyStorageObjectWithConditions(ctx context.Context, conn *pgx.Conn, projec
 			responseHeaders = replacement.Headers
 		}
 	}
+	if size > storageObjectAdmissionLimit() {
+		return nil, &storageMutationFault{413, "EntityTooLarge"}
+	}
 	var oldDigest string
 	var oldSize int64
 	e = tx.QueryRow(ctx, `SELECT sha256,size FROM neon_storage.objects WHERE bucket=$1 AND key=$2`, dstBucket, dstKey).Scan(&oldDigest, &oldSize)
@@ -137,7 +140,7 @@ func copyStorageObjectWithConditions(ctx context.Context, conn *pgx.Conn, projec
 	if e = tx.QueryRow(ctx, `SELECT count(*),COALESCE(sum(size),0)::bigint FROM neon_storage.objects`).Scan(&count, &total); e != nil {
 		return nil, e
 	}
-	if (oldDigest == "" && count >= 1000) || total-oldSize+size > storageBranchLimit {
+	if (oldDigest == "" && count >= 1000) || total-oldSize+size > storageBranchAdmissionLimit() {
 		return nil, &storageMutationFault{429, "QuotaExceeded"}
 	}
 	var modified time.Time

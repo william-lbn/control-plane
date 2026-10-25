@@ -106,7 +106,7 @@ func TestStorageLargeSchemaUpgradePreservesExistingObjectsAndPartBounds(t *testi
 		t.Fatal("large object upgrade removed the bounded part constraint")
 	}
 	var format int
-	if e := conn.QueryRow(ctx, `SELECT format_version FROM neon_storage.installations WHERE branch_id=$1`, p.BranchID).Scan(&format); e != nil || format != 5 {
+	if e := conn.QueryRow(ctx, `SELECT format_version FROM neon_storage.installations WHERE branch_id=$1`, p.BranchID).Scan(&format); e != nil || format != 6 {
 		t.Fatal("native format marker missing", e)
 	}
 	upgrade()

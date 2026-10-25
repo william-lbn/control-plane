@@ -65,7 +65,7 @@ func (s *server) objectStorageRead(w http.ResponseWriter, r *http.Request) {
 	item["s3_supported"] = []string{"ListBuckets", "CreateBucket", "DeleteBucket", "HeadBucket", "GetBucketLocation", "ListObjects", "ListObjectsV2", "Delimiter", "CopyObjectBasic", "PutObject", "GetObject", "HeadObject", "DeleteObject", "DeleteObjects", "PresignedGet", "PresignedPut", "BucketCORS", "UserMetadata", "CopyObjectMetadataReplace", "CopyObjectSourceConditions", "SignedChunksWithoutTrailers", "CreateMultipartUpload", "UploadPart", "UploadPartCopy", "CompleteMultipartUpload", "AbortMultipartUpload", "ListMultipartUploads", "ListParts", "MultipartDelimiter", "StreamedPutObject", "StreamedGetObject", "FullObjectSHA256", "FullObjectCRC64NVME", "StoredFullObjectChecksums", "PayloadChecksums", "ByteRanges", "BucketTagging", "ObjectTagging", "ReadOnlyACL", "ReadOnlyBucketPolicy", "StoredVersioningConfiguration", "StoredLifecycleConfiguration", "StoredObjectLockConfiguration", "PublicAccessBlock", "SelectedObjectAttributes", "AnonymousPublicRead", "BrowserPostPolicy", "SignedChecksumTrailers", "UnsignedChecksumTrailers", "ObjectResponseHeaders"}
 	item["multipart_administration_enabled"] = s.storage != nil
 	item["s3_missing"] = []string{"advanced_checksums", "historical_multipart_layout_backfill", "physical_gc"}
-	item["limits"] = record{"object_bytes": storageObjectLimit, "part_bytes": storagePartLimit, "branch_bytes": storageBranchLimit, "buckets": 32, "objects": 1000, "active_uploads": multipartActiveLimit, "parts_per_upload": multipartPartLimit, "multipart_minimum_nonfinal_part_bytes": multipartMinimumPart}
+	item["limits"] = record{"object_bytes": storageObjectAdmissionLimit(), "object_format_bytes": storageObjectFormatLimit, "part_bytes": storagePartLimit, "branch_bytes": storageBranchAdmissionLimit(), "buckets": 32, "objects": 1000, "active_uploads": multipartActiveLimit, "parts_per_upload": multipartPartLimit, "multipart_minimum_nonfinal_part_bytes": multipartMinimumPart}
 	w.Header().Set("ETag", fmt.Sprintf(`"%d"`, item["generation"].(int64)))
 	jsonResponse(w, 200, item)
 }
@@ -220,7 +220,8 @@ func storageAdmit(w http.ResponseWriter, r *http.Request) (*http.Request, func()
 		fail(w, r, 429, "storage_capacity_exhausted", "Object request concurrency exhausted")
 		return r, nil, false
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 150*time.Second)
+	storageTransferDeadlines(w)
+	ctx, cancel := context.WithTimeout(r.Context(), currentStorageCapacity().TransferTimeout)
 	return r.WithContext(ctx), func() { cancel(); <-objectStorageSlots }, true
 }
 func (s *server) storageFailure(w http.ResponseWriter, r *http.Request, err error) {
@@ -472,7 +473,7 @@ func (s *server) storageObjects(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 422, "invalid_content_type", "Valid Content-Type required")
 		return
 	}
-	data, err := readStoragePayload(r.Context(), r.Body, storageObjectLimit)
+	data, err := readStoragePayload(r.Context(), r.Body, storageObjectAdmissionLimit())
 	if err != nil {
 		s.storagePayloadFailure(w, r, err, false)
 		return
@@ -497,7 +498,7 @@ func (s *server) storageObjects(w http.ResponseWriter, r *http.Request) {
 		s.storageFailure(w, r, err)
 		return
 	}
-	if (previous == "" && count >= 1000) || total-oldSize+data.Size > storageBranchLimit {
+	if (previous == "" && count >= 1000) || total-oldSize+data.Size > storageBranchAdmissionLimit() {
 		fail(w, r, 409, "object_quota_exhausted", "Branch object quota exhausted")
 		return
 	}

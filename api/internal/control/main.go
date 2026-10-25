@@ -140,6 +140,9 @@ func runProcess(ctx context.Context, role processRole) error {
 	if !regexp.MustCompile(`^[a-z0-9./-]+@sha256:[a-f0-9]{64}$`).MatchString(vmComputeImage()) {
 		return errors.New("NEON_VM_COMPUTE_IMAGE must be an image pinned by sha256 digest")
 	}
+	if err := configureStorageCapacity(); err != nil {
+		return err
+	}
 	databaseURL := os.Getenv("NEON_V2_DATABASE_URL")
 	if databaseURL == "" {
 		return errors.New("NEON_V2_DATABASE_URL is required")

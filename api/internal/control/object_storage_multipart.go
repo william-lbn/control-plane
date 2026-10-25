@@ -92,7 +92,7 @@ func loadMultipart(ctx context.Context, tx pgx.Tx, p objectStoragePayload, princ
 }
 func (s *server) createMultipart(ctx context.Context, conn *pgx.Conn, p objectStoragePayload, principal, bucket, requestKey string, input multipartCreate) (multipartUpload, error) {
 	var u multipartUpload
-	if !validStorageKey(input.Key) || !storageBucketName.MatchString(bucket) || len(input.ContentType) > 256 || input.Size < -1 || input.Size > storageObjectLimit || (input.SHA256 != "" && !storageSHA256.MatchString(input.SHA256)) {
+	if !validStorageKey(input.Key) || !storageBucketName.MatchString(bucket) || len(input.ContentType) > 256 || input.Size < -1 || input.Size > storageObjectAdmissionLimit() || (input.SHA256 != "" && !storageSHA256.MatchString(input.SHA256)) {
 		return u, multipartFault(400, "InvalidArgument")
 	}
 	if input.ContentType == "" {
@@ -255,7 +255,7 @@ func (s *server) putMultipartPart(ctx context.Context, conn *pgx.Conn, p objectS
 	if e != nil && !fresh {
 		return part, e
 	}
-	if fresh && count >= multipartPartLimit || total-old+int64(len(data)) > storageObjectLimit {
+	if fresh && count >= multipartPartLimit || total-old+int64(len(data)) > storageObjectAdmissionLimit() {
 		return part, multipartFault(429, "QuotaExceeded")
 	}
 	var pending int64
@@ -263,7 +263,7 @@ func (s *server) putMultipartPart(ctx context.Context, conn *pgx.Conn, p objectS
 	if e != nil {
 		return part, e
 	}
-	if pending-old+int64(len(data)) > storageBranchLimit {
+	if pending-old+int64(len(data)) > storageBranchAdmissionLimit() {
 		return part, multipartFault(429, "QuotaExceeded")
 	}
 	part = multipartPart{Number: number, ETag: fmt.Sprintf("%x", sum), SHA256: fmt.Sprintf("%x", sha256.Sum256(data)), Size: int64(len(data)), blob: p.ProjectID + "/" + newID("part_")}
@@ -368,7 +368,7 @@ func (s *server) completeMultipart(ctx context.Context, conn *pgx.Conn, p object
 		size += part.Size
 		layout = append(layout, storageObjectPart{part.Number, part.Size, part.SHA256})
 	}
-	if size > storageObjectLimit {
+	if size > storageObjectAdmissionLimit() {
 		return u, multipartFault(413, "EntityTooLarge")
 	}
 	if u.ExpectedSize >= 0 && u.ExpectedSize != size {
@@ -388,7 +388,7 @@ func (s *server) completeMultipart(ctx context.Context, conn *pgx.Conn, p object
 	if e = tx.QueryRow(ctx, `SELECT count(*),COALESCE(sum(size),0)::bigint FROM neon_storage.objects`).Scan(&count, &total); e != nil {
 		return u, e
 	}
-	if old == "" && count >= 1000 || total-oldSize+size > storageBranchLimit {
+	if old == "" && count >= 1000 || total-oldSize+size > storageBranchAdmissionLimit() {
 		return u, multipartFault(429, "QuotaExceeded")
 	}
 	content, e := buildStoragePayload(ctx, size, func(dst io.Writer) error {

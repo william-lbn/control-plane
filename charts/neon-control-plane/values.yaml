@@ -4,6 +4,12 @@
 objectStorage:
   enabled: false
   existingSecret: ''
+  # Admission stays conservative until an operator provides a larger disk budget.
+  capacity:
+    objectBytes: 67108864
+    branchBytes: 268435456
+    bufferMiB: 256
+    transferSeconds: 150
   # Core S3 protocol preview: application credentials, never MinIO root keys.
   s3:
     enabled: false

@@ -159,5 +159,10 @@
   ],
   "performance_reliability_campaign": false,
   "capacity_validation": "5 GiB actual bytes deferred; implementation still missing",
-  "GitHub_run_state": "pending after this commit"
+  "GitHub_run_state": "success",
+  "GitHub_run_id": 40149882469,
+  "GitHub_run_url": "https://github.com/william-lbn/control-plane/actions/runs/40149882469",
+  "GitHub_source_commit": "ac13732e919670c8c085333dbf5eb4dce2944a81",
+  "GitHub_successful_jobs": 15,
+  "subsequent_capacity_delivery": "2026-10-25-storage-capacity-functional.json"
 }

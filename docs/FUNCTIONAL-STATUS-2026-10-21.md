@@ -4,7 +4,7 @@
 
 用户最新优先级：先完成所有业务功能；性能、压力、可靠性、分区、HA/DR、外部栅栏与长期环境认证转到其他环境。已有功能在来源/配置/依赖未变时复用原回执，只验证新增及受影响路径。权限、身份、数据保留和幂等是功能验收的一部分，继续执行。
 
-2026-10-25 补充：已通过的小对象/基础功能直接复用；大对象、大容量及不适合当前硬件的验证转到更合适的环境。准确区分“基础已验收”“代码完成但验证后置”“仍缺实现”，见 [环境后置清单](ENVIRONMENT-DEFERRED-VALIDATION.md)。当前存储仍为 64 MiB 合同，不能据此宣称 5 GiB 已实现。
+2026-10-25 补充：已通过的小对象/基础功能直接复用；大对象、大容量及不适合当前硬件的验证转到更合适的环境。准确区分“基础已验收”“代码完成但验证后置”“仍缺实现”，见 [环境后置清单](ENVIRONMENT-DEFERRED-VALIDATION.md)。当前准入仍为 64 MiB；[5 GiB 容量代码与基础检查](DELIVERY-2026-10-25-STORAGE-CAPACITY.md)已完成，5 GiB 全量字节验证后置。
 
 ## 已有基础验收的 18 组
 
@@ -36,7 +36,7 @@
 | ID | 业务组 | 实际缺口 |
 |---|---|---|
 | C02 | 目录/系统身份 | 默认/系统漂移、Backend 名称依赖；普通身份、继承、当前展示及有原证明的旧身份衔接已通过 |
-| S02 | 大对象/checksum | 64 MiB 流式、Range/UI 及五种完整对象 checksum 持久化已通过；5 GiB、multipart 扩展 checksum/COMPOSITE 协商仍缺 |
+| S02 | 大对象/checksum | 64 MiB 流式、Range/UI 及五种完整对象 checksum 持久化已通过；5 GiB 容量代码与基础检查已完成、全量字节验证后置；multipart 扩展 checksum/COMPOSITE 协商仍缺 |
 | S03 | 引用安全 GC | 分支/历史引用保护下的清理功能；只使用新建专用夹具验证，不删除历史业务字节 |
 | S05 | Storage gateway/用量 | 独立入口、授权/配额与可信用量；吞吐和容量压测后置 |
 | L02 | 原分支 reset/PITR | 备份、原地切换、失败回退和 UI |
@@ -105,3 +105,5 @@
 2026-10-25 CLI/MCP：[CLI 与官方 MCP SDK 双协议基线](DELIVERY-2026-10-25-CONTROL-CLIENTS.md)通过 15 组新增 Linux 功能检查和七个累计真实接口检查点；两组受影响路径复验，原 Go/Web/Helm 功能不重测。创建/读取/版本更新、原键回执、冲突/跨项目拒绝及撤销后即时拒绝通过；未执行 SQL 或启动 Compute，原保存查询摘要保持一致。离线运行包复用缓存，两个终态 QA Job 已归档退休。服务端仍为 API 0.86.0 / schema 067 / Core Helm 182；O03 账单接口与外部支付继续，容量/性能验证按既定边界后置。
 
 2026-10-25 存储校验：[CRC64NVME 与持久化完整对象校验](DELIVERY-2026-10-25-STORAGE-CHECKSUMS.md)通过五组新增、八组受影响 Go/PG/签名检查及四项真实 SDK 检查。五种完整校验值随对象事务保存，复制/覆盖、错误拒绝和读取通过；原六类存储清单、17 张目录表摘要一致。API/Worker 0.87.0 / Chart 0.9.84 / Core Helm 183 / schema 067 / 原生格式 5；旧对象校验保持未知，未回填历史字节。953 个原 Secret UID、9 PVC 和其他六套发行保留，VM 0。S02 的 5 GiB 和 multipart checksum/COMPOSITE 协商继续，容量/性能后置。
+
+2026-10-25 容量配置：[5 GiB 格式与运营配置](DELIVERY-2026-10-25-STORAGE-CAPACITY.md)通过七组新增 Go/PG、六组受影响检查、三组 Helm 和五个现场检查点。65 MiB 私有文件、5 GiB 元数据、64 位计数、预算/时限、默认超限拒绝及降低预算保留引用通过；5 GiB 全量字节验证后置。API/Worker 0.88.0 / Chart 0.9.85 / Core Helm 184 / schema 067 / 原生格式 6；当前仍保留 64 MiB 默认准入。原六类存储清单（含 checksum）、17 张目录表、953 Secret UID、9 PVC 和其他六套发行保留，VM 0；S02 的 multipart 扩展 checksum/COMPOSITE 协商继续。

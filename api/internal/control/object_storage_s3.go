@@ -88,8 +88,8 @@ func (s *server) s3Invoke(w http.ResponseWriter, r *http.Request) {
 	var data []byte
 	var payload *storagePayload
 	if s3StreamingObjectPUT(r) {
-		payload, e = buildStoragePayload(r.Context(), storageObjectLimit, func(dst io.Writer) error {
-			return signature.VerifyAndDecodeTo(r, r.Body, dst, storageSigningSecret(token), s3Region(), storageObjectLimit)
+		payload, e = buildStoragePayload(r.Context(), storageObjectAdmissionLimit(), func(dst io.Writer) error {
+			return signature.VerifyAndDecodeTo(r, r.Body, dst, storageSigningSecret(token), s3Region(), storageObjectAdmissionLimit())
 		})
 		if e != nil {
 			if errors.Is(e, s3protocol.ErrSignature) {
@@ -653,7 +653,7 @@ func (s *server) s3WritePayload(w http.ResponseWriter, r *http.Request, conn *pg
 			s3Error(w, r, 503, "ServiceUnavailable")
 			return false
 		}
-		if previous == "" && count >= 1000 || total-oldSize+data.Size > storageBranchLimit {
+		if previous == "" && count >= 1000 || total-oldSize+data.Size > storageBranchAdmissionLimit() {
 			s3Error(w, r, 429, "QuotaExceeded")
 			return false
 		}
