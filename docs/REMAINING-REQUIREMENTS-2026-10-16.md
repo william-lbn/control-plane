@@ -1,5 +1,6 @@
 # 剩余需求：源码核对与实施账本
 
+当前汇总更新至 2026-10-26：21 个固定基础组已验收，剩余六个业务组、O01/T01/O02 和五组后置专项。历史计数保留其原日期，当前状态以[功能清单](FUNCTIONAL-STATUS-2026-10-21.md)为准。
 ## 1. 核对基线
 
 审计基线为控制面 `b4ad4f4`，此前已交付 `63456a7`，最初增量 API/Worker、Web 0.48.0；并核对 Autoscaling `1720924` 和统一 Helm `648488a`，以及本地
@@ -46,7 +47,7 @@ website 文档快照 `c0d49cbb6979b2ce79ea502d62dbc40780a923b0`（提交时间
 | Q02 | 项目共享 SQL 历史 | 基础已实现并验收：逐条确认、密文引用、撤回、当前作者/读者授权、删除/到期失效、分页与多账号 UI | [共享合同](SHARED-SQL-HISTORY.md)与[当前交付](DELIVERY-2026-10-16-CURRENT.md)；不含外部公开链接/已复制内容召回 |
 | Q03 | SQL AI、计划比较/建议 | 计划比较、受控 Schema/SQL AI 草稿、真实本地模型与人工执行、计划建议通路已验收；AI 修错及个人加密名称/显式 AI 命名也已验收；默认自动命名/长期授权和建议准确性仍有扩展门槛 | [比较合同](SQL-PLAN-COMPARISON.md)、[助手合同](SQL-ASSISTANT.md)；模型建议准确性独立，[修错合同](SQL-AI-REPAIR.md)、[命名合同](SQL-HISTORY-NAMES.md)；默认自动授权/全自动命名另验 |
 | I01 | AI 动态供应商配置 UI | 明确 operator、密文/固定 UID 来源、原幂等操作、受限模型发现、显式别名发布、失败更新保留旧版、有效凭据更新、停用及实际 Console/本地模型基础已验收 | [合同](AI-PROVIDERS.md)及[交付](DELIVERY-2026-10-20-AI-PROVIDERS.md)；商业供应商正式输入、其他协议/预算和生产 TLS 独立继续 |
-| I02 | AI 原生协议/预算/持久状态 | 原生协议、预算/取消/对账、供应商发现、组织额度/BYOK、分支文件和持久响应/会话基线已验收 | [持久状态交付](DELIVERY-2026-10-25-AI-PROVIDER-STATE.md)；外部账单/支付仍与 O03 继续，不冒充商业供应商验收 |
+| I02 | AI 原生协议/预算/持久状态 | 原生协议、预算/取消/对账、供应商发现、组织额度/BYOK、分支文件、持久响应/会话及固定付款基线已验收 | [付款与原功能回执](DELIVERY-2026-10-26-BILLING.md)；商业商户/供应商认证后置，未宣称全部扩展协议 |
 | R01 | 严格 Guest 小数 CPU | QEMU 实际 250/500m 已验收；四倍预算保留 | Guest 隔离、公平性/计量；公开修复 runner 及统一锁待发行 |
 | R02 | 完整物理内存归还 | VM status 缩回已有；物理 RAM/OOM 未通过 | Guest/宿主联合采样、压力与 SQL/coldboot；硬件压力后置单列 |
 | X01 | 跨实例缩零栅栏 | 缺完整短连接 ledger / 外部 epoch fence | 多 API/Proxy、旧 Worker、分区、新连接/删除竞争；不能用 DB 租约代替 |
@@ -55,7 +56,7 @@ website 文档快照 `c0d49cbb6979b2ce79ea502d62dbc40780a923b0`（提交时间
 | T01 | 全链路可信 TLS | Auth→Proxy 有正反例；Functions 原实例管理叶自动续期已完成 TLS/PG/真实 Console/SQL 基础闭环；浏览器/元数据/Storage 等仍有例外 | [续期合同](FUNCTION-MANAGER-IDENTITY.md)及[交付](DELIVERY-2026-10-19-FUNCTION-MANAGER-IDENTITY.md)；根 CA 轮换、全链路本地 CA/IP SAN/verify-full 与网络策略继续，公网输入后置 |
 | O01 | 长期监控/告警/审计/预算 | UI 瞬时/基础指标已有；长期运营不全 | TSDB 保留、SLO/告警闭环、容量/错误预算和审计导出 |
 | O02 | 供应链消费策略与统一发行 | digest/source 锁已有；最新本地镜像尚未统一公开 | 同源发布、签名/SBOM/provenance 验证、版本锁/回滚和独立安装 |
-| O03 | 官网运营集成 | 自托管服务计划/配额与 CLI/MCP 固定基线已验收；计费/充值仍缺 | [CLI/MCP](DELIVERY-2026-10-25-CONTROL-CLIENTS.md)及[服务计划](DELIVERY-2026-10-25-SERVICE-PLANS.md)；账单接口继续，外部支付/正式运营输入另列 |
+| O03 | 官网运营集成 | 自托管服务计划/配额、CLI/MCP、固定 USD 预付账单、核验退款/争议和原订单恢复基线已验收 | [固定本地合同与验收](DELIVERY-2026-10-26-BILLING.md)；正式商户、税务和商业运营输入后置，订阅等扩展未提供 |
 
 ## 3. 实施和记录原则
 

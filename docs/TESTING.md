@@ -570,3 +570,7 @@ See [the branch email/recovery contract](AUTH-EMAIL-RECOVERY.md). The protected 
 `storage-large-objects.spec.ts` 使用既有数据分支、原存储数据库和新专用桶，验证 17 MiB UI/SDK 单次与 multipart、完整 SHA-256、Range、HEAD、CRC32C 拒绝、凭据清理和 Compute 归零。原子续传及 SDK 原操作检查点保存在 Linux 私有目录，不能盲目重发未知结果。见 [2026-10-22 有界大对象、Range 与 checksum](DELIVERY-2026-10-22-STORAGE-LARGE-OBJECTS.md)。
 
 `auth-factor-rebind.spec.ts` 使用专用物理父子分支，覆盖 MFA 迁移、原子结果、父子 Cookie/恢复码/SQL 登录隔离、验证器恢复、启停及最终归零。未知结果沿用原 Operation 与 Linux 私有检查点，不重建用户或迁移意图；只续跑未完成项。见 [2026-10-22 Auth 分支双重认证迁移](DELIVERY-2026-10-22-AUTH-FACTOR-MIGRATION.md)。
+
+## 2026-10-26 固定预付付款验收
+
+Linux 受保护 `billing.spec.ts` 串行七检查点；夹具仅允许新建 `ci-billing-` 组织、非 Live 私有协议服务和明确组织白名单。先保留原订单、请求键和支付方记录，再按原 checkpoint 续验；未知 POST 不重发。合成商户配置、签名密钥、收银台 URL 和原始私有日志不进入 Git。验收后撤回 API 配置，归档供应商状态再缩零自有服务，按 UID 退休终态 QA Job。参见 [合同](BILLING.md)与[回执](DELIVERY-2026-10-26-BILLING.md)。

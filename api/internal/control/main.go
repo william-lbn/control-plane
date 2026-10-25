@@ -44,6 +44,7 @@ type server struct {
 	aiProviders       *aiProviderSettings
 	consoleOIDC       *consoleOIDCSettings
 	platform          *platformPolicy
+	billing           *billingSettings
 	functionSlotsOnce sync.Once
 	functionSlots     chan struct{}
 }
@@ -220,6 +221,13 @@ func runProcess(ctx context.Context, role processRole) error {
 		}
 	}
 	if role != roleWorker {
+		s.billing, err = loadBillingSettings()
+		if err != nil {
+			return err
+		}
+		if s.billing != nil && (s.backendKeys == nil || len(s.idempotencyKey) < 32) {
+			return errors.New("billing requires versioned encryption and persistent receipt keys")
+		}
 		if err := s.bootstrapAdmin(ctx); err != nil {
 			return fmt.Errorf("admin bootstrap: %w", err)
 		}
@@ -229,6 +237,9 @@ func runProcess(ctx context.Context, role processRole) error {
 	}
 	processCtx, cancelProcess := context.WithCancel(ctx)
 	defer cancelProcess()
+	if role != roleWorker && s.billing != nil {
+		go s.runBilling(processCtx)
+	}
 	controllerDone := make(chan error, 1)
 	leadership := &controllerState{}
 	if role != roleAPI {

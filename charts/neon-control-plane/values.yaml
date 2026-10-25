@@ -19,6 +19,11 @@ objectStorage:
     serviceType: ClusterIP
     nodePort: 30893
 
+# Protected operator-provisioned config.json; API-only payment keys. Disabled by default.
+billing:
+  enabled: false
+  existingSecret: ''
+
 fullnameOverride: neon-control
 # Operator-provisioned OIDC clients; config.json is mounted only in the API.
 consoleSSO:

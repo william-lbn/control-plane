@@ -46,7 +46,9 @@ func (s *server) many(ctx context.Context, query string, args ...any) ([]record,
 }
 
 func (s *server) routes() *http.ServeMux {
+	// Provider-authenticated durable inbox; browser sessions cannot fund invoices.
 	mux := http.NewServeMux()
+	mux.HandleFunc("POST /webhooks/billing/stripe", s.billingWebhook)
 	mux.Handle("GET /api/v1/platform/ai-providers/capabilities", s.auth(http.HandlerFunc(s.aiProviderCapabilities), false))
 	mux.Handle("GET /api/v1/platform/ai-providers", s.auth(http.HandlerFunc(s.aiProviderRead), false))
 	mux.Handle("POST /api/v1/platform/ai-providers", s.auth(http.HandlerFunc(s.aiProviderDraft), true))
@@ -209,6 +211,17 @@ func (s *server) routes() *http.ServeMux {
 	mux.Handle("GET /api/v1/organizations/{org}/ai-provider-operations/{providerOperation}", s.auth(http.HandlerFunc(s.aiProviderOperation), false))
 	mux.Handle("POST /api/v1/organizations/{org}/ai-provider-operations/{providerOperation}/retry", s.auth(http.HandlerFunc(s.aiProviderRetry), true))
 	mux.Handle("GET /api/v1/organizations/{org}/ai-credits", s.auth(http.HandlerFunc(s.aiCreditRead), false))
+	mux.Handle("GET /api/v1/organizations/{org}/billing", s.auth(http.HandlerFunc(s.billingCatalog), false))
+	mux.Handle("POST /api/v1/organizations/{org}/billing/invoices", s.auth(http.HandlerFunc(s.billingCreateInvoice), true))
+	mux.Handle("GET /api/v1/organizations/{org}/billing/invoices", s.auth(http.HandlerFunc(s.billingReadInvoices), false))
+	mux.Handle("GET /api/v1/organizations/{org}/billing/invoices/{invoice}", s.auth(http.HandlerFunc(s.billingReadInvoices), false))
+	mux.Handle("POST /api/v1/organizations/{org}/billing/invoices/{invoice}/checkout", s.auth(http.HandlerFunc(s.billingQueueCheckout), true))
+	mux.Handle("GET /api/v1/organizations/{org}/billing/invoices/{invoice}/checkout", s.auth(http.HandlerFunc(s.billingCheckoutLink), false))
+	mux.Handle("GET /api/v1/platform/billing/organizations/{billingOrg}/invoices", s.auth(http.HandlerFunc(s.billingReadInvoices), false))
+	mux.Handle("GET /api/v1/platform/billing/organizations/{billingOrg}/invoices/{invoice}", s.auth(http.HandlerFunc(s.billingReadInvoices), false))
+	mux.Handle("POST /api/v1/platform/billing/organizations/{billingOrg}/invoices/{invoice}/reconcile", s.auth(http.HandlerFunc(s.billingReconcile), true))
+	mux.Handle("GET /api/v1/platform/billing/organizations/{billingOrg}/invoices/{invoice}/receipts", s.auth(http.HandlerFunc(s.billingReadReceipts), false))
+	mux.Handle("GET /api/v1/organizations/{org}/billing/invoices/{invoice}/receipts", s.auth(http.HandlerFunc(s.billingReadReceipts), false))
 	mux.Handle("GET /api/v1/service-plans", s.auth(http.HandlerFunc(s.servicePlanCatalog), false))
 	mux.Handle("GET /api/v1/service-plans/{servicePlan}", s.auth(http.HandlerFunc(s.servicePlanCatalog), false))
 	mux.Handle("GET /api/v1/platform/service-plans", s.auth(http.HandlerFunc(s.servicePlanCatalog), false))

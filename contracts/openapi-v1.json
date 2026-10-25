@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.89.0",
+    "version": "0.90.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -9292,6 +9292,427 @@
           "parts_count"
         ],
         "description": "Negotiated publication checksum. COMPOSITE hashes the concatenated raw selected part checksums and appends -partCount. COPY retains the original policy independently of its unknown multipart layout."
+      },
+      "BillingOffer": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^offer_[a-f0-9]{24}$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "amount_minor": {
+            "type": "integer",
+            "minimum": 50,
+            "maximum": 99999999
+          },
+          "credit_micros": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000000000
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "revision",
+          "amount_minor",
+          "credit_micros"
+        ]
+      },
+      "BillingCatalog": {
+        "type": "object",
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "currency": {
+            "enum": [
+              "USD"
+            ]
+          },
+          "offers": {
+            "type": "array",
+            "maxItems": 64,
+            "items": {
+              "$ref": "#/components/schemas/BillingOffer"
+            }
+          },
+          "credit_account_ready": {
+            "type": "boolean"
+          },
+          "can_manage": {
+            "type": "boolean"
+          },
+          "provider_mode": {
+            "enum": [
+              "disabled",
+              "synthetic",
+              "test",
+              "live"
+            ]
+          }
+        },
+        "required": [
+          "enabled",
+          "currency",
+          "offers",
+          "credit_account_ready",
+          "can_manage",
+          "provider_mode"
+        ]
+      },
+      "BillingInvoice": {
+        "type": "object",
+        "properties": {
+          "invoice_id": {
+            "type": "string"
+          },
+          "org_id": {
+            "type": "string"
+          },
+          "offer_id": {
+            "type": "string"
+          },
+          "offer_revision": {
+            "type": "string"
+          },
+          "offer_name": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "amount_minor": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "credit_micros": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "refunded_minor": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "dispute_minor": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "applied_credit_micros": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "paid": {
+            "type": "boolean"
+          },
+          "checkout_dispatched": {
+            "type": "boolean"
+          },
+          "can_retry_checkout": {
+            "type": "boolean"
+          },
+          "checkout_state": {
+            "enum": [
+              "open",
+              "dispatching",
+              "ready",
+              "uncertain",
+              "expired"
+            ]
+          },
+          "dispute_state": {
+            "type": "string",
+            "nullable": true
+          },
+          "checkout_expires_at": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": [
+          "invoice_id",
+          "org_id",
+          "offer_id",
+          "offer_revision",
+          "offer_name",
+          "currency",
+          "created_at",
+          "updated_at",
+          "amount_minor",
+          "credit_micros",
+          "version",
+          "refunded_minor",
+          "dispute_minor",
+          "applied_credit_micros",
+          "paid",
+          "checkout_dispatched",
+          "can_retry_checkout",
+          "checkout_state",
+          "dispute_state",
+          "checkout_expires_at"
+        ]
+      },
+      "BillingInvoiceList": {
+        "type": "object",
+        "properties": {
+          "org_id": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/BillingInvoice"
+            }
+          },
+          "next_cursor": {
+            "type": "string"
+          },
+          "limit": {
+            "const": 100
+          }
+        },
+        "required": [
+          "org_id",
+          "items",
+          "next_cursor",
+          "limit"
+        ]
+      },
+      "BillingInvoiceDetail": {
+        "type": "object",
+        "properties": {
+          "invoice": {
+            "$ref": "#/components/schemas/BillingInvoice"
+          }
+        },
+        "required": [
+          "invoice"
+        ]
+      },
+      "BillingCreateInvoiceInput": {
+        "type": "object",
+        "properties": {
+          "offer_id": {
+            "type": "string",
+            "pattern": "^offer_[a-f0-9]{24}$"
+          },
+          "offer_revision": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "offer_id",
+          "offer_revision"
+        ],
+        "additionalProperties": false
+      },
+      "BillingCheckoutInput": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000000000
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "additionalProperties": false
+      },
+      "BillingMutationReceipt": {
+        "type": "object",
+        "properties": {
+          "invoice_id": {
+            "type": "string"
+          },
+          "org_id": {
+            "type": "string"
+          },
+          "checkout_state": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "inbox_id": {
+            "type": "string"
+          },
+          "currency": {
+            "type": "string"
+          },
+          "amount_minor": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "credit_micros": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000000000
+          },
+          "offer_id": {
+            "type": "string"
+          },
+          "offer_revision": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "invoice_id",
+          "org_id"
+        ]
+      },
+      "BillingCheckoutLink": {
+        "type": "object",
+        "properties": {
+          "invoice_id": {
+            "type": "string"
+          },
+          "checkout_url": {
+            "type": "string",
+            "maxLength": 8192,
+            "format": "uri"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "invoice_id",
+          "checkout_url",
+          "expires_at"
+        ]
+      },
+      "BillingReconcileInput": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000000000
+          },
+          "object_type": {
+            "enum": [
+              "session",
+              "charge",
+              "dispute"
+            ]
+          },
+          "object_id": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 255
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 500
+          },
+          "evidence_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        },
+        "required": [
+          "version",
+          "object_type",
+          "object_id",
+          "reason",
+          "evidence_sha256"
+        ],
+        "additionalProperties": false
+      },
+      "BillingProviderReceipt": {
+        "type": "object",
+        "properties": {
+          "inbox_id": {
+            "type": "string"
+          },
+          "event_type": {
+            "type": "string"
+          },
+          "object_id": {
+            "type": "string"
+          },
+          "source_kind": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "attempts": {
+            "type": "integer"
+          },
+          "error_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "observation": {
+            "type": "array",
+            "items": {}
+          }
+        },
+        "required": [
+          "inbox_id",
+          "event_type",
+          "source_kind",
+          "state"
+        ]
+      },
+      "BillingReceiptList": {
+        "type": "object",
+        "properties": {
+          "invoice_id": {
+            "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/BillingProviderReceipt"
+            }
+          },
+          "limit": {
+            "const": 100
+          }
+        },
+        "required": [
+          "invoice_id",
+          "items",
+          "limit"
+        ]
       }
     },
     "responses": {
@@ -36425,6 +36846,856 @@
             "$ref": "#/components/responses/Error"
           },
           "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/{org}/billing": {
+      "get": {
+        "operationId": "getOrganizationBilling",
+        "summary": "getOrganizationBilling",
+        "tags": [
+          "Billing"
+        ],
+        "description": "Opt-in prepaid USD credit receipts. Current organization administrator session required; API keys cannot purchase. Fixed server-approved offer revision and original merchant identity are retained. Creating an invoice or checkout never issues credits. Signed events are durably accepted then reconciled by authenticated provider reads outside database transactions. Credits, refunds and disputes update the original immutable credit ledger atomically. Unknown checkout outcomes are recovered by original provider IDs, never by resending a payment request. Independent explicitly approved billing operator required for platform reconciliation. Test/synthetic credits require a bounded explicit organization allowlist. Commercial collection, tax and recurring subscriptions require separate operator inputs and are not implied.",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Original durable receipt or current organization billing state; sensitive links are no-store.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingCatalog"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/{org}/billing/invoices": {
+      "post": {
+        "operationId": "createOrganizationBillingInvoice",
+        "summary": "createOrganizationBillingInvoice",
+        "tags": [
+          "Billing"
+        ],
+        "description": "Opt-in prepaid USD credit receipts. Current organization administrator session required; API keys cannot purchase. Fixed server-approved offer revision and original merchant identity are retained. Creating an invoice or checkout never issues credits. Signed events are durably accepted then reconciled by authenticated provider reads outside database transactions. Credits, refunds and disputes update the original immutable credit ledger atomically. Unknown checkout outcomes are recovered by original provider IDs, never by resending a payment request. Independent explicitly approved billing operator required for platform reconciliation. Test/synthetic credits require a bounded explicit organization allowlist. Commercial collection, tax and recurring subscriptions require separate operator inputs and are not implied.",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Original durable receipt or current organization billing state; sensitive links are no-store.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingMutationReceipt"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BillingCreateInvoiceInput"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "listOrganizationBillingInvoices",
+        "summary": "listOrganizationBillingInvoices",
+        "tags": [
+          "Billing"
+        ],
+        "description": "Opt-in prepaid USD credit receipts. Current organization administrator session required; API keys cannot purchase. Fixed server-approved offer revision and original merchant identity are retained. Creating an invoice or checkout never issues credits. Signed events are durably accepted then reconciled by authenticated provider reads outside database transactions. Credits, refunds and disputes update the original immutable credit ledger atomically. Unknown checkout outcomes are recovered by original provider IDs, never by resending a payment request. Independent explicitly approved billing operator required for platform reconciliation. Test/synthetic credits require a bounded explicit organization allowlist. Commercial collection, tax and recurring subscriptions require separate operator inputs and are not implied.",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 344
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Original durable receipt or current organization billing state; sensitive links are no-store.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingInvoiceList"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/{org}/billing/invoices/{invoice}": {
+      "get": {
+        "operationId": "getOrganizationBillingInvoice",
+        "summary": "getOrganizationBillingInvoice",
+        "tags": [
+          "Billing"
+        ],
+        "description": "Opt-in prepaid USD credit receipts. Current organization administrator session required; API keys cannot purchase. Fixed server-approved offer revision and original merchant identity are retained. Creating an invoice or checkout never issues credits. Signed events are durably accepted then reconciled by authenticated provider reads outside database transactions. Credits, refunds and disputes update the original immutable credit ledger atomically. Unknown checkout outcomes are recovered by original provider IDs, never by resending a payment request. Independent explicitly approved billing operator required for platform reconciliation. Test/synthetic credits require a bounded explicit organization allowlist. Commercial collection, tax and recurring subscriptions require separate operator inputs and are not implied.",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "invoice",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Original durable receipt or current organization billing state; sensitive links are no-store.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingInvoiceDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/{org}/billing/invoices/{invoice}/checkout": {
+      "post": {
+        "operationId": "queueOriginalBillingCheckout",
+        "summary": "queueOriginalBillingCheckout",
+        "tags": [
+          "Billing"
+        ],
+        "description": "Opt-in prepaid USD credit receipts. Current organization administrator session required; API keys cannot purchase. Fixed server-approved offer revision and original merchant identity are retained. Creating an invoice or checkout never issues credits. Signed events are durably accepted then reconciled by authenticated provider reads outside database transactions. Credits, refunds and disputes update the original immutable credit ledger atomically. Unknown checkout outcomes are recovered by original provider IDs, never by resending a payment request. Independent explicitly approved billing operator required for platform reconciliation. Test/synthetic credits require a bounded explicit organization allowlist. Commercial collection, tax and recurring subscriptions require separate operator inputs and are not implied.",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "invoice",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Original durable receipt or current organization billing state; sensitive links are no-store.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingMutationReceipt"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BillingCheckoutInput"
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "operationId": "getOriginalBillingCheckoutLink",
+        "summary": "getOriginalBillingCheckoutLink",
+        "tags": [
+          "Billing"
+        ],
+        "description": "Opt-in prepaid USD credit receipts. Current organization administrator session required; API keys cannot purchase. Fixed server-approved offer revision and original merchant identity are retained. Creating an invoice or checkout never issues credits. Signed events are durably accepted then reconciled by authenticated provider reads outside database transactions. Credits, refunds and disputes update the original immutable credit ledger atomically. Unknown checkout outcomes are recovered by original provider IDs, never by resending a payment request. Independent explicitly approved billing operator required for platform reconciliation. Test/synthetic credits require a bounded explicit organization allowlist. Commercial collection, tax and recurring subscriptions require separate operator inputs and are not implied.",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "invoice",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Original durable receipt or current organization billing state; sensitive links are no-store.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingCheckoutLink"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/organizations/{org}/billing/invoices/{invoice}/receipts": {
+      "get": {
+        "operationId": "listOrganizationBillingReceipts",
+        "summary": "listOrganizationBillingReceipts",
+        "tags": [
+          "Billing"
+        ],
+        "description": "Opt-in prepaid USD credit receipts. Current organization administrator session required; API keys cannot purchase. Fixed server-approved offer revision and original merchant identity are retained. Creating an invoice or checkout never issues credits. Signed events are durably accepted then reconciled by authenticated provider reads outside database transactions. Credits, refunds and disputes update the original immutable credit ledger atomically. Unknown checkout outcomes are recovered by original provider IDs, never by resending a payment request. Independent explicitly approved billing operator required for platform reconciliation. Test/synthetic credits require a bounded explicit organization allowlist. Commercial collection, tax and recurring subscriptions require separate operator inputs and are not implied.",
+        "parameters": [
+          {
+            "name": "org",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "invoice",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Original durable receipt or current organization billing state; sensitive links are no-store.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingReceiptList"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/platform/billing/organizations/{billingOrg}/invoices": {
+      "get": {
+        "operationId": "listPlatformBillingInvoices",
+        "summary": "listPlatformBillingInvoices",
+        "tags": [
+          "Billing"
+        ],
+        "description": "Opt-in prepaid USD credit receipts. Current organization administrator session required; API keys cannot purchase. Fixed server-approved offer revision and original merchant identity are retained. Creating an invoice or checkout never issues credits. Signed events are durably accepted then reconciled by authenticated provider reads outside database transactions. Credits, refunds and disputes update the original immutable credit ledger atomically. Unknown checkout outcomes are recovered by original provider IDs, never by resending a payment request. Independent explicitly approved billing operator required for platform reconciliation. Test/synthetic credits require a bounded explicit organization allowlist. Commercial collection, tax and recurring subscriptions require separate operator inputs and are not implied. Platform operator and current organization scope are checked on every request.",
+        "parameters": [
+          {
+            "name": "billingOrg",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 344
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Original durable receipt or current organization billing state; sensitive links are no-store.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingInvoiceList"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/platform/billing/organizations/{billingOrg}/invoices/{invoice}": {
+      "get": {
+        "operationId": "getPlatformBillingInvoice",
+        "summary": "getPlatformBillingInvoice",
+        "tags": [
+          "Billing"
+        ],
+        "description": "Opt-in prepaid USD credit receipts. Current organization administrator session required; API keys cannot purchase. Fixed server-approved offer revision and original merchant identity are retained. Creating an invoice or checkout never issues credits. Signed events are durably accepted then reconciled by authenticated provider reads outside database transactions. Credits, refunds and disputes update the original immutable credit ledger atomically. Unknown checkout outcomes are recovered by original provider IDs, never by resending a payment request. Independent explicitly approved billing operator required for platform reconciliation. Test/synthetic credits require a bounded explicit organization allowlist. Commercial collection, tax and recurring subscriptions require separate operator inputs and are not implied. Platform operator and current organization scope are checked on every request.",
+        "parameters": [
+          {
+            "name": "billingOrg",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "invoice",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Original durable receipt or current organization billing state; sensitive links are no-store.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingInvoiceDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/platform/billing/organizations/{billingOrg}/invoices/{invoice}/reconcile": {
+      "post": {
+        "operationId": "reconcileOriginalBillingInvoice",
+        "summary": "reconcileOriginalBillingInvoice",
+        "tags": [
+          "Billing"
+        ],
+        "description": "Opt-in prepaid USD credit receipts. Current organization administrator session required; API keys cannot purchase. Fixed server-approved offer revision and original merchant identity are retained. Creating an invoice or checkout never issues credits. Signed events are durably accepted then reconciled by authenticated provider reads outside database transactions. Credits, refunds and disputes update the original immutable credit ledger atomically. Unknown checkout outcomes are recovered by original provider IDs, never by resending a payment request. Independent explicitly approved billing operator required for platform reconciliation. Test/synthetic credits require a bounded explicit organization allowlist. Commercial collection, tax and recurring subscriptions require separate operator inputs and are not implied. Platform operator and current organization scope are checked on every request.",
+        "parameters": [
+          {
+            "name": "billingOrg",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "invoice",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Original durable receipt or current organization billing state; sensitive links are no-store.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingMutationReceipt"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BillingReconcileInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/platform/billing/organizations/{billingOrg}/invoices/{invoice}/receipts": {
+      "get": {
+        "operationId": "listPlatformBillingReceipts",
+        "summary": "listPlatformBillingReceipts",
+        "tags": [
+          "Billing"
+        ],
+        "description": "Opt-in prepaid USD credit receipts. Current organization administrator session required; API keys cannot purchase. Fixed server-approved offer revision and original merchant identity are retained. Creating an invoice or checkout never issues credits. Signed events are durably accepted then reconciled by authenticated provider reads outside database transactions. Credits, refunds and disputes update the original immutable credit ledger atomically. Unknown checkout outcomes are recovered by original provider IDs, never by resending a payment request. Independent explicitly approved billing operator required for platform reconciliation. Test/synthetic credits require a bounded explicit organization allowlist. Commercial collection, tax and recurring subscriptions require separate operator inputs and are not implied. Platform operator and current organization scope are checked on every request.",
+        "parameters": [
+          {
+            "name": "billingOrg",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "invoice",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Original durable receipt or current organization billing state; sensitive links are no-store.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BillingReceiptList"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/webhooks/billing/stripe": {
+      "post": {
+        "operationId": "receiveStripeBillingEvent",
+        "summary": "Receive signed payment events",
+        "tags": [
+          "Billing"
+        ],
+        "description": "Raw original body up to 1 MiB; timestamped Stripe v1 HMAC required before JSON decoding. No Console session, API key or CSRF token is accepted as payment authority. Durable inbox insert precedes 202; duplicate original event returns 200; conflicting identity returns 409. This endpoint never grants credits directly.",
+        "security": [],
+        "parameters": [
+          {
+            "name": "Stripe-Signature",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 4096
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Original event already retained"
+          },
+          "202": {
+            "description": "Original signed event durably accepted"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error"
+          },
+          "415": {
             "$ref": "#/components/responses/Error"
           },
           "429": {

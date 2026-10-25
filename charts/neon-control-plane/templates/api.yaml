@@ -5,6 +5,9 @@
 {{- if and .Values.consoleSSO.enabled (not .Values.backendCredentials.enabled) }}
 {{- fail "consoleSSO requires backendCredentials.enabled and retained versioned encryption keys" }}
 {{- end }}
+{{- if and .Values.billing.enabled (not (and .Values.backendCredentials.enabled .Values.worker.enabled)) }}
+{{- fail "billing requires retained Backend encryption keys and a separated API/Worker" }}
+{{- end }}
 {{- if and .Values.aiProviderManagement.enabled (not (and .Values.aiGateway.enabled .Values.backendCredentials.enabled .Values.worker.enabled)) }}
 {{- fail "aiProviderManagement requires AI Gateway, versioned Backend keys and separated Worker" }}
 {{- end }}
@@ -68,6 +71,9 @@ spec:
             - {name: NEON_V2_BIND, value: ':8788'}
             - {name: NEON_V2_SQL_HISTORY_ENABLED, value: {{ .Values.sqlHistory.enabled | quote }}}
             - {name: NEON_V2_ADMIN_PASSWORD_FILE, value: /run/neon-secrets/admin-password}
+            {{- if .Values.billing.enabled }}
+            - {name: NEON_BILLING_CONFIG_FILE, value: /run/billing/config.json}
+            {{- end }}
             {{- if .Values.platformManagement.enabled }}
             - {name: NEON_PLATFORM_POLICY_FILE, value: /run/platform-policy/config.json}
             {{- end }}
@@ -87,6 +93,9 @@ spec:
             {{- include "neonControl.runtimeEnv" . | nindent 12 }}
             {{- include "neonControl.storageCapacityEnv" . | nindent 12 }}
           volumeMounts:
+            {{- if .Values.billing.enabled }}
+            - {name: billing, mountPath: /run/billing, readOnly: true}
+            {{- end }}
             {{- if .Values.platformManagement.enabled }}
             - {name: platform-policy, mountPath: /run/platform-policy, readOnly: true}
             {{- end }}
@@ -113,6 +122,13 @@ spec:
           readinessProbe: {httpGet: {path: /readyz, port: http}, periodSeconds: 10, timeoutSeconds: 4, failureThreshold: 3}
           livenessProbe: {httpGet: {path: /healthz, port: http}, periodSeconds: 15, timeoutSeconds: 3, failureThreshold: 3}
       volumes:
+        {{- if .Values.billing.enabled }}
+        - name: billing
+          secret:
+            secretName: {{ required "billing.existingSecret required" .Values.billing.existingSecret }}
+            defaultMode: 288
+            items: [{key: config.json, path: config.json}]
+        {{- end }}
         {{- if .Values.platformManagement.enabled }}
         - name: platform-policy
           configMap:

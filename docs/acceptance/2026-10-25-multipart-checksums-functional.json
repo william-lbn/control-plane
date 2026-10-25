@@ -209,5 +209,9 @@
   "first_failed_upgrade_assertion_retained": "comparison included new empty format7 columns; corrected to exclude only additions and explicitly verify their defaults; focused rerun passed",
   "credentials_exported": false,
   "performance_reliability_campaign": false,
-  "GitHub_run_state": "pending after this commit"
+  "GitHub_run_state": "success",
+  "GitHub_run_id": 40195484311,
+  "GitHub_run_url": "https://github.com/william-lbn/control-plane/actions/runs/40195484311",
+  "GitHub_source_commit": "af5e7044167c96faa71d74548d9ae87034cc6833",
+  "GitHub_successful_jobs": 15
 }
