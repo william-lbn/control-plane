@@ -1,0 +1,47 @@
+{
+  "date": "2026-10-25",
+  "scope": "控制面原VM资源计划v2与数据库reservation守卫前向修复；整体未完成",
+  "branch": "codex/dsga-control-plane-v3-20261020",
+  "PG": "d42638e089bc31965b94a6f49f1ea5fb5b738a6a",
+  "AS": "4460da5a69f11f09ec795fce5de04dd6797e2db6",
+  "maintenance": "b1fbd5ce106c5e4e8668585e83ca742601f0a62b全量合入，Neon/AS/双PG官方missing0",
+  "passed": {
+    "maintenance": "新增服务计划/策略5+受影响OpenAPI3+迁移注册1=9顶层/17含子项通过0skip，Webtsc exit0",
+    "fix": "受影响公开项目测试+新前向迁移+注册共13顶层/27含子项通过0skip。初轮12顶层/26含子项pass，旧迁移夹具1fail；仅该夹具修正后1pass替换，不重复其余",
+    "vet": "dsga-reservation-vm2-vet.log exit0"
+  },
+  "failure_records": [
+    "dsga-main031-native initial: DSGA公开接受/原凭据未知写恢复2fail；GoVM2与SQL只认1是此前已有组合缺陷，三相关源码相对HEAD字节一致，不归因新main",
+    "dsga-reservation-vm2-native:旧前向迁移夹具回退基础表却保留后继066标记，恢复061旧guard导致失败；修夹具依赖标记后单项通过"
+  ],
+  "actual_assertions": [
+    "旧061建立真实v1 reservation后执行新前向DDL，整行和xmin不变",
+    "旧原意图不能UPDATE成v2；新INSERTv1拒绝",
+    "真实v2新创建/重放/权限撤销/配额/原凭据未知/并发/原键互斥路径",
+    "直接SQL缺失/null/array资源对象或未知/缺失协议23514",
+    "旧迁移重放两次保留原幂等行/xmin/OID并从公开入口202接受"
+  ],
+  "changed_between_fix_runs": [
+    "api/internal/control/dsga_project_test.go"
+  ],
+  "production_ready": false,
+  "remaining_CODE": [
+    "完整Quiesce及关门事务结束",
+    "可信Prepare/Finalize/system outside/首次准入",
+    "Host/最终VM/公开worker/受控恢复"
+  ],
+  "not_run": [
+    "Linux K8s/RBAC/NeonVM/HugeTLB物理/性能",
+    "镜像构建、K8s准备或部署（排除）"
+  ],
+  "source_sha256": {
+    "api/internal/control/migrations/900000066_dsga_reservation_vm_v2.sql": "17008c666ad60c69e1c3496bf93fea7681ee4eaaeb342590ff605950cc58a62d",
+    "api/internal/control/dsga_reservation_vm_v2_test.go": "325c15cc60e30d6201849da8537e4e51720a218ecea035c690fe3dc7a99ccae6",
+    "api/internal/control/dsga_project_test.go": "0bd9f954fde990005627e524e57066c6ab67c8dc083ed46823947ba8b57cef02",
+    "api/internal/control/dsga_vm.go": "b5713a455adcdaf010f41148d766fb25d1567f9189313023d938f0b43edf1c92",
+    "api/internal/control/dsga_project_reservation.go": "a86e2b0aa3ea88354ddca77bfd84617e6b4040969d4567c209ce40039b652082",
+    "api/internal/control/migrations/900000061_dsga_creation_reservations.sql": "ebd4e04a829dd20a12eb954da570fe80598d3c523c106695c00fb6534cd59280",
+    "api/go.mod": "0cb1da554eec80a9ff93b49cba5f92e54199bea4f67d1d37f4d64b9643f1f451",
+    "api/go.sum": "9b43d85c522a967ccd08d1087b0dc30855449f0c7eadc217ce6f9a1a1bafaffb"
+  }
+}

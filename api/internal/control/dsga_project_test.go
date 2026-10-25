@@ -326,7 +326,10 @@ func TestDSGAProjectReservationForwardMigrationPreservesLegacyKey(t *testing.T) 
 	f.exec(`DROP TRIGGER dsga_reserved_idempotency_guard ON idempotency_keys;
  DROP FUNCTION guard_dsga_reserved_idempotency(); DROP TABLE dsga_creation_reservations;
  DROP FUNCTION guard_dsga_creation_reservation(); DROP FUNCTION dsga_lock_creation_key(text,text);
- DELETE FROM schema_migrations WHERE version=900000061`)
+ -- 本夹具回退到reservation表创建之前；依赖它替换守卫的前向迁移也尚不存在。
+ -- 不能留下900000066已执行标记，却让重放061把新守卫换回旧v1，这不是有效的
+ -- 已发布数据库快照。实际迁移DDL及标记同事务提交，不存在该半回退状态。
+ DELETE FROM schema_migrations WHERE version IN (900000061,900000066)`)
 	if err := migrate(f.ctx, f.s.db); err != nil {
 		t.Fatal(err)
 	}
