@@ -158,7 +158,7 @@ func (s *server) s3BrowserPost(w http.ResponseWriter, r *http.Request) bool {
 				return true
 			}
 			status, _ = strconv.Atoi(value)
-		case "content-type", "content-disposition", "cache-control", "content-md5", "x-amz-checksum-sha256", "x-amz-checksum-sha1", "x-amz-checksum-crc32", "x-amz-checksum-crc32c", "x-amz-sdk-checksum-algorithm":
+		case "content-type", "content-disposition", "cache-control", "content-md5", "x-amz-checksum-sha256", "x-amz-checksum-sha1", "x-amz-checksum-crc32", "x-amz-checksum-crc32c", "x-amz-checksum-crc64nvme", "x-amz-sdk-checksum-algorithm":
 			headers.Set(name, value)
 		case "acl":
 			if value != "private" {

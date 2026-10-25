@@ -9,6 +9,8 @@ import (
 	"encoding/hex"
 	"hash"
 	"hash/crc32"
+
+	"github.com/minio/crc64nvme"
 	"io"
 	"net/http"
 	"strconv"
@@ -46,6 +48,8 @@ func (s Signature) decodeTrailerChunksTo(r *http.Request, source io.Reader, dest
 		checksum = crc32.NewIEEE()
 	case "x-amz-checksum-crc32c":
 		checksum = crc32.New(crc32.MakeTable(crc32.Castagnoli))
+	case "x-amz-checksum-crc64nvme":
+		checksum = crc64nvme.New()
 	default:
 		return ErrSignature
 	}

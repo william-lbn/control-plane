@@ -94,15 +94,18 @@ func copyStorageObjectWithConditions(ctx context.Context, conn *pgx.Conn, projec
 		return nil, &storageMutationFault{404, "NoSuchBucket"}
 	}
 	var blob, digest, contentType string
-	var metadata, responseHeaders map[string]string
+	var metadata, responseHeaders, checksums map[string]string
 	var tags []storageTag
 	var size int64
 	var sourceModified time.Time
-	if e = tx.QueryRow(ctx, `SELECT blob_key,sha256,size,content_type,metadata,updated_at,tags,response_headers FROM neon_storage.objects WHERE bucket=$1 AND key=$2`, srcBucket, srcKey).Scan(&blob, &digest, &size, &contentType, &metadata, &sourceModified, &tags, &responseHeaders); e != nil {
+	if e = tx.QueryRow(ctx, `SELECT blob_key,sha256,size,content_type,metadata,updated_at,tags,response_headers,checksums FROM neon_storage.objects WHERE bucket=$1 AND key=$2`, srcBucket, srcKey).Scan(&blob, &digest, &size, &contentType, &metadata, &sourceModified, &tags, &responseHeaders, &checksums); e != nil {
 		if errors.Is(e, pgx.ErrNoRows) {
 			return nil, &storageMutationFault{404, "NoSuchKey"}
 		}
 		return nil, e
+	}
+	if _, e = storageStoredChecksums(digest, checksums); e != nil {
+		return nil, &storageMutationFault{503, "ServiceUnavailable"}
 	}
 	if !strings.HasPrefix(blob, project+"/") {
 		return nil, &storageMutationFault{409, "ObjectIdentityMismatch"}
@@ -138,8 +141,8 @@ func copyStorageObjectWithConditions(ctx context.Context, conn *pgx.Conn, projec
 		return nil, &storageMutationFault{429, "QuotaExceeded"}
 	}
 	var modified time.Time
-	e = tx.QueryRow(ctx, `INSERT INTO neon_storage.objects(bucket,key,blob_key,sha256,size,content_type,metadata,tags,response_headers) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)
- ON CONFLICT(bucket,key) DO UPDATE SET blob_key=$3,sha256=$4,size=$5,content_type=$6,metadata=$7,tags=$8,response_headers=$9,part_layout='[]'::jsonb,updated_at=now() RETURNING updated_at`, dstBucket, dstKey, blob, digest, size, contentType, metadata, tags, responseHeaders).Scan(&modified)
+	e = tx.QueryRow(ctx, `INSERT INTO neon_storage.objects(bucket,key,blob_key,sha256,size,content_type,metadata,tags,response_headers,checksums) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+ ON CONFLICT(bucket,key) DO UPDATE SET blob_key=$3,sha256=$4,size=$5,content_type=$6,metadata=$7,tags=$8,response_headers=$9,checksums=$10,part_layout='[]'::jsonb,updated_at=now() RETURNING updated_at`, dstBucket, dstKey, blob, digest, size, contentType, metadata, tags, responseHeaders, checksums).Scan(&modified)
 	if e != nil {
 		return nil, e
 	}

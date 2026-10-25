@@ -36,7 +36,7 @@
 | ID | 业务组 | 实际缺口 |
 |---|---|---|
 | C02 | 目录/系统身份 | 默认/系统漂移、Backend 名称依赖；普通身份、继承、当前展示及有原证明的旧身份衔接已通过 |
-| S02 | 大对象/checksum | 64 MiB 流式、Range/基础 checksum 与 UI 已通过；5 GiB、完整扩展 checksum 等仍缺 |
+| S02 | 大对象/checksum | 64 MiB 流式、Range/UI 及五种完整对象 checksum 持久化已通过；5 GiB、multipart 扩展 checksum/COMPOSITE 协商仍缺 |
 | S03 | 引用安全 GC | 分支/历史引用保护下的清理功能；只使用新建专用夹具验证，不删除历史业务字节 |
 | S05 | Storage gateway/用量 | 独立入口、授权/配额与可信用量；吞吐和容量压测后置 |
 | L02 | 原分支 reset/PITR | 备份、原地切换、失败回退和 UI |
@@ -103,3 +103,5 @@
 2026-10-25 服务计划：[自托管服务计划与组织配额](DELIVERY-2026-10-25-SERVICE-PLANS.md)通过五组新增 Go/PG、三组受影响 OpenAPI、三组 Helm 和九个累计实机检查点；复用前五项，仅续验余项。不可变修订、原回执、真实准入/超额拒绝、降级原子性、禁用和恢复原配额通过。API/Worker 0.86.0，Web 重建，schema 067 / Chart 0.9.83 / Core Helm 182；原目录、36 个旧组织配额、947 个持久 Secret UID、9 PVC 和另外六套发行配置保留，最终三节点/三个 Safekeeper Ready，VM 0。临时平台审批已撤回。CLI/MCP、账单接口及其余业务继续；大对象/高容量验证按用户要求后置并单列实现缺口。
 
 2026-10-25 CLI/MCP：[CLI 与官方 MCP SDK 双协议基线](DELIVERY-2026-10-25-CONTROL-CLIENTS.md)通过 15 组新增 Linux 功能检查和七个累计真实接口检查点；两组受影响路径复验，原 Go/Web/Helm 功能不重测。创建/读取/版本更新、原键回执、冲突/跨项目拒绝及撤销后即时拒绝通过；未执行 SQL 或启动 Compute，原保存查询摘要保持一致。离线运行包复用缓存，两个终态 QA Job 已归档退休。服务端仍为 API 0.86.0 / schema 067 / Core Helm 182；O03 账单接口与外部支付继续，容量/性能验证按既定边界后置。
+
+2026-10-25 存储校验：[CRC64NVME 与持久化完整对象校验](DELIVERY-2026-10-25-STORAGE-CHECKSUMS.md)通过五组新增、八组受影响 Go/PG/签名检查及四项真实 SDK 检查。五种完整校验值随对象事务保存，复制/覆盖、错误拒绝和读取通过；原六类存储清单、17 张目录表摘要一致。API/Worker 0.87.0 / Chart 0.9.84 / Core Helm 183 / schema 067 / 原生格式 5；旧对象校验保持未知，未回填历史字节。953 个原 Secret UID、9 PVC 和其他六套发行保留，VM 0。S02 的 5 GiB 和 multipart checksum/COMPOSITE 协商继续，容量/性能后置。
