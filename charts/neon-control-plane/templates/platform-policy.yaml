@@ -1,0 +1,16 @@
+{{- if .Values.platformManagement.enabled }}
+{{- if not .Values.platformManagement.operatorIds }}
+{{- fail "platformManagement requires explicitly approved operatorIds" }}
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "neonControl.platformPolicyName" . }}
+  annotations:
+    helm.sh/resource-policy: keep
+  labels:
+    {{- include "neonControl.labels" . | nindent 4 }}
+immutable: true
+data:
+  config.json: {{ include "neonControl.platformPolicy" . | quote }}
+{{- end }}

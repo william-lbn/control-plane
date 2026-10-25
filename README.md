@@ -7,7 +7,9 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 
 功能进度与当前优先级见 [已验收/剩余清单](docs/FUNCTIONAL-STATUS-2026-10-21.md)：18 组基础已有回执；五组专项后置，12 组尚未整体闭环。后续优先业务功能，复用来源未变的既有验收。
 
-最新状态：2026-10-25 AI 持久状态：[供应商响应与会话](docs/DELIVERY-2026-10-25-AI-PROVIDER-STATE.md)通过 15 组新增 Go/PG、4 组受影响检查和 6 个累计实机检查点；复用前三项和原已完成 SSE，未重复推理。原生 JSON/SSE、响应续接、会话/条目、不可变加密引用及未知结果核对通过。API/Worker/AI 0.85.0，Web 重建，schema 066 / Chart 0.9.82 / Core Helm 180；原 17 张目录表、946 个持久 Secret UID、9 PVC 和另外六套发行配置保留，最终三节点/三个 Safekeeper Ready，VM 0。临时配置已撤下、合成服务归档后缩零。I02 外部账单/支付及其他业务继续；性能、可靠性后置。
+最新状态：2026-10-25 服务计划：[自托管服务计划与组织配额](docs/DELIVERY-2026-10-25-SERVICE-PLANS.md)通过五组新增 Go/PG、三组受影响 OpenAPI、三组 Helm 和九个累计实机检查点；复用前五项，仅续验余项。不可变修订、原回执、真实准入/超额拒绝、降级原子性、禁用和恢复原配额通过。API/Worker 0.86.0，Web 重建，schema 067 / Chart 0.9.83 / Core Helm 182；原目录、36 个旧组织配额、947 个持久 Secret UID、9 PVC 和另外六套发行配置保留，最终三节点/三个 Safekeeper Ready，VM 0。临时平台审批已撤回。CLI/MCP、账单接口及其余业务继续；大对象/高容量验证按用户要求后置并单列实现缺口。
+
+此前状态：2026-10-25 AI 持久状态：[供应商响应与会话](docs/DELIVERY-2026-10-25-AI-PROVIDER-STATE.md)通过 15 组新增 Go/PG、4 组受影响检查和 6 个累计实机检查点；复用前三项和原已完成 SSE，未重复推理。原生 JSON/SSE、响应续接、会话/条目、不可变加密引用及未知结果核对通过。API/Worker/AI 0.85.0，Web 重建，schema 066 / Chart 0.9.82 / Core Helm 180；原 17 张目录表、946 个持久 Secret UID、9 PVC 和另外六套发行配置保留，最终三节点/三个 Safekeeper Ready，VM 0。临时配置已撤下、合成服务归档后缩零。I02 外部账单/支付及其他业务继续；性能、可靠性后置。
 
 此前状态：2026-10-25 Auth 生命周期：[保留删除、恢复与身份一致性](docs/DELIVERY-2026-10-25-AUTH-LIFECYCLE.md)通过两组新增 Go 和八个累计实机检查点；前四项与原 Cookie 保留后只续验余项。恢复后 Auth 保持关闭，显式新代次拒绝旧会话/JWKS 并保留原账号、密码和 SQL 数据。复用 0.84 镜像，Core Helm 178 / schema 065 不变；原目录、945 个续验前持久 Secret UID 和 9 PVC 保留，三节点、三个 Safekeeper Ready，VM 0。A05 保留生命周期基线完成；当前 18 组基础、9 个业务和 3 个其他组继续。
 

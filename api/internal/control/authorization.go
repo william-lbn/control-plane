@@ -154,6 +154,8 @@ func (s *server) authorizeRoute(w http.ResponseWriter, r *http.Request, u user) 
 		a.OrganizationID = org
 		a.Level = roleLevel(a.OrganizationRole)
 		switch {
+		case strings.HasSuffix(r.URL.Path, "/service-plan"):
+			required = 3 // Organization entitlements and aggregate usage are administrative data.
 		case strings.HasSuffix(r.URL.Path, "/sso/link") || strings.Contains(r.URL.Path, "/sso/bindings/"):
 			required = 0 // Existing members may link/revoke only their own identity.
 		case strings.HasSuffix(r.URL.Path, "/projects") && r.Method == http.MethodGet:

@@ -1,0 +1,162 @@
+{
+  "basic_accepted_groups": [
+    "F01",
+    "F02",
+    "F03",
+    "F04",
+    "F05",
+    "S01",
+    "A01",
+    "C01",
+    "L01",
+    "Q01",
+    "Q02",
+    "Q03",
+    "I01",
+    "A04",
+    "S04",
+    "A02",
+    "A03",
+    "A05"
+  ],
+  "remaining_business_groups": [
+    "C02",
+    "S02",
+    "S03",
+    "S05",
+    "L02",
+    "L03",
+    "F06",
+    "I02",
+    "O03"
+  ],
+  "remaining_other_groups": [
+    "O01",
+    "T01",
+    "O02"
+  ],
+  "deferred_groups": [
+    "R01",
+    "R02",
+    "X01",
+    "H01",
+    "H02"
+  ],
+  "frozen_migrations": {
+    "058": "ef77ef8aa674bba9f5a75750d944ba3bb297d988b8aa9a689c1ad99dccdaf282",
+    "059": "48de708734444ab625c3955510dd28c66e772e9f536ecb2b32b10f4de7986fce",
+    "060": "f058d1417b0eb6cb72e4229777ada1248f9738c798b1fcb3664e3fb7f048d53b",
+    "061": "e8bf3d9cbce1e6d22c6a61f0e101d7ad9164aa0581be8d1bc0b2d0449fdaa4ac",
+    "062": "c7e7b0abae640799c0afc5b471c08ff043c730409d7a2edfdc6d0d20b90299a7",
+    "063": "9ddc0b968d693631ac4066f589e9f99d6741c8724d29bea4e00a02ebec5e107c",
+    "064": "3b4878bfd9506b74778e78ac67a569bfa430d8b8757d067531776635a5a69e1a",
+    "065": "b24d7ccb858a66a1a2bc42541bca9e8d53136f84c3fb5dc4f3bc263c7f1792f0",
+    "066": "253b62fd88b2a619dd4a06646fb0f2531eb4d49b0cbca7fdc8a9dbc627e55489",
+    "067": "fb5ec4e9082cdfa144cc7859ccd81c5b88a4398b8dfa8bef61cf417fa897f8c3"
+  },
+  "result": "pass",
+  "recorded_on": "2026-10-25",
+  "live_finished_at": "2026-10-24T23:32:29.101511+00:00",
+  "O03_service_plans_baseline_complete": true,
+  "O03_whole_group_complete": false,
+  "O03_remaining": [
+    "CLI/MCP",
+    "billing interface and external payment integration"
+  ],
+  "whole_product_complete": false,
+  "production_qualified": false,
+  "api_version": "0.86.0",
+  "chart_version": "0.9.83",
+  "application_auth_protocol": "0.28.0",
+  "native_storage_format": 4,
+  "schema": 67,
+  "helm_revision": 182,
+  "source_parent_revision": "4d86357d98e5b49b605462d1fefc027b1008468f",
+  "parent_revision_is_deployed_source": false,
+  "runtime_source_sha256": "d2158f6caf69f96061ab2b997c87a070635c0a16d7cd8122ade965da469e15bf",
+  "source_archive_sha256": "22b08d9dccebe0e82d9720c63600d279b0c3eb03371f0eb720b58aa8f2d95f74",
+  "source_proof": {
+    "matched_build_inputs": 908,
+    "compiled_Go_SQL_inputs": 519,
+    "checked_test_only_override": {
+      "sha256": "126db645474e20f5b895b15a80536f0c8997096aa3190e313e3e4893c80c1013",
+      "path": "web/e2e/service-plans.spec.ts",
+      "runtime_changes": false
+    },
+    "source_sha256": "d2158f6caf69f96061ab2b997c87a070635c0a16d7cd8122ade965da469e15bf",
+    "source_archive_sha256": "22b08d9dccebe0e82d9720c63600d279b0c3eb03371f0eb720b58aa8f2d95f74"
+  },
+  "new_Go_functional_groups": 5,
+  "new_Go_pure_groups": 1,
+  "new_Go_PostgreSQL_groups": 4,
+  "affected_OpenAPI_groups": 3,
+  "new_Helm_groups": 3,
+  "typescript": "pass",
+  "vite": "pass",
+  "live_functional_unique_checkpoints": [
+    "new_owned_scope_and_unchanged_original_limits",
+    "GUI_lost_creation_reply_replays_exact_original_receipt",
+    "GUI_assignment_and_first_real_project_admitted",
+    "project_and_Reader_quota_denied_without_new_operations",
+    "GUI_publish_new_revision_preserves_existing_entitlement",
+    "GUI_explicit_revision_switch_admits_Reader",
+    "GUI_downgrade_below_actual_usage_rejected_atomically",
+    "GUI_disable_preserves_assigned_revision_and_denies_new_assignment",
+    "owned_cleanup_and_original_limits_restored"
+  ],
+  "prior_five_checkpoints_reused": true,
+  "Reader_original_operation_id": "op_b40ae98b25eb3f999af41265",
+  "Reader_same_VM_UID_after_single_explicit_retry": true,
+  "failed_attempts_preserved": true,
+  "automatic_mutation_retries": false,
+  "synthetic_fixture_only": true,
+  "commercial_payment_processing": false,
+  "temporary_platform_approval_withdrawn": true,
+  "immutable_approval_policy_UID_retained": true,
+  "owned_original_limits_restored": [
+    50,
+    200
+  ],
+  "owned_assignment_history_rows": 3,
+  "old_organizations_quotas_unchanged": 36,
+  "old_catalog_tables_unchanged": 17,
+  "old_Auth_generations_retained": 8,
+  "PVC_UIDs_retained": 9,
+  "original_persistent_Secret_UIDs_retained": 947,
+  "final_persistent_Secret_count": 953,
+  "other_Helm_releases_unchanged": 6,
+  "old_bootstrap_proofs_retained": 145,
+  "new_owned_bootstrap_proofs": 2,
+  "owned_terminal_QA_jobs_archived_and_retired": 7,
+  "nodes_ready": 3,
+  "safekeepers_ready": 3,
+  "critical_data_components_ready": 7,
+  "Compute": 0,
+  "VM": 0,
+  "nonretired_functions": 0,
+  "credentials_exported": false,
+  "performance_reliability_campaign": false,
+  "capacity_validation_policy": "ENVIRONMENT-DEFERRED-VALIDATION.md",
+  "images": {
+    "api": {
+      "reference": "neon.local/control-api@sha256:25bbf24fa495c5b03ec9c80c42ca885ec3bab436ac39572e16b64243d10a90d4",
+      "digest": "sha256:25bbf24fa495c5b03ec9c80c42ca885ec3bab436ac39572e16b64243d10a90d4"
+    },
+    "web": {
+      "reference": "neon.local/control-web@sha256:905b8b258982d2f323b145a7fa6f938806671c1387d886b36d646ec960e22a04",
+      "digest": "sha256:905b8b258982d2f323b145a7fa6f938806671c1387d886b36d646ec960e22a04"
+    },
+    "auth": {
+      "reference": "neon.local/control-auth@sha256:274c8267696aa0b7ba24bd0036ea9fac6cb94d582b976edcb51096f1c334c966",
+      "digest": "sha256:274c8267696aa0b7ba24bd0036ea9fac6cb94d582b976edcb51096f1c334c966"
+    },
+    "ai": {
+      "reference": "neon.local/control-ai@sha256:da5a59732ee8f68c77c3620d1f1e8fde5170032f13251342eb1f45f289bd7a29",
+      "digest": "sha256:da5a59732ee8f68c77c3620d1f1e8fde5170032f13251342eb1f45f289bd7a29"
+    },
+    "e2e": {
+      "reference": "neon.local/public-control-e2e@sha256:9ed0f4030d7af2ffa86e4fa6bf6bedcc348bbc50d3d58cf354880ae9580570f0",
+      "digest": "sha256:9ed0f4030d7af2ffa86e4fa6bf6bedcc348bbc50d3d58cf354880ae9580570f0"
+    }
+  }
+}

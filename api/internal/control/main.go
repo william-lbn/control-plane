@@ -43,6 +43,7 @@ type server struct {
 	ai                *aigateway.Config
 	aiProviders       *aiProviderSettings
 	consoleOIDC       *consoleOIDCSettings
+	platform          *platformPolicy
 	functionSlotsOnce sync.Once
 	functionSlots     chan struct{}
 }
@@ -177,6 +178,10 @@ func runProcess(ctx context.Context, role processRole) error {
 		return err
 	}
 	if role != roleWorker {
+		s.platform, err = loadPlatformPolicy()
+		if err != nil {
+			return err
+		}
 		s.consoleOIDC, err = loadConsoleOIDCSettings(s.secureCookies)
 		if err != nil {
 			return err

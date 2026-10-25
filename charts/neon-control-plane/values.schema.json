@@ -294,7 +294,10 @@
         "pgServerName"
       ],
       "properties": {
-        "integrationsSecret": {"type":"string","pattern":"^$|^[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?$"},
+        "integrationsSecret": {
+          "type": "string",
+          "pattern": "^$|^[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?$"
+        },
         "enabled": {
           "type": "boolean"
         },
@@ -758,6 +761,56 @@
         }
       },
       "additionalProperties": false
+    },
+    "platformManagement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "operatorIds",
+        "allowedOrganizations"
+      ],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "operatorIds": {
+          "type": "array",
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]{1,128}$"
+          }
+        },
+        "allowedOrganizations": {
+          "type": "array",
+          "maxItems": 128,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]{1,128}$"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "operatorIds": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
     }
   },
   "definitions": {
