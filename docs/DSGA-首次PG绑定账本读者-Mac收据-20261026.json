@@ -1,0 +1,36 @@
+{
+  "created_at": "2026-10-25T19:32:40.568717+00:00",
+  "branch": "codex/dsga-control-plane-v3-20261020",
+  "as_commit": "da2aa56a1efaf6241ebf85c7814542e41e757a66",
+  "pseudo": "v0.0.0-20261025192811-da2aa56a1efa",
+  "OriginHash": "da2aa56a1efaf6241ebf85c7814542e41e757a66",
+  "sum_delta": 2,
+  "validation": {
+    "reader_race_pass": 1,
+    "failed": 0,
+    "skip": 0,
+    "initial_setup_failure": "newtestlibraryneeded extra x/textsum; replacedwithstandardtesting, no extradependency; initialsource/log retained",
+    "readonly_vet_exit": 0,
+    "models": "actualdedicatedTLSbroker/typedStore/CAS; KubeTokenReviewfixtures; noPG or fullbudget claim"
+  },
+  "source_sha256": {
+    "repos/control-plane/api/go.mod": "356ecb3e0832d18c11968b401e4b9f2f4c6884d9ecd3b5f672335177d3c8880b",
+    "repos/control-plane/api/go.sum": "951c48c4b6263479d4e3187812b8acc613ef64780330a6ac61bf294fada7cc59",
+    "repos/control-plane/api/internal/control/dsga_pg_binding_test.go": "a095d5b4b4bdbee74e8cf2bbf3f73c6e926e091cadf252e9b552aaf412492a43",
+    "repos/control-plane/docs/DSGA-首次PG绑定账本读者-Mac验收-20261026.md": "1ae6c90874f0904b838f7073c7b753ecde6893945e980078048b71c23e1737a6"
+  },
+  "log_and_recipe_sha256": {
+    "build/dsga-pg-first-binding-cp-module.json": "840f8d10e1ef0057848c082830a84d6f907be33456c3580695a8cc9b97d7f248",
+    "build/dsga-pg-first-binding-cp-module.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "build/dsga-pg-first-binding-cp-vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "build/dsga-pg-first-binding-cp-reader.jsonl": "45e793b20d0798a8adbf968d4c4d06e4882783536693173f19b97a7f50664a48",
+    "build/dsga-pg-first-binding-cp-reader.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "build/dsga-pg-first-binding-cp-reader-final.jsonl": "fd6919eb04c2233e3e7bbc21420dbf40b4c17e73cfc17acc6fab5ca2d3b446d8",
+    "build/dsga-pg-first-binding-cp-reader-final.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "build/dsga-pg-first-binding-cp-reader-test-initial.go": "f123fc112d97c6069f41f7d0db75b10559eb41613e337a1bdcb1bcec3d1bd6db",
+    "build/run-dsga-pg-first-binding-cp-dependency.py": "11cd53acd573726a8a3117b5c64dc6fa2ceafcbbd1c623a4c69cc6f766857567",
+    "build/run-dsga-pg-first-binding-cp-reader.sh": "3fa233064a37bbf0ae384f52098336f9af0a7a2eb331208f28d1c441b0d2af78",
+    "build/run-dsga-pg-first-binding-cp-reader-final.sh": "559fb38c380a9184b61d1e9f84497867229bcdc5e0d00d7c3383fc181817205e"
+  },
+  "goal": "active/incomplete; scopePG17; noimages/noK8s/mainmerge"
+}
