@@ -193,7 +193,8 @@
       "retained_Web_src_matches_original_Web_build": true,
       "API_source_sha256": "7bbff6920f06f2a498f683094c6b4b356ec0536691c957d50d53525d63783367",
       "API_source_archive_sha256": "63a483eabce01e886d031c2f60b29de191ae695207e29e0470d562d911de3c1b",
-      "Web_source_sha256": "ac8a83736763a4eed5f45e75fae6083ab0194994050fbd6c01a0ce6524863970"
+      "Web_source_sha256": "ac8a83736763a4eed5f45e75fae6083ab0194994050fbd6c01a0ce6524863970",
+      "measured_code_commit": "1b0e8121ce54b52910c5d66f7f1dea6842d7451f"
     }
   },
   "credentials_exported": false,
@@ -214,5 +215,14 @@
     "contract quality archive missing contract file",
     "initial UI organization selector"
   ],
-  "GitHub_run_state": "pending after this commit"
+  "GitHub_run_state": "pending test-only follow-up commit",
+  "affected_existing_CLI_catalog_groups": 1,
+  "initial_GitHub_run_id": 40216666380,
+  "initial_GitHub_failure": "CLI catalog test retained 293 rather than the new 305 operations",
+  "test_only_followup": {
+    "path": "clients/test/client.test.mjs",
+    "sha256": "5a232b027e5c9d249b91849935b38ebd300b9c66f232154025dd6018c3492969",
+    "Linux_affected_catalog_check": "pass",
+    "runtime_changed": false
+  }
 }

@@ -1,0 +1,29 @@
+{
+  "created_at": "2026-10-25T18:42:46.991449+00:00",
+  "branch": "codex/dsga-control-plane-v3-20261020",
+  "main_merged": "f7df93a2dc9443f653d218960536a8e119b45645",
+  "previous": "19a1e56b1b0bee1b014aedf0bd8b35bbae07569e",
+  "upstream_files_exact": [
+    "clients/test/client.test.mjs",
+    "docs/DELIVERY-2026-10-26-BILLING.md",
+    "docs/acceptance/2026-10-26-billing-functional.json"
+  ],
+  "validation": {
+    "command": "/Users/williamlee/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/bin/node --test --test-name-pattern \"^Catalog covers the exact API once and cursors bind filter and source$\" clients/test/client.test.mjs",
+    "pass": 1,
+    "failed": 0,
+    "skip": 0,
+    "unchanged_not_repeated": "Go/PG/Web/Helm/otherclients"
+  },
+  "source_sha256": {
+    "clients/test/client.test.mjs": "5a232b027e5c9d249b91849935b38ebd300b9c66f232154025dd6018c3492969",
+    "docs/DELIVERY-2026-10-26-BILLING.md": "a2074987166aeeeb48d4310f7c0ff053fd983f35faa2405e968dbbbd9d65fef1",
+    "docs/acceptance/2026-10-26-billing-functional.json": "99016ec81efda0ab686dd7bc3b89fafbfa01b217fe03797573567dc48964ee50",
+    "docs/DSGA-客户端账单目录维护-Mac验收-20261026.md": "d958bb4e54f2ae78d4c4afc8ea4a52dc73afbeb897fae24b8bdceefe936c9dfd"
+  },
+  "log_sha256": {
+    "build/control-mainf7df-catalog.log": "2bee4001ba97b44b7b623caff1fd5fb63a27708f8f18512dc4e974d0a585187d"
+  },
+  "imported_receipts": "not counted as local execution",
+  "scope": "maintenanceonly; overall DSGA incomplete"
+}
