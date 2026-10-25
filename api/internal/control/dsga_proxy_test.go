@@ -166,9 +166,9 @@ func TestDSGAProxyExplicitRoutesPreserveOriginalBytesAndCredential(t *testing.T)
 		w.Header().Set("Location", "https://foreign.invalid")
 		_, _ = w.Write([]byte(`{"native_fact_fixture":true}`))
 	})
-	for _, path := range []string{"capabilities", "memory", "initialization", "budget/shared", "work/state", "connections/state", "resize", "resize/status", "resize/cancel", "issuer/fence", "admission", "admission/status", "admission/close-original", "admission/close-original/status"} {
+	for _, path := range []string{"capabilities", "memory", "initialization", "budget/shared", "work/state", "connections/state", "work/prepared", "resize", "resize/status", "resize/cancel", "issuer/fence", "admission", "admission/status", "admission/close-original", "admission/close-original/status"} {
 		method, body := http.MethodPost, []byte(`{"issuer_epoch":"18446744073709551615"}`)
-		if path == "capabilities" || path == "memory" || path == "initialization" || path == "budget/shared" || path == "work/state" || path == "connections/state" {
+		if path == "capabilities" || path == "memory" || path == "initialization" || path == "budget/shared" || path == "work/state" || path == "connections/state" || path == "work/prepared" {
 			method, body = http.MethodGet, nil
 		}
 		code, data := proxyRequest(t, client, method, base+"/dsg/v1/"+path, token, body)
@@ -176,7 +176,7 @@ func TestDSGAProxyExplicitRoutesPreserveOriginalBytesAndCredential(t *testing.T)
 			t.Fatalf("route %s got %d", path, code)
 		}
 	}
-	if calls.Load() != 14 {
+	if calls.Load() != 15 {
 		t.Fatal("not all native calls ran")
 	}
 }
@@ -271,9 +271,9 @@ func TestDSGAProxyObservationIndependentFromBlockedExecution(t *testing.T) {
 	case <-time.After(3 * time.Second):
 		t.Fatal("execution did not enter")
 	}
-	for _, path := range []string{"memory", "budget/shared", "work/state", "connections/state", "resize/status", "resize/cancel", "admission", "admission/status", "admission/close-original", "admission/close-original/status"} {
+	for _, path := range []string{"memory", "budget/shared", "work/state", "connections/state", "work/prepared", "resize/status", "resize/cancel", "admission", "admission/status", "admission/close-original", "admission/close-original/status"} {
 		method, body := http.MethodPost, []byte(`{}`)
-		if path == "memory" || path == "budget/shared" || path == "work/state" || path == "connections/state" {
+		if path == "memory" || path == "budget/shared" || path == "work/state" || path == "connections/state" || path == "work/prepared" {
 			method, body = http.MethodGet, nil
 		}
 		code, _ := proxyRequest(t, client, method, base+"/dsg/v1/"+path, token, body)
