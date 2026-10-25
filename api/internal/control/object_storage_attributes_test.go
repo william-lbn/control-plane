@@ -46,12 +46,12 @@ func TestStorageObjectAttributePaginationAndCorruption(t *testing.T) {
 	if _, _, e := storageAttributePagination(h); e == nil {
 		t.Fatal("duplicate bound admitted")
 	}
-	layout := []storageObjectPart{{2, 3, strings.Repeat("a", 64)}, {7, 2, strings.Repeat("b", 64)}}
+	layout := []storageObjectPart{{Number: 2, Size: 3, SHA256: strings.Repeat("a", 64)}, {Number: 7, Size: 2, SHA256: strings.Repeat("b", 64)}}
 	p, e := storagePaginateObjectParts(layout, 5, 1, 2)
 	if e != nil || p.Count != 2 || p.Parts[0].Number != 7 || p.Truncated || p.Next != 0 {
 		t.Fatal("noncontiguous pagination", p, e)
 	}
-	for _, bad := range [][]storageObjectPart{{{2, 4, strings.Repeat("a", 64)}}, {{2, 5, "bad"}}, {{2, 3, strings.Repeat("a", 64)}, {2, 2, strings.Repeat("b", 64)}}} {
+	for _, bad := range [][]storageObjectPart{{{Number: 2, Size: 4, SHA256: strings.Repeat("a", 64)}}, {{Number: 2, Size: 5, SHA256: "bad"}}, {{Number: 2, Size: 3, SHA256: strings.Repeat("a", 64)}, {Number: 2, Size: 2, SHA256: strings.Repeat("b", 64)}}} {
 		if _, e = storagePaginateObjectParts(bad, 5, 1, 0); e == nil {
 			t.Fatal("corrupt stored layout admitted")
 		}
@@ -116,7 +116,7 @@ func TestStorageObjectAttributesPostgresActualSDKPublicationAndOverwrite(t *test
 	if e != nil {
 		t.Fatal(e)
 	}
-	selection := []multipartSelection{{2, a.ETag}, {7, b.ETag}}
+	selection := []multipartSelection{{Number: 2, ETag: a.ETag}, {Number: 7, ETag: b.ETag}}
 	if _, e = s.completeMultipart(f.ctx, f.conn, f.p, "actor", "settings-bucket", key, u.ID, selection, "", "*"); e != nil {
 		t.Fatal(e)
 	}

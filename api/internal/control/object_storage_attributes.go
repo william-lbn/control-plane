@@ -12,14 +12,15 @@ import (
 // This snapshot is written in the same transaction as object publication.
 // Upload receipts may outlive an overwrite and must never reconstruct it.
 type storageObjectPart struct {
-	Number int    `json:"part_number"`
-	Size   int64  `json:"size"`
-	SHA256 string `json:"sha256"`
+	Number    int               `json:"part_number"`
+	Size      int64             `json:"size"`
+	SHA256    string            `json:"sha256"`
+	Checksums map[string]string `json:"checksums,omitempty"`
 }
 type storageAttributePart struct {
-	Number int    `xml:"PartNumber"`
-	Size   int64  `xml:"Size"`
-	SHA256 string `xml:"ChecksumSHA256"`
+	Number int   `xml:"PartNumber"`
+	Size   int64 `xml:"Size"`
+	storageAttributeChecksum
 }
 type storageAttributeParts struct {
 	Count     int                    `xml:"PartsCount"`
@@ -54,7 +55,7 @@ func storageAttributePagination(h http.Header) (max, marker int, err error) {
 	}
 	return max, marker, nil
 }
-func storagePaginateObjectParts(layout []storageObjectPart, size int64, max, marker int) (*storageAttributeParts, error) {
+func storagePaginateObjectParts(layout []storageObjectPart, size int64, max, marker int, policies ...storageChecksumPolicy) (*storageAttributeParts, error) {
 	if len(layout) == 0 {
 		return nil, nil
 	}
@@ -78,7 +79,16 @@ func storagePaginateObjectParts(layout []storageObjectPart, size int64, max, mar
 			continue
 		}
 		raw, _ := hex.DecodeString(part.SHA256)
-		out.Parts = append(out.Parts, storageAttributePart{part.Number, part.Size, base64.StdEncoding.EncodeToString(raw)})
+		checksum := storageAttributeChecksum{SHA256: base64.StdEncoding.EncodeToString(raw)}
+		if len(policies) == 1 && policies[0].Algorithm != "" {
+			values, err := storageStoredChecksums(part.SHA256, part.Checksums)
+			name := storageChecksumAlgorithms[policies[0].Algorithm]
+			if err != nil || name == "" || values[name] == "" {
+				return nil, fmt.Errorf("invalid stored part checksum")
+			}
+			checksum = storagePartChecksumXML(map[string]string{name: values[name]})
+		}
+		out.Parts = append(out.Parts, storageAttributePart{Number: part.Number, Size: part.Size, storageAttributeChecksum: checksum})
 	}
 	if total != size {
 		return nil, fmt.Errorf("stored layout size mismatch")

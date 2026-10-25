@@ -27,40 +27,48 @@ var multipartID = regexp.MustCompile(`^mpu_[a-f0-9]{24}$`)
 var multipartETag = regexp.MustCompile(`^[a-f0-9]{32}$`)
 
 type multipartUpload struct {
-	ID              string            `json:"upload_id"`
-	Key             string            `json:"key"`
-	ContentType     string            `json:"content_type"`
-	Metadata        map[string]string `json:"metadata"`
-	ExpectedSHA256  string            `json:"expected_sha256"`
-	ExpectedSize    int64             `json:"expected_size"`
-	State           string            `json:"state"`
-	Created         time.Time         `json:"created_at"`
-	SHA256          string            `json:"sha256"`
-	Size            int64             `json:"size"`
-	Tags            []storageTag      `json:"tags,omitempty"`
-	ResponseHeaders map[string]string `json:"response_headers,omitempty"`
-	completion      string
+	ID                string                `json:"upload_id"`
+	Key               string                `json:"key"`
+	ContentType       string                `json:"content_type"`
+	Metadata          map[string]string     `json:"metadata"`
+	ExpectedSHA256    string                `json:"expected_sha256"`
+	ExpectedSize      int64                 `json:"expected_size"`
+	State             string                `json:"state"`
+	Created           time.Time             `json:"created_at"`
+	SHA256            string                `json:"sha256"`
+	Size              int64                 `json:"size"`
+	Tags              []storageTag          `json:"tags,omitempty"`
+	ResponseHeaders   map[string]string     `json:"response_headers,omitempty"`
+	ChecksumAlgorithm string                `json:"checksum_algorithm,omitempty"`
+	ChecksumType      string                `json:"checksum_type,omitempty"`
+	ChecksumPolicy    storageChecksumPolicy `json:"checksum_policy,omitzero"`
+	completion        string
 }
 type multipartPart struct {
-	Number   int       `json:"part_number" xml:"PartNumber"`
-	ETag     string    `json:"etag" xml:"ETag"`
-	Size     int64     `json:"size" xml:"Size"`
-	SHA256   string    `json:"sha256" xml:"-"`
-	Modified time.Time `json:"updated_at" xml:"LastModified"`
-	blob     string
+	Number    int               `json:"part_number" xml:"PartNumber"`
+	ETag      string            `json:"etag" xml:"ETag"`
+	Size      int64             `json:"size" xml:"Size"`
+	SHA256    string            `json:"sha256" xml:"-"`
+	Modified  time.Time         `json:"updated_at" xml:"LastModified"`
+	Checksums map[string]string `json:"checksums,omitempty" xml:"-"`
+	blob      string
+	algorithm string
 }
 type multipartSelection struct {
-	Number int    `json:"part_number" xml:"PartNumber"`
-	ETag   string `json:"etag" xml:"ETag"`
+	Number    int               `json:"part_number" xml:"PartNumber"`
+	ETag      string            `json:"etag" xml:"ETag"`
+	Checksums map[string]string `json:"checksums,omitempty" xml:"-"`
 }
 type multipartCreate struct {
-	Key             string            `json:"key"`
-	ContentType     string            `json:"content_type"`
-	Metadata        map[string]string `json:"metadata"`
-	SHA256          string            `json:"sha256"`
-	Size            int64             `json:"size"`
-	Tags            []storageTag      `json:"tags,omitempty"`
-	ResponseHeaders map[string]string `json:"response_headers,omitempty"`
+	Key               string            `json:"key"`
+	ContentType       string            `json:"content_type"`
+	Metadata          map[string]string `json:"metadata"`
+	SHA256            string            `json:"sha256"`
+	Size              int64             `json:"size"`
+	Tags              []storageTag      `json:"tags,omitempty"`
+	ResponseHeaders   map[string]string `json:"response_headers,omitempty"`
+	ChecksumAlgorithm string            `json:"checksum_algorithm,omitempty"`
+	ChecksumType      string            `json:"checksum_type,omitempty"`
 }
 
 func multipartFault(status int, code string) error { return &storageMutationFault{status, code} }
@@ -84,7 +92,7 @@ func loadMultipart(ctx context.Context, tx pgx.Tx, p objectStoragePayload, princ
 	if !multipartID.MatchString(id) {
 		return u, multipartFault(404, "NoSuchUpload")
 	}
-	e := tx.QueryRow(ctx, `SELECT id,key,content_type,metadata,expected_sha256,expected_size,state,created_at,result_sha256,result_size,completion_hash,tags,response_headers FROM neon_storage.multipart_uploads WHERE id=$1 AND branch_id=$2 AND principal=$3 AND bucket=$4 AND ($5='' OR key=$5) FOR UPDATE`, id, p.BranchID, principal, bucket, key).Scan(&u.ID, &u.Key, &u.ContentType, &u.Metadata, &u.ExpectedSHA256, &u.ExpectedSize, &u.State, &u.Created, &u.SHA256, &u.Size, &u.completion, &u.Tags, &u.ResponseHeaders)
+	e := tx.QueryRow(ctx, `SELECT id,key,content_type,metadata,expected_sha256,expected_size,state,created_at,result_sha256,result_size,completion_hash,tags,response_headers,checksum_algorithm,checksum_type,result_checksum_policy FROM neon_storage.multipart_uploads WHERE id=$1 AND branch_id=$2 AND principal=$3 AND bucket=$4 AND ($5='' OR key=$5) FOR UPDATE`, id, p.BranchID, principal, bucket, key).Scan(&u.ID, &u.Key, &u.ContentType, &u.Metadata, &u.ExpectedSHA256, &u.ExpectedSize, &u.State, &u.Created, &u.SHA256, &u.Size, &u.completion, &u.Tags, &u.ResponseHeaders, &u.ChecksumAlgorithm, &u.ChecksumType, &u.ChecksumPolicy)
 	if isNoRows(e) {
 		e = multipartFault(404, "NoSuchUpload")
 	}
@@ -106,6 +114,10 @@ func (s *server) createMultipart(ctx context.Context, conn *pgx.Conn, p objectSt
 		return u, multipartFault(400, "InvalidArgument")
 	}
 	input.Metadata = metadata
+	input.ChecksumType, e = normalizeMultipartChecksum(input.ChecksumAlgorithm, input.ChecksumType)
+	if e != nil {
+		return u, e
+	}
 	input.Tags, e = normalizeStorageTags(input.Tags, 10)
 	if e != nil {
 		return u, multipartFault(400, "InvalidTag")
@@ -153,12 +165,12 @@ func (s *server) createMultipart(ctx context.Context, conn *pgx.Conn, p objectSt
 		return u, multipartFault(429, "QuotaExceeded")
 	}
 	u.ID = newID("mpu_")
-	_, e = tx.Exec(ctx, `INSERT INTO neon_storage.multipart_uploads(id,branch_id,principal,bucket,key,content_type,metadata,expected_sha256,expected_size,request_key,request_hash,tags,response_headers) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,NULLIF($10,''),$11,$12,$13)`, u.ID, p.BranchID, principal, bucket, input.Key, input.ContentType, metadata, input.SHA256, input.Size, func() string {
+	_, e = tx.Exec(ctx, `INSERT INTO neon_storage.multipart_uploads(id,branch_id,principal,bucket,key,content_type,metadata,expected_sha256,expected_size,request_key,request_hash,tags,response_headers,checksum_algorithm,checksum_type) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,NULLIF($10,''),$11,$12,$13,$14,$15)`, u.ID, p.BranchID, principal, bucket, input.Key, input.ContentType, metadata, input.SHA256, input.Size, func() string {
 		if requestKey != "" {
 			return keyHash(requestKey)
 		}
 		return ""
-	}(), fingerprint, input.Tags, input.ResponseHeaders)
+	}(), fingerprint, input.Tags, input.ResponseHeaders, input.ChecksumAlgorithm, input.ChecksumType)
 	if e == nil {
 		u, e = loadMultipart(ctx, tx, p, principal, bucket, input.Key, u.ID)
 	}
@@ -244,6 +256,14 @@ func (s *server) putMultipartPart(ctx context.Context, conn *pgx.Conn, p objectS
 	if contentMD5 != "" && base64.StdEncoding.EncodeToString(sum[:]) != contentMD5 {
 		return part, multipartFault(400, "BadDigest")
 	}
+	payload, e := smallStoragePayload(data)
+	if e != nil {
+		return part, e
+	}
+	checksums, e := multipartPartChecksums(u, payload, copyHeaders, copyHeaders.Get("X-Amz-Copy-Source") != "")
+	if e != nil {
+		return part, e
+	}
 	var count int
 	var total, old int64
 	e = tx.QueryRow(ctx, `SELECT count(*),COALESCE(sum(size),0)::bigint FROM neon_storage.multipart_parts WHERE upload_id=$1`, id).Scan(&count, &total)
@@ -266,11 +286,11 @@ func (s *server) putMultipartPart(ctx context.Context, conn *pgx.Conn, p objectS
 	if pending-old+int64(len(data)) > storageBranchAdmissionLimit() {
 		return part, multipartFault(429, "QuotaExceeded")
 	}
-	part = multipartPart{Number: number, ETag: fmt.Sprintf("%x", sum), SHA256: fmt.Sprintf("%x", sha256.Sum256(data)), Size: int64(len(data)), blob: p.ProjectID + "/" + newID("part_")}
+	part = multipartPart{Number: number, ETag: fmt.Sprintf("%x", sum), SHA256: payload.SHA256, Size: int64(len(data)), Checksums: checksums, algorithm: u.ChecksumAlgorithm, blob: p.ProjectID + "/" + newID("part_")}
 	if e = s.storage.put(ctx, part.blob, "application/octet-stream", data); e != nil {
 		return part, e
 	}
-	e = tx.QueryRow(ctx, `INSERT INTO neon_storage.multipart_parts(upload_id,part_number,blob_key,sha256,etag,size) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(upload_id,part_number) DO UPDATE SET blob_key=$3,sha256=$4,etag=$5,size=$6,updated_at=now() RETURNING updated_at`, id, number, part.blob, part.SHA256, part.ETag, part.Size).Scan(&part.Modified)
+	e = tx.QueryRow(ctx, `INSERT INTO neon_storage.multipart_parts(upload_id,part_number,blob_key,sha256,etag,size,checksums) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(upload_id,part_number) DO UPDATE SET blob_key=$3,sha256=$4,etag=$5,size=$6,checksums=$7,updated_at=now() RETURNING updated_at`, id, number, part.blob, part.SHA256, part.ETag, part.Size, part.Checksums).Scan(&part.Modified)
 	if e == nil {
 		e = tx.Commit(ctx)
 	}
@@ -289,7 +309,7 @@ func multipartCopyRange(value string, size int64) (int64, int64, error) {
 	return a, b, nil
 }
 func listMultipartParts(ctx context.Context, tx pgx.Tx, id string) ([]multipartPart, error) {
-	rows, e := tx.Query(ctx, `SELECT part_number,etag,size,sha256,updated_at,blob_key FROM neon_storage.multipart_parts WHERE upload_id=$1 ORDER BY part_number`, id)
+	rows, e := tx.Query(ctx, `SELECT part_number,etag,size,sha256,updated_at,blob_key,checksums FROM neon_storage.multipart_parts WHERE upload_id=$1 ORDER BY part_number`, id)
 	if e != nil {
 		return nil, e
 	}
@@ -297,7 +317,7 @@ func listMultipartParts(ctx context.Context, tx pgx.Tx, id string) ([]multipartP
 	items := []multipartPart{}
 	for rows.Next() {
 		var p multipartPart
-		if e = rows.Scan(&p.Number, &p.ETag, &p.Size, &p.SHA256, &p.Modified, &p.blob); e != nil {
+		if e = rows.Scan(&p.Number, &p.ETag, &p.Size, &p.SHA256, &p.Modified, &p.blob, &p.Checksums); e != nil {
 			return nil, e
 		}
 		items = append(items, p)
@@ -323,9 +343,9 @@ func multipartManifestHash(parts []multipartSelection, match, none string) (stri
 	b, _ := json.Marshal(record{"parts": parts, "match": match, "none": none})
 	return fmt.Sprintf("%x", sha256.Sum256(b)), nil
 }
-func (s *server) completeMultipart(ctx context.Context, conn *pgx.Conn, p objectStoragePayload, principal, bucket, key, id string, selection []multipartSelection, match, none string) (multipartUpload, error) {
+func (s *server) completeMultipart(ctx context.Context, conn *pgx.Conn, p objectStoragePayload, principal, bucket, key, id string, selection []multipartSelection, match, none string, options ...multipartCompletionChecksums) (multipartUpload, error) {
 	var u multipartUpload
-	hash, e := multipartManifestHash(selection, match, none)
+	hash, opt, e := multipartCompletionFingerprint(selection, match, none, options)
 	if e != nil {
 		return u, e
 	}
@@ -362,16 +382,25 @@ func (s *server) completeMultipart(ctx context.Context, conn *pgx.Conn, p object
 		if !found || part.ETag != v.ETag {
 			return u, multipartFault(400, "InvalidPart")
 		}
+		if e = multipartValidateSelection(u, v, part, i); e != nil {
+			return u, e
+		}
 		if i < len(selection)-1 && part.Size < multipartMinimumPart {
 			return u, multipartFault(400, "EntityTooSmall")
 		}
 		size += part.Size
-		layout = append(layout, storageObjectPart{part.Number, part.Size, part.SHA256})
+		layout = append(layout, storageObjectPart{Number: part.Number, Size: part.Size, SHA256: part.SHA256, Checksums: part.Checksums})
 	}
 	if size > storageObjectAdmissionLimit() {
 		return u, multipartFault(413, "EntityTooLarge")
 	}
 	if u.ExpectedSize >= 0 && u.ExpectedSize != size {
+		return u, multipartFault(400, "BadDigest")
+	}
+	if opt.Size != nil && *opt.Size != size {
+		return u, multipartFault(400, "InvalidRequest")
+	}
+	if opt.Type != "" && opt.Type != u.ChecksumType {
 		return u, multipartFault(400, "BadDigest")
 	}
 	var old string
@@ -401,6 +430,17 @@ func (s *server) completeMultipart(ctx context.Context, conn *pgx.Conn, p object
 			if err != nil {
 				return err
 			}
+			if u.ChecksumAlgorithm != "" {
+				actual, err := smallStoragePayload(data)
+				if err != nil {
+					return err
+				}
+				for name, value := range part.Checksums {
+					if actual.checksums[name] != value {
+						return multipartFault(409, "InvalidPart")
+					}
+				}
+			}
 			if _, err = dst.Write(data); err != nil {
 				return err
 			}
@@ -414,6 +454,10 @@ func (s *server) completeMultipart(ctx context.Context, conn *pgx.Conn, p object
 	u.SHA256, u.Size = content.SHA256, content.Size
 	if u.Size != size || u.ExpectedSHA256 != "" && u.ExpectedSHA256 != u.SHA256 {
 		return u, multipartFault(400, "BadDigest")
+	}
+	u.ChecksumPolicy, e = multipartPublishedChecksum(u, selection, indexed, content, opt)
+	if e != nil {
+		return u, e
 	}
 	settings, err := normalizeStorageObjectSettings(storageObjectSettings{Tags: u.Tags, ResponseHeaders: u.ResponseHeaders})
 	if err != nil {
@@ -429,14 +473,14 @@ func (s *server) completeMultipart(ctx context.Context, conn *pgx.Conn, p object
 		return u, e
 	}
 
-	_, e = tx.Exec(ctx, `INSERT INTO neon_storage.objects(bucket,key,blob_key,sha256,size,content_type,metadata,tags,response_headers,part_layout,checksums) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) ON CONFLICT(bucket,key) DO UPDATE SET blob_key=$3,sha256=$4,size=$5,content_type=$6,metadata=$7,tags=$8,response_headers=$9,part_layout=$10,checksums=$11,updated_at=now()`, bucket, u.Key, blob, u.SHA256, size, u.ContentType, u.Metadata, u.Tags, u.ResponseHeaders, layout, content.storedChecksums())
+	_, e = tx.Exec(ctx, `INSERT INTO neon_storage.objects(bucket,key,blob_key,sha256,size,content_type,metadata,tags,response_headers,part_layout,checksums,checksum_policy) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) ON CONFLICT(bucket,key) DO UPDATE SET blob_key=$3,sha256=$4,size=$5,content_type=$6,metadata=$7,tags=$8,response_headers=$9,part_layout=$10,checksums=$11,checksum_policy=$12,updated_at=now()`, bucket, u.Key, blob, u.SHA256, size, u.ContentType, u.Metadata, u.Tags, u.ResponseHeaders, layout, content.storedChecksums(), u.ChecksumPolicy)
 	if e != nil {
 		return u, e
 	}
 	if e = s.publishStorageFunctionEvent(ctx, tx, p, bucket, u.Key, u.SHA256, size); e != nil {
 		return u, e
 	}
-	_, e = tx.Exec(ctx, `UPDATE neon_storage.multipart_uploads SET state='completed',completion_hash=$2,result_sha256=$3,result_size=$4,updated_at=now() WHERE id=$1`, id, hash, u.SHA256, size)
+	_, e = tx.Exec(ctx, `UPDATE neon_storage.multipart_uploads SET state='completed',completion_hash=$2,result_sha256=$3,result_size=$4,result_checksum_policy=$5,updated_at=now() WHERE id=$1`, id, hash, u.SHA256, size, u.ChecksumPolicy)
 	if e != nil {
 		return u, e
 	}

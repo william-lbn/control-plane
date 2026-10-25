@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.88.0",
+    "version": "0.89.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -5317,6 +5317,27 @@
                 "maxLength": 1024
               }
             }
+          },
+          "checksum_algorithm": {
+            "type": "string",
+            "enum": [
+              "CRC32",
+              "CRC32C",
+              "CRC64NVME",
+              "SHA1",
+              "SHA256"
+            ]
+          },
+          "checksum_type": {
+            "type": "string",
+            "enum": [
+              "FULL_OBJECT",
+              "COMPOSITE"
+            ],
+            "description": "CRC32/CRC32C accept both types, CRC64NVME FULL_OBJECT only, SHA1/SHA256 COMPOSITE only. With an algorithm, default CRC64NVME to FULL_OBJECT and others to COMPOSITE."
+          },
+          "checksum_policy": {
+            "$ref": "#/components/schemas/StorageChecksumPolicy"
           }
         },
         "required": [
@@ -5356,6 +5377,9 @@
           "updated_at": {
             "type": "string",
             "format": "date-time"
+          },
+          "checksums": {
+            "$ref": "#/components/schemas/StorageChecksumMap"
           }
         },
         "required": [
@@ -5377,6 +5401,9 @@
           },
           "etag": {
             "type": "string"
+          },
+          "checksums": {
+            "$ref": "#/components/schemas/StorageChecksumMap"
           }
         },
         "required": [
@@ -5432,6 +5459,24 @@
                 "maxLength": 1024
               }
             }
+          },
+          "checksum_algorithm": {
+            "type": "string",
+            "enum": [
+              "CRC32",
+              "CRC32C",
+              "CRC64NVME",
+              "SHA1",
+              "SHA256"
+            ]
+          },
+          "checksum_type": {
+            "type": "string",
+            "enum": [
+              "FULL_OBJECT",
+              "COMPOSITE"
+            ],
+            "description": "CRC32/CRC32C accept both types, CRC64NVME FULL_OBJECT only, SHA1/SHA256 COMPOSITE only. With an algorithm, default CRC64NVME to FULL_OBJECT and others to COMPOSITE."
           }
         },
         "required": [
@@ -9176,6 +9221,77 @@
             "description": "Explicit immutable revision; null restores the quotas retained before first assignment. Omission is rejected."
           }
         }
+      },
+      "StorageChecksumMap": {
+        "type": "object",
+        "additionalProperties": false,
+        "maxProperties": 5,
+        "properties": {
+          "X-Amz-Checksum-Crc32": {
+            "type": "string",
+            "maxLength": 64,
+            "description": "Canonical base64 checksum of complete part bytes; validated against actual bytes."
+          },
+          "X-Amz-Checksum-Crc32c": {
+            "type": "string",
+            "maxLength": 64,
+            "description": "Canonical base64 checksum of complete part bytes; validated against actual bytes."
+          },
+          "X-Amz-Checksum-Crc64nvme": {
+            "type": "string",
+            "maxLength": 64,
+            "description": "Canonical base64 checksum of complete part bytes; validated against actual bytes."
+          },
+          "X-Amz-Checksum-Sha1": {
+            "type": "string",
+            "maxLength": 64,
+            "description": "Canonical base64 checksum of complete part bytes; validated against actual bytes."
+          },
+          "X-Amz-Checksum-Sha256": {
+            "type": "string",
+            "maxLength": 64,
+            "description": "Canonical base64 checksum of complete part bytes; validated against actual bytes."
+          }
+        }
+      },
+      "StorageChecksumPolicy": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "algorithm": {
+            "type": "string",
+            "enum": [
+              "CRC32",
+              "CRC32C",
+              "CRC64NVME",
+              "SHA1",
+              "SHA256"
+            ]
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "FULL_OBJECT",
+              "COMPOSITE"
+            ]
+          },
+          "value": {
+            "type": "string",
+            "maxLength": 64
+          },
+          "parts_count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          }
+        },
+        "required": [
+          "algorithm",
+          "type",
+          "value",
+          "parts_count"
+        ],
+        "description": "Negotiated publication checksum. COMPOSITE hashes the concatenated raw selected part checksums and appends -partCount. COPY retains the original policy independently of its unknown multipart layout."
       }
     },
     "responses": {
@@ -19969,6 +20085,13 @@
                     "updated_at": {
                       "type": "string",
                       "format": "date-time"
+                    },
+                    "checksum_policy": {
+                      "type": "object",
+                      "description": "Empty for legacy/default full-byte publication; otherwise the negotiated policy."
+                    },
+                    "checksums": {
+                      "$ref": "#/components/schemas/StorageChecksumMap"
                     }
                   }
                 }
@@ -22569,6 +22692,71 @@
               "minimum": 1,
               "maximum": 10000
             }
+          },
+          {
+            "name": "X-Amz-Checksum-Crc32",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            },
+            "description": "Part checksum for the algorithm selected at initiation; required for COMPOSITE uploads."
+          },
+          {
+            "name": "X-Amz-Checksum-Crc32c",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            },
+            "description": "Part checksum for the algorithm selected at initiation; required for COMPOSITE uploads."
+          },
+          {
+            "name": "X-Amz-Checksum-Crc64nvme",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            },
+            "description": "Part checksum for the algorithm selected at initiation; required for COMPOSITE uploads."
+          },
+          {
+            "name": "X-Amz-Checksum-Sha1",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            },
+            "description": "Part checksum for the algorithm selected at initiation; required for COMPOSITE uploads."
+          },
+          {
+            "name": "X-Amz-Checksum-Sha256",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "maxLength": 64
+            },
+            "description": "Part checksum for the algorithm selected at initiation; required for COMPOSITE uploads."
+          },
+          {
+            "name": "X-Amz-Sdk-Checksum-Algorithm",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "CRC32",
+                "CRC32C",
+                "CRC64NVME",
+                "SHA1",
+                "SHA256"
+              ]
+            }
           }
         ],
         "responses": {
@@ -22736,7 +22924,7 @@
             "description": "Outcome may be unknown; inspect original upload before explicit retry"
           }
         },
-        "description": "One branch SQL transaction publishes the directory and receipt. Identical explicit retry returns the original receipt without republishing; different manifest/conditions conflict. Incomplete uploads are not inherited by child branches.",
+        "description": "One branch SQL transaction publishes the directory and receipt. Identical explicit retry returns the original receipt without republishing; different manifest/conditions conflict. Incomplete uploads are not inherited by child branches. Explicit checksum uploads require consecutive parts starting at 1; COMPOSITE selections include each selected checksum. Optional completion checksum type, expected value and size are bound to the original receipt. JSON checksum declarations and checksum headers are mutually exclusive.",
         "requestBody": {
           "required": true,
           "content": {
@@ -22752,6 +22940,45 @@
                     "items": {
                       "$ref": "#/components/schemas/MultipartSelection"
                     }
+                  },
+                  "checksum_type": {
+                    "type": "string",
+                    "enum": [
+                      "FULL_OBJECT",
+                      "COMPOSITE"
+                    ]
+                  },
+                  "checksums": {
+                    "type": "object",
+                    "maxProperties": 1,
+                    "additionalProperties": false,
+                    "properties": {
+                      "X-Amz-Checksum-Crc32": {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      "X-Amz-Checksum-Crc32c": {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      "X-Amz-Checksum-Crc64nvme": {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      "X-Amz-Checksum-Sha1": {
+                        "type": "string",
+                        "maxLength": 64
+                      },
+                      "X-Amz-Checksum-Sha256": {
+                        "type": "string",
+                        "maxLength": 64
+                      }
+                    }
+                  },
+                  "object_size": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 5368709120
                   }
                 },
                 "required": [

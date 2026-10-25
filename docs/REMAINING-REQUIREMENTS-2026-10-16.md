@@ -28,7 +28,7 @@ website 文档快照 `c0d49cbb6979b2ce79ea502d62dbc40780a923b0`（提交时间
 | F05 | Functions 分支复制及恢复 | 同项目显式复制、不可变来源/环境重封装、新 SQL 身份、无 Writer 延迟冻结继承、默认禁用触发器、历史 SQL 当前代码确认、实际隔离及原失败操作恢复基础已验收 | [合同](FUNCTION-BRANCHES.md)及[交付](DELIVERY-2026-10-19-FUNCTION-BRANCHES.md)；跨服务一致时间点归 L03，物理去重/跨项目共享另列 |
 | F06 | Functions 完整计量与独立 edge | 未完成；当前 public listener 同 API 进程 | 最小权限进程、实际资源/调用计量、长流与部署切换 |
 | S01 | S3 multipart | 有界基础已实现并验收：七类 S3 操作、身份隔离、原子发布/回执、UI 续传、中止、SDK 字节、目录分组分页、已撤销身份管理员中止/审计恢复；仍限 8 MiB | [当前交付](DELIVERY-2026-10-16-CURRENT.md)与[运维合同](MULTIPART-ADMINISTRATION.md)；完整 checksum/大对象、GC/自动回收和写入权转让仍有独立扩展门槛 |
-| S02 | 大对象与完整 checksum | 64 MiB 流式/Range/UI 与[五种完整 checksum 持久化](DELIVERY-2026-10-25-STORAGE-CHECKSUMS.md)已验收；[5 GiB 容量代码与基础检查](DELIVERY-2026-10-25-STORAGE-CAPACITY.md)已完成、完整字节验证后置；multipart 扩展协商未满足 | 目标环境验证 5 GiB 全量字节；继续显式 multipart checksum 与 COMPOSITE 协商 |
+| S02 | 大对象与完整 checksum | 固定五种完整校验、七种 multipart 算法/类型协商、逐片字段、COMPOSITE、复制/覆盖及回执基线已验收；5 GiB 容量代码与基础检查完成 | [功能闭环](DELIVERY-2026-10-25-MULTIPART-CHECKSUMS.md)；5 GiB 完整上传/下载/合并/恢复字节验证在目标环境进行，未宣称生产容量认证 |
 | S03 | 引用安全物理 GC | 未开发；删除只移除分支清单 | 分支/PITR/保留窗口引用证明、隔离清扫、失败恢复；不得删除历史业务字节 |
 | S04 | S3 兼容扩展 | 固定官网矩阵 41 项操作及预签名/POST/trailers、公开读阻断、MinIO/Boto3 基线已通过；版本/生命周期/Object Lock 仅存储 | [矩阵与回执](DELIVERY-2026-10-23-S3-CAPABILITIES.md)；5 GiB/完整 checksum、安全 GC、独立入口分别归 S02/S03/S05；原账本的 STS 不在固定支持矩阵中，不提供 |
 | S05 | 独立 Storage gateway / 可信计量 | 当前 S3 同 API 进程；last_used_at 不等于计费 | 最小权限独立部署、配额/物理容量、租户并发与用量 |
@@ -146,3 +146,5 @@ fixture、失败、日志、密码保护输入和所有业务字节。测试完�
 2026-10-25 存储校验：[CRC64NVME 与持久化完整对象校验](DELIVERY-2026-10-25-STORAGE-CHECKSUMS.md)通过五组新增、八组受影响 Go/PG/签名检查及四项真实 SDK 检查。五种完整校验值随对象事务保存，复制/覆盖、错误拒绝和读取通过；原六类存储清单、17 张目录表摘要一致。API/Worker 0.87.0 / Chart 0.9.84 / Core Helm 183 / schema 067 / 原生格式 5；旧对象校验保持未知，未回填历史字节。953 个原 Secret UID、9 PVC 和其他六套发行保留，VM 0。S02 的 5 GiB 和 multipart checksum/COMPOSITE 协商继续，容量/性能后置。
 
 2026-10-25 容量配置：[5 GiB 格式与运营配置](DELIVERY-2026-10-25-STORAGE-CAPACITY.md)通过七组新增 Go/PG、六组受影响检查、三组 Helm 和五个现场检查点。65 MiB 私有文件、5 GiB 元数据、64 位计数、预算/时限、默认超限拒绝及降低预算保留引用通过；5 GiB 全量字节验证后置。API/Worker 0.88.0 / Chart 0.9.85 / Core Helm 184 / schema 067 / 原生格式 6；当前仍保留 64 MiB 默认准入。原六类存储清单（含 checksum）、17 张目录表、953 Secret UID、9 PVC 和其他六套发行保留，VM 0；S02 的 multipart 扩展 checksum/COMPOSITE 协商继续。
+
+2026-10-25 S02 基础闭环：[multipart checksum 协商](DELIVERY-2026-10-25-MULTIPART-CHECKSUMS.md)通过九组新增 Go/PG、十组受影响检查和七种实际 SDK 组合（59 检查点）。原回执、复制/覆盖、逐分片校验、COMPOSITE、拒绝和格式 7 升级通过；原数据身份、953 Secret、9 PVC、三节点/三个 Safekeeper 保留，VM 0。API/Worker 0.89.0 / Chart 0.9.86 / Core 185 / schema 067。5 GiB 完整字节验证仍在新环境进行，当前基础计数为 19 组，剩余八组业务及三组运维/TLS/发行继续。

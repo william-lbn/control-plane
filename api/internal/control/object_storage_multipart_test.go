@@ -46,7 +46,7 @@ func TestMultipartParserRejectsAmbiguousOrUnsupportedInput(t *testing.T) {
 			t.Fatal("invalid range accepted")
 		}
 	}
-	if _, e := multipartManifestHash([]multipartSelection{{2, strings.Repeat("a", 32)}, {1, strings.Repeat("b", 32)}}, "", ""); e == nil {
+	if _, e := multipartManifestHash([]multipartSelection{{Number: 2, ETag: strings.Repeat("a", 32)}, {Number: 1, ETag: strings.Repeat("b", 32)}}, "", ""); e == nil {
 		t.Fatal("unordered manifest accepted")
 	}
 }
@@ -187,8 +187,8 @@ func TestMultipartPostgreSQLAtomicPublicationIsolationReplayAndAbort(t *testing.
 	if e = conn.QueryRow(ctx, `SELECT count(*) FROM neon_storage.objects WHERE key=$1`, input.Key).Scan(&count); e != nil || count != 0 {
 		t.Fatal("partial upload visible")
 	}
-	manifest := []multipartSelection{{1, first.ETag}, {9, last.ETag}}
-	_, e = s.completeMultipart(ctx, conn, p, "user:one", "ci-multipart", input.Key, created.ID, []multipartSelection{{1, strings.Repeat("0", 32)}}, "", "*")
+	manifest := []multipartSelection{{Number: 1, ETag: first.ETag}, {Number: 9, ETag: last.ETag}}
+	_, e = s.completeMultipart(ctx, conn, p, "user:one", "ci-multipart", input.Key, created.ID, []multipartSelection{{Number: 1, ETag: strings.Repeat("0", 32)}}, "", "*")
 	assertCode(e, "InvalidPart")
 	// Force receipt update to fail. Object publication must roll back with it.
 	if _, e = conn.Exec(ctx, `ALTER TABLE neon_storage.multipart_uploads ADD CONSTRAINT ci_no_completion CHECK (state<>'completed')`); e != nil {
@@ -229,7 +229,7 @@ func TestMultipartPostgreSQLAtomicPublicationIsolationReplayAndAbort(t *testing.
 	if e = conn.QueryRow(ctx, `SELECT sha256 FROM neon_storage.objects WHERE key=$1`, input.Key).Scan(&current); e != nil || current != strings.Repeat("f", 64) {
 		t.Fatal("replay republished stale object")
 	}
-	_, e = s.completeMultipart(ctx, conn, p, "user:one", "ci-multipart", input.Key, created.ID, []multipartSelection{{1, first.ETag}}, "", "*")
+	_, e = s.completeMultipart(ctx, conn, p, "user:one", "ci-multipart", input.Key, created.ID, []multipartSelection{{Number: 1, ETag: first.ETag}}, "", "*")
 	assertCode(e, "CompletionConflict")
 	assertCode(abortMultipart(ctx, conn, p, "user:one", "ci-multipart", input.Key, created.ID), "NoSuchUpload")
 	// Restore only this disposable fixture for range-copy checks.
@@ -248,7 +248,7 @@ func TestMultipartPostgreSQLAtomicPublicationIsolationReplayAndAbort(t *testing.
 	if e != nil || part.Size != 11 {
 		t.Fatal("range copy failed", e)
 	}
-	copyResult, e := s.completeMultipart(ctx, conn, p, "credential:one", "ci-multipart", copyInput.Key, copyUpload.ID, []multipartSelection{{2, part.ETag}}, "", "")
+	copyResult, e := s.completeMultipart(ctx, conn, p, "credential:one", "ci-multipart", copyInput.Key, copyUpload.ID, []multipartSelection{{Number: 2, ETag: part.ETag}}, "", "")
 	if e != nil || copyResult.Size != 11 {
 		t.Fatal("copied part publication failed", e)
 	}

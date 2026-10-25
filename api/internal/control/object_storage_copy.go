@@ -28,11 +28,12 @@ type storageMutationFault struct {
 func (e *storageMutationFault) Error() string { return e.Code }
 
 type storageCopyMetadata struct {
-	Metadata    map[string]string
-	ContentType string
-	Tags        *[]storageTag
-	Headers     map[string]string
-	OnlyTags    bool
+	Metadata          map[string]string
+	ContentType       string
+	Tags              *[]storageTag
+	Headers           map[string]string
+	ChecksumAlgorithm string
+	OnlyTags          bool
 }
 
 // One metadata transaction references the original immutable, project-owned
@@ -95,10 +96,12 @@ func copyStorageObjectWithConditions(ctx context.Context, conn *pgx.Conn, projec
 	}
 	var blob, digest, contentType string
 	var metadata, responseHeaders, checksums map[string]string
+	var policy storageChecksumPolicy
+	var layout []storageObjectPart
 	var tags []storageTag
 	var size int64
 	var sourceModified time.Time
-	if e = tx.QueryRow(ctx, `SELECT blob_key,sha256,size,content_type,metadata,updated_at,tags,response_headers,checksums FROM neon_storage.objects WHERE bucket=$1 AND key=$2`, srcBucket, srcKey).Scan(&blob, &digest, &size, &contentType, &metadata, &sourceModified, &tags, &responseHeaders, &checksums); e != nil {
+	if e = tx.QueryRow(ctx, `SELECT blob_key,sha256,size,content_type,metadata,updated_at,tags,response_headers,checksums,checksum_policy,part_layout FROM neon_storage.objects WHERE bucket=$1 AND key=$2`, srcBucket, srcKey).Scan(&blob, &digest, &size, &contentType, &metadata, &sourceModified, &tags, &responseHeaders, &checksums, &policy, &layout); e != nil {
 		if errors.Is(e, pgx.ErrNoRows) {
 			return nil, &storageMutationFault{404, "NoSuchKey"}
 		}
@@ -106,6 +109,23 @@ func copyStorageObjectWithConditions(ctx context.Context, conn *pgx.Conn, projec
 	}
 	if _, e = storageStoredChecksums(digest, checksums); e != nil {
 		return nil, &storageMutationFault{503, "ServiceUnavailable"}
+	}
+	full, e := storageStoredChecksums(digest, checksums)
+	if e != nil {
+		return nil, &storageMutationFault{503, "ServiceUnavailable"}
+	}
+	if e = storageValidatePolicyLayout(layout, size, full, policy); e != nil {
+		return nil, &storageMutationFault{503, "ServiceUnavailable"}
+	}
+	if replacement != nil && replacement.ChecksumAlgorithm != "" {
+		name := storageChecksumAlgorithms[replacement.ChecksumAlgorithm]
+		if name == "" {
+			return nil, &storageMutationFault{501, "NotImplemented"}
+		}
+		if full[name] == "" {
+			return nil, &storageMutationFault{409, "ChecksumUnavailable"}
+		}
+		policy = storageChecksumPolicy{Algorithm: replacement.ChecksumAlgorithm, Type: "FULL_OBJECT", Value: full[name], Parts: 1}
 	}
 	if !strings.HasPrefix(blob, project+"/") {
 		return nil, &storageMutationFault{409, "ObjectIdentityMismatch"}
@@ -144,8 +164,8 @@ func copyStorageObjectWithConditions(ctx context.Context, conn *pgx.Conn, projec
 		return nil, &storageMutationFault{429, "QuotaExceeded"}
 	}
 	var modified time.Time
-	e = tx.QueryRow(ctx, `INSERT INTO neon_storage.objects(bucket,key,blob_key,sha256,size,content_type,metadata,tags,response_headers,checksums) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
- ON CONFLICT(bucket,key) DO UPDATE SET blob_key=$3,sha256=$4,size=$5,content_type=$6,metadata=$7,tags=$8,response_headers=$9,checksums=$10,part_layout='[]'::jsonb,updated_at=now() RETURNING updated_at`, dstBucket, dstKey, blob, digest, size, contentType, metadata, tags, responseHeaders, checksums).Scan(&modified)
+	e = tx.QueryRow(ctx, `INSERT INTO neon_storage.objects(bucket,key,blob_key,sha256,size,content_type,metadata,tags,response_headers,checksums,checksum_policy) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+ ON CONFLICT(bucket,key) DO UPDATE SET blob_key=$3,sha256=$4,size=$5,content_type=$6,metadata=$7,tags=$8,response_headers=$9,checksums=$10,checksum_policy=$11,part_layout='[]'::jsonb,updated_at=now() RETURNING updated_at`, dstBucket, dstKey, blob, digest, size, contentType, metadata, tags, responseHeaders, checksums, policy).Scan(&modified)
 	if e != nil {
 		return nil, e
 	}
@@ -155,7 +175,7 @@ func copyStorageObjectWithConditions(ctx context.Context, conn *pgx.Conn, projec
 	if e = tx.Commit(ctx); e != nil {
 		return nil, e
 	}
-	return record{"key": dstKey, "bucket": dstBucket, "sha256": digest, "size": size, "content_type": contentType, "updated_at": modified.UTC()}, nil
+	return record{"key": dstKey, "bucket": dstBucket, "sha256": digest, "size": size, "content_type": contentType, "updated_at": modified.UTC(), "checksum_policy": policy, "checksums": full}, nil
 }
 
 func parseS3CopySource(raw string) (string, string, error) {

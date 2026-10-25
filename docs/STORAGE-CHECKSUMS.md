@@ -1,5 +1,6 @@
 # 持久化完整对象 checksum
 
+2026-10-25 后续实现：[显式 multipart 校验、逐片字段与 COMPOSITE](STORAGE-MULTIPART-CHECKSUMS.md)现已通过[功能验收](DELIVERY-2026-10-25-MULTIPART-CHECKSUMS.md)；下面旧版本的缺口说明由新合同覆盖。5 GiB 完整字节验证继续后置。
 API/Worker 0.87.0 / Chart 0.9.84 / 原生格式 5 在对象发布事务中保存 SHA-256、SHA-1、CRC32、CRC32C 和 CRC64NVME 五种完整字节校验值。普通 REST/S3 PUT、预签名/POST 上传及现有 multipart 合并共用发布路径；复制保留原校验值，覆盖写替换整组校验值，元数据修改不改变字节校验值。
 
 CRC64NVME 使用原依赖树中已锁定的 `github.com/minio/crc64nvme` 1.1.1，无新增模块下载。上传可使用 `x-amz-checksum-crc64nvme` 与 `x-amz-sdk-checksum-algorithm: CRC64NVME`；错误、缺失、重复值及冲突的声明不能发布对象。其余四种上传检查沿用原路径。签名/非签名 aws-chunked 解码器新增 CRC64NVME trailer 算法，与原签名链、长度和完整结束检查共用。

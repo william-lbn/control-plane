@@ -45,11 +45,15 @@ func (p *storagePayload) storedChecksums() map[string]string {
 	return out
 }
 
-func writeStoredStorageChecksums(w http.ResponseWriter, values map[string]string) {
+func writeStoredStorageChecksums(w http.ResponseWriter, values map[string]string, kinds ...string) {
 	for name, value := range values {
 		w.Header().Set(name, value)
 	}
-	w.Header().Set("X-Amz-Checksum-Type", "FULL_OBJECT")
+	kind := "FULL_OBJECT"
+	if len(kinds) == 1 {
+		kind = kinds[0]
+	}
+	w.Header().Set("X-Amz-Checksum-Type", kind)
 }
 
 type storageAttributeChecksum struct {
@@ -58,13 +62,22 @@ type storageAttributeChecksum struct {
 	CRC32     string `xml:"ChecksumCRC32,omitempty"`
 	CRC32C    string `xml:"ChecksumCRC32C,omitempty"`
 	CRC64NVME string `xml:"ChecksumCRC64NVME,omitempty"`
-	Type      string `xml:"ChecksumType"`
+	Type      string `xml:"ChecksumType,omitempty"`
 }
 
-func storageAttributeChecksums(digest string, stored map[string]string) (*storageAttributeChecksum, error) {
+func storageAttributeChecksums(digest string, stored map[string]string, policies ...storageChecksumPolicy) (*storageAttributeChecksum, error) {
 	values, err := storageStoredChecksums(digest, stored)
 	if err != nil {
 		return nil, err
 	}
-	return &storageAttributeChecksum{SHA256: values["X-Amz-Checksum-Sha256"], SHA1: values["X-Amz-Checksum-Sha1"], CRC32: values["X-Amz-Checksum-Crc32"], CRC32C: values["X-Amz-Checksum-Crc32c"], CRC64NVME: values["X-Amz-Checksum-Crc64nvme"], Type: "FULL_OBJECT"}, nil
+	kind := "FULL_OBJECT"
+	if len(policies) == 1 {
+		values, kind, err = storagePolicyValues(values, policies[0])
+		if err != nil {
+			return nil, err
+		}
+	}
+	out := storagePartChecksumXML(values)
+	out.Type = kind
+	return &out, nil
 }

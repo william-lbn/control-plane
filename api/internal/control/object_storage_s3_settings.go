@@ -340,12 +340,18 @@ func (s *server) s3ObjectAttributes(w http.ResponseWriter, r *http.Request, conn
 	var modified time.Time
 	var layout []storageObjectPart
 	var checksums map[string]string
-	e = conn.QueryRow(r.Context(), `SELECT blob_key,sha256,size,updated_at,part_layout,checksums FROM neon_storage.objects WHERE bucket=$1 AND key=$2`, bucket, key).Scan(&blob, &digest, &size, &modified, &layout, &checksums)
+	var policy storageChecksumPolicy
+	e = conn.QueryRow(r.Context(), `SELECT blob_key,sha256,size,updated_at,part_layout,checksums,checksum_policy FROM neon_storage.objects WHERE bucket=$1 AND key=$2`, bucket, key).Scan(&blob, &digest, &size, &modified, &layout, &checksums, &policy)
 	if isNoRows(e) {
 		s3Error(w, r, 404, "NoSuchKey")
 		return
 	}
 	if e != nil || !strings.HasPrefix(blob, p.ProjectID+"/") {
+		s3Error(w, r, 503, "ServiceUnavailable")
+		return
+	}
+	full, err := storageStoredChecksums(digest, checksums)
+	if err != nil || storageValidatePolicyLayout(layout, size, full, policy) != nil {
 		s3Error(w, r, 503, "ServiceUnavailable")
 		return
 	}
@@ -359,7 +365,7 @@ func (s *server) s3ObjectAttributes(w http.ResponseWriter, r *http.Request, conn
 		Parts        *storageAttributeParts    `xml:"ObjectParts,omitempty"`
 	}{XMLNS: s3XMLNamespace}
 	if requested["ObjectParts"] {
-		v.Parts, e = storagePaginateObjectParts(layout, size, max, marker)
+		v.Parts, e = storagePaginateObjectParts(layout, size, max, marker, policy)
 		if e != nil {
 			s3Error(w, r, 503, "ServiceUnavailable")
 			return
@@ -376,7 +382,7 @@ func (s *server) s3ObjectAttributes(w http.ResponseWriter, r *http.Request, conn
 		v.StorageClass = &name
 	}
 	if requested["Checksum"] {
-		v.Checksum, e = storageAttributeChecksums(digest, checksums)
+		v.Checksum, e = storageAttributeChecksums(digest, checksums, policy)
 		if e != nil {
 			s3Error(w, r, 503, "ServiceUnavailable")
 			return

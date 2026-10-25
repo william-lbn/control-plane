@@ -2,6 +2,7 @@ package control
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/xml"
 	"errors"
 	"io"
@@ -59,9 +60,23 @@ func (s *server) s3Multipart(w http.ResponseWriter, r *http.Request, conn *pgx.C
 		s3Error(w, r, 400, "InvalidArgument")
 		return
 	}
+	operation := ""
+	if r.Method == http.MethodPost {
+		if q.Has("uploads") && key != "" {
+			operation = "create"
+		} else if q.Has("uploadId") {
+			operation = "complete"
+		}
+	} else if r.Method == http.MethodPut && q.Has("partNumber") {
+		operation = "part"
+	}
+	if e := multipartChecksumHeaders(r.Header, operation); e != nil {
+		multipartError(w, r, e, true)
+		return
+	}
 	for k := range r.Header {
 		v := strings.ToLower(k)
-		if strings.HasPrefix(v, "x-amz-checksum-") || strings.HasPrefix(v, "x-amz-server-side-") || (v == "x-amz-acl" || v == "x-amz-storage-class") && !(q.Has("uploads") && r.Method == http.MethodPost && key != "") || (v == "x-amz-tagging" && !(q.Has("uploads") && r.Method == http.MethodPost && key != "")) || v == "x-amz-sdk-checksum-algorithm" || strings.HasPrefix(v, "x-amz-object-lock-") || v == "x-amz-expected-bucket-owner" || v == "x-amz-request-payer" {
+		if strings.HasPrefix(v, "x-amz-server-side-") || (v == "x-amz-acl" || v == "x-amz-storage-class") && !(q.Has("uploads") && r.Method == http.MethodPost && key != "") || (v == "x-amz-tagging" && !(q.Has("uploads") && r.Method == http.MethodPost && key != "")) || strings.HasPrefix(v, "x-amz-object-lock-") || v == "x-amz-expected-bucket-owner" || v == "x-amz-request-payer" {
 			s3Error(w, r, 501, "NotImplemented")
 			return
 		}
@@ -90,10 +105,14 @@ func (s *server) s3Multipart(w http.ResponseWriter, r *http.Request, conn *pgx.C
 			s3Error(w, r, 400, "InvalidArgument")
 			return
 		}
-		u, e := s.createMultipart(r.Context(), conn, p, principal, bucket, "", multipartCreate{Key: key, ContentType: r.Header.Get("Content-Type"), Metadata: metadata, Size: -1, Tags: tags, ResponseHeaders: headers})
+		u, e := s.createMultipart(r.Context(), conn, p, principal, bucket, "", multipartCreate{Key: key, ContentType: r.Header.Get("Content-Type"), Metadata: metadata, Size: -1, Tags: tags, ResponseHeaders: headers, ChecksumAlgorithm: r.Header.Get("X-Amz-Checksum-Algorithm"), ChecksumType: r.Header.Get("X-Amz-Checksum-Type")})
 		if e != nil {
 			multipartError(w, r, e, true)
 			return
+		}
+		if u.ChecksumAlgorithm != "" {
+			w.Header().Set("X-Amz-Checksum-Algorithm", u.ChecksumAlgorithm)
+			w.Header().Set("X-Amz-Checksum-Type", u.ChecksumType)
 		}
 		s3XML(w, 200, struct {
 			XMLName xml.Name `xml:"InitiateMultipartUploadResult"`
@@ -125,13 +144,19 @@ func (s *server) s3Multipart(w http.ResponseWriter, r *http.Request, conn *pgx.C
 			return
 		}
 		w.Header().Set("ETag", "\""+part.ETag+"\"")
+		// Only the negotiated algorithm is returned, including for UploadPartCopy.
+		selected := storagePartChecksumXML(map[string]string{storageChecksumAlgorithms[part.algorithm]: part.Checksums[storageChecksumAlgorithms[part.algorithm]]})
+		if name := storageChecksumAlgorithms[part.algorithm]; name != "" {
+			w.Header().Set(name, part.Checksums[name])
+		}
 		if r.Header.Get("X-Amz-Copy-Source") != "" {
 			s3XML(w, 200, struct {
+				storageAttributeChecksum
 				XMLName  xml.Name `xml:"CopyPartResult"`
 				XMLNS    string   `xml:"xmlns,attr"`
 				ETag     string   `xml:"ETag"`
 				Modified string   `xml:"LastModified"`
-			}{XMLNS: s3XMLNamespace, ETag: "\"" + part.ETag + "\"", Modified: part.Modified.UTC().Format(time.RFC3339Nano)})
+			}{storageAttributeChecksum: selected, XMLNS: s3XMLNamespace, ETag: "\"" + part.ETag + "\"", Modified: part.Modified.UTC().Format(time.RFC3339Nano)})
 		} else {
 			w.WriteHeader(200)
 		}
@@ -148,20 +173,32 @@ func (s *server) s3Multipart(w http.ResponseWriter, r *http.Request, conn *pgx.C
 			s3Error(w, r, 400, "MalformedXML")
 			return
 		}
-		u, e := s.completeMultipart(r.Context(), conn, p, principal, bucket, key, id, parts, r.Header.Get("If-Match"), r.Header.Get("If-None-Match"))
+		opt, e := multipartCompletionHeaders(r.Header)
+		if e != nil {
+			multipartError(w, r, e, true)
+			return
+		}
+		u, e := s.completeMultipart(r.Context(), conn, p, principal, bucket, key, id, parts, r.Header.Get("If-Match"), r.Header.Get("If-None-Match"), opt)
 		if e != nil {
 			multipartError(w, r, e, true)
 			return
 		}
 		w.Header().Set("ETag", "\""+u.SHA256+"\"")
+		checksum := storageAttributeChecksum{}
+		if u.ChecksumPolicy != (storageChecksumPolicy{}) {
+			checksum = storagePartChecksumXML(map[string]string{storageChecksumAlgorithms[u.ChecksumAlgorithm]: u.ChecksumPolicy.Value})
+			checksum.Type = u.ChecksumType
+			w.Header().Set("X-Amz-Checksum-Type", u.ChecksumType)
+		}
 		s3XML(w, 200, struct {
+			storageAttributeChecksum
 			XMLName  xml.Name `xml:"CompleteMultipartUploadResult"`
 			XMLNS    string   `xml:"xmlns,attr"`
 			Location string   `xml:"Location"`
 			Bucket   string   `xml:"Bucket"`
 			Key      string   `xml:"Key"`
 			ETag     string   `xml:"ETag"`
-		}{XMLNS: s3XMLNamespace, Location: multipartObjectLocation(p.BranchID, bucket, key), Bucket: bucket, Key: key, ETag: "\"" + u.SHA256 + "\""})
+		}{storageAttributeChecksum: checksum, XMLNS: s3XMLNamespace, Location: multipartObjectLocation(p.BranchID, bucket, key), Bucket: bucket, Key: key, ETag: "\"" + u.SHA256 + "\""})
 	case http.MethodDelete:
 		if len(data) != 0 || len(qWithoutSignature(q)) != 1 {
 			s3Error(w, r, 400, "InvalidRequest")
@@ -241,7 +278,7 @@ func parseMultipartCompletion(data []byte) ([]multipartSelection, error) {
 				part = multipartSelection{}
 				seen = map[string]bool{}
 			} else if depth == 3 {
-				if (v.Name.Local != "PartNumber" && v.Name.Local != "ETag") || seen[v.Name.Local] {
+				if (v.Name.Local != "PartNumber" && v.Name.Local != "ETag" && (!strings.HasPrefix(v.Name.Local, "Checksum") || storageChecksumAlgorithms[strings.TrimPrefix(v.Name.Local, "Checksum")] == "")) || seen[v.Name.Local] {
 					return nil, bad
 				}
 				field = v.Name.Local
@@ -260,15 +297,26 @@ func parseMultipartCompletion(data []byte) ([]multipartSelection, error) {
 			if depth == 3 {
 				if field == "ETag" {
 					part.ETag = strings.TrimSpace(value)
-				} else {
+				} else if field == "PartNumber" {
 					part.Number, e = strconv.Atoi(strings.TrimSpace(value))
 					if e != nil {
 						return nil, bad
 					}
+				} else {
+					if part.Checksums == nil {
+						part.Checksums = map[string]string{}
+					}
+					name := storageChecksumAlgorithms[strings.TrimPrefix(field, "Checksum")]
+					value = strings.TrimSpace(value)
+					raw, err := base64.StdEncoding.Strict().DecodeString(value)
+					if err != nil || len(raw) != storageChecksumSizes[name] || base64.StdEncoding.EncodeToString(raw) != value {
+						return nil, bad
+					}
+					part.Checksums[name] = value
 				}
 			}
 			if depth == 2 {
-				if len(seen) != 2 {
+				if !seen["PartNumber"] || !seen["ETag"] {
 					return nil, bad
 				}
 				parts = append(parts, part)
@@ -310,7 +358,7 @@ func (s *server) s3ListMultipartParts(w http.ResponseWriter, r *http.Request, co
 		multipartError(w, r, e, true)
 		return
 	}
-	selected := []multipartPart{}
+	selected := []multipartWirePart{}
 	truncated := false
 	next := 0
 	for _, v := range items {
@@ -322,25 +370,27 @@ func (s *server) s3ListMultipartParts(w http.ResponseWriter, r *http.Request, co
 			break
 		}
 		v.ETag = "\"" + v.ETag + "\""
-		selected = append(selected, v)
+		selected = append(selected, multipartWirePart{Number: v.Number, ETag: v.ETag, Size: v.Size, Modified: v.Modified, storageAttributeChecksum: storagePartChecksumXML(map[string]string{storageChecksumAlgorithms[u.ChecksumAlgorithm]: v.Checksums[storageChecksumAlgorithms[u.ChecksumAlgorithm]]})})
 		next = v.Number
 	}
 	owner := s3ObjectOwner{ID: principal, Name: principal}
 	s3XML(w, 200, struct {
-		XMLName   xml.Name        `xml:"ListPartsResult"`
-		XMLNS     string          `xml:"xmlns,attr"`
-		Bucket    string          `xml:"Bucket"`
-		Key       string          `xml:"Key"`
-		ID        string          `xml:"UploadId"`
-		Marker    int             `xml:"PartNumberMarker"`
-		Next      int             `xml:"NextPartNumberMarker"`
-		Max       int             `xml:"MaxParts"`
-		Truncated bool            `xml:"IsTruncated"`
-		Owner     s3ObjectOwner   `xml:"Owner"`
-		Initiator s3ObjectOwner   `xml:"Initiator"`
-		Storage   string          `xml:"StorageClass"`
-		Parts     []multipartPart `xml:"Part"`
-	}{XMLNS: s3XMLNamespace, Bucket: bucket, Key: key, ID: id, Marker: marker, Next: next, Max: max, Truncated: truncated, Owner: owner, Initiator: owner, Storage: "STANDARD", Parts: selected})
+		XMLName   xml.Name            `xml:"ListPartsResult"`
+		XMLNS     string              `xml:"xmlns,attr"`
+		Bucket    string              `xml:"Bucket"`
+		Key       string              `xml:"Key"`
+		ID        string              `xml:"UploadId"`
+		Marker    int                 `xml:"PartNumberMarker"`
+		Next      int                 `xml:"NextPartNumberMarker"`
+		Max       int                 `xml:"MaxParts"`
+		Truncated bool                `xml:"IsTruncated"`
+		Owner     s3ObjectOwner       `xml:"Owner"`
+		Initiator s3ObjectOwner       `xml:"Initiator"`
+		Storage   string              `xml:"StorageClass"`
+		Algorithm string              `xml:"ChecksumAlgorithm,omitempty"`
+		Type      string              `xml:"ChecksumType,omitempty"`
+		Parts     []multipartWirePart `xml:"Part"`
+	}{XMLNS: s3XMLNamespace, Bucket: bucket, Key: key, ID: id, Marker: marker, Next: next, Max: max, Truncated: truncated, Owner: owner, Initiator: owner, Storage: "STANDARD", Algorithm: u.ChecksumAlgorithm, Type: u.ChecksumType, Parts: selected})
 }
 func (s *server) s3ListMultipart(w http.ResponseWriter, r *http.Request, conn *pgx.Conn, p objectStoragePayload, principal, bucket string, q url.Values) {
 	max, e := multipartNumber(q, "max-uploads", 1000, 1, 1000)
@@ -378,7 +428,7 @@ func (s *server) s3ListMultipart(w http.ResponseWriter, r *http.Request, conn *p
 			return
 		}
 	}
-	rows, e := conn.Query(r.Context(), `SELECT id,key,created_at FROM neon_storage.multipart_uploads WHERE branch_id=$1 AND principal=$2 AND bucket=$3 AND state='uploading' AND starts_with(key,$4) ORDER BY key COLLATE "C",created_at,id LIMIT $5`, p.BranchID, principal, bucket, prefix, multipartActiveLimit+1)
+	rows, e := conn.Query(r.Context(), `SELECT id,key,created_at,checksum_algorithm,checksum_type FROM neon_storage.multipart_uploads WHERE branch_id=$1 AND principal=$2 AND bucket=$3 AND state='uploading' AND starts_with(key,$4) ORDER BY key COLLATE "C",created_at,id LIMIT $5`, p.BranchID, principal, bucket, prefix, multipartActiveLimit+1)
 	if e != nil {
 		multipartError(w, r, e, true)
 		return
@@ -391,6 +441,8 @@ func (s *server) s3ListMultipart(w http.ResponseWriter, r *http.Request, conn *p
 		Owner     s3ObjectOwner `xml:"Owner"`
 		Initiator s3ObjectOwner `xml:"Initiator"`
 		Storage   string        `xml:"StorageClass"`
+		Algorithm string        `xml:"ChecksumAlgorithm,omitempty"`
+		Type      string        `xml:"ChecksumType,omitempty"`
 	}
 	items := []upload{}
 	prefixes := []struct {
@@ -408,9 +460,9 @@ func (s *server) s3ListMultipart(w http.ResponseWriter, r *http.Request, conn *p
 		return v
 	}
 	for rows.Next() {
-		var id, key string
+		var id, key, algorithm, kind string
 		var created time.Time
-		if e = rows.Scan(&id, &key, &created); e != nil {
+		if e = rows.Scan(&id, &key, &created, &algorithm, &kind); e != nil {
 			multipartError(w, r, e, true)
 			return
 		}
@@ -439,7 +491,7 @@ func (s *server) s3ListMultipart(w http.ResponseWriter, r *http.Request, conn *p
 			}{encode(group)})
 			nextKey, nextID = group, ""
 		} else {
-			items = append(items, upload{encode(key), id, created.UTC().Format(time.RFC3339Nano), owner, owner, "STANDARD"})
+			items = append(items, upload{encode(key), id, created.UTC().Format(time.RFC3339Nano), owner, owner, "STANDARD", algorithm, kind})
 			nextKey, nextID = key, id
 		}
 	}
