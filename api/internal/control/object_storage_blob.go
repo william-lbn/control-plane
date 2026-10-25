@@ -18,9 +18,8 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
-const storageObjectLimit = 64 << 20
+const storageObjectLimit = storageObjectFormatLimit
 const storagePartLimit = 8 << 20
-const storageBranchLimit = 256 << 20
 
 // This credential must be provisioned with ListBucket/GetObject/PutObject only
 // on the product bucket. It must never be a Pageserver or MinIO root credential.

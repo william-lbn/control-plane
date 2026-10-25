@@ -1,0 +1,168 @@
+{
+  "basic_accepted_groups": [
+    "F01",
+    "F02",
+    "F03",
+    "F04",
+    "F05",
+    "S01",
+    "A01",
+    "C01",
+    "L01",
+    "Q01",
+    "Q02",
+    "Q03",
+    "I01",
+    "A04",
+    "S04",
+    "A02",
+    "A03",
+    "A05"
+  ],
+  "remaining_business_groups": [
+    "C02",
+    "S02",
+    "S03",
+    "S05",
+    "L02",
+    "L03",
+    "F06",
+    "I02",
+    "O03"
+  ],
+  "remaining_other_groups": [
+    "O01",
+    "T01",
+    "O02"
+  ],
+  "deferred_groups": [
+    "R01",
+    "R02",
+    "X01",
+    "H01",
+    "H02"
+  ],
+  "frozen_migrations": {
+    "058": "ef77ef8aa674bba9f5a75750d944ba3bb297d988b8aa9a689c1ad99dccdaf282",
+    "059": "48de708734444ab625c3955510dd28c66e772e9f536ecb2b32b10f4de7986fce",
+    "060": "f058d1417b0eb6cb72e4229777ada1248f9738c798b1fcb3664e3fb7f048d53b",
+    "061": "e8bf3d9cbce1e6d22c6a61f0e101d7ad9164aa0581be8d1bc0b2d0449fdaa4ac",
+    "062": "c7e7b0abae640799c0afc5b471c08ff043c730409d7a2edfdc6d0d20b90299a7",
+    "063": "9ddc0b968d693631ac4066f589e9f99d6741c8724d29bea4e00a02ebec5e107c",
+    "064": "3b4878bfd9506b74778e78ac67a569bfa430d8b8757d067531776635a5a69e1a",
+    "065": "b24d7ccb858a66a1a2bc42541bca9e8d53136f84c3fb5dc4f3bc263c7f1792f0",
+    "066": "253b62fd88b2a619dd4a06646fb0f2531eb4d49b0cbca7fdc8a9dbc627e55489",
+    "067": "fb5ec4e9082cdfa144cc7859ccd81c5b88a4398b8dfa8bef61cf417fa897f8c3"
+  },
+  "result": "pass",
+  "recorded_on": "2026-10-25",
+  "api_version": "0.87.0",
+  "chart_version": "0.9.84",
+  "schema": 67,
+  "helm_revision": 183,
+  "native_format": 5,
+  "native_checksum_asset_sha256": "244874a4a4c3de1b3cb2ca3578f2d9693ffed1f5cc6ba0ed5c467aa212c374c8",
+  "whole_product_complete": false,
+  "production_qualified": false,
+  "S02_whole_group_complete": false,
+  "S02_remaining_implementation": [
+    "5 GiB object capacity",
+    "explicit multipart checksum negotiation and COMPOSITE"
+  ],
+  "new_unique_Go_functional_groups": 5,
+  "new_Go_group_names": [
+    "TestTrailerCRC64NVMEActualSignerAndTamper",
+    "TestStorageFullChecksumKnownVectorsAndStrictDeclaration",
+    "TestStorageStoredChecksumLegacyFallbackCorruptionAndNoAliasing",
+    "TestStorageFullChecksumPostgresPublicationReadsCopyAndOverwrite",
+    "TestStorageFullChecksumPostgresMultipartReplayAndAdditiveSchema"
+  ],
+  "affected_Go_groups": 8,
+  "affected_Go_group_names": [
+    "TestOpenAPIRouteParity",
+    "TestOpenAPIReferencesAndSessionContract",
+    "TestOpenAPIOperationIDs",
+    "TestStoragePayloadChecksumAlgorithmsAndControlRequestSeparation",
+    "TestStorageObjectAttributesPostgresActualSDKPublicationAndOverwrite",
+    "TestStorageCopyUsesRealPostgresConditionsAndSharedBlobReferences",
+    "TestStorageLargeSchemaUpgradePreservesExistingObjectsAndPartBounds",
+    "TestMultipartPostgreSQLAtomicPublicationIsolationReplayAndAbort"
+  ],
+  "live_functional_unique_checkpoints": [
+    "actual_Boto3_CRC64NVME_PUT_and_all_five_HEAD_GET_attributes",
+    "bad_CRC64_rejected_without_publication",
+    "copy_preserves_and_overwrite_replaces_all_checksums",
+    "multipart_publishes_full_byte_checksums_in_same_generation"
+  ],
+  "new_objects": [
+    {
+      "checksum_fields": 5,
+      "key": "checksums/copy",
+      "size": 0
+    },
+    {
+      "checksum_fields": 5,
+      "key": "checksums/multipart",
+      "size": 9
+    },
+    {
+      "checksum_fields": 5,
+      "key": "checksums/source",
+      "size": 9
+    }
+  ],
+  "new_object_content_bytes": 18,
+  "old_native_tables_unchanged": 6,
+  "catalog_tables_unchanged": 17,
+  "old_checksum_values_fabricated": false,
+  "old_byte_backfill": false,
+  "owned_credential_revoked": true,
+  "original_writer_suspended": true,
+  "old_functional_tests_repeated": false,
+  "affected_functional_paths_rechecked": true,
+  "new_image_builds": 1,
+  "LAN_imported_nodes": 3,
+  "repeated_WAN_downloads": false,
+  "existing_Boto3_version": "1.34.46",
+  "Boto3_CRC64_compatibility": "standard signing hook and raw headers/XML; retained model predates CRC64NVME",
+  "final_guards": {
+    "schema": 67,
+    "bootstrap": 147,
+    "nonretired_functions": 0,
+    "result": "pass",
+    "managed_Auth_workloads_at_zero": 30,
+    "nodes_ready": 3,
+    "safekeepers_ready": 3,
+    "critical_ready": 7,
+    "VM": 0,
+    "pvc_UIDs_retained": 9,
+    "original_secret_UIDs_retained": 953,
+    "final_persistent_secret_count": 953,
+    "other_Helm_releases_unchanged": 6,
+    "helm_revision": 183,
+    "credentials_exported": false,
+    "performance_reliability_campaign": false,
+    "source_proof": {
+      "matched_non_document_inputs": 924,
+      "compiled_Go_SQL_inputs": 523,
+      "new_test_only_file": "tools/storage-checksum-live.mjs",
+      "tested_probe_sha256": "31f8e6d82457e6d3dd2a189bb4369ed67f942df0be2b3c0948d78f490430ad0d",
+      "source_sha256": "1dc305bd4025b44a0159f0f5366817e3f9ce177eb3c21c54c02ad21b0b3f2d6e",
+      "archive_sha256": "bd7e44e2fa48760f81b511a3936708dd90643b2c01fa2ddf551d0927815b483f",
+      "runtime_rebuilds_after_live": false
+    }
+  },
+  "failed_attempts_retained": [
+    "third node SSH connection dropped before import; resumed original archive without rebuild",
+    "post-revocation read-only proof SQL used nonexistent function; corrected and continued without replaying revocation",
+    "final guard count confused eight selected Auth generations with all thirty deployments; observed all at zero and corrected guard"
+  ],
+  "performance_reliability_campaign": false,
+  "capacity_validation": "5 GiB actual bytes deferred; implementation still missing",
+  "GitHub_run_state": "success",
+  "GitHub_run_id": 40149882469,
+  "GitHub_run_url": "https://github.com/william-lbn/control-plane/actions/runs/40149882469",
+  "GitHub_source_commit": "ac13732e919670c8c085333dbf5eb4dce2944a81",
+  "GitHub_successful_jobs": 15,
+  "subsequent_capacity_delivery": "2026-10-25-storage-capacity-functional.json"
+}

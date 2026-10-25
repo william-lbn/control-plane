@@ -176,5 +176,9 @@
   "performance_reliability_campaign": false,
   "capacity_validation": "deferred to suitable environment; 5 GiB client and server implementation still missing",
   "required_GitHub_jobs": 15,
-  "GitHub_run_state": "pending after this commit"
+  "GitHub_run_state": "success",
+  "GitHub_run_id": 40146882624,
+  "GitHub_run_url": "https://github.com/william-lbn/control-plane/actions/runs/40146882624",
+  "GitHub_source_commit": "76a769922f2ad73c2b03ec1046a11aec06b3fb37",
+  "GitHub_successful_jobs": 15
 }

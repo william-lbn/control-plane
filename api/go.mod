@@ -78,7 +78,9 @@ require (
 	github.com/klauspost/compress v1.18.6 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.11 // indirect
 	github.com/klauspost/crc32 v1.3.0 // indirect
-	github.com/minio/crc64nvme v1.1.1 // indirect
+	github.com/kr/text v0.2.0 // indirect
+	// 主线CRC64现在直接引用；保留其依赖性质，同时保留下方DSGA准确fork替换。
+	github.com/minio/crc64nvme v1.1.1
 	github.com/minio/md5-simd v1.1.2 // indirect
 	github.com/neondatabase/autoscaling v0.0.0-20261020225115-3eeafd997c8c
 	github.com/philhofer/fwd v1.2.0 // indirect

@@ -17,6 +17,8 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/minio/crc64nvme"
 )
 
 // Buffers contain uncommitted private bytes, never durable object references.
@@ -110,7 +112,7 @@ func smallStoragePayload(data []byte) (*storagePayload, error) {
 }
 
 func storagePayloadHashes() map[string]hash.Hash {
-	return map[string]hash.Hash{"Content-MD5": md5.New(), "X-Amz-Checksum-Sha256": sha256.New(), "X-Amz-Checksum-Sha1": sha1.New(), "X-Amz-Checksum-Crc32": crc32.NewIEEE(), "X-Amz-Checksum-Crc32c": crc32.New(crc32.MakeTable(crc32.Castagnoli))}
+	return map[string]hash.Hash{"Content-MD5": md5.New(), "X-Amz-Checksum-Crc64nvme": crc64nvme.New(), "X-Amz-Checksum-Sha256": sha256.New(), "X-Amz-Checksum-Sha1": sha1.New(), "X-Amz-Checksum-Crc32": crc32.NewIEEE(), "X-Amz-Checksum-Crc32c": crc32.New(crc32.MakeTable(crc32.Castagnoli))}
 }
 
 type storagePayloadWriter struct {
@@ -223,6 +225,11 @@ func readStoragePayload(ctx context.Context, source io.Reader, limit int64) (*st
 }
 
 func validateStoragePayloadChecksums(headers http.Header, p *storagePayload) error {
+	for _, name := range []string{"X-Amz-Checksum-Type", "X-Amz-Sdk-Checksum-Algorithm"} {
+		if len(headers.Values(name)) > 1 {
+			return multipartFault(400, "BadDigest")
+		}
+	}
 	for name, expected := range p.checksums {
 		values := headers.Values(name)
 		if len(values) > 1 || len(values) == 1 && values[0] != expected {
@@ -241,7 +248,7 @@ func validateStoragePayloadChecksums(headers http.Header, p *storagePayload) err
 		return multipartFault(501, "NotImplemented")
 	}
 	if algorithm := headers.Get("X-Amz-Sdk-Checksum-Algorithm"); algorithm != "" {
-		name := map[string]string{"SHA256": "X-Amz-Checksum-Sha256", "SHA1": "X-Amz-Checksum-Sha1", "CRC32": "X-Amz-Checksum-Crc32", "CRC32C": "X-Amz-Checksum-Crc32c"}[algorithm]
+		name := map[string]string{"SHA256": "X-Amz-Checksum-Sha256", "SHA1": "X-Amz-Checksum-Sha1", "CRC32": "X-Amz-Checksum-Crc32", "CRC32C": "X-Amz-Checksum-Crc32c", "CRC64NVME": "X-Amz-Checksum-Crc64nvme"}[algorithm]
 		if name == "" {
 			return multipartFault(501, "NotImplemented")
 		}

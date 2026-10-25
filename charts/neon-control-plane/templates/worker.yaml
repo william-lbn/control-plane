@@ -93,6 +93,7 @@ spec:
             - {name: NEON_BACKEND_CREDENTIAL_KEYS_FILE, value: /run/backend-keys/keyring.json}
             {{- end }}
             {{- include "neonControl.runtimeEnv" . | nindent 12 }}
+            {{- include "neonControl.storageCapacityEnv" . | nindent 12 }}
           volumeMounts:
             {{- include "neonControl.providerMounts" (dict "root" . "private" true) | nindent 12 }}
             {{- include "neonControl.functionsMounts" . | nindent 12 }}

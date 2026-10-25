@@ -88,8 +88,8 @@ func (s *server) s3Invoke(w http.ResponseWriter, r *http.Request) {
 	var data []byte
 	var payload *storagePayload
 	if s3StreamingObjectPUT(r) {
-		payload, e = buildStoragePayload(r.Context(), storageObjectLimit, func(dst io.Writer) error {
-			return signature.VerifyAndDecodeTo(r, r.Body, dst, storageSigningSecret(token), s3Region(), storageObjectLimit)
+		payload, e = buildStoragePayload(r.Context(), storageObjectAdmissionLimit(), func(dst io.Writer) error {
+			return signature.VerifyAndDecodeTo(r, r.Body, dst, storageSigningSecret(token), s3Region(), storageObjectAdmissionLimit())
 		})
 		if e != nil {
 			if errors.Is(e, s3protocol.ErrSignature) {
@@ -354,11 +354,11 @@ func (s *server) s3Invoke(w http.ResponseWriter, r *http.Request) {
 }
 func (s *server) serveS3Object(w http.ResponseWriter, r *http.Request, conn *pgx.Conn, p objectStoragePayload, bucket, key string) {
 	var blob, digest, contentType string
-	var metadata, responseHeaders map[string]string
+	var metadata, responseHeaders, checksums map[string]string
 	var tags []storageTag
 	var size int64
 	var modified time.Time
-	e := conn.QueryRow(r.Context(), `SELECT blob_key,sha256,size,content_type,updated_at,metadata,response_headers,tags FROM neon_storage.objects WHERE bucket=$1 AND key=$2`, bucket, key).Scan(&blob, &digest, &size, &contentType, &modified, &metadata, &responseHeaders, &tags)
+	e := conn.QueryRow(r.Context(), `SELECT blob_key,sha256,size,content_type,updated_at,metadata,response_headers,tags,checksums FROM neon_storage.objects WHERE bucket=$1 AND key=$2`, bucket, key).Scan(&blob, &digest, &size, &contentType, &modified, &metadata, &responseHeaders, &tags, &checksums)
 	if isNoRows(e) {
 		s3Error(w, r, 404, "NoSuchKey")
 		return
@@ -378,8 +378,19 @@ func (s *server) serveS3Object(w http.ResponseWriter, r *http.Request, conn *pgx
 		s.storagePayloadFailure(w, r, e, true)
 		return
 	}
+	declared, e := storageStoredChecksums(digest, checksums)
+	if e != nil {
+		s3Error(w, r, 503, "ServiceUnavailable")
+		return
+	}
+	for name, value := range declared {
+		if data.checksums[name] != value {
+			s3Error(w, r, 503, "ServiceUnavailable")
+			return
+		}
+	}
 	if r.Header.Get("X-Amz-Checksum-Mode") == "ENABLED" && r.Header.Get("Range") == "" {
-		writeStoragePayloadChecksums(w, r, data)
+		writeStoredStorageChecksums(w, declared)
 	}
 	w.Header().Set("ETag", "\""+digest+"\"")
 	w.Header().Set("X-Amz-Version-Id", "null")
@@ -642,7 +653,7 @@ func (s *server) s3WritePayload(w http.ResponseWriter, r *http.Request, conn *pg
 			s3Error(w, r, 503, "ServiceUnavailable")
 			return false
 		}
-		if previous == "" && count >= 1000 || total-oldSize+data.Size > storageBranchLimit {
+		if previous == "" && count >= 1000 || total-oldSize+data.Size > storageBranchAdmissionLimit() {
 			s3Error(w, r, 429, "QuotaExceeded")
 			return false
 		}
@@ -662,7 +673,7 @@ func (s *server) s3WritePayload(w http.ResponseWriter, r *http.Request, conn *pg
 			s3Error(w, r, 503, "ServiceUnavailable")
 			return false
 		}
-		_, e = tx.Exec(r.Context(), `INSERT INTO neon_storage.objects(bucket,key,blob_key,sha256,size,content_type,metadata,tags,response_headers) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(bucket,key) DO UPDATE SET blob_key=$3,sha256=$4,size=$5,content_type=$6,metadata=$7,tags=$8,response_headers=$9,part_layout='[]'::jsonb,updated_at=now()`, bucket, key, blob, digest, data.Size, contentType, metadata, tags, responseHeaders)
+		_, e = tx.Exec(r.Context(), `INSERT INTO neon_storage.objects(bucket,key,blob_key,sha256,size,content_type,metadata,tags,response_headers,checksums) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(bucket,key) DO UPDATE SET blob_key=$3,sha256=$4,size=$5,content_type=$6,metadata=$7,tags=$8,response_headers=$9,checksums=$10,part_layout='[]'::jsonb,updated_at=now()`, bucket, key, blob, digest, data.Size, contentType, metadata, tags, responseHeaders, data.storedChecksums())
 		if e == nil {
 			e = s.publishStorageFunctionEvent(r.Context(), tx, p, bucket, key, digest, data.Size)
 		}

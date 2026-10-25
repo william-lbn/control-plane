@@ -7,7 +7,7 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 
 功能进度与当前优先级见 [已验收/剩余清单](docs/FUNCTIONAL-STATUS-2026-10-21.md)：18 组基础已有回执；五组专项后置，12 组尚未整体闭环。后续优先业务功能，复用来源未变的既有验收。
 
-最新状态：2026-10-25 CLI/MCP：[CLI 与官方 MCP SDK 双协议基线](docs/DELIVERY-2026-10-25-CONTROL-CLIENTS.md)通过 15 组新增 Linux 功能检查和七个累计真实接口检查点；两组受影响路径复验，原 Go/Web/Helm 功能不重测。创建/读取/版本更新、原键回执、冲突/跨项目拒绝及撤销后即时拒绝通过；未执行 SQL 或启动 Compute，原保存查询摘要保持一致。离线运行包复用缓存，两个终态 QA Job 已归档退休。服务端仍为 API 0.86.0 / schema 067 / Core Helm 182；O03 账单接口与外部支付继续，容量/性能验证按既定边界后置。
+最新状态：2026-10-25 容量配置：[5 GiB 格式与运营配置](docs/DELIVERY-2026-10-25-STORAGE-CAPACITY.md)通过七组新增 Go/PG、六组受影响检查、三组 Helm 和五个现场检查点。65 MiB 私有文件、5 GiB 元数据、64 位计数、预算/时限、默认超限拒绝及降低预算保留引用通过；5 GiB 全量字节验证后置。API/Worker 0.88.0 / Chart 0.9.85 / Core Helm 184 / schema 067 / 原生格式 6；当前仍保留 64 MiB 默认准入。原六类存储清单（含 checksum）、17 张目录表、953 Secret UID、9 PVC 和其他六套发行保留，VM 0；S02 的 multipart 扩展 checksum/COMPOSITE 协商继续。
 
 此前状态：2026-10-25 AI 持久状态：[供应商响应与会话](docs/DELIVERY-2026-10-25-AI-PROVIDER-STATE.md)通过 15 组新增 Go/PG、4 组受影响检查和 6 个累计实机检查点；复用前三项和原已完成 SSE，未重复推理。原生 JSON/SSE、响应续接、会话/条目、不可变加密引用及未知结果核对通过。API/Worker/AI 0.85.0，Web 重建，schema 066 / Chart 0.9.82 / Core Helm 180；原 17 张目录表、946 个持久 Secret UID、9 PVC 和另外六套发行配置保留，最终三节点/三个 Safekeeper Ready，VM 0。临时配置已撤下、合成服务归档后缩零。I02 外部账单/支付及其他业务继续；性能、可靠性后置。
 

@@ -48,11 +48,11 @@ func (s *server) s3BrowserPost(w http.ResponseWriter, r *http.Request) bool {
 		s3Error(w, r, 400, "InvalidURI")
 		return true
 	}
-	if r.ContentLength > storageObjectLimit+(128<<10) {
+	if r.ContentLength > storageObjectAdmissionLimit()+(128<<10) {
 		s3Error(w, r, 413, "EntityTooLarge")
 		return true
 	}
-	r.Body = http.MaxBytesReader(w, r.Body, storageObjectLimit+(128<<10))
+	r.Body = http.MaxBytesReader(w, r.Body, storageObjectAdmissionLimit()+(128<<10))
 	reader, e := r.MultipartReader()
 	if e != nil {
 		s3Error(w, r, 400, "MalformedPOSTRequest")
@@ -84,7 +84,7 @@ func (s *server) s3BrowserPost(w http.ResponseWriter, r *http.Request) bool {
 		name := strings.ToLower(part.FormName())
 		if name == "file" {
 			filename = part.FileName()
-			payload, e = readStoragePayload(r.Context(), part, storageObjectLimit)
+			payload, e = readStoragePayload(r.Context(), part, storageObjectAdmissionLimit())
 			part.Close()
 			if e != nil {
 				s.storagePayloadFailure(w, r, e, true)
@@ -114,7 +114,7 @@ func (s *server) s3BrowserPost(w http.ResponseWriter, r *http.Request) bool {
 		s3Error(w, r, 400, "MalformedPOSTRequest")
 		return true
 	}
-	policy, e := s3protocol.ParsePostPolicy(fields, bucket, filename, s3Region(), time.Now(), storageObjectLimit)
+	policy, e := s3protocol.ParsePostPolicy(fields, bucket, filename, s3Region(), time.Now(), storageObjectAdmissionLimit())
 	if e != nil {
 		s3Error(w, r, 403, "SignatureDoesNotMatch")
 		return true
@@ -158,7 +158,7 @@ func (s *server) s3BrowserPost(w http.ResponseWriter, r *http.Request) bool {
 				return true
 			}
 			status, _ = strconv.Atoi(value)
-		case "content-type", "content-disposition", "cache-control", "content-md5", "x-amz-checksum-sha256", "x-amz-checksum-sha1", "x-amz-checksum-crc32", "x-amz-checksum-crc32c", "x-amz-sdk-checksum-algorithm":
+		case "content-type", "content-disposition", "cache-control", "content-md5", "x-amz-checksum-sha256", "x-amz-checksum-sha1", "x-amz-checksum-crc32", "x-amz-checksum-crc32c", "x-amz-checksum-crc64nvme", "x-amz-sdk-checksum-algorithm":
 			headers.Set(name, value)
 		case "acl":
 			if value != "private" {

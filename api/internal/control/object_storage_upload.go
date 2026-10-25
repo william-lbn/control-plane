@@ -53,7 +53,7 @@ func (s *server) decodeStorageUpload(token string) (storageUpload, bool) {
 		return v, false
 	}
 	raw, e := base64.RawURLEncoding.DecodeString(parts[0])
-	if e != nil || json.Unmarshal(raw, &v) != nil || v.Expires <= time.Now().Unix() || v.Expires > time.Now().Add(15*time.Minute).Unix() || !validStorageKey(v.Key) || !storageBucketName.MatchString(v.Bucket) || !dataBranchID.MatchString(v.Branch) || v.Actor == "" || v.Generation < 1 || !storageSHA256.MatchString(v.SHA256) || v.Size < 0 || v.Size > storageObjectLimit {
+	if e != nil || json.Unmarshal(raw, &v) != nil || v.Expires <= time.Now().Unix() || v.Expires > time.Now().Add(15*time.Minute).Unix() || !validStorageKey(v.Key) || !storageBucketName.MatchString(v.Bucket) || !dataBranchID.MatchString(v.Branch) || v.Actor == "" || v.Generation < 1 || !storageSHA256.MatchString(v.SHA256) || v.Size < 0 || v.Size > storageObjectAdmissionLimit() {
 		return v, false
 	}
 	_, _, e = mime.ParseMediaType(v.ContentType)
@@ -67,7 +67,7 @@ func (s *server) storagePresignUpload(w http.ResponseWriter, r *http.Request) {
 		Size        int64  `json:"size"`
 		ContentType string `json:"content_type"`
 	}
-	if readJSON(r, &input) != nil || !validStorageKey(input.Key) || input.Expires < 1 || input.Expires > 900 || !storageSHA256.MatchString(input.SHA256) || input.Size < 0 || input.Size > storageObjectLimit || len(input.ContentType) > 256 {
+	if readJSON(r, &input) != nil || !validStorageKey(input.Key) || input.Expires < 1 || input.Expires > 900 || !storageSHA256.MatchString(input.SHA256) || input.Size < 0 || input.Size > storageObjectAdmissionLimit() || len(input.ContentType) > 256 {
 		fail(w, r, 422, "invalid_presign", "Valid key, SHA-256, size, Content-Type and expiry 1 to 900 required")
 		return
 	}
@@ -117,8 +117,13 @@ func (s *server) storagePublicUpload(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 403, "invalid_upload_capability", "Upload capability rejected")
 		return
 	}
+	r, done, ok := storageAdmit(w, r)
+	if !ok {
+		return
+	}
+	defer done()
 	// Invalid or changed bytes are rejected before opening/waking a compute.
-	data, e := readStoragePayload(r.Context(), r.Body, storageObjectLimit)
+	data, e := readStoragePayload(r.Context(), r.Body, storageObjectAdmissionLimit())
 	if e != nil {
 		s.storagePayloadFailure(w, r, e, false)
 		return
@@ -132,11 +137,6 @@ func (s *server) storagePublicUpload(w http.ResponseWriter, r *http.Request) {
 		s.storagePayloadFailure(w, r, e, false)
 		return
 	}
-	r, done, ok := storageAdmit(w, r)
-	if !ok {
-		return
-	}
-	defer done()
 	conn, p, close, e := s.openObjectStorage(r, "", v.Branch)
 	if e != nil {
 		s.storageFailure(w, r, e)
