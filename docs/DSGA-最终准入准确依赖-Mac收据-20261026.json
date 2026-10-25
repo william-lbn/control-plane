@@ -1,0 +1,21 @@
+{
+  "created_at": "2026-10-25T19:00:30.100608+00:00",
+  "branch": "codex/dsga-control-plane-v3-20261020",
+  "as_commit": "d6979c068866b310e0cfc1dd04a075081b1684a9",
+  "pseudo": "v0.0.0-20261025185856-d6979c068866",
+  "OriginHash": "d6979c068866b310e0cfc1dd04a075081b1684a9",
+  "sum_delta": 2,
+  "readonly_vet_exit": 0,
+  "source_sha256": {
+    "repos/control-plane/api/go.mod": "21b169ec479903ec6943eee7e2880d303104251d775489b11bd42a367294522e",
+    "repos/control-plane/api/go.sum": "266bf0d1a2f79770e52a1b2295ce15f2e033677ab6b1e7c17b8e7d0515076394",
+    "repos/control-plane/docs/DSGA-最终准入准确依赖-Mac验收-20261026.md": "50c65bbac0598feeadc8621b31474d5f6c15260d324dc5d5ab46b31a141b7bf1"
+  },
+  "log_and_recipe_sha256": {
+    "build/dsga-admission-root-cp-module.json": "d1285b27c850e499f6ff655a233955e4f4b33264781439613ad0bc88a6d1a51f",
+    "build/dsga-admission-root-cp-module.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "build/dsga-admission-root-cp-vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "build/run-dsga-admission-root-cp-dependency.py": "0e015a283fa160780d314d8ca6c5844a8a9ff81ad69775b3de0589a324ba167a"
+  },
+  "scope": "accurate dependencycompile/vet only; no repeat unchanged business; overall incomplete"
+}
