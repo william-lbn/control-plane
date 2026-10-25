@@ -11,6 +11,7 @@ import { Empty, PageHeading } from '../../shared/ui';
 import { Invitations } from './Invitations';
 import { AICredits } from '../ai/AICredits';
 import { ServicePlans } from './ServicePlans';
+import { Billing } from './Billing';
 
 type Member = { user_id: string; username: string; role: string };
 type Key = {
@@ -118,6 +119,7 @@ export function Organizations({
         <>
           <ServicePlans key={'plans:' + organization.id} organizationId={organization.id} />
           <AICredits key={organization.id} organizationId={organization.id} />
+          <Billing key={'billing:' + organization.id} organizationId={organization.id} />
           <AIOrganizationProviders
             key={'byok-' + organization.id}
             organizationId={organization.id}
