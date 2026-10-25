@@ -1,0 +1,12 @@
+{
+  "name": "@william-lbn/control-clients",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "license": "Apache-2.0",
+  "engines": { "node": ">=24.5 <25" },
+  "bin": { "neon-control": "./cli.mjs", "neon-control-mcp": "./mcp.mjs" },
+  "scripts": { "test": "node --test test/*.test.mjs" },
+  "dependencies": { "@modelcontextprotocol/server": "2.4.0", "zod": "4.6.7" },
+  "devDependencies": { "@modelcontextprotocol/client": "2.4.0" }
+}

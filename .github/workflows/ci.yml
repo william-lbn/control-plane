@@ -68,6 +68,18 @@ jobs:
       - run: npm run format:check
       - run: npm test
       - run: npm run build
+  clients:
+    name: CLI and MCP official SDK interoperability
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    defaults:
+      run: {working-directory: clients}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with: {node-version: '24.19.0', cache: npm, cache-dependency-path: clients/package-lock.json}
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: node --test --test-concurrency=1 --test-timeout=30000 test/*.test.mjs
   helm:
     name: Helm rendering and rejection gates
     runs-on: ubuntu-24.04
@@ -124,7 +136,7 @@ jobs:
       - run: npm test
   publish:
     name: Publish ${{ matrix.component }}
-    needs: [go, web, helm, workflows, auth, functions]
+    needs: [go, web, helm, workflows, auth, functions, clients]
     if: github.event_name != 'pull_request' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
     runs-on: ubuntu-24.04
     timeout-minutes: 20
