@@ -17,3 +17,5 @@
 下一步连接管理员准入、自动备份/物理 fork、原检查点续办、目录和元数据原子切换、失败回退、控制台及真实 Neon 验收。Auth、Storage 和 Function 一致性语义仍属 L03 未完成项。性能、可靠性、HA/DR、完整大对象字节验证继续后置。
 
 见[结构化验收](acceptance/2026-10-26-branch-reset-primitives-functional.json)及[当前剩余清单](FUNCTIONAL-STATUS-2026-10-21.md)。
+
+提交 `6e0214c227f12721b12db26ab2b8aeb3c7d1610d` 的 [GitHub 运行 40282082327](https://github.com/william-lbn/control-plane/actions/runs/40282082327) 已完成，15 项检查全部成功；本回执随下一功能增量归档。

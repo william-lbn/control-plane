@@ -237,6 +237,9 @@ func (s *server) openObjectStorage(r *http.Request, project, branch string) (*pg
 	if s.storage == nil {
 		return nil, p, nil, errors.New("Object Storage Driver disabled")
 	}
+	if err := s.admitStorageUsage(r, project, branch); err != nil {
+		return nil, p, nil, err
+	}
 	tx, err := s.db.Begin(r.Context())
 	if err != nil {
 		return nil, p, nil, err
@@ -245,18 +248,30 @@ func (s *server) openObjectStorage(r *http.Request, project, branch string) (*pg
 	var raw []byte
 	// Match lifecycle's lock order: project, branch, service. This prevents a
 	// disable and project deletion from waiting on each other's row locks.
-	err = tx.QueryRow(r.Context(), `SELECT p.id FROM projects p JOIN branches b ON b.project_id=p.id WHERE b.id=$1 AND ($2='' OR p.id=$2) AND p.state='ready' AND p.deleted_at IS NULL FOR SHARE OF p`, branch, project).Scan(&p.ProjectID)
+	projectLock := `SELECT p.id FROM projects p JOIN branches b ON b.project_id=p.id WHERE b.id=$1 AND ($2='' OR p.id=$2) AND p.state='ready' AND p.deleted_at IS NULL FOR SHARE OF p`
+	if s.processRole == roleStorageGateway {
+		projectLock = `SELECT * FROM storage_gateway_lock_project($1,$2)`
+	}
+	err = tx.QueryRow(r.Context(), projectLock, branch, project).Scan(&p.ProjectID)
 	if err != nil {
 		cleanup()
 		return nil, p, nil, err
 	}
 	var branchID string
-	err = tx.QueryRow(r.Context(), `SELECT id FROM branches WHERE id=$1 AND project_id=$2 AND state='ready' AND deleted_at IS NULL FOR SHARE`, branch, p.ProjectID).Scan(&branchID)
+	branchLock := `SELECT id FROM branches WHERE id=$1 AND project_id=$2 AND state='ready' AND deleted_at IS NULL FOR SHARE`
+	if s.processRole == roleStorageGateway {
+		branchLock = `SELECT * FROM storage_gateway_lock_branch($1,$2)`
+	}
+	err = tx.QueryRow(r.Context(), branchLock, branch, p.ProjectID).Scan(&branchID)
 	if err != nil {
 		cleanup()
 		return nil, p, nil, err
 	}
-	err = tx.QueryRow(r.Context(), `SELECT a.endpoint_id,a.generation,a.spec FROM object_storage_instances a JOIN endpoints e ON e.id=a.endpoint_id WHERE a.branch_id=$1 AND a.project_id=$2 AND a.state='active' AND e.state IN ('active','suspended') AND e.deleted_at IS NULL FOR SHARE OF a`, branch, p.ProjectID).Scan(&p.EndpointID, &p.Generation, &raw)
+	instanceLock := `SELECT a.endpoint_id,a.generation,a.spec FROM object_storage_instances a JOIN endpoints e ON e.id=a.endpoint_id WHERE a.branch_id=$1 AND a.project_id=$2 AND a.state='active' AND e.state IN ('active','suspended') AND e.deleted_at IS NULL FOR SHARE OF a`
+	if s.processRole == roleStorageGateway {
+		instanceLock = `SELECT * FROM storage_gateway_lock_instance($1,$2)`
+	}
+	err = tx.QueryRow(r.Context(), instanceLock, branch, p.ProjectID).Scan(&p.EndpointID, &p.Generation, &raw)
 	if err != nil {
 		cleanup()
 		return nil, p, nil, err
@@ -298,6 +313,11 @@ func (s *server) openObjectStorage(r *http.Request, project, branch string) (*pg
 		return nil, p, nil, errors.New("Object Storage directory identity or generation mismatch")
 	}
 	if !evolved {
+		if s.processRole == roleStorageGateway {
+			_ = conn.Close(context.Background())
+			cleanup()
+			return nil, p, nil, errors.New("Storage directory requires controller upgrade")
+		}
 		upgrade, e := conn.Begin(r.Context())
 		if e == nil {
 			e = applyObjectStorageSQLTx(r.Context(), upgrade, p)

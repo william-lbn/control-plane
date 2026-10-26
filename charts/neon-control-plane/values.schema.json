@@ -480,6 +480,8 @@
             "enabled": {
               "type": "boolean"
             },
+            "apiListenerEnabled": { "type": "boolean" },
+            "gatewayService": { "type": "string", "maxLength": 253, "pattern": "^$|^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?([.][a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?)*$" },
             "origin": {
               "type": "string",
               "maxLength": 255
@@ -569,6 +571,61 @@
       "properties": {
         "enabled": {
           "type": "boolean"
+        },
+        "edge": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "replicaCount",
+            "existingClientSecret",
+            "existingBrokerSecret",
+            "resources"
+          ],
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "replicaCount": {
+              "type": "integer",
+              "const": 1
+            },
+            "existingClientSecret": {
+              "type": "string",
+              "maxLength": 253,
+              "pattern": "^$|^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$"
+            },
+            "existingBrokerSecret": {
+              "type": "string",
+              "maxLength": 253,
+              "pattern": "^$|^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$"
+            },
+            "resources": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "enabled": {
+                    "const": true
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "existingClientSecret": {
+                    "minLength": 1
+                  },
+                  "existingBrokerSecret": {
+                    "minLength": 1
+                  }
+                }
+              }
+            }
+          ]
         },
         "existingConfigSecret": {
           "type": "string",

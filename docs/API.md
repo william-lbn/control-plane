@@ -1,7 +1,7 @@
 # 实际 API 合同
 
 OpenAPI 3 合同的权威源是 [openapi-v1.json](../contracts/openapi-v1.json)。
-版本 0.92.0，218 个路径、308 个操作，全部拥有稳定且唯一的 operationId。
+版本 0.92.0，224 个路径、314 个操作，全部拥有稳定且唯一的 operationId。
 运行 Swagger 位于 `/api/docs`，JSON 位于 `/api/openapi.json`。
 本合同是自托管 `/api/v1`，不声称兼容 Neon SaaS `/api/v2`。
 
@@ -332,6 +332,12 @@ request_id/operation_id/error_code，再由显式 retry 接口恢复可重试操
 | GET | `/api/v1/projects/{project}/branches/{branch}/catalog-platform-identities` | `getCatalogPlatformIdentities` | 200 |
 | POST | `/api/v1/projects/{project}/branches/{branch}/catalog-platform-identities` | `recordCatalogPlatformIdentities` | 200 |
 | GET | `/api/v1/projects/{project}/branches/{branch}/restore-point` | `previewBranchRestorePoint` | 200 |
+| POST | `/api/v1/platform/storage-gc/projects/{project}/runs` | `planStorageGarbageCollection` | 200 |
+| GET | `/api/v1/platform/storage-gc/projects/{project}/runs/{gcRun}` | `getStorageGarbageCollectionRun` | 200 |
+| POST | `/api/v1/platform/storage-gc/projects/{project}/runs/{gcRun}/execute` | `executeStorageGarbageCollectionRun` | 200 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/storage/usage` | `getStorageGatewayUsage` | 200 |
+| GET | `/api/v1/projects/{project}/storage-gateway` | `getStorageGatewayLimits` | 200 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/functions/{slug}/usage` | `getFunctionUsage` | 200 |
 
 ## 3. 实现映射与演进
 

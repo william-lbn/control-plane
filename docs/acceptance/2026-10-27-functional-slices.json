@@ -1,0 +1,47 @@
+{
+  "date": "2026-10-27",
+  "status": "increment_verified_not_whole_groups_closed",
+  "new_parallel_go_pg_groups": 24,
+  "new_helm_groups": 10,
+  "new_contract_groups": 1,
+  "affected_existing_contract_groups": 3,
+  "branch_reset_cumulative_new_groups": 20,
+  "vet": "pass",
+  "standalone_binaries_compiled": 2,
+  "openapi_paths": 224,
+  "openapi_operations": 314,
+  "business_runtime": {
+    "api_worker": "0.92.0",
+    "core_revision": 193,
+    "schema": "069",
+    "native_storage_format": 7,
+    "migrations_070_to_073_applied": false
+  },
+  "retained_static_native_guards": {
+    "original_secret_uids": 1099,
+    "original_pvc_uids": 9,
+    "original_private_files_sha": "unchanged",
+    "job_retired_with_original_uid": true
+  },
+  "business_groups_open": [
+    "S03",
+    "S05",
+    "L02",
+    "L03",
+    "F06"
+  ],
+  "other_groups_open": [
+    "O01",
+    "T01",
+    "O02"
+  ],
+  "deferred": [
+    "R01",
+    "R02",
+    "X01",
+    "H01",
+    "H02"
+  ],
+  "performance_reliability_tests_run": false,
+  "private_evidence_published": false
+}

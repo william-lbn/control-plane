@@ -1,0 +1,15 @@
+image:
+  reference: ghcr.io/example/storage@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+metadataSecret: storage-metadata
+blobSecret: storage-blob
+backendKeysSecret: storage-backend
+capabilitySecret: storage-capability
+endpointCredentialSecrets: [cp-0123456789abcdef-credentials]
+publicOrigin: https://storage.example.test
+proxy:
+  host: proxy.example.test
+  tlsMode: verify-full
+  caSecret: proxy-ca
+ingress:
+  host: storage.example.test
+  tlsSecret: storage-tls

@@ -32,8 +32,9 @@ type storageBlobConfig struct {
 	LabHTTP   bool   `json:"lab_http"`
 }
 type storageBlobs struct {
-	client *minio.Client
-	bucket string
+	client    *minio.Client
+	bucket    string
+	gcJournal *storageGCJournal
 }
 
 func loadStorageBlobs() (*storageBlobs, error) {
@@ -66,7 +67,7 @@ func loadStorageBlobs() (*storageBlobs, error) {
 	if err != nil {
 		return nil, errors.New("could not configure product blob client")
 	}
-	return &storageBlobs{client, config.Bucket}, nil
+	return &storageBlobs{client: client, bucket: config.Bucket}, nil
 }
 func (b *storageBlobs) verify(ctx context.Context) error {
 	exists, err := b.client.BucketExists(ctx, b.bucket)
@@ -82,12 +83,28 @@ func (b *storageBlobs) putReader(ctx context.Context, key, contentType string, s
 	if size < 0 || size > storageObjectLimit {
 		return errors.New("invalid object upload size")
 	}
-	info, err := b.client.PutObject(ctx, b.bucket, key, source, size, minio.PutObjectOptions{ContentType: contentType, DisableMultipart: true})
-	if err != nil {
-		return errors.New("product blob upload failed")
+	options := minio.PutObjectOptions{ContentType: contentType, DisableMultipart: true}
+	allocation := ""
+	if b.gcJournal != nil {
+		var err error
+		allocation, err = b.gcJournal.begin(ctx, key, size)
+		if err != nil {
+			return err
+		}
+		options.SetMatchETagExcept("*")
+		options.UserMetadata = map[string]string{storageGCMetadata: allocation}
 	}
-	if info.Size != size {
-		return errors.New("product blob upload acknowledgment size differs")
+	info, err := b.client.PutObject(ctx, b.bucket, key, source, size, options)
+	canPublish := err == nil && info.Size == size
+	if allocation != "" {
+		// Finish with the same bounded request context. A canceled/unknown
+		// journal commit retains uploading; it is never inferred to be an orphan.
+		if journalErr := b.gcJournal.finish(ctx, key, allocation, canPublish); journalErr != nil {
+			return journalErr
+		}
+	}
+	if !canPublish {
+		return errors.New("product blob upload failed or acknowledgment size differs")
 	}
 	return nil
 }

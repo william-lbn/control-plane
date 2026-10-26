@@ -9924,6 +9924,695 @@
             "const": false
           }
         }
+      },
+      "StorageGCPlanInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "limit"
+        ],
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        }
+      },
+      "StorageGCExecuteInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "confirm_run"
+        ],
+        "properties": {
+          "confirm_run": {
+            "type": "string",
+            "pattern": "^sgr_[a-f0-9]{24}$",
+            "description": "Exact ID of the previously inspected persistent plan; must equal the gcRun path value."
+          }
+        }
+      },
+      "StorageGCItem": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "allocation_id",
+          "size",
+          "state",
+          "reason",
+          "attempts",
+          "updated_at"
+        ],
+        "properties": {
+          "allocation_id": {
+            "type": "string",
+            "pattern": "^sga_[a-f0-9]{24}$"
+          },
+          "size": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 5368709120
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "planned",
+              "deleted",
+              "absent",
+              "held",
+              "delete_unknown"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "attempts": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "StorageGCAttempt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "allocation_id",
+          "attempt",
+          "phase",
+          "actor_id",
+          "state",
+          "reason",
+          "recorded_at"
+        ],
+        "properties": {
+          "allocation_id": {
+            "type": "string",
+            "pattern": "^sga_[a-f0-9]{24}$"
+          },
+          "attempt": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "phase": {
+            "type": "string",
+            "enum": [
+              "intent",
+              "result"
+            ]
+          },
+          "actor_id": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "deleted",
+              "absent",
+              "held",
+              "delete_unknown"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "recorded_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "An intent is committed before any backing operation; a missing result remains unknown. Each completed result is appended without replacing an earlier unknown attempt."
+      },
+      "StorageGCRun": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "project_id",
+          "actor_id",
+          "created_at",
+          "items",
+          "attempt_history",
+          "scope",
+          "published_history_gc"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^sgr_[a-f0-9]{24}$"
+          },
+          "project_id": {
+            "type": "string"
+          },
+          "actor_id": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/StorageGCItem"
+            }
+          },
+          "attempt_history": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StorageGCAttempt"
+            }
+          },
+          "scope": {
+            "const": "never_published_only"
+          },
+          "published_history_gc": {
+            "const": "held_native_proof_unavailable"
+          }
+        },
+        "description": "Persistent immutable plan membership and current per-allocation results. Intent/result history is append-only. HTTP 200 does not mean every item was deleted. Private backing keys, allocation metadata, credentials and native proof material are never returned."
+      },
+      "StorageGatewayUsageRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "method",
+          "protocol",
+          "state",
+          "started_at",
+          "finished_at",
+          "http_status",
+          "ingress_bytes",
+          "egress_bytes",
+          "duration_ms",
+          "reserved_bytes"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^sgr_[a-f0-9]{24}$"
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "GET",
+              "HEAD",
+              "PUT",
+              "POST",
+              "DELETE",
+              "OPTIONS",
+              "PATCH"
+            ]
+          },
+          "protocol": {
+            "type": "string",
+            "enum": [
+              "s3",
+              "rest"
+            ]
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "admitted",
+              "completed",
+              "interrupted",
+              "unknown"
+            ]
+          },
+          "started_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "finished_at": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "http_status": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 100,
+            "maximum": 599
+          },
+          "ingress_bytes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 0
+          },
+          "egress_bytes": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 0
+          },
+          "duration_ms": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "minimum": 0
+          },
+          "reserved_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          }
+        },
+        "description": "Recent request receipt. An expired admitted lease is displayed as unknown. Unfinished requests retain null final byte/status/duration fields; null is not a measured zero."
+      },
+      "StorageGatewayUsageSummary": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "requests",
+          "successful_responses",
+          "error_responses",
+          "interrupted",
+          "unfinished_or_unknown",
+          "observed_ingress_bytes",
+          "observed_egress_bytes"
+        ],
+        "properties": {
+          "requests": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "successful_responses": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "error_responses": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "interrupted": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "unfinished_or_unknown": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "observed_ingress_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "observed_egress_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        },
+        "description": "Current UTC-day aggregate. Unfinished/unknown requests retain their reservations. Observed byte sums include only observed server body counters and do not prove zero unobserved usage."
+      },
+      "StorageGatewayUsage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "items",
+          "summary",
+          "period",
+          "source",
+          "billing_enabled",
+          "physical_capacity_measured",
+          "unknown_usage_is_zero"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "$ref": "#/components/schemas/StorageGatewayUsageRequest"
+            }
+          },
+          "summary": {
+            "$ref": "#/components/schemas/StorageGatewayUsageSummary"
+          },
+          "period": {
+            "const": "UTC day"
+          },
+          "source": {
+            "const": "server_observed_http_body_bytes"
+          },
+          "billing_enabled": {
+            "const": false
+          },
+          "physical_capacity_measured": {
+            "const": false
+          },
+          "unknown_usage_is_zero": {
+            "const": false
+          }
+        },
+        "description": "At most 50 newest retained branch receipts across all dates, ordered by started_at then id descending, plus the current UTC-day summary. No pagination, physical-capacity measurement or billing debit is performed."
+      },
+      "StorageGatewayLimits": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "project_id",
+          "generation",
+          "concurrent_requests",
+          "daily_requests",
+          "daily_transfer_bytes",
+          "admitted_requests",
+          "observed_bytes",
+          "reserved_bytes",
+          "period",
+          "zero_limit_means",
+          "per_request_transfer_reservation_bytes",
+          "limits_managed_by",
+          "object_bytes",
+          "branch_logical_bytes"
+        ],
+        "properties": {
+          "project_id": {
+            "type": "string"
+          },
+          "generation": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "concurrent_requests": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 8
+          },
+          "daily_requests": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 1000000000
+          },
+          "daily_transfer_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0,
+            "maximum": 1125899906842624
+          },
+          "admitted_requests": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "observed_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "reserved_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "period": {
+            "const": "UTC day"
+          },
+          "zero_limit_means": {
+            "const": "unlimited"
+          },
+          "per_request_transfer_reservation_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "limits_managed_by": {
+            "const": "operator"
+          },
+          "object_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "branch_logical_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        },
+        "description": "Current UTC-day project admission counters and operator-managed limits. Generation 0 means no explicit limits row: concurrency defaults to 4 and both daily limits default to unlimited. Reserved bytes include unsettled/unknown requests and do not describe physical object capacity."
+      },
+      "FunctionInvocationUsage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "channel",
+          "admitted_invocations",
+          "completed_invocations",
+          "in_progress_invocations",
+          "unknown_invocations",
+          "observed_response_bytes",
+          "observed_duration_ms"
+        ],
+        "properties": {
+          "channel": {
+            "type": "string",
+            "enum": [
+              "console",
+              "public_http",
+              "schedule",
+              "object_storage"
+            ]
+          },
+          "admitted_invocations": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "completed_invocations": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "in_progress_invocations": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "unknown_invocations": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "observed_response_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "observed_duration_ms": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "FunctionEdgeUsage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "admitted_invocations",
+          "dispatch_attempts",
+          "unconfirmed_dispatches",
+          "completion_receipts",
+          "admitted_request_bytes",
+          "observed_response_bytes",
+          "observed_websocket_request_bytes"
+        ],
+        "properties": {
+          "admitted_invocations": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "dispatch_attempts": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "unconfirmed_dispatches": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "completion_receipts": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "admitted_request_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "observed_response_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "observed_websocket_request_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          }
+        }
+      },
+      "FunctionResourceObservation": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "instance_id",
+          "deployment_id",
+          "boot_id",
+          "observed_cpu_usec",
+          "observed_memory_current_bytes",
+          "observed_memory_peak_bytes",
+          "sample_count",
+          "first_observed_at",
+          "last_observed_at",
+          "fresh"
+        ],
+        "properties": {
+          "instance_id": {
+            "type": "string"
+          },
+          "deployment_id": {
+            "type": "string"
+          },
+          "boot_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{32}$"
+          },
+          "observed_cpu_usec": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "observed_memory_current_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "observed_memory_peak_bytes": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 0
+          },
+          "sample_count": {
+            "type": "integer",
+            "format": "int64",
+            "minimum": 1
+          },
+          "first_observed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_observed_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fresh": {
+            "type": "boolean"
+          }
+        }
+      },
+      "FunctionUsage": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "function_id",
+          "state",
+          "period",
+          "invocations",
+          "edge",
+          "resource_observations",
+          "resource_status",
+          "resource_source",
+          "cpu_basis",
+          "memory_basis",
+          "billing"
+        ],
+        "properties": {
+          "function_id": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "provisioning",
+              "active",
+              "suspended",
+              "degraded",
+              "deleting"
+            ]
+          },
+          "period": {
+            "const": "retained_lifetime"
+          },
+          "invocations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FunctionInvocationUsage"
+            }
+          },
+          "edge": {
+            "$ref": "#/components/schemas/FunctionEdgeUsage"
+          },
+          "resource_observations": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FunctionResourceObservation"
+            }
+          },
+          "resource_status": {
+            "type": "string",
+            "enum": [
+              "unavailable",
+              "historical_only",
+              "observed"
+            ]
+          },
+          "resource_source": {
+            "const": "authenticated_supervisor_cgroup_v2"
+          },
+          "cpu_basis": {
+            "const": "cumulative_per_original_boot_not_per_request"
+          },
+          "memory_basis": {
+            "const": "observed_current_and_peak_not_integrated_gb_hours"
+          },
+          "billing": {
+            "const": "usage_observation_no_automatic_credit_debit"
+          }
+        },
+        "description": "Durable metadata read without waking SQL or a Guest. Invocation and edge counts cover retained lifetime; admission, dispatch and completion remain distinct. Resource observations are cumulative per original boot, never summed per concurrent request. Missing/stale observations do not imply zero CPU or memory. No automatic credit debit or integrated memory GB-hour estimate."
       }
     },
     "responses": {
@@ -38159,6 +38848,364 @@
         "operationId": "previewBranchRestorePoint",
         "summary": "Preview a retained time or LSN against the exact original timeline",
         "description": "Project Reader access; cache disabled. Specify exactly one timestamp or LSN. Reads actual retention bounds and the storage timestamp mapping, without waking Compute, leasing history, mutating metadata or creating a branch. Missing, duplicate or conflicting input is 422; unreplayed timestamp is 409; changing source timeline is 412. Observation does not promise future retention. To accept this exact point, create the historical branch using parent_lsn=lsn and expected_parent_timeline_id=source_timeline_id; admission rechecks and leases that exact original point. This preview alone does not execute customer SQL or perform in-place reset."
+      }
+    },
+    "/api/v1/platform/storage-gc/projects/{project}/runs": {
+      "post": {
+        "operationId": "planStorageGarbageCollection",
+        "tags": [
+          "Object Storage"
+        ],
+        "summary": "Create or replay a bounded persistent orphan cleanup plan",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Required Console CSRF token matching the neon_v2_csrf cookie and current session. Control API keys are rejected for this operation."
+          }
+        ],
+        "description": "Requires a current Console session, current project permission, an explicitly approved active GC operator, an exact approved project scope, and separately configured deletion credentials. Control API keys are rejected. Only prospective never-published failed uploads can be collected; all legacy, published/shared/multipart/history references and unknown uploads remain held. Complete native history GC is unavailable. Requires project Editor permission. The actor-scoped idempotency key binds the exact project, store and limit. Same input returns the original immutable plan; different input returns 409. This request never deletes backing bytes.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StorageGCPlanInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Persistent plan and current item/attempt results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageGCRun"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/platform/storage-gc/projects/{project}/runs/{gcRun}": {
+      "get": {
+        "operationId": "getStorageGarbageCollectionRun",
+        "tags": [
+          "Object Storage"
+        ],
+        "summary": "Read the original orphan cleanup plan and retained attempt history",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "name": "gcRun",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^sgr_[a-f0-9]{24}$"
+            }
+          }
+        ],
+        "description": "Requires a current Console session, current project permission, an explicitly approved active GC operator, an exact approved project scope, and separately configured deletion credentials. Control API keys are rejected. Only prospective never-published failed uploads can be collected; all legacy, published/shared/multipart/history references and unknown uploads remain held. Complete native history GC is unavailable. Requires project Viewer permission. Scope checks bind the run to the exact project and backing store. Reading does not execute or promote candidates.",
+        "responses": {
+          "200": {
+            "description": "Persistent plan and current item/attempt results",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageGCRun"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/platform/storage-gc/projects/{project}/runs/{gcRun}/execute": {
+      "post": {
+        "operationId": "executeStorageGarbageCollectionRun",
+        "tags": [
+          "Object Storage"
+        ],
+        "summary": "Execute the exact previously reviewed orphan cleanup plan",
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "name": "gcRun",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^sgr_[a-f0-9]{24}$"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Required Console CSRF token matching the neon_v2_csrf cookie and current session. Control API keys are rejected for this operation."
+          }
+        ],
+        "description": "Requires a current Console session, current project permission, an explicitly approved active GC operator, an exact approved project scope, and separately configured deletion credentials. Control API keys are rejected. Only prospective never-published failed uploads can be collected; all legacy, published/shared/multipart/history references and unknown uploads remain held. Complete native history GC is unavailable. Requires project Editor permission and confirm_run equal to the path run ID. No new Idempotency-Key is required: replay targets the same run. Versioning must be verified disabled before work starts. Each operation records a durable intent, rechecks ownership, and confirms absence after DELETE. Held/unknown/absent outcomes are reported per item; HTTP 200 can contain unresolved results. Deleted items are not deleted again. A request interrupted before result commit retains its intent and can be reconciled by replaying the original run.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StorageGCExecuteInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Current per-item outcomes and append-only intent/result history; inspect item state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageGCRun"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/storage/usage": {
+      "get": {
+        "operationId": "getStorageGatewayUsage",
+        "tags": [
+          "Object Storage"
+        ],
+        "summary": "Read server-observed branch transfer receipts and current UTC-day totals",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          }
+        ],
+        "description": "Requires current project Viewer permission; scoped control API keys remain intersected with the issuer's current project permissions. Reads metadata only without waking Compute. Returns the 50 newest retained receipts across all dates and a separate current UTC-day summary. Unfinished counters remain null/unknown and reservations remain held. No physical-capacity measurement or automatic billing is performed.",
+        "responses": {
+          "200": {
+            "description": "Recent retained branch receipts and current UTC-day summary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageGatewayUsage"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/storage-gateway": {
+      "get": {
+        "operationId": "getStorageGatewayLimits",
+        "tags": [
+          "Object Storage"
+        ],
+        "summary": "Read project Storage admission limits, observed transfer and reservations",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          }
+        ],
+        "description": "Requires current project Viewer permission. This read-only API exposes operator-managed admission limits and current UTC-day counters. It does not change quotas or measure backing object capacity. Generation 0 uses default concurrency 4 and unlimited daily request/transfer limits. Outstanding or unknown usage retains its reservation.",
+        "responses": {
+          "200": {
+            "description": "Effective project admission limits and current UTC-day counters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StorageGatewayLimits"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/functions/{slug}/usage": {
+      "get": {
+        "operationId": "getFunctionUsage",
+        "tags": [
+          "Functions"
+        ],
+        "summary": "Read retained invocation, edge and authenticated per-boot resource observations",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "description": "Requires current project Viewer permission. Reads durable metadata without waking SQL, polling a Guest or issuing an invocation. Counts distinguish admissions, confirmed dispatches, completion receipts and unknown outcomes. CPU is cumulative per original boot; memory is observed current/peak. Historical or unavailable observations are explicit, never inferred as zero. No automatic credit debit or per-request CPU attribution.",
+        "responses": {
+          "200": {
+            "description": "Retained invocation/edge counts and per-original-boot resource observations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FunctionUsage"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
       }
     }
   }

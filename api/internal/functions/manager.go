@@ -55,20 +55,21 @@ type Invocation struct {
 }
 
 type Manager struct {
-	scope        Scope
-	auth         *ManagerAuthenticator
-	bootID       string
-	origin       string
-	client       *http.Client
-	stop         func(context.Context) error
-	mu           sync.Mutex
-	active       int
-	draining     bool
-	stopping     bool
-	stopped      bool
-	lastActivity time.Time
-	output       *OutputJournal
-	identity     *managerCertificate
+	scope         Scope
+	auth          *ManagerAuthenticator
+	bootID        string
+	origin        string
+	client        *http.Client
+	stop          func(context.Context) error
+	mu            sync.Mutex
+	active        int
+	draining      bool
+	stopping      bool
+	stopped       bool
+	lastActivity  time.Time
+	output        *OutputJournal
+	identity      *managerCertificate
+	resourceMeter func() (ResourceMeter, error)
 }
 
 // NewManager has a fixed loopback runtime destination. The destination is never
@@ -129,6 +130,8 @@ func (m *Manager) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch {
+	case r.Method == http.MethodGet && r.URL.Path == "/internal/v1/resources" && r.URL.RawQuery == "" && len(body) == 0:
+		m.resources(w, r)
 	case r.Method == http.MethodGet && r.URL.Path == "/internal/v1/status" && r.URL.RawQuery == "" && len(body) == 0:
 		m.status(w, r)
 	case r.Method == http.MethodGet && r.URL.Path == "/internal/v1/capabilities" && r.URL.RawQuery == "" && len(body) == 0:

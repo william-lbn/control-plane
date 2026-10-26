@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"github.com/william-lbn/control-plane/api/internal/functionsql"
 	"net/http"
 	"reflect"
 	"regexp"
@@ -81,13 +82,17 @@ func prepareBranchResetBacking(operation string, original computeCatalogBootstra
 	password, credentialErr := secretText(credential, "probePassword")
 	admin, adminErr := secretText(credential, "adminVerifier")
 	verifier, verifierErr := secretText(credential, "probeVerifier")
+	roots, rootErr := branchResetConfigRootRoles(prepared)
+	if rootErr != nil {
+		return value, rootErr
+	}
+	if _, present := value.CredentialData["probeVerifier"]; !present {
+		// Original legacy bootstrap accepted this exact verifier from its sealed
+		// config. Prove it against the retained password without adding a file.
+		verifier, verifierErr = roots["control_probe"], nil
+	}
 	if err != nil || credentialErr != nil || adminErr != nil || verifierErr != nil || probe == "" || probe != password || !scramMatches(probe, verifier) {
 		return value, errBranchResetBacking
-	}
-	roots := map[string]string{}
-	for _, raw := range nested(prepared, "spec", "cluster", "roles").([]any) {
-		role := raw.(map[string]any)
-		roots[stringVal(role["name"])] = stringVal(role["encrypted_password"])
 	}
 	if roots["cloud_admin"] != admin || roots["control_probe"] != verifier {
 		return value, errBranchResetBacking
@@ -105,7 +110,7 @@ func prepareBranchResetBacking(operation string, original computeCatalogBootstra
 }
 
 func (v branchResetBacking) secretName() string {
-	return "branch-reset-" + catalogMarkerDigest(v.Operation + "/" + v.Original.Endpoint)[:40]
+	return "branch-reset-" + catalogMarkerDigest(v.Operation + "/" + v.Original.Endpoint + "/" + v.Original.Timeline)[:40]
 }
 func (v branchResetBacking) digest() string {
 	raw, _ := json.Marshal(v)
@@ -253,4 +258,30 @@ func (k *kubeClient) transitionBranchResetBacking(ctx context.Context, value bra
 		return errBranchResetBacking
 	}
 	return errBranchResetBacking
+}
+
+func branchResetConfigRootRoles(config map[string]any) (map[string]string, error) {
+	roots := map[string]string{}
+	roles, ok := nested(config, "spec", "cluster", "roles").([]any)
+	if !ok || len(roles) != 2 {
+		return nil, errBranchResetBacking
+	}
+	for _, raw := range roles {
+		item, ok := raw.(map[string]any)
+		name := stringVal(item["name"])
+		verifier := stringVal(item["encrypted_password"])
+		if !ok || name != "cloud_admin" && name != "control_probe" || roots[name] != "" || !functionsql.ValidVerifier(verifier) {
+			return nil, errBranchResetBacking
+		}
+		roots[name] = verifier
+	}
+	return roots, nil
+}
+func branchResetBackingRootRoles(value branchResetBacking) (map[string]string, error) {
+	raw, err := base64.StdEncoding.DecodeString(value.PreparedData["config.json"])
+	var config map[string]any
+	if err != nil || json.Unmarshal(raw, &config) != nil {
+		return nil, errBranchResetBacking
+	}
+	return branchResetConfigRootRoles(config)
 }

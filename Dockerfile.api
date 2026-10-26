@@ -9,6 +9,7 @@ COPY api/internal ./internal
 RUN --mount=type=cache,id=neon-control-gomod-1-27,target=/go/pkg/mod --mount=type=cache,id=neon-control-gobuild-1-27,target=/root/.cache/go-build CGO_ENABLED=0 GOMAXPROCS=2 go build -p=2 -trimpath -buildvcs=false -o /control-api ./cmd/control-api
 RUN --mount=type=cache,id=neon-control-gomod-1-27,target=/go/pkg/mod --mount=type=cache,id=neon-control-gobuild-1-27,target=/root/.cache/go-build CGO_ENABLED=0 GOMAXPROCS=2 go build -p=2 -trimpath -buildvcs=false -o /control-worker ./cmd/control-worker
 RUN --mount=type=cache,id=neon-control-gomod-1-27,target=/go/pkg/mod --mount=type=cache,id=neon-control-gobuild-1-27,target=/root/.cache/go-build CGO_ENABLED=0 GOMAXPROCS=2 go build -p=2 -trimpath -buildvcs=false -o /functions-trust ./cmd/functions-trust
+RUN --mount=type=cache,id=neon-control-gomod-1-27,target=/go/pkg/mod --mount=type=cache,id=neon-control-gobuild-1-27,target=/root/.cache/go-build CGO_ENABLED=0 GOMAXPROCS=2 go build -p=2 -trimpath -buildvcs=false -o /control-function-edge ./cmd/control-function-edge
 FROM scratch
 COPY LICENSE NOTICE /usr/share/licenses/neon-control-plane/
 COPY third_party/licenses /usr/share/licenses/neon-control-plane/third_party/
@@ -16,6 +17,7 @@ COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certifica
 COPY --from=build /control-api /opt/neon-control/control-api
 COPY --from=build /control-worker /opt/neon-control/control-worker
 COPY --from=build /functions-trust /opt/neon-control/functions-trust
+COPY --from=build /control-function-edge /opt/neon-control/control-function-edge
 COPY contracts/openapi-v1.json /opt/neon-control/openapi-v1.json
 COPY contracts/application-auth-v1.json /opt/neon-control/application-auth-v1.json
 ENV NEON_V2_BIND=:8788 NEON_V2_OPENAPI=/opt/neon-control/openapi-v1.json NEON_V2_WEB_DIST=/nonexistent

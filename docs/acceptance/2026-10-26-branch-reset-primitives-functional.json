@@ -124,6 +124,11 @@
     "consistent Backend installation and event epoch recovery"
   ],
   "github_ci": {
-    "status": "pending_next_commit"
+    "status": "completed",
+    "conclusion": "success",
+    "run_id": 40282082327,
+    "commit": "6e0214c227f12721b12db26ab2b8aeb3c7d1610d",
+    "checks": 15,
+    "url": "https://github.com/william-lbn/control-plane/actions/runs/40282082327"
   }
 }

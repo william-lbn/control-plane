@@ -13,6 +13,11 @@ objectStorage:
   # Core S3 protocol preview: application credentials, never MinIO root keys.
   s3:
     enabled: false
+    # false transfers public S3 and signed /storage/v1/ data to gatewayService.
+    # The core release then removes its legacy S3 Service/NodePort.
+    apiListenerEnabled: true
+    # Standalone Storage chart Service DNS (port 8793); no scheme/port/path.
+    gatewayService: ''
     origin: ''
     region: us-east-2
     labHTTP: false
@@ -51,6 +56,14 @@ platformManagement:
 # Existing Secrets are operator-managed and are retained across Helm upgrades.
 functions:
   enabled: false
+  edge:
+    enabled: false
+    replicaCount: 1
+    existingClientSecret: ''
+    existingBrokerSecret: ''
+    resources:
+      requests: {cpu: 100m, memory: 64Mi}
+      limits: {cpu: 500m, memory: 256Mi}
   objectEvents:
     enabled: false
   outputLogs:

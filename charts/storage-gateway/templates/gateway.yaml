@@ -1,0 +1,178 @@
+{{- $name := printf "%s-storage" .Release.Name | trunc 63 | trimSuffix "-" -}}
+{{- if not (regexMatch "^[a-z0-9./_-]+@sha256:[a-f0-9]{64}$" .Values.image.reference) -}}{{- fail "Storage image must be pinned by sha256 digest" -}}{{- end -}}
+{{- if ne (int .Values.replicaCount) 1 -}}{{- fail "Storage replicaCount must be 1 until independent HA acceptance" -}}{{- end -}}
+{{- $metadata := required "restricted metadataSecret (database-url) required" .Values.metadataSecret -}}
+{{- $blob := required "dedicated blobSecret (config.json) required" .Values.blobSecret -}}
+{{- $backend := required "backendKeysSecret (keys.json) required" .Values.backendKeysSecret -}}
+{{- $capability := required "capabilitySecret (signing-key) required" .Values.capabilitySecret -}}
+{{- $origin := required "canonical publicOrigin required" .Values.publicOrigin -}}
+{{- $_ := required "proxy.host required" .Values.proxy.host -}}
+{{- if and (eq .Values.proxy.tlsMode "verify-full") (empty .Values.proxy.caSecret) -}}{{- fail "verify-full proxy TLS requires caSecret (ca.crt)" -}}{{- end -}}
+{{- if and (ne .Values.proxy.tlsMode "verify-full") (not .Values.laboratory.allowHTTP) -}}{{- fail "unverified proxy TLS requires explicit laboratory override" -}}{{- end -}}
+{{- if empty .Values.endpointCredentialSecrets -}}{{- fail "explicit endpointCredentialSecrets allowlist required" -}}{{- end -}}
+{{- range .Values.endpointCredentialSecrets -}}
+{{- if not (regexMatch "^cp-[a-f0-9]{16}-credentials$" .) -}}{{- fail "endpoint Secret must be an exact owned cp-<16 hex>-credentials name" -}}{{- end -}}
+{{- end -}}
+{{- if ne (empty .Values.events.secret) (empty .Values.events.keyVersion) -}}{{- fail "event MAC Secret and version must be supplied together" -}}{{- end -}}
+{{- if and (not .Values.laboratory.allowHTTP) (or (not .Values.ingress.enabled) (ne .Values.service.type "ClusterIP")) -}}{{- fail "Storage requires TLS Ingress and private ClusterIP outside laboratory" -}}{{- end -}}
+{{- if .Values.ingress.enabled -}}
+{{- $host := required "Storage Ingress host required" .Values.ingress.host -}}
+{{- $_ := required "Storage Ingress TLS Secret required" .Values.ingress.tlsSecret -}}
+{{- if ne $origin (printf "https://%s" $host) -}}{{- fail "publicOrigin must match the HTTPS Ingress host" -}}{{- end -}}
+{{- if .Values.ingress.restHost -}}{{- $_ := required "Console REST TLS Secret required" .Values.ingress.restTLSSecret -}}{{- end -}}
+{{- end -}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $name }}
+rules:
+  - apiGroups: [""]
+    resources: [secrets]
+    resourceNames: {{ toYaml .Values.endpointCredentialSecrets | nindent 6 }}
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $name }}
+subjects:
+  - {kind: ServiceAccount, name: {{ $name }}, namespace: {{ .Release.Namespace }}}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: {{ $name }}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app.kubernetes.io/name: neon-storage-gateway, app.kubernetes.io/instance: {{ .Release.Name | quote }}}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: neon-storage-gateway, app.kubernetes.io/instance: {{ .Release.Name | quote }}}
+    spec:
+      serviceAccountName: {{ $name }}
+      automountServiceAccountToken: true
+      terminationGracePeriodSeconds: 30
+      securityContext: {runAsNonRoot: true, runAsUser: 65532, runAsGroup: 65532, fsGroup: 65532, seccompProfile: {type: RuntimeDefault}}
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: storage
+          image: {{ .Values.image.reference | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports: [{name: http, containerPort: 8793}, {name: health, containerPort: 8794}]
+          env:
+            - {name: NEON_STORAGE_DATABASE_URL_FILE, value: /run/storage/metadata/database-url}
+            - {name: NEON_OBJECT_STORAGE_CONFIG_FILE, value: /run/storage/blob/config.json}
+            - {name: NEON_BACKEND_CREDENTIAL_KEYS_FILE, value: /run/storage/backend/keys.json}
+            - {name: NEON_STORAGE_SIGNING_KEY_FILE, value: /run/storage/capability/signing-key}
+            - {name: NEON_KUBE_NAMESPACE, value: {{ .Release.Namespace | quote }}}
+            - {name: NEON_S3_PUBLIC_ORIGIN, value: {{ $origin | quote }}}
+            - {name: NEON_S3_LAB_HTTP, value: {{ .Values.laboratory.allowHTTP | quote }}}
+            - {name: NEON_S3_REGION, value: {{ .Values.region | quote }}}
+            - {name: NEON_PROXY_HOST, value: {{ .Values.proxy.host | quote }}}
+            - {name: NEON_PROXY_PORT, value: {{ .Values.proxy.port | quote }}}
+            - {name: NEON_PG_TLS_MODE, value: {{ .Values.proxy.tlsMode | quote }}}
+            {{- if .Values.proxy.caSecret }}
+            - {name: NEON_PG_CA_FILE, value: /run/storage/proxy-ca/ca.crt}
+            {{- end }}
+            - {name: NEON_STORAGE_BUFFER_DIR, value: /var/lib/neon-storage/buffers}
+            - {name: NEON_STORAGE_OBJECT_BYTES, value: {{ .Values.capacity.objectBytes | quote }}}
+            - {name: NEON_STORAGE_BRANCH_BYTES, value: {{ .Values.capacity.branchBytes | quote }}}
+            - {name: NEON_STORAGE_BUFFER_BYTES, value: {{ .Values.capacity.bufferBytes | quote }}}
+            - {name: NEON_STORAGE_TRANSFER_SECONDS, value: {{ .Values.capacity.transferSeconds | quote }}}
+            {{- if .Values.events.secret }}
+            - {name: NEON_STORAGE_EVENT_MAC_KEY_FILE, value: /run/storage/events/mac-key}
+            - {name: NEON_STORAGE_EVENT_KEY_VERSION, value: {{ .Values.events.keyVersion | quote }}}
+            {{- end }}
+          startupProbe: {httpGet: {path: /readyz, port: health}, periodSeconds: 2, failureThreshold: 30}
+          readinessProbe: {httpGet: {path: /readyz, port: health}, periodSeconds: 5}
+          livenessProbe: {httpGet: {path: /healthz, port: health}, periodSeconds: 15}
+          resources: {{ toYaml .Values.resources | nindent 12 }}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+          volumeMounts:
+            - {name: metadata, mountPath: /run/storage/metadata, readOnly: true}
+            - {name: blob, mountPath: /run/storage/blob, readOnly: true}
+            - {name: backend, mountPath: /run/storage/backend, readOnly: true}
+            - {name: capability, mountPath: /run/storage/capability, readOnly: true}
+            {{- if .Values.proxy.caSecret }}
+            - {name: proxy-ca, mountPath: /run/storage/proxy-ca, readOnly: true}
+            {{- end }}
+            - {name: buffers, mountPath: /var/lib/neon-storage/buffers}
+            {{- if .Values.events.secret }}
+            - {name: events, mountPath: /run/storage/events, readOnly: true}
+            {{- end }}
+      volumes:
+        - name: metadata
+          secret: {secretName: {{ $metadata | quote }}, defaultMode: 0440, items: [{key: database-url, path: database-url}]}
+        - name: blob
+          secret: {secretName: {{ $blob | quote }}, defaultMode: 0440, items: [{key: config.json, path: config.json}]}
+        - name: backend
+          secret: {secretName: {{ $backend | quote }}, defaultMode: 0440, items: [{key: keys.json, path: keys.json}]}
+        - name: capability
+          secret: {secretName: {{ $capability | quote }}, defaultMode: 0440, items: [{key: signing-key, path: signing-key}]}
+        {{- if .Values.proxy.caSecret }}
+        - name: proxy-ca
+          secret: {secretName: {{ .Values.proxy.caSecret | quote }}, defaultMode: 0440, items: [{key: ca.crt, path: ca.crt}]}
+        {{- end }}
+        - name: buffers
+          emptyDir: {sizeLimit: {{ .Values.capacity.bufferBytes | quote }}}
+        {{- if .Values.events.secret }}
+        - name: events
+          secret: {secretName: {{ .Values.events.secret | quote }}, defaultMode: 0440, items: [{key: mac-key, path: mac-key}]}
+        {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+spec:
+  type: {{ .Values.service.type }}
+  selector: {app.kubernetes.io/name: neon-storage-gateway, app.kubernetes.io/instance: {{ .Release.Name | quote }}}
+  ports:
+    - {name: http, port: 8793, targetPort: http{{ if and (eq .Values.service.type "NodePort") .Values.service.nodePort }}, nodePort: {{ .Values.service.nodePort }}{{ end }}}
+{{- if .Values.ingress.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $name }}
+spec:
+  {{- if .Values.ingress.className }}
+  ingressClassName: {{ .Values.ingress.className | quote }}
+  {{- end }}
+  tls:
+    - hosts: [{{ .Values.ingress.host | quote }}]
+      secretName: {{ .Values.ingress.tlsSecret | quote }}
+    {{- if .Values.ingress.restHost }}
+    - hosts: [{{ .Values.ingress.restHost | quote }}]
+      secretName: {{ .Values.ingress.restTLSSecret | quote }}
+    {{- end }}
+  rules:
+    - host: {{ .Values.ingress.host | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: {service: {name: {{ $name }}, port: {name: http}}}
+    {{- if .Values.ingress.restHost }}
+    - host: {{ .Values.ingress.restHost | quote }}
+      http:
+        paths:
+          - path: /storage/v1/
+            pathType: Prefix
+            backend: {service: {name: {{ $name }}, port: {name: http}}}
+    {{- end }}
+{{- end }}

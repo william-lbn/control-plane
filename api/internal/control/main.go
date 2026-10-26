@@ -196,6 +196,10 @@ func runProcess(ctx context.Context, role processRole) error {
 	if err != nil {
 		return err
 	}
+	if err = s.configureStorageGC(); err != nil {
+		return err
+	}
+	defer s.closeStorageGC()
 	s.functions, err = loadFunctionsPlatform(role)
 	if err != nil {
 		return err
@@ -251,23 +255,34 @@ func runProcess(ctx context.Context, role processRole) error {
 		addr = env("NEON_WORKER_BIND", "127.0.0.1:8789")
 		handler = s.workerHealthHandler(leadership)
 	} else {
-		handler = s.middleware(s.routes())
+		handler = s.middleware(s.withStorageGatewayRoutes(s.routes()))
 	}
 	httpServer := &http.Server{Addr: addr, Handler: handler, ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout: 30 * time.Second, WriteTimeout: 195 * time.Second, IdleTimeout: 60 * time.Second}
-	errCh := make(chan error, 3)
+	errCh := make(chan error, 4)
+	var functionEdgeBroker *http.Server
+	if role != roleWorker && s.functions != nil && functionEdgeEnabled() {
+		functionEdgeBroker, err = s.newFunctionEdgeBrokerServer()
+		if err != nil {
+			return err
+		}
+	}
 	var storageHTTP *http.Server
-	if role != roleWorker && s3Origin() != "" {
+	if role != roleWorker && s3Origin() != "" && env("NEON_S3_LISTENER_ENABLED", "true") == "true" {
 		storageHTTP = &http.Server{Addr: env("NEON_S3_BIND", ":8793"), Handler: s.s3Handler(), ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 150 * time.Second, WriteTimeout: 155 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
 		go func() { errCh <- storageHTTP.ListenAndServe() }()
 	}
 	var functionsHTTP *http.Server
-	if role != roleWorker && s.functions != nil && functionPublicOrigin() != "" {
+	if role != roleWorker && s.functions != nil && functionPublicOrigin() != "" && !functionEdgeEnabled() {
 		functionsHTTP = &http.Server{Addr: env("NEON_FUNCTIONS_PUBLIC_BIND", ":8792"), Handler: s.functionPublicHandler(), ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 30 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
 		go func() { errCh <- functionsHTTP.ListenAndServe() }()
 	}
+	if functionEdgeBroker != nil {
+		go func() { errCh <- functionEdgeBroker.ListenAndServeTLS("", "") }()
+	}
 	if role == roleWorker && s.functions != nil {
 		go func() { errCh <- s.serveFunctionArtifacts(processCtx, leadership) }()
+		go s.runFunctionResourceMeter(processCtx)
 	}
 	go func() {
 		logger.Info("control process listening", "address", addr, "role", role)
@@ -295,6 +310,11 @@ func runProcess(ctx context.Context, role processRole) error {
 	if functionsHTTP != nil {
 		if err := functionsHTTP.Shutdown(shutdownCtx); err != nil {
 			functionsHTTP.Close()
+		}
+	}
+	if functionEdgeBroker != nil {
+		if err := functionEdgeBroker.Shutdown(shutdownCtx); err != nil {
+			functionEdgeBroker.Close()
 		}
 	}
 	if err := httpServer.Shutdown(shutdownCtx); err != nil {

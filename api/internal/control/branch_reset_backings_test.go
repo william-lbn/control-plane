@@ -40,7 +40,37 @@ func resetJSONCopy(value map[string]any) map[string]any {
 }
 
 func TestBranchResetBackingRetainsCompleteFilesAndRejectsForgedHistory(t *testing.T) {
+	legacy, legacyConfig, legacyCredential := resetBackingFixture(t)
+	delete(legacyCredential["data"].(map[string]any), "probeVerifier")
+	restored, legacyErr := prepareBranchResetBacking(legacy.Operation, legacy.Original, legacy.Target, legacyConfig, legacyCredential)
+	if legacyErr != nil {
+		t.Fatal("original legacy bootstrap could not be retained", legacyErr)
+	}
+	if _, invented := restored.CredentialData["probeVerifier"]; invented {
+		t.Fatal("missing original private file was invented")
+	}
+	roots, legacyErr := branchResetBackingRootRoles(restored)
+	if legacyErr != nil || !scramMatches("synthetic-reset-probe-password", roots["control_probe"]) {
+		t.Fatal("legacy original verifier not proven", legacyErr)
+	}
 	value, config, credential := resetBackingFixture(t)
+	// The same Endpoint may be both a current target and an old source epoch.
+	// Their immutable snapshots must coexist within one accepted reset.
+	nextProof := value.Original
+	nextProof.Timeline = value.Target.TimelineID
+	nextProof.Operation = "op_" + strings.Repeat("c", 24)
+	nextProof.Witness = branchResetBootstrapWitness
+	nextConfig := resetJSONCopy(config)
+	nextConfig["data"] = resetDataAny(value.PreparedData)
+	nextTarget := catalogNativeScope{value.Target.TenantID, strings.Repeat("e", 32)}
+	priorEpoch, epochErr := prepareBranchResetBacking(value.Operation, value.Original, nextTarget, config, credential)
+	if epochErr != nil {
+		t.Fatal(epochErr)
+	}
+	currentEpoch, epochErr := prepareBranchResetBacking(value.Operation, nextProof, nextTarget, nextConfig, credential)
+	if epochErr != nil || priorEpoch.secretName() == currentEpoch.secretName() {
+		t.Fatal("source and target native epochs collided at original Endpoint", epochErr)
+	}
 	before, _ := json.Marshal(config)
 	if err := validateBranchResetBacking(value); err != nil {
 		t.Fatal(err)

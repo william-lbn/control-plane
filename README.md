@@ -7,7 +7,7 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 
 功能进度与当前优先级见 [已验收/剩余清单](docs/FUNCTIONAL-STATUS-2026-10-21.md)：22 组固定基础已有回执；五组专项后置，五组业务及三组运维/TLS/发行继续。复用来源未变的既有验收。
 
-最新开发增量：2026-10-26 [原分支恢复隔离基础](docs/DELIVERY-2026-10-26-BRANCH-RESET-PRIMITIVES.md)：16 组新增 Go/PG、五组受影响检查通过，覆盖完整私有文件/UID、短时授权、关闭路由、原生 OID/数据及旧密码拒绝。未开放 reset API、未部署 schema 070、未执行现有分支恢复，L02/L03 继续。
+最新开发增量：2026-10-27 [存储与 Functions 功能增量](docs/DELIVERY-2026-10-27-FUNCTIONAL-SLICES.md)：24 组新增 Go/PG、10 组新增 Helm、4 组 API 合同检查通过；恢复基础累计 20 组新增检查通过。业务运行仍为 schema 069，070–073 未应用；实机接管、完整 reset 和历史 GC 继续。
 
 最新部署：2026-10-26 [时间点预览与精确历史分支](docs/DELIVERY-2026-10-26-TIME-TRAVEL.md)：两组新增 Go/PG、六组受影响检查、四个真实页面检查点与原生祖先/LSN 核对通过；原请求恢复、源身份和 971 个 Secret/9 PVC 保留，VM 0。API/Worker 0.92.0 / Chart 0.9.89 / Core 193 / schema 069。原地 reset 和完整 Backend 恢复继续，未关闭 L02/L03。
 

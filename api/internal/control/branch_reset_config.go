@@ -26,10 +26,8 @@ func branchResetComputeConfig(source map[string]any, original computeCatalogBoot
 	// The pinned native spec also accepts modern identity overrides. This
 	// restore path handles one canonical legacy representation; never retain an
 	// override that could boot the old timeline while its GUC says the new one.
-	for _, key := range []string{"tenant_id", "timeline_id", "pageserver_connstring", "pageserver_connection_info", "shard_stripe_size", "safekeeper_connstrings", "safekeepers_generation"} {
-		if _, present := spec[key]; present {
-			return nil, errBranchResetConfig
-		}
+	if branchResetHasNativeOverrides(spec) {
+		return nil, errBranchResetConfig
 	}
 	mode := stringVal(spec["mode"])
 	reader := original.EndpointType == "read_only"

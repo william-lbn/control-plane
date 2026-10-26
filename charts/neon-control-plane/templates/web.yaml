@@ -1,5 +1,15 @@
 {{- $name := include "neonControl.name" . -}}
 {{- $config := .Files.Get "files/nginx.conf" -}}
+{{- $gateway := include "neonControl.storageGatewayService" . -}}
+{{- if $gateway -}}
+{{- $config = replace "proxy_pass http://neon-control-api:8788; # storage-public-upstream" (printf "proxy_pass http://%s:8793; # storage-public-upstream" $gateway) $config -}}
+{{- end -}}
+{{- if .Values.objectStorage.enabled -}}
+{{- $config = replace "client_max_body_size 65m; # storage-body-limit" (printf "client_max_body_size %d; # storage-body-limit" (add (int64 .Values.objectStorage.capacity.objectBytes) 1048576)) $config -}}
+{{- $transferSeconds := add (int64 .Values.objectStorage.capacity.transferSeconds) 10 -}}
+{{- $config = replace "proxy_read_timeout 200s; # storage-transfer-timeout" (printf "proxy_read_timeout %ds; # storage-transfer-timeout" $transferSeconds) $config -}}
+{{- $config = replace "proxy_send_timeout 200s; # storage-transfer-timeout" (printf "proxy_send_timeout %ds; # storage-transfer-timeout" $transferSeconds) $config -}}
+{{- end -}}
 {{- if and .Values.functions.enabled .Values.functions.publicHTTP.enabled -}}
 {{- $origin := required "functions.publicHTTP.origin is required" .Values.functions.publicHTTP.origin -}}
 {{- if not (regexMatch "^https?://[A-Za-z0-9.:\\[\\]-]+$" $origin) -}}

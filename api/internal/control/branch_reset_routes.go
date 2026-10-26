@@ -44,14 +44,8 @@ func prepareBranchResetRoute(backing branchResetBacking, routesUID, namespace st
 	if state := stringVal(original["state"]); state != "" && state != "active" && state != "ready" && state != "suspended" {
 		return value, errBranchResetBacking
 	}
-	decode := func(encoded string) string {
-		raw, err := base64.StdEncoding.DecodeString(encoded)
-		if err != nil {
-			return ""
-		}
-		return string(raw)
-	}
-	if roles["cloud_admin"] != decode(backing.CredentialData["adminVerifier"]) || roles["control_probe"] != decode(backing.CredentialData["probeVerifier"]) {
+	protectedRoots, err := branchResetBackingRootRoles(backing)
+	if err != nil || roles["cloud_admin"] != protectedRoots["cloud_admin"] || roles["control_probe"] != protectedRoots["control_probe"] {
 		return value, errBranchResetBacking
 	}
 	for name, verifier := range roles {
@@ -59,7 +53,6 @@ func prepareBranchResetRoute(backing branchResetBacking, routesUID, namespace st
 			return value, errBranchResetBacking
 		}
 	}
-	var err error
 	if value.Original, err = copyResetDocument(original); err != nil {
 		return value, err
 	}
@@ -233,6 +226,12 @@ func (k *kubeClient) casBranchResetRoute(ctx context.Context, uid, key string, b
 }
 
 func makeBranchResetProbeRoute(operation, project, branch, tenant, namespace, verifier string, cidrs []string) (string, map[string]any, error) {
+	return makeBranchResetPrivateProbeRoute(operation, project, branch, tenant, namespace, verifier, cidrs, false)
+}
+func makeBranchResetBackupProbeRoute(operation, project, branch, tenant, namespace, verifier string, cidrs []string) (string, map[string]any, error) {
+	return makeBranchResetPrivateProbeRoute(operation, project, branch, tenant, namespace, verifier, cidrs, true)
+}
+func makeBranchResetPrivateProbeRoute(operation, project, branch, tenant, namespace, verifier string, cidrs []string, backup bool) (string, map[string]any, error) {
 	if !branchResetOperationID.MatchString(operation) || !dataBranchID.MatchString(branch) || project == "" || namespace == "" || !functionsql.ValidVerifier(verifier) || len(cidrs) == 0 || len(cidrs) > 32 {
 		return "", nil, errBranchResetProbe
 	}
@@ -260,8 +259,11 @@ func makeBranchResetProbeRoute(operation, project, branch, tenant, namespace, ve
 		allowed = append(allowed, text)
 	}
 	endpoint := branchResetProbeEndpoint(operation)
+	if backup {
+		endpoint = branchResetBackupProbeEndpoint(operation)
+	}
 	workload := kubeName(endpoint)
-	alias := "reset_" + catalogMarkerDigest(randomToken(32))[:32]
+	alias := "reset-" + catalogMarkerDigest(randomToken(32))[:32]
 	// An observe-only route has no VM template and cannot create a replacement.
 	route := map[string]any{"project_id": project, "branch_id": branch, "tenant_id": tenant, "kind": "neonvm", "workload": workload,
 		"address": workload + "." + namespace + ".svc.cluster.local:55433", "role": "control_probe", "verifier": verifier, "roles": map[string]any{"control_probe": verifier},
@@ -270,5 +272,5 @@ func makeBranchResetProbeRoute(operation, project, branch, tenant, namespace, ve
 	return alias, normalized, err
 }
 func validBranchResetProbeAlias(alias string) bool {
-	return len(alias) == len("reset_")+32 && strings.HasPrefix(alias, "reset_") && strings.Trim(strings.TrimPrefix(alias, "reset_"), "abcdef0123456789") == ""
+	return len(alias) == len("reset-")+32 && strings.HasPrefix(alias, "reset-") && strings.Trim(strings.TrimPrefix(alias, "reset-"), "abcdef0123456789") == ""
 }

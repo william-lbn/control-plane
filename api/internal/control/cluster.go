@@ -337,6 +337,7 @@ type createPayload struct {
 	CatalogPolicy             string `json:"catalog_policy,omitempty"`
 	CatalogInitializePlatform bool   `json:"-"`
 	ResetInspectionOperation  string `json:"-"`
+	ResetInspectionLSN        string `json:"-"`
 	CatalogSpec               string `json:"-"` // Runtime projection from branch intent; never persisted in Operation.
 	MinCPU                    int    `json:"min_cpu_milli"`
 	MaxCPU                    int    `json:"max_cpu_milli"`
@@ -356,8 +357,8 @@ func (e vmWaitError) Error() string {
 func (e vmWaitError) Unwrap() error { return e.cause }
 
 func (k *kubeClient) createCompute(ctx context.Context, p createPayload) (map[string]any, error) {
-	if p.ResetInspectionOperation != "" && (!branchResetOperationID.MatchString(p.ResetInspectionOperation) || p.EndpointID != branchResetProbeEndpoint(p.ResetInspectionOperation) || p.CatalogPolicy != catalogPreserveInheritedSQL || p.CatalogInitializePlatform || bootstrapEndpointType(p.EndpointType) != "read_write") {
-		return nil, errBranchResetProbe
+	if err := validateBranchResetInspectionPayload(p); err != nil {
+		return nil, err
 	}
 	name := kubeName(p.EndpointID)
 	credential, err := k.request(ctx, http.MethodGet, k.path("secret", name+"-credentials"), nil)
@@ -478,14 +479,17 @@ func (k *kubeClient) createCompute(ctx context.Context, p createPayload) (map[st
 	labels := credentialLabels(p.ProjectID, p.EndpointID)
 	annotations := map[string]string{}
 	if p.ResetInspectionOperation != "" {
-		if !branchResetOperationID.MatchString(p.ResetInspectionOperation) || p.CatalogPolicy != catalogPreserveInheritedSQL || p.CatalogInitializePlatform || bootstrapEndpointType(p.EndpointType) != "read_write" {
-			return nil, errBranchResetProbe
-		}
 		var initial map[string]any
 		if json.Unmarshal([]byte(config), &initial) != nil {
 			return nil, errBranchResetProbe
 		}
-		isolated, err := resetInspectionConfig(initial)
+		var isolated map[string]any
+		var err error
+		if p.ResetInspectionLSN != "" {
+			isolated, err = resetBackupInspectionConfig(initial, p.ResetInspectionLSN)
+		} else {
+			isolated, err = resetInspectionConfig(initial)
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -515,7 +519,10 @@ func (k *kubeClient) createCompute(ctx context.Context, p createPayload) (map[st
 	if stringVal(nested(persisted, "spec", "cluster", "cluster_id")) != p.ProjectID {
 		return nil, errors.New("compute config project mismatch")
 	}
-	if p.EndpointType == "read_only" && nested(persisted, "spec", "mode") != "Replica" {
+	if err = validatePersistedBranchResetInspection(p, persisted); err != nil {
+		return nil, err
+	}
+	if p.EndpointType == "read_only" && p.ResetInspectionLSN == "" && nested(persisted, "spec", "mode") != "Replica" {
 		return nil, errors.New("compute config replica mode mismatch")
 	}
 	roles := map[string]string{}
@@ -534,6 +541,10 @@ func (k *kubeClient) createCompute(ctx context.Context, p createPayload) (map[st
 			"ports": []any{map[string]any{"name": "postgres", "port": 55433, "targetPort": "postgres"}}}}
 	if _, err := k.createOwned(ctx, "service", service, p.ProjectID, p.EndpointID); err != nil {
 		return nil, err
+	}
+	guestAutoscaling := "1"
+	if p.ResetInspectionOperation != "" {
+		guestAutoscaling = "0"
 	}
 	vmLabels := credentialLabels(p.ProjectID, p.EndpointID)
 	vmLabels["autoscaling.neon.tech/enabled"] = "true"
@@ -555,7 +566,7 @@ func (k *kubeClient) createCompute(ctx context.Context, p createPayload) (map[st
 					"--filecache-connstr", "host=localhost port=55433 dbname=postgres user=cloud_admin sslmode=disable application_name=vm-monitor", "--dev"},
 				"env": []any{map[string]string{"name": "PG_VERSION", "value": "16"}, map[string]string{"name": "TENANT_ID", "value": p.TenantID},
 					map[string]string{"name": "TIMELINE_ID", "value": p.TimelineID}, map[string]string{"name": "ALLOW_LAB_AUTOBOOTSTRAP", "value": "NO"},
-					map[string]string{"name": "AUTOSCALING", "value": "1"}},
+					map[string]string{"name": "AUTOSCALING", "value": guestAutoscaling}},
 				"ports": []any{map[string]any{"name": "postgres", "port": 55433}, map[string]any{"name": "metrics", "port": 9100},
 					map[string]any{"name": "monitor", "port": 10301}, map[string]any{"name": "compute-control", "port": 3080}}},
 			"extraNetwork": map[string]bool{"enable": true},

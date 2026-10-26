@@ -287,6 +287,7 @@ func ServeGuest(ctx context.Context) (result error) {
 		return err
 	}
 	manager.output = journal
+	manager.resourceMeter = group.ReadResourceMeter
 	identity, err := manager.EnableIdentityRenewal(b, time.Now())
 	if err != nil {
 		return err

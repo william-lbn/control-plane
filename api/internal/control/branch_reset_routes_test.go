@@ -94,6 +94,11 @@ func TestBranchResetRoutesPreserveSelectorAndDelayPublicAdmission(t *testing.T) 
 	}
 }
 func TestBranchResetProbeRoutePrivateCIDRsAndNoColdCreation(t *testing.T) {
+	// The adapter accepts underscores, but the pinned native Proxy accepts
+	// only ASCII alphanumeric/hyphen endpoint options. Meet both parsers.
+	if validBranchResetProbeAlias("reset_" + strings.Repeat("a", 32)) {
+		t.Fatal("native Proxy-incompatible private selector accepted")
+	}
 	plan, roles := resetRouteFixture(t)
 	alias, route, err := makeBranchResetProbeRoute(plan.Backing.Operation, plan.Backing.Original.Project, plan.Backing.Original.Branch, plan.Backing.Original.Tenant, "neon", roles["control_probe"], []string{"192.168.146.0/24", "10.42.0.0/16"})
 	if err != nil || !validBranchResetProbeAlias(alias) {

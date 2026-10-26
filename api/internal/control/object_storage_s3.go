@@ -44,7 +44,7 @@ func s3XML(w http.ResponseWriter, status int, value any) {
 	w.Write(append([]byte(xml.Header), data...))
 }
 func (s *server) s3Handler() http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return s.storageUsageHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := newID("s3r_")
 		r = r.WithContext(context.WithValue(r.Context(), requestIDKey, id))
 		w.Header().Set("X-Amz-Request-Id", id)
@@ -58,7 +58,7 @@ func (s *server) s3Handler() http.Handler {
 			return
 		}
 		s.s3Invoke(w, r)
-	})
+	}))
 }
 func (s *server) s3Invoke(w http.ResponseWriter, r *http.Request) {
 	r, done, ok := storageAdmit(w, r)
