@@ -113,3 +113,5 @@
 2026-10-25 S02 基础闭环：[multipart checksum 协商](DELIVERY-2026-10-25-MULTIPART-CHECKSUMS.md)通过九组新增 Go/PG、十组受影响检查和七种实际 SDK 组合（59 检查点）。原回执、复制/覆盖、逐分片校验、COMPOSITE、拒绝和格式 7 升级通过；原数据身份、953 Secret、9 PVC、三节点/三个 Safekeeper 保留，VM 0。API/Worker 0.89.0 / Chart 0.9.86 / Core 185 / schema 067。5 GiB 完整字节验证仍在新环境进行，当前基础计数为 19 组，剩余八组业务及三组运维/TLS/发行继续。
 
 2026-10-26：[付款、组织额度与原订单恢复](DELIVERY-2026-10-26-BILLING.md)通过 15 组新增 Go/PG、三组受影响既有合同、两组新 Helm 和七个实际页面检查点。原付款/退款/争议与原键恢复闭环；临时配置已撤下，原目录及旧额度账本保持一致，三节点/三个 Safekeeper Ready，VM 0。API/Worker 0.90.0 / Chart 0.9.87 / Core 188 / schema 068。I02、O03 固定本地基线完成，当前 21 组基础、六组业务和三组其他继续；商业认证、性能、可靠性及完整大容量后置。
+
+2026-10-26 恢复基础增量：[原分支恢复隔离基础](DELIVERY-2026-10-26-BRANCH-RESET-PRIMITIVES.md)通过 16 组新增及五组受影响 Go/PG，包含 SCRAM 新凭据登录、旧密码拒绝、原 OID/业务行和同一 SQL 提交恢复。仅为已验证的基础方法；reset API、Worker 业务流程、原子元数据切换、回退、UI 与完整 Backend 恢复仍未完成。未部署 070，业务环境保持上一交付；22 个基础组及五个业务/三个其他/五个后置组计数不变。

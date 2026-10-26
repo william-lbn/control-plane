@@ -139,6 +139,9 @@ func installComputeTLS(config map[string]any) {
 	ctl["tls"] = map[string]string{"key_path": "/run/neon-lab/control.key", "cert_path": "/run/neon-lab/control.crt"}
 }
 func (s *server) nativeComputeRequest(ctx context.Context, p catalogPayload, config map[string]any, key ed25519.PrivateKey) error {
+	return s.nativeComputeRequestWithResetGrant(ctx, p, config, key, "")
+}
+func (s *server) nativeComputeRequestWithResetGrant(ctx context.Context, p catalogPayload, config map[string]any, key ed25519.PrivateKey, resetGrant string) error {
 	name := kubeName(p.EndpointID) + "-management"
 	service, err := s.kube.request(ctx, http.MethodGet, s.kube.path("service", name), nil)
 	if err != nil {
@@ -172,6 +175,7 @@ func (s *server) nativeComputeRequest(ctx context.Context, p catalogPayload, con
 		return err
 	}
 	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set(resetGrantHeader, resetGrant)
 	request.Header.Set("Authorization", "Bearer "+computeJWT(key, p.EndpointID, time.Now()))
 	if request.URL.Scheme != "https" || request.URL.User != nil {
 		return errors.New("compute gateway requires HTTPS without URL credentials")

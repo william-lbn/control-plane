@@ -7,7 +7,9 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 
 功能进度与当前优先级见 [已验收/剩余清单](docs/FUNCTIONAL-STATUS-2026-10-21.md)：22 组固定基础已有回执；五组专项后置，五组业务及三组运维/TLS/发行继续。复用来源未变的既有验收。
 
-最新状态：2026-10-26 [时间点预览与精确历史分支](docs/DELIVERY-2026-10-26-TIME-TRAVEL.md)：两组新增 Go/PG、六组受影响检查、四个真实页面检查点与原生祖先/LSN 核对通过；原请求恢复、源身份和 971 个 Secret/9 PVC 保留，VM 0。API/Worker 0.92.0 / Chart 0.9.89 / Core 193 / schema 069。原地 reset 和完整 Backend 恢复继续，未关闭 L02/L03。
+最新开发增量：2026-10-26 [原分支恢复隔离基础](docs/DELIVERY-2026-10-26-BRANCH-RESET-PRIMITIVES.md)：16 组新增 Go/PG、五组受影响检查通过，覆盖完整私有文件/UID、短时授权、关闭路由、原生 OID/数据及旧密码拒绝。未开放 reset API、未部署 schema 070、未执行现有分支恢复，L02/L03 继续。
+
+最新部署：2026-10-26 [时间点预览与精确历史分支](docs/DELIVERY-2026-10-26-TIME-TRAVEL.md)：两组新增 Go/PG、六组受影响检查、四个真实页面检查点与原生祖先/LSN 核对通过；原请求恢复、源身份和 971 个 Secret/9 PVC 保留，VM 0。API/Worker 0.92.0 / Chart 0.9.89 / Core 193 / schema 069。原地 reset 和完整 Backend 恢复继续，未关闭 L02/L03。
 
 上一增量：2026-10-26 [平台身份与 Backend 名称迁移](docs/DELIVERY-2026-10-26-CATALOG-PLATFORM.md)：13 组新增 Go/PG、原页面确认/响应恢复、四类 Backend 迁移、原用户/小对象/Function SQL 代际 2 及最终保全通过。原 955 Secret、9 PVC、目录/额度摘要保留，VM 0。API/Worker 0.91.0 / Chart 0.9.88 / Core 192 / schema 069；默认 postgres 外部改名的维护环境验证单列后置。
 

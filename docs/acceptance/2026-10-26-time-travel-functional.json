@@ -220,9 +220,11 @@
     "069": "b733e2a1ab5f829bc4101f31c8962cdc1f1f9ed64e0955b6b4a7838ca183447d"
   },
   "CI": {
-    "status": "pending_new_commit",
-    "previous_C02_commit": "d08be0ce60bbfd962909144c0015f6ea09ae129a",
-    "previous_C02_checks_succeeded": 15
+    "status": "success",
+    "commit": "2283b1fa37bce34e78f9d5b172f98f5bece852f4",
+    "run_id": 40250401484,
+    "url": "https://github.com/william-lbn/control-plane/actions/runs/40250401484",
+    "checks_succeeded": 15
   },
   "performance_reliability_campaign": false
 }

@@ -15,3 +15,5 @@ API/Worker 0.92.0 / Chart 0.9.89 / schema 069 / Core Helm 193，原生格式 7 �
 原 971 个 Secret UID（包含 C02 之前的 955 个）、九个 PVC、六套其他 Helm 发行保留；17 张目录表和三个既有额度表在专用来源/目标之外的范围摘要一致。旧 Auth/Data API 私有文件、Function SQL 原代际和当前代际 2 回执仍保留，付款账本与默认关闭状态不变。三个节点、三个 Safekeeper、七个关键组件就绪，Auth/Compute/VM 和非退休 Function 实例为零，bootstrap 148。七个终态 QA Job 包括失败尝试按 UID 归档退休，专用历史分支、原始请求和所有业务字节保留。
 
 见[功能合同](TIME-TRAVEL.md)、[结构化验收](acceptance/2026-10-26-time-travel-functional.json)、[当前清单](FUNCTIONAL-STATUS-2026-10-21.md)。下一步继续实现原分支备份、原地切换、回退及 Backend 恢复语义；不会把已有独立历史分支当作原地恢复。
+
+提交 `2283b1fa37bce34e78f9d5b172f98f5bece852f4` 的 [GitHub 运行 40250401484](https://github.com/william-lbn/control-plane/actions/runs/40250401484) 已完成，15 项检查全部成功。此门槛在后续功能提交归档，不再次运行本轮已通过的页面或原生存储检查。

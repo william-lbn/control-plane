@@ -189,7 +189,7 @@ func (g *computeGateway) configure(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var requested map[string]any
-	if json.Unmarshal(body, &requested) != nil || !validComputeCatalogRequest(stored, requested) {
+	if json.Unmarshal(body, &requested) != nil || (!validComputeCatalogRequest(stored, requested) && !g.validBranchResetGrant(r.Context(), r.Header.Get(resetGrantHeader), secret, stored, requested)) {
 		http.Error(w, "Configuration identity mismatch", 403)
 		return
 	}
