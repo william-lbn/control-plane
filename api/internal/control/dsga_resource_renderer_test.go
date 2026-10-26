@@ -188,3 +188,71 @@ func TestDSGAFiniteTaskLimitSurvivesFrozenPlanAndRunner(t *testing.T) {
 		t.Fatal("invalid task policy produced partial files")
 	}
 }
+
+// 原计划→持久JSON→配置对→实际Runner解码；不执行Linux归组/内核限额。
+func TestDSGASystemChargedDomainSurvivesOriginalPlanAndRunner(t *testing.T) {
+	p, plan := dsgaVMFixture(t)
+	originalUpper, err := plan.VM.ResourceLimits.TotalUpperBytes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan.VM.ResourceLimits.SystemMemoryMaxBytes = 16 << 20
+	frozen := plan.VM.clone()
+	plan.VM.ResourceLimits.SystemMemoryMaxBytes = 8 << 20
+	if frozen.ResourceLimits.SystemMemoryMaxBytes != 16<<20 {
+		t.Fatal("mutable policy changed frozen system cap")
+	}
+	plan.VM = frozen
+	raw, err := json.Marshal(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var restored dsgaCreationPlan
+	if err = json.Unmarshal(raw, &restored); err != nil {
+		t.Fatal(err)
+	}
+	files, err := renderDSGABootstrapFiles(p, restored, "actual-vm-uid", dsgaRenderFixture())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var source resourceguard.SourceConfig
+	if err = json.Unmarshal(files[resourceguard.ResourceSecretKey], &source); err != nil || source.Validate() != nil {
+		t.Fatal(err)
+	}
+	if !source.Config.SystemCgroup || source.Limits.SystemMemoryMaxBytes != 16<<20 {
+		t.Fatal("source dropped original system mode/cap")
+	}
+	upper, err := source.Limits.TotalUpperBytes()
+	if err != nil || upper != originalUpper {
+		t.Fatal("system cap counted twice", err)
+	}
+	vm, err := renderDSGAVM(p, restored)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vm.Spec.DSGABootstrap.Ready = true
+	vm.Spec.DSGABootstrap.VMUID = "actual-vm-uid"
+	vm.Spec.DSGABootstrap.ConfigSecretUID = "original-config-uid"
+	sum := sha256.Sum256(files[resourceguard.ResourceSecretKey])
+	document := resourceguard.RuntimeDocument{ProtocolVersion: 1, Incarnation: restored.Incarnation, ConfigSecretUID: "original-config-uid", SourceJSON: files[resourceguard.ResourceSecretKey], SourceSHA256: hex.EncodeToString(sum[:])}
+	encoded, err := json.Marshal(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := bootstrap.DecodeRuntime(&vm.Spec, gzip64.Encode(encoded))
+	if err != nil || !bytes.Equal(encoded, decoded) {
+		t.Fatal("actual Runner changed original source", err)
+	}
+	restored.VM.ResourceLimits.SystemMemoryMaxBytes = restored.VM.ResourceLimits.OutsideUpperBytes + 1
+	if files, err = renderDSGABootstrapFiles(p, restored, "actual-vm-uid", dsgaRenderFixture()); err == nil || files != nil {
+		t.Fatal("invalid system cap produced partial files")
+	}
+	restored.VM.ResourceLimits.SystemMemoryMaxBytes = 0
+	files, err = renderDSGABootstrapFiles(p, restored, "actual-vm-uid", dsgaRenderFixture())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(files[resourceguard.ResourceSecretKey], []byte("system_cgroup")) || bytes.Contains(files[resourceguard.ResourceSecretKey], []byte("system_memory_max_bytes")) {
+		t.Fatal("legacy source gained guessed system cap")
+	}
+}

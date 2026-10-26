@@ -1,0 +1,82 @@
+{
+  "date": "2026-10-26",
+  "AS_published": {
+    "sha": "e3641392ac2d3d2b4a5db76130c1de041f8c7c91",
+    "pseudo": "v0.0.0-20261026025902-e3641392ac2d"
+  },
+  "OriginHashVerified": "e3641392ac2d3d2b4a5db76130c1de041f8c7c91",
+  "tests": {
+    "top": 1,
+    "all": 1,
+    "failed": 0,
+    "skipped": 0
+  },
+  "readonly_vet_exit": 0,
+  "sum_delta": 2,
+  "source_files": [
+    {
+      "path": "repos/control-plane/api/go.mod",
+      "sha256": "ecc8d18f7284b4f2b2594705fdb760058b9c8a969047a1c47f924a6025dabff2",
+      "bytes": 4200
+    },
+    {
+      "path": "repos/control-plane/api/go.sum",
+      "sha256": "e4977e4d2f4f572f1ce7c4a21ce1d6ae0cf2dbbcda7b12c5c406983a63f287b8",
+      "bytes": 28842
+    },
+    {
+      "path": "repos/control-plane/api/internal/control/dsga_resource_renderer.go",
+      "sha256": "100c39eb38e3a311235b242729a7ae62852adcd777b60f3c79d1db930f3b0850",
+      "bytes": 2403
+    },
+    {
+      "path": "repos/control-plane/api/internal/control/dsga_resource_renderer_test.go",
+      "sha256": "f3dde4ea549973dc0afea01680d1eb4e6f379b0ddb6ae514e53f64f5723c8343",
+      "bytes": 10173
+    }
+  ],
+  "logs_and_recipes": [
+    {
+      "path": "build/dsga-system-domain-cp-dependency.log",
+      "sha256": "7ad5418101d2073aaf5f2c7ffd157601fd6552bccd78179459689027bf490842",
+      "bytes": 168
+    },
+    {
+      "path": "build/dsga-system-domain-cp-module.json",
+      "sha256": "c31b441ce1c4105e8da6cc115c7c1c9466238c9268b8e9c6ac549dae7dec78df",
+      "bytes": 945
+    },
+    {
+      "path": "build/dsga-system-domain-cp-module.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "build/dsga-system-domain-cp-renderer.jsonl",
+      "sha256": "d2d7511ff1dd7487e5182ce47a7b6814d929e36743a359d5267911aa3835ebfb",
+      "bytes": 1613
+    },
+    {
+      "path": "build/dsga-system-domain-cp-renderer.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "build/dsga-system-domain-cp-vet.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "build/run-dsga-system-domain-cp-dependency.py",
+      "sha256": "768a62121de6b3f9db72bf588f5b94c4d341cd4f48f9f249b621e105d3f57cd7",
+      "bytes": 2461
+    },
+    {
+      "path": "build/run-dsga-system-domain-cp-renderer.sh",
+      "sha256": "8198285a28dcfb8c013db3652d094ec792a5df2e5828978cff4ba2abc570e3d4",
+      "bytes": 941
+    }
+  ],
+  "linux_runtime_executed": false,
+  "k8s_executed": false
+}

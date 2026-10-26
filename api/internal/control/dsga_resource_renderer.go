@@ -13,6 +13,8 @@ import (
 // 数字只证明完整可表示且适合原最低Guest，实际Root/Host约束仍由生产执行器落实。
 // 原计划可显式携带冻结pids上限，整份Limits原样传递；缺省仍是旧未约束来源，
 // 不在Renderer补默认，也不将任务数换算成已经认证的私有字节或VM许可。
+// 系统计费域只从原Limits显式开启，额度包含于Outside；其余系统/旧charge仍需
+// 完整外部预算，Renderer不能凭一个cgroup额度声明已经覆盖全部SystemOutsidePG。
 func renderDSGAResourceBootstrap(p createPayload, plan dsgaCreationPlan, vmUID string, credentials dsgaRenderCredentials) ([]byte, error) {
 	if _, err := plan.nativeBootstrap(p, vmUID); err != nil {
 		return nil, err
@@ -20,7 +22,7 @@ func renderDSGAResourceBootstrap(p createPayload, plan dsgaCreationPlan, vmUID s
 	if plan.VM.validateResourceBudget(plan.Budget) != nil {
 		return nil, errDSGARender
 	}
-	s := resourceguard.SourceConfig{ProtocolVersion: 1, Config: resourceguard.Config{VMUID: vmUID, ComputeInstanceID: plan.ComputeInstanceID, StateDir: resourceguard.FixedStateDir}, IssuerEpoch: 1, BudgetCommitmentID: "bootstrap-" + plan.OperationUUID, Limits: *plan.VM.ResourceLimits, ControlPublicKey: base64.RawURLEncoding.EncodeToString(credentials.ControlPublicKey)}
+	s := resourceguard.SourceConfig{ProtocolVersion: 1, Config: resourceguard.Config{VMUID: vmUID, ComputeInstanceID: plan.ComputeInstanceID, StateDir: resourceguard.FixedStateDir, SystemCgroup: plan.VM.ResourceLimits.SystemMemoryMaxBytes != 0}, IssuerEpoch: 1, BudgetCommitmentID: "bootstrap-" + plan.OperationUUID, Limits: *plan.VM.ResourceLimits, ControlPublicKey: base64.RawURLEncoding.EncodeToString(credentials.ControlPublicKey)}
 	if s.Validate() != nil {
 		return nil, errDSGARender
 	}
