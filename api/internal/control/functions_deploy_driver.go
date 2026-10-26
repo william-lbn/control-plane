@@ -29,16 +29,15 @@ func (s *server) functionSQLIntent(ctx context.Context, op, worker string, p fun
 		return ref, false, err
 	}
 	ref.Namespace = s.kube.namespace
-	ref.Generation = 1
-	ref.Name = "fn-" + p.FunctionID[4:] + "-sql-1"
 	ref.MACKeyVersion = s.functions.input.KeyVersion
 	ref.Scope = functionsql.Scope{FunctionID: p.FunctionID, ProjectID: p.ProjectID, BranchID: p.BranchID, ProvisioningRole: "control_probe"}
-	err = tx.QueryRow(ctx, `SELECT endpoint_id,database_name,sql_schema FROM function_definitions WHERE id=$1`, p.FunctionID).Scan(&ref.WriterID, &ref.Scope.Database, &ref.Scope.Schema)
+	err = tx.QueryRow(ctx, `SELECT endpoint_id,database_name,sql_schema,sql_credential_generation FROM function_definitions WHERE id=$1`, p.FunctionID).Scan(&ref.WriterID, &ref.Scope.Database, &ref.Scope.Schema, &ref.Generation)
+	ref.Name = "fn-" + p.FunctionID[4:] + "-sql-" + strconv.FormatInt(ref.Generation, 10)
 	if err != nil || !ref.valid() {
 		return functionSQLReference{}, false, errFunctionSQLSecret
 	}
 	var persisted bool
-	if tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM function_sql_credentials WHERE function_id=$1 AND credential_generation=1)`, p.FunctionID).Scan(&persisted) != nil {
+	if tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM function_sql_credentials WHERE function_id=$1 AND credential_generation=$2)`, p.FunctionID, ref.Generation).Scan(&persisted) != nil {
 		return functionSQLReference{}, false, errFunctionSQLSecret
 	}
 	if err = commitFunctionInstance(ctx, tx, op, worker); err != nil {

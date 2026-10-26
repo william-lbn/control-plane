@@ -32,7 +32,7 @@ func (s *server) loadPublishedFunction(ctx context.Context, project, branch, slu
  b.namespace,b.secret_name,b.secret_uid,b.content_mac,b.mac_key_version,d.bundle_digest,f.endpoint_id,f.version
  FROM function_definitions f JOIN function_instances i ON i.function_id=f.id AND i.deployment_id=f.active_deployment_id
  JOIN function_deployments d ON d.id=i.deployment_id JOIN function_instance_bootstraps b ON b.instance_id=i.id
- JOIN function_sql_credentials c ON c.function_id=f.id AND c.credential_generation=1
+ JOIN function_sql_credentials c ON c.function_id=f.id AND c.credential_generation=f.sql_credential_generation
  JOIN projects p ON p.id=f.project_id JOIN organizations o ON o.id=f.org_id JOIN branches r ON r.id=f.branch_id
  WHERE f.project_id=$1 AND f.branch_id=$2 AND f.slug=$3 AND f.state='active' AND f.generation=i.generation AND i.state='ready'
  AND p.state='ready' AND p.deleted_at IS NULL AND r.state='ready' AND r.deleted_at IS NULL AND o.state='active' AND d.state='completed'`,

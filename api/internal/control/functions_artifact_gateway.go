@@ -129,7 +129,7 @@ func (g *functionArtifactGateway) identities(ctx context.Context, instance, depl
  JOIN function_deployments d ON d.id=i.deployment_id AND d.function_id=f.id
  JOIN function_instance_bootstraps b ON b.instance_id=i.id AND b.function_id=f.id
  JOIN function_deployment_backings a ON a.deployment_id=d.id
- JOIN function_sql_credentials c ON c.function_id=f.id AND c.credential_generation=1
+ JOIN function_sql_credentials c ON c.function_id=f.id AND c.credential_generation=f.sql_credential_generation
  JOIN projects p ON p.id=f.project_id JOIN organizations o ON o.id=f.org_id
  JOIN branches r ON r.id=f.branch_id AND r.project_id=f.project_id
  JOIN endpoints e ON e.id=f.endpoint_id AND e.project_id=f.project_id AND e.branch_id=f.branch_id

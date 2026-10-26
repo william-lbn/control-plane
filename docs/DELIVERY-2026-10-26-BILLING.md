@@ -19,3 +19,5 @@ API/Worker 0.90.0 / Chart 0.9.87 / 元数据 schema 068 / Core Helm 188；原生
 详见 [付款合同](BILLING.md)、[结构化回执](acceptance/2026-10-26-billing-functional.json)、[当前清单](FUNCTIONAL-STATUS-2026-10-21.md)、[运营输入](OPERATOR-INPUTS.md)和[环境后置边界](ENVIRONMENT-DEFERRED-VALIDATION.md)。源码推送和 GitHub 门槛另行记录；本地镜像未宣称已统一公开发行。
 
 GitHub 初次运行 40216666380 发现 CLI 目录测试仍锁旧 293 个操作；本次合同已增加到 305。后续仅同步 `clients/test/client.test.mjs` 的两处条数断言，并通过一组受影响的 Linux 目录检查，原有客户端功能复用；运行时代码、镜像和页面验收未重做。首次失败日志保留，修正提交的 GitHub 门槛单独记录。
+
+后续修正提交 `f7df93a2dc9443f653d218960536a8e119b45645` 的 [GitHub 运行 40217218710](https://github.com/william-lbn/control-plane/actions/runs/40217218710) 已完成，15 项检查全部成功；包括 Go/真实 PostgreSQL、CLI/MCP、Web、Auth、Functions、Helm 和八个组件发布任务。统一发行消费、版本锁和独立安装仍按 O02 单列。

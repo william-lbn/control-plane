@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 	"os"
 	"regexp"
 	"strconv"
@@ -165,43 +164,15 @@ func (k *kubeClient) pinRestoreLSN(ctx context.Context, tenant, timeline, lsn st
 }
 
 func (k *kubeClient) resolveRestorePoint(ctx context.Context, tenant, timeline, timestamp, lsn string) (string, error) {
-	window, err := k.timelineRestoreWindow(ctx, tenant, timeline)
+	point, err := k.observeRestorePoint(ctx, tenant, timeline, timestamp, lsn)
 	if err != nil {
 		return "", err
 	}
-	if timestamp != "" {
-		t, _ := time.Parse(time.RFC3339Nano, timestamp)
-		point, err := k.serviceRequest(ctx, "pageserver-managed", 9898,
-			"v1/tenant/"+tenant+"/timeline/"+timeline+"/get_lsn_by_timestamp?timestamp="+url.QueryEscape(t.UTC().Format(time.RFC3339Nano)), http.MethodGet, nil)
-		if err != nil {
-			return "", err
-		}
-		switch stringVal(point["kind"]) {
-		case "present":
-			lsn = stringVal(point["lsn"])
-		case "past":
-			return "", restoreError{422, "restore_point_outside_history"}
-		case "future":
-			return "", restoreError{409, "restore_timestamp_not_replayed"}
-		case "nodata":
-			return "", restoreError{422, "restore_history_empty"}
-		default:
-			return "", errors.New("unknown storage timestamp result")
-		}
-	}
-	lsn, err = canonicalLSN(lsn)
-	if err != nil {
+	// Preview is read-only; durable acceptance separately pins this exact LSN.
+	if err = k.pinRestoreLSN(ctx, tenant, timeline, point.LSN); err != nil {
 		return "", err
 	}
-	if err = restoreLSNWithinWindow(lsn, window); err != nil {
-		return "", err
-	}
-	// Resolving a point is insufficient: pin it before accepting durable intent.
-	// The Worker renews this exact LSN; it never resolves the timestamp again.
-	if err = k.pinRestoreLSN(ctx, tenant, timeline, lsn); err != nil {
-		return "", err
-	}
-	return lsn, nil
+	return point.LSN, nil
 }
 
 func branchCreationSteps(withEndpoint, historical bool) []string {

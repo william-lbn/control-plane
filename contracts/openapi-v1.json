@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.90.0",
+    "version": "0.92.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -879,6 +879,11 @@
           "acknowledge_current_functions_for_historical_data": {
             "type": "boolean",
             "description": "Historical SQL restore additionally requires this consent: use Function code/env frozen at this request admission, not code from the historical SQL data point."
+          },
+          "expected_parent_timeline_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{32}$",
+            "description": "Optional source scope from a restore-point preview. Requires a historical point. Admission locks and compares the exact current timeline before any lease or credential reservation; mismatch is 412. Omitted requests keep their existing idempotency hash."
           }
         },
         "not": {
@@ -6292,6 +6297,11 @@
             "minLength": 1,
             "maxLength": 63,
             "description": "Distinct non-system PostgreSQL identifier, at most 63 UTF-8 bytes; control characters and surrounding whitespace rejected."
+          },
+          "migrate_backend_dependencies": {
+            "type": "boolean",
+            "default": false,
+            "description": "Database only; explicit current project Admin opt-in. Requires disabled Auth, Data API and Storage and suspended initialized Functions with all guests retired. Bind the exact original native OID, metadata snapshot and immutable credential UIDs; clone only connection paths using the original password/signing bytes, and sign a new Functions SQL credential generation while retaining original history. Default connections and protected platform objects remain excluded. No automatic enable or credential rotation."
           }
         }
       },
@@ -8973,7 +8983,7 @@
           "version": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 9223372036854775807
+            "maximum": 9223372036854776000
           },
           "settings": {
             "$ref": "#/components/schemas/StorageBucketSettings"
@@ -9714,6 +9724,207 @@
           "items",
           "limit"
         ]
+      },
+      "CatalogPlatformInitialInput": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "acknowledge_initial_observation",
+          "observation_sha256"
+        ],
+        "properties": {
+          "acknowledge_initial_observation": {
+            "type": "boolean",
+            "const": true
+          },
+          "observation_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      },
+      "CatalogPlatformObservedObject": {
+        "type": "object",
+        "required": [
+          "kind",
+          "name",
+          "oid"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "role",
+              "database"
+            ]
+          },
+          "name": {
+            "type": "string"
+          },
+          "oid": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4294967295
+          },
+          "owner": {
+            "type": "string"
+          },
+          "owner_oid": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 4294967295
+          }
+        }
+      },
+      "CatalogPlatformDifference": {
+        "type": "object",
+        "required": [
+          "kind",
+          "expected_name",
+          "expected_oid",
+          "status",
+          "changes",
+          "credentials"
+        ],
+        "properties": {
+          "kind": {
+            "enum": [
+              "role",
+              "database"
+            ]
+          },
+          "expected_name": {
+            "type": "string"
+          },
+          "expected_oid": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4294967295
+          },
+          "observed_name": {
+            "type": "string"
+          },
+          "observed_oid": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4294967295
+          },
+          "observed_owner": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "changes": {
+            "type": "array",
+            "maxItems": 8,
+            "items": {
+              "type": "string"
+            }
+          },
+          "credentials": {
+            "enum": [
+              "not_observed"
+            ]
+          }
+        }
+      },
+      "CatalogPlatformIdentityResult": {
+        "type": "object",
+        "properties": {
+          "branch_id": {
+            "type": "string"
+          },
+          "recorded": {
+            "type": "boolean"
+          },
+          "baseline_id": {
+            "type": "string"
+          },
+          "captured_at": {
+            "type": "string"
+          },
+          "observation_sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "object_count": {
+            "type": "integer",
+            "minimum": 3,
+            "maximum": 5
+          },
+          "items": {
+            "type": "array",
+            "maxItems": 5,
+            "items": {
+              "$ref": "#/components/schemas/CatalogPlatformDifference"
+            }
+          },
+          "observed_objects": {
+            "type": "array",
+            "maxItems": 5,
+            "items": {
+              "$ref": "#/components/schemas/CatalogPlatformObservedObject"
+            }
+          },
+          "credentials": {
+            "enum": [
+              "not_observed"
+            ]
+          },
+          "basis": {
+            "enum": [
+              "admin_initial_platform_observation",
+              "no_original_platform_observation"
+            ]
+          },
+          "protected_object_mutation": {
+            "type": "boolean",
+            "const": false
+          },
+          "source_endpoint_changed": {
+            "type": "boolean"
+          },
+          "source_backings_changed": {
+            "type": "boolean"
+          },
+          "platform_intent_changed": {
+            "type": "boolean"
+          }
+        }
+      },
+      "RestorePointObservation": {
+        "type": "object",
+        "required": [
+          "branch_id",
+          "source_timeline_id",
+          "lsn",
+          "window",
+          "retention_pinned"
+        ],
+        "properties": {
+          "branch_id": {
+            "type": "string"
+          },
+          "source_timeline_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{32}$"
+          },
+          "lsn": {
+            "type": "string",
+            "pattern": "^[0-9A-Fa-f]{1,8}/[0-9A-Fa-f]{1,8}$"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "window": {
+            "$ref": "#/components/schemas/RestoreWindow"
+          },
+          "retention_pinned": {
+            "type": "boolean",
+            "const": false
+          }
+        }
       }
     },
     "responses": {
@@ -10098,6 +10309,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "description": "Accepted persistent lifecycle Operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Authentication required",
             "content": {
@@ -10174,16 +10395,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "Accepted persistent lifecycle Operation",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Accepted"
                 }
               }
             }
@@ -10370,6 +10581,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "description": "Accepted persistent lifecycle Operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Authentication required",
             "content": {
@@ -10446,16 +10667,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "Accepted persistent lifecycle Operation",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Accepted"
                 }
               }
             }
@@ -10821,6 +11032,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "description": "Accepted persistent lifecycle Operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Authentication required",
             "content": {
@@ -10897,16 +11118,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "Accepted persistent lifecycle Operation",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Accepted"
                 }
               }
             }
@@ -11134,8 +11345,28 @@
               }
             }
           },
-          "422": {
-            "description": "Invalid input, database authentication or PostgreSQL query error; retryable=false.",
+          "401": {
+            "description": "No valid console session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CSRF validation or global write-role validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project or endpoint not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -11146,6 +11377,16 @@
           },
           "408": {
             "description": "Request cancelled; retryable=false.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input, database authentication or PostgreSQL query error; retryable=false.",
             "content": {
               "application/json": {
                 "schema": {
@@ -11186,36 +11427,6 @@
           },
           "504": {
             "description": "Connection or query budget exceeded. retryable=true only before user SQL was sent; otherwise verify the outcome before retrying.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "No valid console session.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "CSRF validation or global write-role validation failed.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Project or endpoint not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -13889,16 +14100,16 @@
           "409": {
             "$ref": "#/components/responses/Error"
           },
-          "422": {
-            "description": "Invalid/protected name, owner or password"
-          },
-          "503": {
-            "$ref": "#/components/responses/Error"
-          },
           "412": {
             "$ref": "#/components/responses/Error"
           },
+          "422": {
+            "description": "Invalid/protected name, owner or password"
+          },
           "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
             "$ref": "#/components/responses/Error"
           }
         },
@@ -14321,6 +14532,16 @@
               }
             }
           },
+          "201": {
+            "description": "Credential created; api_token returned once",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackendCredentialReply"
+                }
+              }
+            }
+          },
           "401": {
             "$ref": "#/components/responses/Error"
           },
@@ -14347,16 +14568,6 @@
           },
           "503": {
             "$ref": "#/components/responses/Error"
-          },
-          "201": {
-            "description": "Credential created; api_token returned once",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BackendCredentialReply"
-                }
-              }
-            }
           }
         },
         "requestBody": {
@@ -14816,6 +15027,16 @@
           }
         ],
         "responses": {
+          "200": {
+            "description": "Idempotent replay: same resource, secret_available=false, no token. Lost plaintext requires revoke and reissue.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleInvitationCreated"
+                }
+              }
+            }
+          },
           "201": {
             "description": "Success",
             "content": {
@@ -14846,16 +15067,6 @@
           },
           "503": {
             "$ref": "#/components/responses/Error"
-          },
-          "200": {
-            "description": "Idempotent replay: same resource, secret_available=false, no token. Lost plaintext requires revoke and reissue.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ConsoleInvitationCreated"
-                }
-              }
-            }
           }
         },
         "requestBody": {
@@ -15118,6 +15329,16 @@
           }
         ],
         "responses": {
+          "200": {
+            "description": "Current lifecycle metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LifecycleOverview"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Authentication required",
             "content": {
@@ -15194,16 +15415,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "200": {
-            "description": "Current lifecycle metadata",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LifecycleOverview"
                 }
               }
             }
@@ -15238,6 +15449,16 @@
           }
         ],
         "responses": {
+          "200": {
+            "description": "Current lifecycle metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProtectionResult"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Authentication required",
             "content": {
@@ -15314,16 +15535,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "200": {
-            "description": "Current lifecycle metadata",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProtectionResult"
                 }
               }
             }
@@ -15371,6 +15582,16 @@
           }
         ],
         "responses": {
+          "200": {
+            "description": "Current lifecycle metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProtectionResult"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Authentication required",
             "content": {
@@ -15447,16 +15668,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "200": {
-            "description": "Current lifecycle metadata",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProtectionResult"
                 }
               }
             }
@@ -15504,6 +15715,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "description": "Accepted persistent lifecycle Operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Authentication required",
             "content": {
@@ -15580,16 +15801,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "Accepted persistent lifecycle Operation",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Accepted"
                 }
               }
             }
@@ -16924,6 +17135,12 @@
               }
             }
           },
+          "206": {
+            "description": "Partial byte range"
+          },
+          "304": {
+            "description": "Matching ETag; no body"
+          },
           "401": {
             "description": "Authorization, lifecycle, quota, version or storage error",
             "content": {
@@ -16984,6 +17201,9 @@
               }
             }
           },
+          "416": {
+            "description": "Unsatisfiable range"
+          },
           "422": {
             "description": "Authorization, lifecycle, quota, version or storage error",
             "content": {
@@ -17023,15 +17243,6 @@
                 }
               }
             }
-          },
-          "206": {
-            "description": "Partial byte range"
-          },
-          "304": {
-            "description": "Matching ETag; no body"
-          },
-          "416": {
-            "description": "Unsatisfiable range"
           }
         }
       },
@@ -17103,6 +17314,12 @@
           "200": {
             "description": "Successful bounded operation"
           },
+          "206": {
+            "description": "Partial byte range"
+          },
+          "304": {
+            "description": "Matching ETag; no body"
+          },
           "401": {
             "description": "Authorization, lifecycle, quota, version or storage error",
             "content": {
@@ -17163,6 +17380,9 @@
               }
             }
           },
+          "416": {
+            "description": "Unsatisfiable range"
+          },
           "422": {
             "description": "Authorization, lifecycle, quota, version or storage error",
             "content": {
@@ -17202,15 +17422,6 @@
                 }
               }
             }
-          },
-          "206": {
-            "description": "Partial byte range"
-          },
-          "304": {
-            "description": "Matching ETag; no body"
-          },
-          "416": {
-            "description": "Unsatisfiable range"
           }
         }
       },
@@ -18934,6 +19145,16 @@
           }
         },
         "responses": {
+          "200": {
+            "description": "Original application result, including application errors and redirects. Body is base64 and never rendered as Console HTML.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FunctionInvocationResult"
+                }
+              }
+            }
+          },
           "401": {
             "$ref": "#/components/responses/Error"
           },
@@ -18958,20 +19179,10 @@
           "429": {
             "$ref": "#/components/responses/Error"
           },
-          "503": {
+          "502": {
             "$ref": "#/components/responses/Error"
           },
-          "200": {
-            "description": "Original application result, including application errors and redirects. Body is base64 and never rendered as Console HTML.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FunctionInvocationResult"
-                }
-              }
-            }
-          },
-          "502": {
+          "503": {
             "$ref": "#/components/responses/Error"
           }
         }
@@ -19068,6 +19279,9 @@
               }
             }
           },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
           "422": {
             "description": "Invalid bounded pagination",
             "content": {
@@ -19079,9 +19293,6 @@
             }
           },
           "503": {
-            "$ref": "#/components/responses/Error"
-          },
-          "409": {
             "$ref": "#/components/responses/Error"
           }
         }
@@ -19286,8 +19497,28 @@
               }
             }
           },
-          "422": {
-            "description": "Invalid input, database authentication or PostgreSQL query error; retryable=false.",
+          "401": {
+            "description": "No valid console session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CSRF validation or global write-role validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project or endpoint not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -19298,6 +19529,16 @@
           },
           "408": {
             "description": "Request cancelled; retryable=false.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input, database authentication or PostgreSQL query error; retryable=false.",
             "content": {
               "application/json": {
                 "schema": {
@@ -19338,36 +19579,6 @@
           },
           "504": {
             "description": "Connection or query budget exceeded. retryable=true only before user SQL was sent; otherwise verify the outcome before retrying.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "No valid console session.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "CSRF validation or global write-role validation failed.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Project or endpoint not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -19917,6 +20128,16 @@
               }
             }
           },
+          "201": {
+            "description": "Personal query metadata; detail reads include decrypted SQL. No Compute startup or execution.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedQueryMutation"
+                }
+              }
+            }
+          },
           "401": {
             "$ref": "#/components/responses/Error"
           },
@@ -19940,16 +20161,6 @@
           },
           "503": {
             "$ref": "#/components/responses/Error"
-          },
-          "201": {
-            "description": "Personal query metadata; detail reads include decrypted SQL. No Compute startup or execution.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SavedQueryMutation"
-                }
-              }
-            }
           }
         },
         "description": "Current project Editor+ and owner-only access. Versioned AES-GCM envelopes bind owner/project/id/generation. Durable mutation replay contains metadata only.",
@@ -21363,33 +21574,6 @@
           }
         ],
         "responses": {
-          "400": {
-            "description": "Invalid source/target or same-object copy"
-          },
-          "403": {
-            "description": "Authorization denied"
-          },
-          "404": {
-            "description": "Source object/target bucket missing"
-          },
-          "409": {
-            "description": "Source blob identity invalid"
-          },
-          "412": {
-            "description": "Observed metadata representation changed; no update"
-          },
-          "422": {
-            "description": "Invalid copy request"
-          },
-          "428": {
-            "description": "Current metadata ETag required"
-          },
-          "429": {
-            "description": "Quota exceeded"
-          },
-          "503": {
-            "description": "Unavailable"
-          },
           "200": {
             "description": "metadata, content_type, metadata_etag, key, unchanged sha256",
             "content": {
@@ -21428,6 +21612,33 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Invalid source/target or same-object copy"
+          },
+          "403": {
+            "description": "Authorization denied"
+          },
+          "404": {
+            "description": "Source object/target bucket missing"
+          },
+          "409": {
+            "description": "Source blob identity invalid"
+          },
+          "412": {
+            "description": "Observed metadata representation changed; no update"
+          },
+          "422": {
+            "description": "Invalid copy request"
+          },
+          "428": {
+            "description": "Current metadata ETag required"
+          },
+          "429": {
+            "description": "Quota exceeded"
+          },
+          "503": {
+            "description": "Unavailable"
           }
         },
         "requestBody": {
@@ -23459,6 +23670,16 @@
           }
         ],
         "responses": {
+          "200": {
+            "description": "Bounded administrator metadata view",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MultipartAdministrationList"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Console authentication required"
           },
@@ -23473,16 +23694,6 @@
           },
           "503": {
             "description": "Outcome may be unknown; original admitted intent and audit retained"
-          },
-          "200": {
-            "description": "Bounded administrator metadata view",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MultipartAdministrationList"
-                }
-              }
-            }
           }
         },
         "operationId": "listMultipartAdministration",
@@ -23545,21 +23756,6 @@
           }
         ],
         "responses": {
-          "401": {
-            "description": "Console authentication required"
-          },
-          "403": {
-            "description": "Current project Admin Console session required; global role and API key do not grant access"
-          },
-          "404": {
-            "description": "Project/branch not found"
-          },
-          "429": {
-            "description": "60 new administrator intents per actor/hour; exact replay does not consume a new admission"
-          },
-          "503": {
-            "description": "Outcome may be unknown; original admitted intent and audit retained"
-          },
           "200": {
             "description": "Logical abort and control receipt confirmed",
             "content": {
@@ -23570,11 +23766,26 @@
               }
             }
           },
+          "401": {
+            "description": "Console authentication required"
+          },
+          "403": {
+            "description": "Current project Admin Console session required; global role and API key do not grant access"
+          },
+          "404": {
+            "description": "Project/branch not found"
+          },
           "409": {
             "description": "Different key/input or upload already completed; existing object unchanged"
           },
           "422": {
             "description": "Explicit valid reason/key required"
+          },
+          "429": {
+            "description": "60 new administrator intents per actor/hour; exact replay does not consume a new admission"
+          },
+          "503": {
+            "description": "Outcome may be unknown; original admitted intent and audit retained"
           }
         },
         "operationId": "abortMultipartAsAdministrator",
@@ -24405,16 +24616,16 @@
           "409": {
             "$ref": "#/components/responses/Error"
           },
-          "422": {
-            "$ref": "#/components/responses/Error"
-          },
-          "503": {
-            "$ref": "#/components/responses/Error"
-          },
           "412": {
             "$ref": "#/components/responses/Error"
           },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
           "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
             "$ref": "#/components/responses/Error"
           }
         },
@@ -24498,20 +24709,20 @@
           "409": {
             "$ref": "#/components/responses/Error"
           },
-          "422": {
-            "$ref": "#/components/responses/Error"
-          },
-          "503": {
-            "$ref": "#/components/responses/Error"
-          },
           "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
             "$ref": "#/components/responses/Error"
           },
           "428": {
             "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
         },
-        "description": "Editor/Admin and session CSRF or scoped API key. Same-key/input/version replay resolves the original durable Operation before re-observing old names. Admission captures the original PostgreSQL OID, branch marker, current metadata version and owned immutable credential/config/routes Secret UIDs. Worker performs transactional ALTER with an OID postcondition, all Writer/Reader cold configurations, Proxy credential publication and atomic final catalog/owner-reference rename. Password/verifier stays in its original immutable Secret; no object/data copy, forced disconnect, privilege escalation or name-only adoption. Target names retained by another managed catalog record are reserved. Default Endpoint identities and retained Backend database dependencies must migrate before rename; arbitrary external DDL management, cross-system fencing and uninterrupted HA remain independent gates. New rename completion atomically commits the renamed metadata and follower Owner references, immutable original result and success audit. The result binds the full original typed payload including object OID and immutable backing/credential UIDs. Original result recovery settles only its five original steps before credential/SQL/config/routes access, preserving later names and authorized password rotations even after the original Writer retires. Fresh execution and commit recheck the original lease/payload, current actor permission, parents, exact Endpoint set, dependencies and original updating metadata generation. Legacy final-looking names do not manufacture a result. This does not establish a complete current native identity lineage or distributed DDL fence.",
+        "description": "Editor/Admin and session CSRF or scoped API key. Same-key/input/version replay resolves the original durable Operation before re-observing old names. Admission captures the original PostgreSQL OID, branch marker, current metadata version and owned immutable credential/config/routes Secret UIDs. Worker performs transactional ALTER with an OID postcondition, all Writer/Reader cold configurations, Proxy credential publication and atomic final catalog/owner-reference rename. Password/verifier stays in its original immutable Secret; no object/data copy, forced disconnect, privilege escalation or name-only adoption. Target names retained by another managed catalog record are reserved. Default Endpoint identities and retained Backend database dependencies must migrate before rename; arbitrary external DDL management, cross-system fencing and uninterrupted HA remain independent gates. New rename completion atomically commits the renamed metadata and follower Owner references, immutable original result and success audit. The result binds the full original typed payload including object OID and immutable backing/credential UIDs. Original result recovery settles only its five original steps before credential/SQL/config/routes access, preserving later names and authorized password rotations even after the original Writer retires. Fresh execution and commit recheck the original lease/payload, current actor permission, parents, exact Endpoint set, dependencies and original updating metadata generation. Legacy final-looking names do not manufacture a result. This does not establish a complete current native identity lineage or distributed DDL fence. Explicit migrate_backend_dependencies=true admits an Admin-only name migration of dormant Backend dependencies bound to the original OID and exact snapshot; credentials and service data generations are preserved.",
         "requestBody": {
           "required": true,
           "content": {
@@ -24558,6 +24769,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "description": "Expiration policy and completed persistent Operation committed atomically; replay returns the same Operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Authentication required",
             "content": {
@@ -24634,16 +24855,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "Expiration policy and completed persistent Operation committed atomically; replay returns the same Operation",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Accepted"
                 }
               }
             }
@@ -26155,9 +26366,6 @@
           "409": {
             "$ref": "#/components/responses/Error"
           },
-          "503": {
-            "$ref": "#/components/responses/Error"
-          },
           "412": {
             "$ref": "#/components/responses/Error"
           },
@@ -26165,6 +26373,9 @@
             "$ref": "#/components/responses/Error"
           },
           "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
             "$ref": "#/components/responses/Error"
           }
         },
@@ -26284,9 +26495,6 @@
           "409": {
             "$ref": "#/components/responses/Error"
           },
-          "503": {
-            "$ref": "#/components/responses/Error"
-          },
           "412": {
             "$ref": "#/components/responses/Error"
           },
@@ -26294,6 +26502,9 @@
             "$ref": "#/components/responses/Error"
           },
           "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
             "$ref": "#/components/responses/Error"
           }
         },
@@ -26385,16 +26596,16 @@
           "409": {
             "$ref": "#/components/responses/Error"
           },
-          "422": {
-            "$ref": "#/components/responses/Error"
-          },
-          "503": {
-            "$ref": "#/components/responses/Error"
-          },
           "412": {
             "$ref": "#/components/responses/Error"
           },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
           "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
             "$ref": "#/components/responses/Error"
           }
         },
@@ -26523,16 +26734,16 @@
           "409": {
             "$ref": "#/components/responses/Error"
           },
-          "422": {
-            "$ref": "#/components/responses/Error"
-          },
-          "503": {
-            "$ref": "#/components/responses/Error"
-          },
           "412": {
             "$ref": "#/components/responses/Error"
           },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
           "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
             "$ref": "#/components/responses/Error"
           }
         },
@@ -26595,27 +26806,6 @@
           }
         ],
         "responses": {
-          "403": {
-            "$ref": "#/components/responses/Error"
-          },
-          "404": {
-            "$ref": "#/components/responses/Error"
-          },
-          "409": {
-            "$ref": "#/components/responses/Error"
-          },
-          "422": {
-            "$ref": "#/components/responses/Error"
-          },
-          "503": {
-            "$ref": "#/components/responses/Error"
-          },
-          "412": {
-            "$ref": "#/components/responses/Error"
-          },
-          "428": {
-            "$ref": "#/components/responses/Error"
-          },
           "200": {
             "description": "Atomic immutable current observation or original-key replay",
             "content": {
@@ -26625,6 +26815,27 @@
                 }
               }
             }
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
         },
         "description": "Project Admin, session CSRF or scoped Admin key, canonical current If-Match, Idempotency-Key and explicit acknowledgment required. Observe the complete native catalog without SQL writes. The immutable original baseline OID, tenant/timeline, current managed name and provenance must match; database Owner requires a current persistent role identity. Changed names require the original successful rename; changed role credentials require their exact original committed immutable Secret UID witness. Historical ordinary results attest their credential UID only and are never backfilled with an OID. Existing persistent identity history cannot be replaced. Atomic current identity, immutable observation, original-key receipt and audit; replay precedes current native or credential reads. Earlier baseline, options and password history remain unmodified and unobserved.",
@@ -27398,6 +27609,9 @@
           "404": {
             "$ref": "#/components/responses/Error"
           },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
           "422": {
             "$ref": "#/components/responses/Error"
           },
@@ -27408,9 +27622,6 @@
             "$ref": "#/components/responses/Error"
           },
           "503": {
-            "$ref": "#/components/responses/Error"
-          },
-          "409": {
             "$ref": "#/components/responses/Error"
           }
         },
@@ -27501,6 +27712,9 @@
           "404": {
             "$ref": "#/components/responses/Error"
           },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
           "422": {
             "$ref": "#/components/responses/Error"
           },
@@ -27511,9 +27725,6 @@
             "$ref": "#/components/responses/Error"
           },
           "503": {
-            "$ref": "#/components/responses/Error"
-          },
-          "409": {
             "$ref": "#/components/responses/Error"
           }
         },
@@ -27847,6 +28058,9 @@
           "404": {
             "$ref": "#/components/responses/Error"
           },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
           "422": {
             "$ref": "#/components/responses/Error"
           },
@@ -27857,9 +28071,6 @@
             "$ref": "#/components/responses/Error"
           },
           "503": {
-            "$ref": "#/components/responses/Error"
-          },
-          "409": {
             "$ref": "#/components/responses/Error"
           }
         },
@@ -28072,6 +28283,9 @@
           "404": {
             "$ref": "#/components/responses/Error"
           },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
           "422": {
             "$ref": "#/components/responses/Error"
           },
@@ -28082,9 +28296,6 @@
             "$ref": "#/components/responses/Error"
           },
           "503": {
-            "$ref": "#/components/responses/Error"
-          },
-          "409": {
             "$ref": "#/components/responses/Error"
           }
         },
@@ -28161,6 +28372,9 @@
           "404": {
             "$ref": "#/components/responses/Error"
           },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
           "422": {
             "$ref": "#/components/responses/Error"
           },
@@ -28171,9 +28385,6 @@
             "$ref": "#/components/responses/Error"
           },
           "503": {
-            "$ref": "#/components/responses/Error"
-          },
-          "409": {
             "$ref": "#/components/responses/Error"
           }
         },
@@ -37706,6 +37917,249 @@
             "$ref": "#/components/responses/Error"
           }
         }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/catalog-platform-identities": {
+      "get": {
+        "operationId": "getCatalogPlatformIdentities",
+        "summary": "getCatalogPlatformIdentities",
+        "tags": [
+          "Catalog identities"
+        ],
+        "description": "Explicit first current observation of the original Endpoint platform role, control_probe, original default database and fixed maintenance databases. Uses the owned original probe and template1, checks native tenant/timeline, and never reads customer tables, passwords or verifiers from PostgreSQL. A prior baseline compares its original OIDs even when the default database or platform role has been renamed; first capture is refused if an anchor is absent. The current observation digest binds original config/credential UIDs and complete bounded native facts. No baseline implies no earlier identity proof. Original baseline, receipt and audit commit atomically and remain immutable. This operation does not recreate, rename or repair protected SQL identities. Backend dependency migration is a separate operation. Current project Editor or Admin required; observation can use a running Writer.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current system identity observation or immutable original capture receipt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogPlatformIdentityResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "post": {
+        "operationId": "recordCatalogPlatformIdentities",
+        "summary": "recordCatalogPlatformIdentities",
+        "tags": [
+          "Catalog identities"
+        ],
+        "description": "Explicit first current observation of the original Endpoint platform role, control_probe, original default database and fixed maintenance databases. Uses the owned original probe and template1, checks native tenant/timeline, and never reads customer tables, passwords or verifiers from PostgreSQL. A prior baseline compares its original OIDs even when the default database or platform role has been renamed; first capture is refused if an anchor is absent. The current observation digest binds original config/credential UIDs and complete bounded native facts. No baseline implies no earlier identity proof. Original baseline, receipt and audit commit atomically and remain immutable. This operation does not recreate, rename or repair protected SQL identities. Backend dependency migration is a separate operation. Current project Admin required to acknowledge only this first observation.",
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "project",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "branch",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "X-CSRF-Token",
+            "in": "header",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Required for a Console cookie session."
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 8,
+              "maxLength": 128
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current system identity observation or immutable original capture receipt",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CatalogPlatformIdentityResult"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CatalogPlatformInitialInput"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/restore-point": {
+      "get": {
+        "tags": [
+          "Catalog"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "name": "timestamp",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "lsn",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9A-Fa-f]{1,8}/[0-9A-Fa-f]{1,8}$"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Unpinned original timeline observation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RestorePointObservation"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "previewBranchRestorePoint",
+        "summary": "Preview a retained time or LSN against the exact original timeline",
+        "description": "Project Reader access; cache disabled. Specify exactly one timestamp or LSN. Reads actual retention bounds and the storage timestamp mapping, without waking Compute, leasing history, mutating metadata or creating a branch. Missing, duplicate or conflicting input is 422; unreplayed timestamp is 409; changing source timeline is 412. Observation does not promise future retention. To accept this exact point, create the historical branch using parent_lsn=lsn and expected_parent_timeline_id=source_timeline_id; admission rechecks and leases that exact original point. This preview alone does not execute customer SQL or perform in-place reset."
       }
     }
   }

@@ -13,12 +13,13 @@ import (
 // never by adopting an arbitrary object that occupies the requested target.
 type catalogRenamePayload struct {
 	catalogPayload
-	Kind          string            `json:"kind"`
-	NewName       string            `json:"new_name"`
-	ObjectOID     uint32            `json:"object_oid"`
-	ConfigUIDs    map[string]string `json:"config_uids"`
-	RoutesUID     string            `json:"routes_uid"`
-	CredentialUID string            `json:"credential_uid,omitempty"`
+	Kind          string                    `json:"kind"`
+	NewName       string                    `json:"new_name"`
+	ObjectOID     uint32                    `json:"object_oid"`
+	ConfigUIDs    map[string]string         `json:"config_uids"`
+	RoutesUID     string                    `json:"routes_uid"`
+	CredentialUID string                    `json:"credential_uid,omitempty"`
+	Backend       *catalogBackendRenamePlan `json:"backend_dependencies,omitempty"`
 }
 
 func (p catalogRenamePayload) valid() bool {

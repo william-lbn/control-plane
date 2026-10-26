@@ -52,6 +52,61 @@ export function CreateResource({
     restoreOnly ? 'timestamp' : 'current',
   );
   const [point, setPoint] = useState('');
+  const [pointPreview, setPointPreview] = useState<{
+    branch_id: string;
+    source_timeline_id: string;
+    lsn: string;
+    retention_pinned: false;
+    input: string;
+    kind: string;
+  } | null>(null);
+  const [previewBusy, setPreviewBusy] = useState(false);
+  const [previewError, setPreviewError] = useState('');
+  const previewEpoch = useRef(0);
+  useEffect(() => {
+    previewEpoch.current++;
+    setPointPreview(null);
+    setPreviewError('');
+    setPreviewBusy(false);
+  }, [parent, pointKind, point]);
+  const selectedPreview =
+    pointPreview?.branch_id === parent &&
+    pointPreview.input === point &&
+    pointPreview.kind === pointKind
+      ? pointPreview
+      : null;
+  async function previewPoint() {
+    const epoch = ++previewEpoch.current;
+    setPreviewBusy(true);
+    setPreviewError('');
+    try {
+      const query = new URLSearchParams({ [pointKind]: point });
+      const value = await api<{
+        branch_id: string;
+        source_timeline_id: string;
+        lsn: string;
+        retention_pinned: false;
+      }>(
+        projectPath(projectId || '') +
+          '/branches/' +
+          encodeURIComponent(parent) +
+          '/restore-point?' +
+          query.toString(),
+      );
+      if (epoch === previewEpoch.current) {
+        if (value.branch_id !== parent || value.retention_pinned !== false)
+          throw new Error('恢复来源观察不匹配');
+        setPointPreview({ ...value, input: point, kind: pointKind });
+      }
+    } catch (reason) {
+      if (epoch === previewEpoch.current) {
+        setPointPreview(null);
+        setPreviewError(reason instanceof Error ? reason.message : String(reason));
+      }
+    } finally {
+      if (epoch === previewEpoch.current) setPreviewBusy(false);
+    }
+  }
   const [window, setWindow] = useState<{ min_readable_lsn: string; latest_lsn: string } | null>(
     null,
   );
@@ -213,11 +268,16 @@ export function CreateResource({
                     acknowledge_current_functions_for_historical_data: historicalFunctionConsent,
                   }
                 : {}),
-              ...(pointKind === 'timestamp'
-                ? { parent_timestamp: point }
-                : pointKind === 'lsn'
-                  ? { parent_lsn: point }
-                  : {}),
+              ...(selectedPreview
+                ? {
+                    parent_lsn: selectedPreview.lsn,
+                    expected_parent_timeline_id: selectedPreview.source_timeline_id,
+                  }
+                : pointKind === 'timestamp'
+                  ? { parent_timestamp: point }
+                  : pointKind === 'lsn'
+                    ? { parent_lsn: point }
+                    : {}),
               password: withEndpoint ? password : '',
               autoscaling: bounds,
             }
@@ -403,6 +463,21 @@ export function CreateResource({
                           }}
                         />
                       </label>
+                      <button
+                        type="button"
+                        className="button"
+                        disabled={busy || !!operation || previewBusy || !point || !parent}
+                        onClick={() => void previewPoint()}
+                      >
+                        {previewBusy ? '正在预览…' : '预览时间点'}
+                      </button>
+                      {previewError && <p role="alert">{previewError}</p>}
+                      {selectedPreview && (
+                        <p role="status">
+                          已解析 LSN：{selectedPreview.lsn}
+                          。确认后使用该精确点；历史尚未固定，受理时重新校验原 Timeline 和保留范围。
+                        </p>
+                      )}
                       <div className="subtle-note" role="status">
                         {windowError ||
                           (window

@@ -17,9 +17,9 @@ OID、业务数据、ACL 和平台管理的 SCRAM 密码。最新现场状态以
 ### 1.1 当前边界
 
 - 只允许 `ready` 项目、分支和平台管理的非系统目录对象。
-- 角色不能仍被任一保留的 Endpoint 默认连接引用。数据库不能仍被 Endpoint
-  默认连接、Data API、Auth、产品 Storage 或 Function 引用。这些依赖，包括
-  保留的删除记录，返回 409；不擅自改变 Backend 的数据库身份。
+- 角色不能仍被任一保留的 Endpoint 默认连接引用。普通数据库改名拒绝 Endpoint
+  默认连接、Data API、Auth、产品 Storage 或 Function 引用。Admin 可显式选择
+  [停用 Backend 名称迁移](CATALOG-PLATFORM-IDENTITIES.md)，按原快照和凭据身份同步迁移；默认连接持续受保护。
 - 新名称不能占用任何现存或保留的受管理目录记录；实际 PostgreSQL 的同名
   非原始 OID 也拒绝。名称按 UTF-8 最多 63 字节校验并安全引用 SQL 标识符。
 - 不强制终止客户数据库连接。PostgreSQL 拒绝繁忙数据库时，保留原 Operation
@@ -69,7 +69,8 @@ Swagger 以 [OpenAPI](../contracts/openapi-v1.json) 为准，索引见 [API](API
 
 两个接口都要求 `Idempotency-Key` 和唯一、规范、带双引号的 `If-Match: "N"`。
 N 取目录 GET 返回的 `version_token`。Cookie 会话另需原 CSRF header；API Key
-按现有 scope 规则授权。DTO 只接受 `new_name`，不接受额外字段和系统名称。
+按现有 scope 规则授权。DTO 接受 `new_name`，数据库可另传 Admin 专用的
+`migrate_backend_dependencies: true`；不接受其他额外字段和系统名称。
 
 | 状态 | 含义与客户端处理 |
 |---|---|

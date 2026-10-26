@@ -52,7 +52,11 @@ func lockCatalogRenameResultIntentTx(ctx context.Context, tx pgx.Tx, operation s
 	if err != nil {
 		return err
 	}
-	if effectivePermission(orgRole, projectRole) < 2 {
+	required := 2
+	if p.Backend != nil {
+		required = 3
+	}
+	if effectivePermission(orgRole, projectRole) < required {
 		return errors.New("current original rename actor permission rejected")
 	}
 	var competing bool
@@ -113,7 +117,7 @@ func (s *server) prepareCatalogRenameResult(ctx context.Context, operation, work
 	}
 	return committed, nil
 }
-func commitCatalogRenameResultTx(ctx context.Context, tx pgx.Tx, operation, worker string, p catalogRenamePayload) error {
+func commitCatalogRenameResultTx(ctx context.Context, tx pgx.Tx, operation, worker string, p catalogRenamePayload, backings ...catalogBackendRenameBackings) error {
 	if err := verifyCatalogRenameOperationTx(ctx, tx, operation, worker, p); err != nil {
 		return err
 	}
@@ -123,6 +127,14 @@ func commitCatalogRenameResultTx(ctx context.Context, tx pgx.Tx, operation, work
 	}
 	if err = lockCatalogRenameResultIntentTx(ctx, tx, operation, p); err != nil {
 		return err
+	}
+	if p.Backend != nil {
+		if len(backings) != 1 {
+			return errors.New("original migrated Backend backings required")
+		}
+		if err = commitCatalogBackendRenameTx(ctx, tx, operation, p, backings[0]); err != nil {
+			return err
+		}
 	}
 	if err = commitCatalogRenameBindingTx(ctx, tx, operation, p); err != nil {
 		return err

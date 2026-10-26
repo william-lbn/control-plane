@@ -1,0 +1,228 @@
+{
+  "result": "pass",
+  "recorded_on": "2026-10-26",
+  "api_version": "0.92.0",
+  "chart_version": "0.9.89",
+  "schema": 69,
+  "helm_revision": 193,
+  "native_format": 7,
+  "basic_accepted_groups": [
+    "F01",
+    "F02",
+    "F03",
+    "F04",
+    "F05",
+    "S01",
+    "A01",
+    "C01",
+    "L01",
+    "Q01",
+    "Q02",
+    "Q03",
+    "I01",
+    "A04",
+    "S04",
+    "A02",
+    "A03",
+    "A05",
+    "S02",
+    "I02",
+    "O03",
+    "C02"
+  ],
+  "remaining_business_groups": [
+    "S03",
+    "S05",
+    "L02",
+    "L03",
+    "F06"
+  ],
+  "remaining_other_groups": [
+    "O01",
+    "T01",
+    "O02"
+  ],
+  "deferred_groups": [
+    "R01",
+    "R02",
+    "X01",
+    "H01",
+    "H02"
+  ],
+  "whole_product_complete": false,
+  "production_qualified": false,
+  "L02_in_place_reset_complete": false,
+  "L03_backend_consistent_restore_complete": false,
+  "time_point_preview_and_exact_historical_fork_complete": true,
+  "new_unique_Go_groups": 2,
+  "new_unique_Go_group_names": [
+    "TestTimeTravelPreviewNeverPinsAndRejectsUnknownHistory",
+    "TestTimeTravelPostgresPreviewAuthorityAndExactSourceAcceptance"
+  ],
+  "affected_existing_Go_groups": 6,
+  "affected_existing_Go_group_names": [
+    "TestRestorePointValidation",
+    "TestRestoreWindowUsesNumericLSNs",
+    "TestHistoricalBranchIntegration",
+    "TestOpenAPIRouteParity",
+    "TestOpenAPIReferencesAndSessionContract",
+    "TestOpenAPIOperationIDs"
+  ],
+  "focused_race_recheck_new_groups": 2,
+  "race_rechecks_counted_again": false,
+  "initial_test_harness_failure": "HistoricalBranchIntegration required explicit disposable schema; recovered using the original compiled binary only",
+  "live": {
+    "result": "pass",
+    "checks": [
+      "real_page_read_only_preview",
+      "lost_POST_ui_recovers_same_original_point_and_operation",
+      "real_storage_fork_uses_exact_preview_LSN",
+      "original_request_replay_retains_source_and_no_new_Compute"
+    ],
+    "original_job": "publication-ui-20261026002913",
+    "original_response_loss_recovery": true,
+    "same_original_key_and_operation": true,
+    "actual_storage_ancestor_and_LSN_match": true,
+    "new_Compute": false
+  },
+  "web": {
+    "format": "pass",
+    "typescript": "pass",
+    "vite": "pass",
+    "e2e_compilation": "pass",
+    "API_index": "pass",
+    "live_suite_registry": "pass",
+    "later_test_only_checks_reuse_typecheck_and_Vite": true
+  },
+  "final": {
+    "result": "pass",
+    "schema": 69,
+    "helm_revision": 193,
+    "nodes_ready": 3,
+    "safekeepers_ready": 3,
+    "critical_ready": 7,
+    "VM": 0,
+    "Compute": 0,
+    "Auth_replicas": 0,
+    "original_secret_UIDs_retained": 955,
+    "current_persistent_secrets": 971,
+    "PVC_UIDs_retained": 9,
+    "other_Helm_releases_retained": 6,
+    "old_catalog_fingerprints_unchanged": 17,
+    "old_AI_credit_fingerprints_unchanged": 3,
+    "counts": {
+      "inbox": 6,
+      "schema": 69,
+      "effects": 5,
+      "invoices": 2,
+      "platform": 1,
+      "bootstrap": 148,
+      "functions": 0,
+      "effect_sum": 0
+    },
+    "backend_original_identity_checks": [
+      {
+        "kind": "auth",
+        "original_UID_retained": true,
+        "original_private_files_retained": true,
+        "only_database_path_changed": true
+      },
+      {
+        "kind": "data_api",
+        "original_UID_retained": true,
+        "original_private_files_retained": true,
+        "only_database_path_changed": true
+      },
+      {
+        "kind": "function",
+        "old_generation": 1,
+        "new_generation": 2,
+        "original_private_bytes_retained": true,
+        "old_receipt_retained": true
+      }
+    ],
+    "terminal_QA_jobs_archived_retired": [
+      {
+        "name": "publication-quality-20261026001039",
+        "uid": "513235a5-b61f-401a-8c9e-43ebbc023342",
+        "phase": "Succeeded"
+      },
+      {
+        "name": "publication-quality-20261026001648",
+        "uid": "41f80c3b-d858-409e-a203-fd619b073e50",
+        "phase": "Succeeded"
+      },
+      {
+        "name": "publication-quality-20261026002421",
+        "uid": "4e20c8f4-3708-4a5a-a141-ec8405bdd69e",
+        "phase": "Succeeded"
+      },
+      {
+        "name": "publication-quality-20261026002631",
+        "uid": "6a94f9ab-b745-42a7-879e-cb72e57e8972",
+        "phase": "Succeeded"
+      },
+      {
+        "name": "publication-quality-20261026002804",
+        "uid": "d4a965ea-84ec-44bd-a8dc-325cdf42727c",
+        "phase": "Succeeded"
+      },
+      {
+        "name": "publication-ui-20261026002555",
+        "uid": "d960d028-d0d6-4bb3-992a-bee9bd84ca01",
+        "phase": "Failed"
+      },
+      {
+        "name": "publication-ui-20261026002913",
+        "uid": "f8fe59c7-4231-49e3-bfd6-86b77d59db0f",
+        "phase": "Succeeded"
+      }
+    ],
+    "performance_reliability_campaign": false,
+    "time_travel": {
+      "result": "pass",
+      "actual_native_ancestor_and_LSN_match": true,
+      "original_source_timeline_unchanged": true,
+      "accepted_operation_succeeded": true,
+      "Compute_created": false,
+      "original_971_secret_UIDs_retained": true,
+      "all_four_live_checkpoints": true
+    },
+    "runtime_source_proof": {
+      "matched_non_documentation_inputs": 968,
+      "compiled_Go_SQL_inputs": 558,
+      "only_E2E_override": "web/e2e/time-travel.spec.ts",
+      "E2E_override_sha256": "913999bd97fb3d5aa71c31951b51e00f6b2540e7bdde9b5cf32620f207c9fd43",
+      "API_and_Web_source_sha256": "a10a45fa00c7ff91c5102bd0463a942e5141e8cdb1caaf627effd86ea5d8d47d",
+      "source_archive_sha256": "294390494fa8b4e365e136d535f3f0e30eeb5ba984be330fbb4bb6b711950fe8"
+    }
+  },
+  "build": {
+    "API_and_Web_builds": 1,
+    "LAN_imported_nodes": 3,
+    "other_images_reused": true,
+    "registry_pushed": false,
+    "API_digest": "sha256:e532c8f32df4c5de76b959aa21702494aaf654b088fad6a984c51f4f8bbed92e",
+    "Web_digest": "sha256:63e3bb667d1c6f6bbdcd4cdedf6efef44e717471c377484665a85232e6716573"
+  },
+  "frozen_migrations": {
+    "058": "ef77ef8aa674bba9f5a75750d944ba3bb297d988b8aa9a689c1ad99dccdaf282",
+    "059": "48de708734444ab625c3955510dd28c66e772e9f536ecb2b32b10f4de7986fce",
+    "060": "f058d1417b0eb6cb72e4229777ada1248f9738c798b1fcb3664e3fb7f048d53b",
+    "061": "e8bf3d9cbce1e6d22c6a61f0e101d7ad9164aa0581be8d1bc0b2d0449fdaa4ac",
+    "062": "c7e7b0abae640799c0afc5b471c08ff043c730409d7a2edfdc6d0d20b90299a7",
+    "063": "9ddc0b968d693631ac4066f589e9f99d6741c8724d29bea4e00a02ebec5e107c",
+    "064": "3b4878bfd9506b74778e78ac67a569bfa430d8b8757d067531776635a5a69e1a",
+    "065": "b24d7ccb858a66a1a2bc42541bca9e8d53136f84c3fb5dc4f3bc263c7f1792f0",
+    "066": "253b62fd88b2a619dd4a06646fb0f2531eb4d49b0cbca7fdc8a9dbc627e55489",
+    "067": "fb5ec4e9082cdfa144cc7859ccd81c5b88a4398b8dfa8bef61cf417fa897f8c3",
+    "068": "678680401574affebd99da35dfe9853bf873fc4892a3d74a914ee6fcd596735d",
+    "069": "b733e2a1ab5f829bc4101f31c8962cdc1f1f9ed64e0955b6b4a7838ca183447d"
+  },
+  "CI": {
+    "status": "pending_new_commit",
+    "previous_C02_commit": "d08be0ce60bbfd962909144c0015f6ea09ae129a",
+    "previous_C02_checks_succeeded": 15
+  },
+  "performance_reliability_campaign": false
+}

@@ -426,7 +426,7 @@ func (s *server) reconcileFunctionStop(ctx context.Context, op, worker string, p
 			var ref functionSQLReference
 			ref.Scope.FunctionID, ref.Scope.ProjectID, ref.Scope.BranchID = p.FunctionID, p.ProjectID, p.BranchID
 			err := s.db.QueryRow(ctx, `SELECT credential_generation,namespace,secret_name,secret_uid,content_mac,mac_key_version,writer_id,database_name,sql_schema,provisioning_role
- FROM function_sql_credentials WHERE function_id=$1 AND project_id=$2 AND branch_id=$3 AND credential_generation=1`, p.FunctionID, p.ProjectID, p.BranchID).
+ FROM function_sql_credentials WHERE function_id=$1 AND project_id=$2 AND branch_id=$3 AND credential_generation=(SELECT sql_credential_generation FROM function_definitions WHERE id=$1)`, p.FunctionID, p.ProjectID, p.BranchID).
 				Scan(&ref.Generation, &ref.Namespace, &ref.Name, &ref.UID, &ref.MAC, &ref.MACKeyVersion, &ref.WriterID, &ref.Scope.Database, &ref.Scope.Schema, &ref.Scope.ProvisioningRole)
 			if err != nil && !isNoRows(err) {
 				return errFunctionSQLSecret

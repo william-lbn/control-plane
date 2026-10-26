@@ -8,6 +8,7 @@ import { CatalogRename } from './CatalogRename';
 import { ConnectionDefaults } from './ConnectionDefaults';
 import { CatalogIdentities } from './CatalogIdentities';
 import { DefaultDatabaseOwner } from './DefaultDatabaseOwner';
+import { CatalogPlatformIdentities } from './CatalogPlatformIdentities';
 
 type CatalogItem = {
   name: string;
@@ -251,6 +252,7 @@ export function Catalog({
         projectId={projectId}
         roles={roles.filter((r) => !r.default_owner_dependency)}
         databases={databases}
+        canAdmin={canAdmin}
         disabled={busy || loading || ownerReserved || !canEdit}
         onBusy={setBusy}
         onComplete={() => load()}
@@ -260,6 +262,13 @@ export function Catalog({
         path={path}
         canAdmin={canAdmin}
         disabled={busy || loading}
+        onBusy={setBusy}
+      />
+      <CatalogPlatformIdentities
+        key={path + '/platform-identities'}
+        path={path}
+        canAdmin={canAdmin}
+        disabled={busy || !canEdit}
         onBusy={setBusy}
       />
       <div className="identity-grid">

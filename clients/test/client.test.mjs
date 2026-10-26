@@ -23,14 +23,14 @@ async function fixture(t, handler) {
 function json(response, value, status = 200, headers = {}) { response.writeHead(status, { 'Content-Type': 'application/json', ...headers }); response.end(JSON.stringify(value)); }
 
 test('Catalog covers the exact API once and cursors bind filter and source', () => {
-  assert.equal(operations.length, 305);
+  assert.equal(operations.length, 308);
   const ids = [], seen = new Set(); let cursor;
   do {
     const result = search({ limit: 17, cursor });
     for (const item of result.items) { assert(!seen.has(item.operation_id)); seen.add(item.operation_id); ids.push(item.operation_id); }
     cursor = result.next_cursor;
   } while (cursor);
-  assert.equal(ids.length, 305);
+  assert.equal(ids.length, 308);
   const first = search({ limit: 1 });
   assert.throws(() => search({ query: 'different', cursor: first.next_cursor }), /mismatched/);
   assert.equal(describe('getProject').path, '/api/v1/projects/{project}');
