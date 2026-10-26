@@ -43,5 +43,20 @@
     "H02"
   ],
   "performance_reliability_tests_run": false,
-  "private_evidence_published": false
+  "private_evidence_published": false,
+  "affected_client_catalog_recheck": {
+    "result": "pass",
+    "linux_only": true,
+    "groups": 1,
+    "old_expected_count": 308,
+    "current_contract_count": 314
+  },
+  "initial_ci": {
+    "commit": "6ed00f5e65c905ee98fec31bdc55f6dd9c0c131f",
+    "run_id": 40367025950,
+    "conclusion": "failure",
+    "failed_job": "client catalog old operation count",
+    "six_other_quality_jobs": "success",
+    "publication": "skipped"
+  }
 }

@@ -20,3 +20,5 @@ F06 当前版本合同是先完成长流、停止并确认原实例退休，再�
 环境清理删除过期构建包、缓存和已验证后不再需要的测试 binary，保留源码、日志、验收回执和恢复数据。没有删除或合并 VM 业务磁盘及 fsck 前快照。后续不再向系统盘迁移数据；内网直连，外网才使用已有代理。性能、可靠性、HA/DR、压力和完整大对象字节验证继续后置。
 
 固定基础计数仍为 22 组；S03/S05/L02/L03/F06 和 O01/T01/O02 仍开放，五组专项后置。详细合同见 [GC](OBJECT-STORAGE-GC.md)、[Storage 网关](STORAGE-GATEWAY.md)、[Functions Edge](FUNCTION-EDGE-METERING.md)；[结构化回执](acceptance/2026-10-27-functional-slices.json)记录各项范围。
+
+提交 `6ed00f5` 的 [CI 40367025950](https://github.com/william-lbn/control-plane/actions/runs/40367025950) 中 Go/race/真实 PG、Helm、Web、Functions、Auth 与工作流检查通过；客户端目录检查仍使用旧的 308 操作总数而失败。已同步为合同实际 314 操作，并在缓存 Linux Node 只续验该项通过；镜像发布因该失败跳过，不能宣称该次 CI 全成功。
