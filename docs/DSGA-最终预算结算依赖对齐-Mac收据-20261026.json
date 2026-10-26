@@ -1,0 +1,52 @@
+{
+  "date": "2026-10-26",
+  "AS_published": {
+    "sha": "565410ad37877d60ecbfb474be3d37c95af1c269",
+    "pseudo": "v0.0.0-20261026070212-565410ad3787"
+  },
+  "OriginHashVerified": "565410ad37877d60ecbfb474be3d37c95af1c269",
+  "readonly_vet_exit": 0,
+  "sum_delta": 2,
+  "business_source_changed": false,
+  "business_tests_repeated": false,
+  "source_files": [
+    {
+      "path": "repos/control-plane/api/go.mod",
+      "sha256": "ddff7ecb9b262cbaf528f635b7c81f9248fcafb5314c30297d6752d6e97566dd",
+      "bytes": 4200
+    },
+    {
+      "path": "repos/control-plane/api/go.sum",
+      "sha256": "2a02fdfec9d6a72bab97603094b2d5ad832319c7f38dcd4cb1fb94fa40c53943",
+      "bytes": 29085
+    }
+  ],
+  "logs_and_recipes": [
+    {
+      "path": "build/dsga-budget-exec-cp-dependency.log",
+      "sha256": "c64f4b14e49fdff4b6a895100bb33926d5f3b4e903986a6074af54a41aa317d0",
+      "bytes": 168
+    },
+    {
+      "path": "build/dsga-budget-exec-cp-module.json",
+      "sha256": "f8c8a7b5671cca572ecc278bf5d8ba6c26282998c9a2382336847699f51be027",
+      "bytes": 945
+    },
+    {
+      "path": "build/dsga-budget-exec-cp-module.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "build/dsga-budget-exec-cp-vet.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": "build/run-dsga-budget-exec-cp-dependency.py",
+      "sha256": "9e9caaed3acb3fcde3de6b4b27801c34e4db5e601b64298f688b328c2e17ed4f",
+      "bytes": 2453
+    }
+  ],
+  "images_or_deployments": false
+}
