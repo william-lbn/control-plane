@@ -214,7 +214,7 @@ jobs:
           wait "$task_observer_pid"
           install -d "$NEON_E2E_ARTIFACTS"
           cp "$NEON_E2E_PRIVATE_DIR/fractional-proof.json" "$NEON_E2E_ARTIFACTS/fractional-resource-proof.json"
-      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         # MFA DOM/trace failures may contain one-time setup/recovery material.
         # Retain that evidence only on the protected Linux runner.
         if: always() && env.NEON_E2E_SUITE != 'branch-expiration.spec.ts' && env.NEON_E2E_SUITE != 'failed-parent-cleanup.spec.ts' && env.NEON_E2E_SUITE != 'failed-endpoint-cleanup.spec.ts' && env.NEON_E2E_SUITE != 'console-mfa.spec.ts' && env.NEON_E2E_SUITE != 'history-policy.spec.ts' && env.NEON_E2E_SUITE != 'history-sharing.spec.ts' && env.NEON_E2E_SUITE != 'storage-multipart.spec.ts' && env.NEON_E2E_SUITE != 'storage-multipart-administration.spec.ts' && env.NEON_E2E_SUITE != 'sql-assistant.spec.ts' && env.NEON_E2E_SUITE != 'sql-ai-repair.spec.ts' && env.NEON_E2E_SUITE != 'history-names.spec.ts' && env.NEON_E2E_SUITE != 'functions-schedules.spec.ts' && env.NEON_E2E_SUITE != 'functions-runtime-recovery.spec.ts' && env.NEON_E2E_SUITE != 'functions-schedules-finalize.spec.ts'
