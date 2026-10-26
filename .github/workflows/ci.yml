@@ -23,6 +23,7 @@ jobs:
       - run: node --check tools/audit-node-cni.mjs
       - run: node tools/check-live-suites.mjs
       - run: node tools/generate-api-docs.mjs --check
+      - run: node --test tools/functions-edge-probe/fixture.test.mjs
   go:
     name: Go + real PostgreSQL
     runs-on: ubuntu-24.04

@@ -63,9 +63,10 @@ spec:
             - {name: s3, containerPort: 8793}
             {{- end }}
             {{- if and .Values.functions.enabled .Values.functions.publicHTTP.enabled }}
-            - {name: functions-http, containerPort: 8792}
             {{- if (dig "edge" "enabled" false .Values.functions) }}
             - {name: edge-broker, containerPort: 8795}
+            {{- else }}
+            - {name: functions-http, containerPort: 8792}
             {{- end }}
             {{- end }}
           resources: {{ toYaml .Values.api.resources | nindent 12 }}

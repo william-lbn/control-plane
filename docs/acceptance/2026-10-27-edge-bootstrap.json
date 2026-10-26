@@ -1,0 +1,50 @@
+{
+  "date": "2026-10-27",
+  "status": "bootstrap_and_transport_verified_customer_execution_pending",
+  "api_worker_source_commit": "b45365f3281e76c755b530861b1fd9eca582cb40",
+  "core_revision": 195,
+  "metadata_schema": 73,
+  "native_storage_format": 7,
+  "frozen_migrations_sha256": {
+    "069": "b733e2a1ab5f829bc4101f31c8962cdc1f1f9ed64e0955b6b4a7838ca183447d",
+    "070": "b54f3590617587208cdeeb5409c76166547adec3da384f6688a53d115b4113b1",
+    "071": "8e71da6ba81ad793f3e564c45d6b81fc31ace4e2b1c15b24e1989cbc57099df2",
+    "072": "47a579528d9422c04e051173b57e98f51a2d6fedaf3f7e5140fd7af5524083b3",
+    "073": "ed02ace4cebc17728ca31fe5e9b748c09b35c2eae1638316e698e4fd0cc79fbd"
+  },
+  "original_secret_uid_baseline_before_core": 1099,
+  "old_secret_uids_retained_at_edge_switch": 1100,
+  "pvc_uids_retained": 9,
+  "new_edge_immutable_inputs": 3,
+  "other_releases_unchanged": 6,
+  "valid_mTLS_client_reaches_admission": true,
+  "no_client_certificate_alert": "TLSV13_ALERT_CERTIFICATE_REQUIRED",
+  "canonical_missing_scope_rejected_without_dispatch": true,
+  "new_fixture_groups_passed": 3,
+  "affected_helm_group_recheck_passed": 1,
+  "new_TLS_private_material_stayed_on_Linux": true,
+  "temporary_raw_and_transport_files_removed": true,
+  "storage_gateway_public_takeover_complete": false,
+  "customer_execution_and_metering_complete": false,
+  "original_canary_code_and_policy_snapshotted": true,
+  "accepted_baseline_groups": 22,
+  "business_groups_open": [
+    "S03",
+    "S05",
+    "L02",
+    "L03",
+    "F06"
+  ],
+  "other_groups_open": [
+    "O01",
+    "T01",
+    "O02"
+  ],
+  "performance_reliability_tests_run": false,
+  "source_ci": {
+    "commit": "b45365f3281e76c755b530861b1fd9eca582cb40",
+    "run_id": 40367868454,
+    "checks": 15,
+    "conclusion": "success"
+  }
+}

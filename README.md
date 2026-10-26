@@ -7,9 +7,9 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 
 功能进度与当前优先级见 [已验收/剩余清单](docs/FUNCTIONAL-STATUS-2026-10-21.md)：22 组固定基础已有回执；五组专项后置，五组业务及三组运维/TLS/发行继续。复用来源未变的既有验收。
 
-最新开发增量：2026-10-27 [存储与 Functions 功能增量](docs/DELIVERY-2026-10-27-FUNCTIONAL-SLICES.md)：24 组新增 Go/PG、10 组新增 Helm、4 组 API 合同检查通过；恢复基础累计 20 组新增检查通过。业务运行仍为 schema 069，070–073 未应用；实机接管、完整 reset 和历史 GC 继续。
+最新开发增量：2026-10-27 [独立 Edge 部署与传输验收](docs/DELIVERY-2026-10-27-EDGE-BOOTSTRAP.md)：专用 mTLS 正反例、无 token 进程和入口切换已验收，新增 A/B 工具三组自检通过；客户执行、计量及版本切换继续。
 
-最新部署：2026-10-26 [时间点预览与精确历史分支](docs/DELIVERY-2026-10-26-TIME-TRAVEL.md)：两组新增 Go/PG、六组受影响检查、四个真实页面检查点与原生祖先/LSN 核对通过；原请求恢复、源身份和 971 个 Secret/9 PVC 保留，VM 0。API/Worker 0.92.0 / Chart 0.9.89 / Core 193 / schema 069。原地 reset 和完整 Backend 恢复继续，未关闭 L02/L03。
+最新部署：Core 195 / schema 073 / Native Storage 7；API/Worker 源码 `b45365f`，独立 Functions Edge 已启用，Storage 仍为旧入口。070–073 已应用并冻结，具体保全与验收范围见上述报告。
 
 上一增量：2026-10-26 [平台身份与 Backend 名称迁移](docs/DELIVERY-2026-10-26-CATALOG-PLATFORM.md)：13 组新增 Go/PG、原页面确认/响应恢复、四类 Backend 迁移、原用户/小对象/Function SQL 代际 2 及最终保全通过。原 955 Secret、9 PVC、目录/额度摘要保留，VM 0。API/Worker 0.91.0 / Chart 0.9.88 / Core 192 / schema 069；默认 postgres 外部改名的维护环境验证单列后置。
 

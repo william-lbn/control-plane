@@ -43,6 +43,7 @@ test('Functions edge routes the public Service to its process and gives API a pr
   assert.equal(env.NEON_FUNCTIONS_EDGE_BROKER_KEY_FILE, '/run/function-edge-broker/tls.key');
   assert.equal(env.NEON_FUNCTIONS_EDGE_CLIENT_CA_FILE, '/run/function-edge-broker/client-ca.crt');
   assert.ok(api.ports.some(v => v.name === 'edge-broker' && v.containerPort === 8795));
+  assert.equal(api.ports.some(v => v.name === 'functions-http'), false);
   assert.deepEqual(apiSpec.volumes.find(v => v.name === 'function-edge-broker').secret, {
     secretName: 'dedicated-edge-broker', defaultMode: 288,
     items: [{ key: 'tls.crt', path: 'tls.crt' }, { key: 'tls.key', path: 'tls.key' }, { key: 'client-ca.crt', path: 'client-ca.crt' }],
