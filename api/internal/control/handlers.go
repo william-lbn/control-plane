@@ -270,6 +270,7 @@ func (s *server) routes() *http.ServeMux {
 	mux.Handle("DELETE /api/v1/projects/{project}/branches/{branch}", s.auth(http.HandlerFunc(s.deleteResource), true))
 	mux.Handle("PATCH /api/v1/projects/{project}/branches/{branch}/protection", s.auth(http.HandlerFunc(s.setResourceProtection), true))
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/restore-window", s.auth(http.HandlerFunc(s.readRestoreWindow), false))
+	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/restore-point", s.auth(http.HandlerFunc(s.previewRestorePoint), false))
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/services", s.auth(http.HandlerFunc(s.branchServices), false))
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/storage", s.auth(http.HandlerFunc(s.objectStorageRead), false))
 	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/storage", s.auth(http.HandlerFunc(s.objectStorageMutate), true))

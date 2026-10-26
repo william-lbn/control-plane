@@ -334,6 +334,7 @@ func (s *server) createBranch(w http.ResponseWriter, r *http.Request) {
 		Autoscaling            *createBounds `json:"autoscaling"`
 		ParentTimestamp        string        `json:"parent_timestamp,omitempty"`
 		ParentLSN              string        `json:"parent_lsn,omitempty"`
+		ExpectedParentTimeline string        `json:"expected_parent_timeline_id,omitempty"`
 		FunctionCopyPolicy     string        `json:"function_copy_policy,omitempty"`
 		AcknowledgeFunctions   bool          `json:"acknowledge_function_environment_copy,omitempty"`
 		AcknowledgeCurrentCode bool          `json:"acknowledge_current_functions_for_historical_data,omitempty"`
@@ -344,6 +345,10 @@ func (s *server) createBranch(w http.ResponseWriter, r *http.Request) {
 	}
 	withEndpoint := body.CreateEndpoint == nil || *body.CreateEndpoint
 	historical := body.ParentTimestamp != "" || body.ParentLSN != ""
+	if body.ExpectedParentTimeline != "" && (!historical || !restoreTimelineID.MatchString(body.ExpectedParentTimeline)) {
+		fail(w, r, 422, "invalid_restore_source", "A preview binds one original source timeline and a historical point")
+		return
+	}
 	if err := validateRestoreInput(body.ParentTimestamp, body.ParentLSN, time.Now()); err != nil {
 		e := err.(restoreError)
 		fail(w, r, e.status, e.code, "Specify one valid retained timestamp or LSN")
@@ -419,9 +424,14 @@ func (s *server) createBranch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var expiring bool
-	err = tx.QueryRow(r.Context(), "SELECT state,expires_at IS NOT NULL FROM branches WHERE id=$1 AND project_id=$2 FOR UPDATE", body.ParentBranchID, p.ProjectID).Scan(&parentState, &expiring)
+	var lockedTimeline string
+	err = tx.QueryRow(r.Context(), "SELECT state,expires_at IS NOT NULL,timeline_id FROM branches WHERE id=$1 AND project_id=$2 FOR UPDATE", body.ParentBranchID, p.ProjectID).Scan(&parentState, &expiring, &lockedTimeline)
 	if err != nil || parentState != "ready" {
 		fail(w, r, 409, "parent_not_ready", "Parent branch is not ready")
+		return
+	}
+	if lockedTimeline != p.ParentTimelineID || body.ExpectedParentTimeline != "" && lockedTimeline != body.ExpectedParentTimeline {
+		fail(w, r, 412, "restore_source_changed", "Inspect the current source timeline again before accepting a branch fork")
 		return
 	}
 	if expiring {

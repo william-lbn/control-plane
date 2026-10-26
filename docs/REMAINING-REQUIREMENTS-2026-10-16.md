@@ -42,7 +42,7 @@ website 文档快照 `c0d49cbb6979b2ce79ea502d62dbc40780a923b0`（提交时间
 | C02 | 默认/系统身份与外部 DDL | 固定本地基础通过：平台初始记录、原 OID/选项漂移、原键恢复与四类停用 Backend 名称迁移；旧身份/继承回执复用 | [0.91.0 验收](DELIVERY-2026-10-26-CATALOG-PLATFORM.md)；原 Auth 用户/小对象/Function SQL 代际 2 保留，默认 postgres 外部改名维护环境实际验证后置，未冒充通过 |
 | L01 | 失败创建清理、异常运行时回收与 TTL | 客户 Node 退出后的认证 idle 回收，以及独立 Compute、项目/分支唯一原失败创建的身份绑定清理、原失败/timeline 保留和重放已实现并验收；分支 TTL 设置/更新/取消、持久重放、自动退休及原数据/父分支保留基础已验收；节点分区后置 | [失败父资源交付](DELIVERY-2026-10-18-FAILED-PARENT-CLEANUP.md)、[失败 Compute 交付](DELIVERY-2026-10-18-FAILED-ENDPOINT-CLEANUP.md)、[异常 idle 交付](DELIVERY-2026-10-18-FUNCTION-UNHEALTHY-IDLE.md)；[TTL 交付](DELIVERY-2026-10-18-BRANCH-EXPIRATION.md)；后续节点分区/外部 fencing 归 X01，按用户要求后置 |
 | L02 | 原分支 reset / 原地 PITR | 未开发；恢复到新分支已有 | 备份分支、连接切换、GC/连接竞争、失败回退与 UI |
-| L03 | Time Travel Assist / Backend 一致恢复 | 未开发 | 查询时间点辅助、Auth/对象/函数分别描述恢复语义并校验 |
+| L03 | Time Travel Assist / Backend 一致恢复 | 时间点预览、原 Timeline/精确 LSN 准入及独立历史分支原请求恢复已验收；整组仍开放 | [预览验收](DELIVERY-2026-10-26-TIME-TRAVEL.md)；继续历史 SQL 查询辅助、Auth/对象/函数的一致恢复语义 |
 | Q01 | 个人 SQL 历史保留/删除 | 采集开关、0/7/30/90 天保留、到期清理和单条手工删除的隔离/重试/审计/UI/PG 基础闭环已完成 | [当前交付](DELIVERY-2026-10-16-CURRENT.md)；未知结果仍保护，人工定性/合规流程另验 |
 | Q02 | 项目共享 SQL 历史 | 基础已实现并验收：逐条确认、密文引用、撤回、当前作者/读者授权、删除/到期失效、分页与多账号 UI | [共享合同](SHARED-SQL-HISTORY.md)与[当前交付](DELIVERY-2026-10-16-CURRENT.md)；不含外部公开链接/已复制内容召回 |
 | Q03 | SQL AI、计划比较/建议 | 计划比较、受控 Schema/SQL AI 草稿、真实本地模型与人工执行、计划建议通路已验收；AI 修错及个人加密名称/显式 AI 命名也已验收；默认自动命名/长期授权和建议准确性仍有扩展门槛 | [比较合同](SQL-PLAN-COMPARISON.md)、[助手合同](SQL-ASSISTANT.md)；模型建议准确性独立，[修错合同](SQL-AI-REPAIR.md)、[命名合同](SQL-HISTORY-NAMES.md)；默认自动授权/全自动命名另验 |

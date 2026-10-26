@@ -19,3 +19,5 @@ API/Worker 0.91.0 / Chart 0.9.88 / schema 069 / Core Helm 192；原生格式 7 �
 当前 22 个需求组有固定基础验收；剩余五个业务组 S03/S05/L02/L03/F06，以及 O01/T01/O02 三组。性能、可靠性、HA/DR 和 5 GiB 全量字节验证继续后置；本次小对象验证不扩大为容量或生产认证。后续继续原分支恢复与相关 Backend 一致性。
 
 见[功能合同](CATALOG-PLATFORM-IDENTITIES.md)、[改名合同](CATALOG-RENAME.md)、[结构化回执](acceptance/2026-10-26-catalog-platform-functional.json)和[当前清单](FUNCTIONAL-STATUS-2026-10-21.md)。当前提交的 GitHub 门槛在推送后记录，上一付款修正提交的 15 项成功回执独立保留；本地构建不冒充统一公开发行。
+
+提交 `d08be0ce60bbfd962909144c0015f6ea09ae129a` 的 [GitHub 运行 40247155239](https://github.com/william-lbn/control-plane/actions/runs/40247155239) 已完成，15 项检查全部成功，包括 Go/真实 PostgreSQL、Web、Auth、CLI/MCP、Functions、Helm 和八项组件发布。此回执在下一功能提交中归档，不为 CI 状态重复构建或验收。

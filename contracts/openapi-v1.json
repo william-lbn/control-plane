@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.91.0",
+    "version": "0.92.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -878,6 +878,11 @@
           "acknowledge_current_functions_for_historical_data": {
             "type": "boolean",
             "description": "Historical SQL restore additionally requires this consent: use Function code/env frozen at this request admission, not code from the historical SQL data point."
+          },
+          "expected_parent_timeline_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{32}$",
+            "description": "Optional source scope from a restore-point preview. Requires a historical point. Admission locks and compares the exact current timeline before any lease or credential reservation; mismatch is 412. Omitted requests keep their existing idempotency hash."
           }
         },
         "not": {
@@ -8977,7 +8982,7 @@
           "version": {
             "type": "integer",
             "minimum": 1,
-            "maximum": 9223372036854775807
+            "maximum": 9223372036854776000
           },
           "settings": {
             "$ref": "#/components/schemas/StorageBucketSettings"
@@ -9885,6 +9890,40 @@
             "type": "boolean"
           }
         }
+      },
+      "RestorePointObservation": {
+        "type": "object",
+        "required": [
+          "branch_id",
+          "source_timeline_id",
+          "lsn",
+          "window",
+          "retention_pinned"
+        ],
+        "properties": {
+          "branch_id": {
+            "type": "string"
+          },
+          "source_timeline_id": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{32}$"
+          },
+          "lsn": {
+            "type": "string",
+            "pattern": "^[0-9A-Fa-f]{1,8}/[0-9A-Fa-f]{1,8}$"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "window": {
+            "$ref": "#/components/schemas/RestoreWindow"
+          },
+          "retention_pinned": {
+            "type": "boolean",
+            "const": false
+          }
+        }
       }
     },
     "responses": {
@@ -10269,6 +10308,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "description": "Accepted persistent lifecycle Operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Authentication required",
             "content": {
@@ -10345,16 +10394,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "Accepted persistent lifecycle Operation",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Accepted"
                 }
               }
             }
@@ -10541,6 +10580,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "description": "Accepted persistent lifecycle Operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Authentication required",
             "content": {
@@ -10617,16 +10666,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "Accepted persistent lifecycle Operation",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Accepted"
                 }
               }
             }
@@ -10992,6 +11031,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "description": "Accepted persistent lifecycle Operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Authentication required",
             "content": {
@@ -11068,16 +11117,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "Accepted persistent lifecycle Operation",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Accepted"
                 }
               }
             }
@@ -11305,8 +11344,28 @@
               }
             }
           },
-          "422": {
-            "description": "Invalid input, database authentication or PostgreSQL query error; retryable=false.",
+          "401": {
+            "description": "No valid console session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CSRF validation or global write-role validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project or endpoint not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -11317,6 +11376,16 @@
           },
           "408": {
             "description": "Request cancelled; retryable=false.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input, database authentication or PostgreSQL query error; retryable=false.",
             "content": {
               "application/json": {
                 "schema": {
@@ -11357,36 +11426,6 @@
           },
           "504": {
             "description": "Connection or query budget exceeded. retryable=true only before user SQL was sent; otherwise verify the outcome before retrying.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "No valid console session.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "CSRF validation or global write-role validation failed.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Project or endpoint not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -14060,16 +14099,16 @@
           "409": {
             "$ref": "#/components/responses/Error"
           },
-          "422": {
-            "description": "Invalid/protected name, owner or password"
-          },
-          "503": {
-            "$ref": "#/components/responses/Error"
-          },
           "412": {
             "$ref": "#/components/responses/Error"
           },
+          "422": {
+            "description": "Invalid/protected name, owner or password"
+          },
           "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
             "$ref": "#/components/responses/Error"
           }
         },
@@ -14492,6 +14531,16 @@
               }
             }
           },
+          "201": {
+            "description": "Credential created; api_token returned once",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackendCredentialReply"
+                }
+              }
+            }
+          },
           "401": {
             "$ref": "#/components/responses/Error"
           },
@@ -14518,16 +14567,6 @@
           },
           "503": {
             "$ref": "#/components/responses/Error"
-          },
-          "201": {
-            "description": "Credential created; api_token returned once",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/BackendCredentialReply"
-                }
-              }
-            }
           }
         },
         "requestBody": {
@@ -14987,6 +15026,16 @@
           }
         ],
         "responses": {
+          "200": {
+            "description": "Idempotent replay: same resource, secret_available=false, no token. Lost plaintext requires revoke and reissue.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConsoleInvitationCreated"
+                }
+              }
+            }
+          },
           "201": {
             "description": "Success",
             "content": {
@@ -15017,16 +15066,6 @@
           },
           "503": {
             "$ref": "#/components/responses/Error"
-          },
-          "200": {
-            "description": "Idempotent replay: same resource, secret_available=false, no token. Lost plaintext requires revoke and reissue.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ConsoleInvitationCreated"
-                }
-              }
-            }
           }
         },
         "requestBody": {
@@ -15289,6 +15328,16 @@
           }
         ],
         "responses": {
+          "200": {
+            "description": "Current lifecycle metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LifecycleOverview"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Authentication required",
             "content": {
@@ -15365,16 +15414,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "200": {
-            "description": "Current lifecycle metadata",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/LifecycleOverview"
                 }
               }
             }
@@ -15409,6 +15448,16 @@
           }
         ],
         "responses": {
+          "200": {
+            "description": "Current lifecycle metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProtectionResult"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Authentication required",
             "content": {
@@ -15485,16 +15534,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "200": {
-            "description": "Current lifecycle metadata",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProtectionResult"
                 }
               }
             }
@@ -15542,6 +15581,16 @@
           }
         ],
         "responses": {
+          "200": {
+            "description": "Current lifecycle metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProtectionResult"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Authentication required",
             "content": {
@@ -15618,16 +15667,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "200": {
-            "description": "Current lifecycle metadata",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProtectionResult"
                 }
               }
             }
@@ -15675,6 +15714,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "description": "Accepted persistent lifecycle Operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Authentication required",
             "content": {
@@ -15751,16 +15800,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "Accepted persistent lifecycle Operation",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Accepted"
                 }
               }
             }
@@ -17095,6 +17134,12 @@
               }
             }
           },
+          "206": {
+            "description": "Partial byte range"
+          },
+          "304": {
+            "description": "Matching ETag; no body"
+          },
           "401": {
             "description": "Authorization, lifecycle, quota, version or storage error",
             "content": {
@@ -17155,6 +17200,9 @@
               }
             }
           },
+          "416": {
+            "description": "Unsatisfiable range"
+          },
           "422": {
             "description": "Authorization, lifecycle, quota, version or storage error",
             "content": {
@@ -17194,15 +17242,6 @@
                 }
               }
             }
-          },
-          "206": {
-            "description": "Partial byte range"
-          },
-          "304": {
-            "description": "Matching ETag; no body"
-          },
-          "416": {
-            "description": "Unsatisfiable range"
           }
         }
       },
@@ -17274,6 +17313,12 @@
           "200": {
             "description": "Successful bounded operation"
           },
+          "206": {
+            "description": "Partial byte range"
+          },
+          "304": {
+            "description": "Matching ETag; no body"
+          },
           "401": {
             "description": "Authorization, lifecycle, quota, version or storage error",
             "content": {
@@ -17334,6 +17379,9 @@
               }
             }
           },
+          "416": {
+            "description": "Unsatisfiable range"
+          },
           "422": {
             "description": "Authorization, lifecycle, quota, version or storage error",
             "content": {
@@ -17373,15 +17421,6 @@
                 }
               }
             }
-          },
-          "206": {
-            "description": "Partial byte range"
-          },
-          "304": {
-            "description": "Matching ETag; no body"
-          },
-          "416": {
-            "description": "Unsatisfiable range"
           }
         }
       },
@@ -19105,6 +19144,16 @@
           }
         },
         "responses": {
+          "200": {
+            "description": "Original application result, including application errors and redirects. Body is base64 and never rendered as Console HTML.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FunctionInvocationResult"
+                }
+              }
+            }
+          },
           "401": {
             "$ref": "#/components/responses/Error"
           },
@@ -19129,20 +19178,10 @@
           "429": {
             "$ref": "#/components/responses/Error"
           },
-          "503": {
+          "502": {
             "$ref": "#/components/responses/Error"
           },
-          "200": {
-            "description": "Original application result, including application errors and redirects. Body is base64 and never rendered as Console HTML.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/FunctionInvocationResult"
-                }
-              }
-            }
-          },
-          "502": {
+          "503": {
             "$ref": "#/components/responses/Error"
           }
         }
@@ -19239,6 +19278,9 @@
               }
             }
           },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
           "422": {
             "description": "Invalid bounded pagination",
             "content": {
@@ -19250,9 +19292,6 @@
             }
           },
           "503": {
-            "$ref": "#/components/responses/Error"
-          },
-          "409": {
             "$ref": "#/components/responses/Error"
           }
         }
@@ -19457,8 +19496,28 @@
               }
             }
           },
-          "422": {
-            "description": "Invalid input, database authentication or PostgreSQL query error; retryable=false.",
+          "401": {
+            "description": "No valid console session.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "CSRF validation or global write-role validation failed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Project or endpoint not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -19469,6 +19528,16 @@
           },
           "408": {
             "description": "Request cancelled; retryable=false.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid input, database authentication or PostgreSQL query error; retryable=false.",
             "content": {
               "application/json": {
                 "schema": {
@@ -19509,36 +19578,6 @@
           },
           "504": {
             "description": "Connection or query budget exceeded. retryable=true only before user SQL was sent; otherwise verify the outcome before retrying.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "No valid console session.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "CSRF validation or global write-role validation failed.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Project or endpoint not found.",
             "content": {
               "application/json": {
                 "schema": {
@@ -20088,6 +20127,16 @@
               }
             }
           },
+          "201": {
+            "description": "Personal query metadata; detail reads include decrypted SQL. No Compute startup or execution.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedQueryMutation"
+                }
+              }
+            }
+          },
           "401": {
             "$ref": "#/components/responses/Error"
           },
@@ -20111,16 +20160,6 @@
           },
           "503": {
             "$ref": "#/components/responses/Error"
-          },
-          "201": {
-            "description": "Personal query metadata; detail reads include decrypted SQL. No Compute startup or execution.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SavedQueryMutation"
-                }
-              }
-            }
           }
         },
         "description": "Current project Editor+ and owner-only access. Versioned AES-GCM envelopes bind owner/project/id/generation. Durable mutation replay contains metadata only.",
@@ -21534,33 +21573,6 @@
           }
         ],
         "responses": {
-          "400": {
-            "description": "Invalid source/target or same-object copy"
-          },
-          "403": {
-            "description": "Authorization denied"
-          },
-          "404": {
-            "description": "Source object/target bucket missing"
-          },
-          "409": {
-            "description": "Source blob identity invalid"
-          },
-          "412": {
-            "description": "Observed metadata representation changed; no update"
-          },
-          "422": {
-            "description": "Invalid copy request"
-          },
-          "428": {
-            "description": "Current metadata ETag required"
-          },
-          "429": {
-            "description": "Quota exceeded"
-          },
-          "503": {
-            "description": "Unavailable"
-          },
           "200": {
             "description": "metadata, content_type, metadata_etag, key, unchanged sha256",
             "content": {
@@ -21599,6 +21611,33 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "Invalid source/target or same-object copy"
+          },
+          "403": {
+            "description": "Authorization denied"
+          },
+          "404": {
+            "description": "Source object/target bucket missing"
+          },
+          "409": {
+            "description": "Source blob identity invalid"
+          },
+          "412": {
+            "description": "Observed metadata representation changed; no update"
+          },
+          "422": {
+            "description": "Invalid copy request"
+          },
+          "428": {
+            "description": "Current metadata ETag required"
+          },
+          "429": {
+            "description": "Quota exceeded"
+          },
+          "503": {
+            "description": "Unavailable"
           }
         },
         "requestBody": {
@@ -23630,6 +23669,16 @@
           }
         ],
         "responses": {
+          "200": {
+            "description": "Bounded administrator metadata view",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MultipartAdministrationList"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Console authentication required"
           },
@@ -23644,16 +23693,6 @@
           },
           "503": {
             "description": "Outcome may be unknown; original admitted intent and audit retained"
-          },
-          "200": {
-            "description": "Bounded administrator metadata view",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MultipartAdministrationList"
-                }
-              }
-            }
           }
         },
         "operationId": "listMultipartAdministration",
@@ -23716,21 +23755,6 @@
           }
         ],
         "responses": {
-          "401": {
-            "description": "Console authentication required"
-          },
-          "403": {
-            "description": "Current project Admin Console session required; global role and API key do not grant access"
-          },
-          "404": {
-            "description": "Project/branch not found"
-          },
-          "429": {
-            "description": "60 new administrator intents per actor/hour; exact replay does not consume a new admission"
-          },
-          "503": {
-            "description": "Outcome may be unknown; original admitted intent and audit retained"
-          },
           "200": {
             "description": "Logical abort and control receipt confirmed",
             "content": {
@@ -23741,11 +23765,26 @@
               }
             }
           },
+          "401": {
+            "description": "Console authentication required"
+          },
+          "403": {
+            "description": "Current project Admin Console session required; global role and API key do not grant access"
+          },
+          "404": {
+            "description": "Project/branch not found"
+          },
           "409": {
             "description": "Different key/input or upload already completed; existing object unchanged"
           },
           "422": {
             "description": "Explicit valid reason/key required"
+          },
+          "429": {
+            "description": "60 new administrator intents per actor/hour; exact replay does not consume a new admission"
+          },
+          "503": {
+            "description": "Outcome may be unknown; original admitted intent and audit retained"
           }
         },
         "operationId": "abortMultipartAsAdministrator",
@@ -24576,16 +24615,16 @@
           "409": {
             "$ref": "#/components/responses/Error"
           },
-          "422": {
-            "$ref": "#/components/responses/Error"
-          },
-          "503": {
-            "$ref": "#/components/responses/Error"
-          },
           "412": {
             "$ref": "#/components/responses/Error"
           },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
           "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
             "$ref": "#/components/responses/Error"
           }
         },
@@ -24669,16 +24708,16 @@
           "409": {
             "$ref": "#/components/responses/Error"
           },
-          "422": {
-            "$ref": "#/components/responses/Error"
-          },
-          "503": {
-            "$ref": "#/components/responses/Error"
-          },
           "412": {
             "$ref": "#/components/responses/Error"
           },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
           "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
             "$ref": "#/components/responses/Error"
           }
         },
@@ -24729,6 +24768,16 @@
           }
         ],
         "responses": {
+          "202": {
+            "description": "Expiration policy and completed persistent Operation committed atomically; replay returns the same Operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Accepted"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Authentication required",
             "content": {
@@ -24805,16 +24854,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "Expiration policy and completed persistent Operation committed atomically; replay returns the same Operation",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Accepted"
                 }
               }
             }
@@ -26326,9 +26365,6 @@
           "409": {
             "$ref": "#/components/responses/Error"
           },
-          "503": {
-            "$ref": "#/components/responses/Error"
-          },
           "412": {
             "$ref": "#/components/responses/Error"
           },
@@ -26336,6 +26372,9 @@
             "$ref": "#/components/responses/Error"
           },
           "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
             "$ref": "#/components/responses/Error"
           }
         },
@@ -26455,9 +26494,6 @@
           "409": {
             "$ref": "#/components/responses/Error"
           },
-          "503": {
-            "$ref": "#/components/responses/Error"
-          },
           "412": {
             "$ref": "#/components/responses/Error"
           },
@@ -26465,6 +26501,9 @@
             "$ref": "#/components/responses/Error"
           },
           "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
             "$ref": "#/components/responses/Error"
           }
         },
@@ -26556,16 +26595,16 @@
           "409": {
             "$ref": "#/components/responses/Error"
           },
-          "422": {
-            "$ref": "#/components/responses/Error"
-          },
-          "503": {
-            "$ref": "#/components/responses/Error"
-          },
           "412": {
             "$ref": "#/components/responses/Error"
           },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
           "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
             "$ref": "#/components/responses/Error"
           }
         },
@@ -26694,16 +26733,16 @@
           "409": {
             "$ref": "#/components/responses/Error"
           },
-          "422": {
-            "$ref": "#/components/responses/Error"
-          },
-          "503": {
-            "$ref": "#/components/responses/Error"
-          },
           "412": {
             "$ref": "#/components/responses/Error"
           },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
           "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
             "$ref": "#/components/responses/Error"
           }
         },
@@ -26766,27 +26805,6 @@
           }
         ],
         "responses": {
-          "403": {
-            "$ref": "#/components/responses/Error"
-          },
-          "404": {
-            "$ref": "#/components/responses/Error"
-          },
-          "409": {
-            "$ref": "#/components/responses/Error"
-          },
-          "422": {
-            "$ref": "#/components/responses/Error"
-          },
-          "503": {
-            "$ref": "#/components/responses/Error"
-          },
-          "412": {
-            "$ref": "#/components/responses/Error"
-          },
-          "428": {
-            "$ref": "#/components/responses/Error"
-          },
           "200": {
             "description": "Atomic immutable current observation or original-key replay",
             "content": {
@@ -26796,6 +26814,27 @@
                 }
               }
             }
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
           }
         },
         "description": "Project Admin, session CSRF or scoped Admin key, canonical current If-Match, Idempotency-Key and explicit acknowledgment required. Observe the complete native catalog without SQL writes. The immutable original baseline OID, tenant/timeline, current managed name and provenance must match; database Owner requires a current persistent role identity. Changed names require the original successful rename; changed role credentials require their exact original committed immutable Secret UID witness. Historical ordinary results attest their credential UID only and are never backfilled with an OID. Existing persistent identity history cannot be replaced. Atomic current identity, immutable observation, original-key receipt and audit; replay precedes current native or credential reads. Earlier baseline, options and password history remain unmodified and unobserved.",
@@ -27569,6 +27608,9 @@
           "404": {
             "$ref": "#/components/responses/Error"
           },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
           "422": {
             "$ref": "#/components/responses/Error"
           },
@@ -27579,9 +27621,6 @@
             "$ref": "#/components/responses/Error"
           },
           "503": {
-            "$ref": "#/components/responses/Error"
-          },
-          "409": {
             "$ref": "#/components/responses/Error"
           }
         },
@@ -27672,6 +27711,9 @@
           "404": {
             "$ref": "#/components/responses/Error"
           },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
           "422": {
             "$ref": "#/components/responses/Error"
           },
@@ -27682,9 +27724,6 @@
             "$ref": "#/components/responses/Error"
           },
           "503": {
-            "$ref": "#/components/responses/Error"
-          },
-          "409": {
             "$ref": "#/components/responses/Error"
           }
         },
@@ -28018,6 +28057,9 @@
           "404": {
             "$ref": "#/components/responses/Error"
           },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
           "422": {
             "$ref": "#/components/responses/Error"
           },
@@ -28028,9 +28070,6 @@
             "$ref": "#/components/responses/Error"
           },
           "503": {
-            "$ref": "#/components/responses/Error"
-          },
-          "409": {
             "$ref": "#/components/responses/Error"
           }
         },
@@ -28243,6 +28282,9 @@
           "404": {
             "$ref": "#/components/responses/Error"
           },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
           "422": {
             "$ref": "#/components/responses/Error"
           },
@@ -28253,9 +28295,6 @@
             "$ref": "#/components/responses/Error"
           },
           "503": {
-            "$ref": "#/components/responses/Error"
-          },
-          "409": {
             "$ref": "#/components/responses/Error"
           }
         },
@@ -28332,6 +28371,9 @@
           "404": {
             "$ref": "#/components/responses/Error"
           },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
           "422": {
             "$ref": "#/components/responses/Error"
           },
@@ -28342,9 +28384,6 @@
             "$ref": "#/components/responses/Error"
           },
           "503": {
-            "$ref": "#/components/responses/Error"
-          },
-          "409": {
             "$ref": "#/components/responses/Error"
           }
         },
@@ -38048,6 +38087,78 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/restore-point": {
+      "get": {
+        "tags": [
+          "Catalog"
+        ],
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "name": "timestamp",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "format": "date-time"
+            }
+          },
+          {
+            "name": "lsn",
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9A-Fa-f]{1,8}/[0-9A-Fa-f]{1,8}$"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Unpinned original timeline observation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RestorePointObservation"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "operationId": "previewBranchRestorePoint",
+        "summary": "Preview a retained time or LSN against the exact original timeline",
+        "description": "Project Reader access; cache disabled. Specify exactly one timestamp or LSN. Reads actual retention bounds and the storage timestamp mapping, without waking Compute, leasing history, mutating metadata or creating a branch. Missing, duplicate or conflicting input is 422; unreplayed timestamp is 409; changing source timeline is 412. Observation does not promise future retention. To accept this exact point, create the historical branch using parent_lsn=lsn and expected_parent_timeline_id=source_timeline_id; admission rechecks and leases that exact original point. This preview alone does not execute customer SQL or perform in-place reset."
       }
     }
   }

@@ -287,9 +287,11 @@
     "other_components_reused": true
   },
   "CI": {
-    "status": "pending_new_commit",
-    "previous_billing_commit": "f7df93a2dc9443f653d218960536a8e119b45645",
-    "previous_billing_checks_succeeded": 15
+    "status": "success",
+    "commit": "d08be0ce60bbfd962909144c0015f6ea09ae129a",
+    "run_id": 40247155239,
+    "url": "https://github.com/william-lbn/control-plane/actions/runs/40247155239",
+    "checks_succeeded": 15
   },
   "performance_reliability_campaign": false,
   "large_object_capacity_validation": "deferred_target_environment"
