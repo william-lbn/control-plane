@@ -11,6 +11,8 @@ import (
 // Secret并固定其UID。只有原计划/真实VM UID/原凭据公钥参与，重试不取当前env、
 // 不生成新预算引用/epoch、不补写历史配置；没有私钥、verifier或角色口令输出。
 // 数字只证明完整可表示且适合原最低Guest，实际Root/Host约束仍由生产执行器落实。
+// 原计划可显式携带冻结pids上限，整份Limits原样传递；缺省仍是旧未约束来源，
+// 不在Renderer补默认，也不将任务数换算成已经认证的私有字节或VM许可。
 func renderDSGAResourceBootstrap(p createPayload, plan dsgaCreationPlan, vmUID string, credentials dsgaRenderCredentials) ([]byte, error) {
 	if _, err := plan.nativeBootstrap(p, vmUID); err != nil {
 		return nil, err

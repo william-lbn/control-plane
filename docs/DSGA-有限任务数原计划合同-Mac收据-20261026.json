@@ -1,0 +1,36 @@
+{
+  "created_at": "2026-10-26T01:30:49.389503+00:00",
+  "branch": "codex/dsga-control-plane-v3-20261020",
+  "AS": {
+    "branch": "codex/dsga-autoscaling-20261019",
+    "sha": "849d84285e9099ae33c3d837a0563ff1f4974aa3",
+    "remote": "849d84285e9099ae33c3d837a0563ff1f4974aa3",
+    "pseudo": "v0.0.0-20261026012721-849d84285e90"
+  },
+  "OriginHash": "849d84285e9099ae33c3d837a0563ff1f4974aa3",
+  "sum_delta": 2,
+  "validation": {
+    "new_race_tests_pass": 1,
+    "fail": 0,
+    "skip": 0,
+    "readonly_vet": 0,
+    "real_Runner_decoder": true,
+    "Kube_Linux_execution": false
+  },
+  "source_sha256": {
+    "api/go.mod": "170076fd801a2b8f62f18c7e7b10e6f56aad2f4df099df4be3e8d9ee93faf11d",
+    "api/go.sum": "3ed9f75161274c5bd57b8ac4abdb0b9e210f186647a32e714fd2dfcb9074288c",
+    "api/internal/control/dsga_resource_renderer.go": "5a852bd0995c3b1760b038cd68116fadb2f0d8b55458223b8bd6b44e21b06781",
+    "api/internal/control/dsga_resource_renderer_test.go": "03fcb033185e76937119b76455b79b76be5b31bd129e1db84cfb2e03dc2932bd",
+    "docs/DSGA-有限任务数原计划合同-Mac验收-20261026.md": "ec2bdf2f8e8e87c1720bf594971f7fd4b480fd9b22bbf3acc96000e37fd7ff35"
+  },
+  "log_and_recipe_sha256": {
+    "build/dsga-task-quota-cp-module.json": "416585c3f0c7f0d0ce81b888e3c8c6250b4a4254dc94ede2b5125612cdc62f78",
+    "build/dsga-task-quota-cp-renderer.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "build/dsga-task-quota-cp-vet.log": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "build/run-dsga-task-quota-cp-dependency.py": "c5cc83d1d3bbacb1ecd1f19833d9ecd15043bd04519ae22451138b68d2b8d7db",
+    "build/dsga-task-quota-cp-module.stderr": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "build/dsga-task-quota-cp-renderer.jsonl": "0a89dfb2d8c30c32106a8b1b27cb8f9a8d448440b48e3cb942166810b55a5ead",
+    "build/run-dsga-task-quota-cp-renderer.sh": "eae6b460934f181dc26602d73e476849c868f66a4e1da83716b3506c95021bd2"
+  }
+}

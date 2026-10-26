@@ -124,3 +124,67 @@ func TestDSGAResourcePublicPolicyRequiresV2BeforeReservation(t *testing.T) {
 		t.Fatal("new public reservation accepted missing original resource budget")
 	}
 }
+
+// 生产Plan clone→JSON持久读者→Renderer→实际Runner Decoder的有限任务数合同。
+// 只证明原N未丢失/未补默认，不声称Mac执行了Linux pids控制器或完整私有预算。
+func TestDSGAFiniteTaskLimitSurvivesFrozenPlanAndRunner(t *testing.T) {
+	p, plan := dsgaVMFixture(t)
+	legacyUpper, err := plan.VM.ResourceLimits.TotalUpperBytes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan.VM.ResourceLimits.PidsMaxTasks = 64
+	frozen := plan.VM.clone()
+	plan.VM.ResourceLimits.PidsMaxTasks = 65
+	if frozen.ResourceLimits.PidsMaxTasks != 64 {
+		t.Fatal("source policy alias changed original task limit")
+	}
+	plan.VM = frozen
+	raw, err := json.Marshal(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var restored dsgaCreationPlan
+	if err = json.Unmarshal(raw, &restored); err != nil {
+		t.Fatal(err)
+	}
+	if restored.VM.ResourceLimits.PidsMaxTasks != 64 {
+		t.Fatal("persistent reader dropped task limit")
+	}
+	files, err := renderDSGABootstrapFiles(p, restored, "actual-vm-uid", dsgaRenderFixture())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var source resourceguard.SourceConfig
+	if err = json.Unmarshal(files[resourceguard.ResourceSecretKey], &source); err != nil || source.Validate() != nil {
+		t.Fatal(err)
+	}
+	if source.Limits.PidsMaxTasks != 64 {
+		t.Fatal("source renderer omitted finite tasks")
+	}
+	upper, err := source.Limits.TotalUpperBytes()
+	if err != nil || upper != legacyUpper {
+		t.Fatal("task count was added to byte budget", err)
+	}
+	vm, err := renderDSGAVM(p, restored)
+	if err != nil {
+		t.Fatal(err)
+	}
+	vm.Spec.DSGABootstrap.Ready = true
+	vm.Spec.DSGABootstrap.VMUID = "actual-vm-uid"
+	vm.Spec.DSGABootstrap.ConfigSecretUID = "original-config-uid"
+	sum := sha256.Sum256(files[resourceguard.ResourceSecretKey])
+	document := resourceguard.RuntimeDocument{ProtocolVersion: 1, Incarnation: restored.Incarnation, ConfigSecretUID: "original-config-uid", SourceJSON: files[resourceguard.ResourceSecretKey], SourceSHA256: hex.EncodeToString(sum[:])}
+	encoded, err := json.Marshal(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := bootstrap.DecodeRuntime(&vm.Spec, gzip64.Encode(encoded))
+	if err != nil || !bytes.Equal(encoded, decoded) {
+		t.Fatal("actual Runner lost frozen task source", err)
+	}
+	restored.VM.ResourceLimits.PidsMaxTasks = resourceguard.MaxPidsTasks + 1
+	if files, err = renderDSGABootstrapFiles(p, restored, "actual-vm-uid", dsgaRenderFixture()); err == nil || files != nil {
+		t.Fatal("invalid task policy produced partial files")
+	}
+}
