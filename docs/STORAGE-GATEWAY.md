@@ -84,3 +84,29 @@ Console 原生签名 API 返回的是相对 `/storage/v1/{branch}/{bucket}?key=.
 新增仅针对接管路径的静态渲染组 `tools/helm-tests/storage-gateway.test.mjs`：旧部署兼容、旧 NodePort 释放、origin 保留、签名 REST 直达、payload/timeout 预算、非法配置拒绝，以及独立 chart 的 NodePort/RBAC。此组需协调器统一运行；它不能代替真实部署接管与现有用户小对象路径的功能证据。
 
 2026-10-27 主代理已完成本文新增 Go/PG、独立 binary 编译、vet 及五组 Helm 检查；具体复用与失败续验记录见[增量回执](DELIVERY-2026-10-27-FUNCTIONAL-SLICES.md)。本记录不声明尚未执行的实机接管通过。
+
+## GitHub 发布与本轮新增检查
+
+`.github/workflows/ci.yml` 在原 8 个 component 顺序后新增第 9 项 `storage-gateway`，仍由 Go/Web/Helm/workflows/Auth/Functions/clients 全部质量门禁共同保护，只在 main 或 v* tag 的非 PR 事件发布；原 8 项的 image 名称、quality needs、packages 权限、并行度 2 和自己的 cache scope 保留。新项使用现有 `Dockerfile.storage-gateway` 与 `containers/builders.lock.json` 的 digest Go builder，仅构建 linux/amd64 的独立命令、scratch runtime、65532 用户，并生成 SBOM/provenance。原源码/模块层可读 `api` cache；新项只写 `storage-gateway` scope，不覆盖 API cache。CI cache 能恢复的层按 BuildKit 能力复用，不宣称 RUN cache mount 可完整跨 runner 迁移。
+
+输出 image repository 为 `ghcr.io/<owner>/control-storage-gateway`，tag 为 `sha-<commit>-r<run>-a<attempt>`；有既有 Docker Hub 凭据时沿用相同发布策略。`image-storage-gateway` artifact 记录 component、精确 commit、digest、tags、linux/amd64。部署必须使用该 digest 引用，不能把旧本地缓存镜像或成功的 publish job 当作新源码已经运行。Helm CI 额外 lint/render/package 独立 Storage chart，并将 tgz 纳入同一 SHA256SUMS/Helm artifact。
+
+新增 `tools/storage-gateway/workflow-contract.test.mjs` 不联网、不构建镜像；验证第 9 项、原 8 项身份、质量门禁、固定 actions/builders、cache 隔离、不可变 tag/digest receipt 与独立 chart 包路径。宿主机普通 Node 测试子进程受到 EPERM 限制，同进程 `node --test --test-isolation=none tools/storage-gateway/workflow-contract.test.mjs` 已通过 3/3。它不等于 actionlint、镜像构建、registry 发布或实机接管通过；后者继续由 GitHub CI 与协调器验证。
+
+运行权限检查已修正 PostgreSQL 多 privilege 列表的“任意一种”语义：不再用 `has_table_privilege(...,'SELECT,INSERT')` 证明两者都有，而逐一要求每张读取/插入表、每个实际 UPDATE/INSERT/SELECT 列与全部三个 row-lock EXECUTE。缺失 `last_used_at`、ledger 结束字段、事件 dirty marker 或 audit append 任一必需权限都会拒绝启动/ready。额外拒绝父角色成员关系、metadata schema CREATE、column-only 生命周期 UPDATE 和 Console 密码/会话读取。健康检查自身有 3 秒预算，chart 的 startup/readiness probe timeout 设为 4 秒，避免 Kube 默认 1 秒误杀合法检查。
+
+新增 PG selector 为 `^TestStorageGatewayRestrictedMetadataRole$`，仅 disposable `control_ci` 的随机 schema/NOLOGIN role；实际读取并应用 `tools/storage-gateway/metadata-grants.sql`，除测试 schema/role 名外不复制另一套 grant SQL。检查正确受限身份可 ready，逐项撤销 INSERT、last_used_at/ledger 列和三个 EXECUTE 后必须拒绝；恢复直接重放实际脚本；精确锁函数、持久 admission/finalization 和 audit append 使用受限 role 实际执行，直接 FOR SHARE、生命周期写、Console password/session 读取必须为权限拒绝。本轮仅新增源码并检查 gofmt；该 PG 组尚待 GitHub CI 执行，070–073 未改写。
+
+## 协调器的实机小对象接管计划
+
+以下是尚未执行的固定功能检查，复用原已通过业务与现有服务；每项只用一组明确命名的小夹具，不重新运行历史全套。不包含性能、可靠性、HA、灾备、压力或大对象专项。
+
+1. **前置与镜像身份。** 先满足宿主 D 持续至少 40 GiB 的用户约束，再核对 GitHub 新 commit/digest receipt。保持 schema 073/native 7 及原 project/branch/endpoint/目录、Secret UID、PVC 和业务字节；记录原 S3 origin `.100:30893`、Console `.100:30788` 与 core values。旧本地 92d8… 镜像仅是已验证基线，不能替代这次修复的 GitHub 新 digest。
+2. **真实受限 metadata 与 RBAC。** 创建仅此网关使用的 LOGIN，运行实际 grants 脚本，不授 API/Worker identity；只挂 product blob、Backend ring、相同 capability key、现有 event MAC 和必要公开 CA。先以独立 ClusterIP 部署。核对 ready=200；确认缺一个 ledger INSERT/last_used_at 列/EXECUTE 的负例不能 ready。确认 ServiceAccount 仅 GET 本次 endpoint Secret，其他 Secret、list/watch、Pod/VM/Deployment 写都被拒绝。负例只修改自有测试角色/allowlist，恢复后再次 ready，不改业务角色与原 Secret。
+3. **规范 Host 的 S3 小字节。** 在既有授权 storage branch 上创建一个专用小对象，固定 canonical Host/origin，通过独立 ClusterIP 的 SDK transport 完成 PUT、HEAD、GET、Range、一次 COPY/DELETE 当前逻辑清单、一次小 multipart。比对摘要与原 baseline；错误 Host、签名篡改、只读 token 写入、无 lineage 的另租户和撤销后的 credential 均拒绝。只删除本次自有逻辑对象，不物理清理 blob，也不处理历史业务字节。
+4. **同源签名 REST 真正进入独立进程。** 先切 core `apiListenerEnabled=false,gatewayService=<独立 Service DNS>` 并确认旧 `-s3` Service 已释放固定 NodePort，再让独立 Service 接管同一 NodePort；保持 origin 不变。Console 原签名 API 仍由 API 签发 `/storage/v1/...` 相对 URL，浏览器/HTTP 客户端通过 `.100:30788` Web 执行一次小 PUT 和下载/HEAD。检查 Web upstream 为独立 8793、返回独立进程生成的 usage receipt，并比对实际文件摘要；metadata 只新增对应 server-observed receipt，不能仅看到 API 计量便宣称分离。到期/篡改 capability、service generation 和 actor 权限负例均拒绝；Console cookie/Authorization 不转发给独立进程。
+5. **Storage→Functions 事件。** 复用一个现有可用 Function 与一个明确前缀 trigger。分别在独立 S3 和签名 REST 各发布一份小对象，核对同事务 outbox、dirty marker、Worker export 与真实函数 invocation 的相同事件 ID/摘要；不因独立进程拆分漏事件。临时对自有副本移除 event MAC 时，匹配 trigger 的发布应失败且当前对象清单不提交；恢复正确 MAC/version 后通过。旧事件/历史 invocation 保留。
+6. **配额与可信 receipt。** 自有测试 project 以已有接口/受控 SQL 设置有限 UTC 日 requests/transfer 与并发 1；验证一次正常小传输的实际 ingress/egress、HEAD body=0、真实 HTTP status、finished timestamp、reservation 释放和重复 finish 不加计。两条有界请求只用来验证共享 tenant admission；超出 request 或保守 transfer reservation 的请求在 SQL/blob mutation 前拒绝。错误/取消保留相应状态，未完成 receipt 不按 0 或成功处理；不为此杀业务 Pod、制造故障或删除账本。结束恢复该自有 fixture 的原 operator 限额。
+7. **入口与回退身份。** 核对固定 S3/REST public 入口均进入独立 gateway，而目录管理/签名签发仍在 API。若需要回退，先将独立 Service 改回 ClusterIP 释放 NodePort，再恢复 core `apiListenerEnabled=true,gatewayService=''`。原 source/业务 IDs、目录、Secret/PVC 和 ledger 继续保留；记录切换窗口，不宣称 HA。
+
+实机证据必须分别记录“CI 发布/受限身份 ready/S3 路径/Console Web 签名 REST/事件/预算/入口接管”，不能用已完成的 F06 edge 验收、旧 S3 baseline 或新 image 已导入三节点代替这些待验内容。

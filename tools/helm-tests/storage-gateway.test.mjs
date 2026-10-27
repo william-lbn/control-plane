@@ -77,6 +77,9 @@ test('standalone chart owns the released NodePort with exact endpoint Secret GET
   assert.equal(service.spec.ports[0].nodePort, 30893);
   assert.equal(service.spec.ports[0].port, 8793);
   assert.equal(service.spec.ports.some(v => v.port === 8794), false);
+  const container = objects.find(v => v.kind === 'Deployment').spec.template.spec.containers[0];
+  assert.equal(container.startupProbe.timeoutSeconds, 4);
+  assert.equal(container.readinessProbe.timeoutSeconds, 4);
   assert.deepEqual(objects.find(v => v.kind === 'Role').rules, [{ apiGroups: [''], resources: ['secrets'],
     resourceNames: ['cp-0123456789abcdef-credentials'], verbs: ['get'] }]);
 });

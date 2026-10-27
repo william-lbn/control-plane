@@ -39,6 +39,10 @@ helm template credentials charts/neon-control-plane --namespace neon -f charts/n
 grep -q 'NEON_BACKEND_CREDENTIAL_KEYS_FILE' artifacts/helm/backend-credentials.yaml
 if helm template bad charts/neon-control-plane -f charts/neon-control-plane/ci/render-values.yaml --set backendCredentials.enabled=true --set backendCredentials.labHTTP=true > artifacts/helm/rejected-backend-secret.log 2>&1; then exit 1; fi
 if helm template bad charts/neon-control-plane -f charts/neon-control-plane/ci/render-values.yaml --set backendCredentials.enabled=true --set backendCredentials.existingSecret=backend-keys --set api.cookieSecure=false > artifacts/helm/rejected-backend-http.log 2>&1; then exit 1; fi
+# Independent Storage is distributed with its own digest-pinned image and chart.
+helm lint charts/storage-gateway --strict -f charts/storage-gateway/ci/render-values.yaml
+helm template neon-storage charts/storage-gateway --namespace neon -f charts/storage-gateway/ci/render-values.yaml > artifacts/helm/storage-gateway.yaml
+helm package charts/storage-gateway -d artifacts/helm
 sha256sum artifacts/helm/*.tgz > artifacts/helm/SHA256SUMS
 helm template native-auth charts/neon-control-plane --namespace neon -f charts/neon-control-plane/ci/render-values.yaml \
   --set managedAuth.enabled=true --set managedAuth.labHTTP=true \

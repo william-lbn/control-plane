@@ -24,6 +24,7 @@ jobs:
       - run: node tools/check-live-suites.mjs
       - run: node tools/generate-api-docs.mjs --check
       - run: node --test tools/functions-edge-probe/fixture.test.mjs
+      - run: node --test tools/storage-gateway/workflow-contract.test.mjs
   go:
     name: Go + real PostgreSQL
     runs-on: ubuntu-24.04
@@ -145,7 +146,7 @@ jobs:
     strategy:
       fail-fast: false
       max-parallel: 2
-      matrix: {component: [api, web, gateway, dataapi, postgrest, adapter, auth, ai]}
+      matrix: {component: [api, web, gateway, dataapi, postgrest, adapter, auth, ai, storage-gateway]}
     env:
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -195,7 +196,9 @@ jobs:
             org.opencontainers.image.licenses=${{ steps.names.outputs.license }}
           sbom: true
           provenance: mode=max
-          cache-from: type=gha,scope=${{ matrix.component }}
+          cache-from: |
+            type=gha,scope=${{ matrix.component }}
+            ${{ matrix.component == 'storage-gateway' && 'type=gha,scope=api' || '' }}
           cache-to: type=gha,mode=max,scope=${{ matrix.component }}
       - name: Image publication receipt
         env:

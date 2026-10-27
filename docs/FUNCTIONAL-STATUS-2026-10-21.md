@@ -119,3 +119,5 @@
 2026-10-27 增量：[存储与 Functions 功能增量](DELIVERY-2026-10-27-FUNCTIONAL-SLICES.md)通过 24 组新增 Go/PG、10 组新增 Helm、1 组新增及 3 组受影响 API 合同检查；恢复基础累计 20 组新增检查通过。已实现 prospective orphan 清理、独立数据入口与用量、Edge 与实际资源观测；070–073 未部署，实机接管、完整历史 GC、reset/Backend 恢复继续，组计数不变。
 
 2026-10-27 实机部署：[独立 Edge 部署与传输验收](DELIVERY-2026-10-27-EDGE-BOOTSTRAP.md)完成 Core 194/195、schema 073、专用 mTLS 正反例、入口切换及旧身份保全。070–073 现在已应用并冻结，Native Storage 7 保持；原 Function 的真实执行、计量及 A/B/回滚继续，S05 网关尚未实机接管。基础/开放组计数不变。
+
+2026-10-27 执行增量：[Functions 执行与用量](DELIVERY-2026-10-27-FUNCTION-EXECUTION.md)完成原 canary 的 A/B/回滚三轮、每轮五项真实检查，以及活动长流部署拒绝、原代码/环境和 SQL 代次 2 恢复。当前 Core 196/schema 073/Native Storage 7；Function 和原 Writer 停止。用量 UI 与受限网关准入修复进入 CI，实际页面、旧策略证明、最终保全和网关入口接管继续。22 个基础组、五个业务和三个其他开放组计数保持；所有新构建交 GitHub CI，D 盘持续保留至少 40GiB，C 盘不接收大批量构建数据。

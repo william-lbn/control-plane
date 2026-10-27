@@ -97,8 +97,8 @@ spec:
             - {name: NEON_STORAGE_EVENT_MAC_KEY_FILE, value: /run/storage/events/mac-key}
             - {name: NEON_STORAGE_EVENT_KEY_VERSION, value: {{ .Values.events.keyVersion | quote }}}
             {{- end }}
-          startupProbe: {httpGet: {path: /readyz, port: health}, periodSeconds: 2, failureThreshold: 30}
-          readinessProbe: {httpGet: {path: /readyz, port: health}, periodSeconds: 5}
+          startupProbe: {httpGet: {path: /readyz, port: health}, timeoutSeconds: 4, periodSeconds: 2, failureThreshold: 30}
+          readinessProbe: {httpGet: {path: /readyz, port: health}, timeoutSeconds: 4, periodSeconds: 5}
           livenessProbe: {httpGet: {path: /healthz, port: health}, periodSeconds: 15}
           resources: {{ toYaml .Values.resources | nindent 12 }}
           securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}

@@ -158,21 +158,49 @@ func (s *server) storageGatewayHandler() http.Handler {
 // own ledger plus last_used_at. Reject owner/superuser credentials at startup.
 func validateStorageGatewayRole(ctx context.Context, db *pgxpool.Pool) error {
 	var safe, ready bool
-	err := db.QueryRow(ctx, `SELECT NOT (r.rolsuper OR r.rolcreaterole OR r.rolcreatedb OR r.rolbypassrls)
- AND NOT has_table_privilege(current_user,'projects','UPDATE')
- AND NOT has_table_privilege(current_user,'branches','UPDATE')
- AND NOT has_table_privilege(current_user,'operations','INSERT')
- AND NOT has_table_privilege(current_user,'sessions','SELECT')
+	err := db.QueryRow(ctx, `SELECT NOT (r.rolsuper OR r.rolcreaterole OR r.rolcreatedb OR r.rolbypassrls OR r.rolreplication)
+ AND NOT EXISTS(SELECT 1 FROM pg_auth_members WHERE member=r.oid)
+ AND NOT has_schema_privilege(current_user,current_schema(),'CREATE')
+ AND NOT has_any_column_privilege(current_user,'projects','UPDATE')
+ AND NOT has_any_column_privilege(current_user,'branches','UPDATE')
+ AND NOT has_any_column_privilege(current_user,'endpoints','UPDATE')
+ AND NOT has_any_column_privilege(current_user,'object_storage_instances','UPDATE')
+ AND NOT has_any_column_privilege(current_user,'operations','INSERT')
+ AND NOT has_any_column_privilege(current_user,'sessions','SELECT')
  AND NOT has_column_privilege(current_user,'users','password_hash','SELECT')
  AND NOT has_column_privilege(current_user,'backend_credentials','revoked_at','UPDATE')
- AND NOT has_table_privilege(current_user,'storage_gateway_limits','UPDATE'),
- to_regclass('storage_gateway_requests') IS NOT NULL
- AND EXISTS(SELECT 1 FROM schema_migrations WHERE version=72)
- AND has_table_privilege(current_user,'storage_gateway_requests','SELECT,INSERT')
- AND has_column_privilege(current_user,'storage_gateway_requests','state','UPDATE')
- AND has_function_privilege(current_user,'storage_gateway_lock_instance(text,text)','EXECUTE')
- AND has_table_privilege(current_user,'backend_storage_signing','SELECT')
- AND has_table_privilege(current_user,'function_triggers','SELECT')
+ AND NOT has_any_column_privilege(current_user,'storage_gateway_limits','UPDATE'),
+ EXISTS(SELECT 1 FROM schema_migrations WHERE version=72)
+ AND NOT EXISTS (
+  SELECT 1 FROM (VALUES
+   ('schema_migrations','SELECT'),('projects','SELECT'),('branches','SELECT'),('endpoints','SELECT'),
+   ('object_storage_instances','SELECT'),('organizations','SELECT'),('organization_members','SELECT'),
+   ('project_grants','SELECT'),('backend_credentials','SELECT'),('backend_storage_signing','SELECT'),
+   ('storage_gateway_limits','SELECT'),('storage_gateway_days','SELECT'),('storage_gateway_requests','SELECT'),
+   ('storage_gc_allocations','SELECT'),('function_triggers','SELECT'),('function_definitions','SELECT'),
+   ('storage_event_branches','SELECT'),('storage_gateway_days','INSERT'),('storage_gateway_requests','INSERT'),
+   ('storage_gc_allocations','INSERT'),('storage_event_branches','INSERT')
+  ) required(relation,privilege) WHERE NOT has_table_privilege(current_user,relation,privilege)
+ )
+ AND NOT EXISTS (
+  SELECT 1 FROM (VALUES
+   ('users','id','SELECT'),('users','disabled','SELECT'),('backend_credentials','last_used_at','UPDATE'),
+   ('storage_gateway_days','requests','UPDATE'),('storage_gateway_days','observed_bytes','UPDATE'),('storage_gateway_days','reserved_bytes','UPDATE'),
+   ('storage_gateway_requests','state','UPDATE'),('storage_gateway_requests','finished_at','UPDATE'),
+   ('storage_gateway_requests','http_status','UPDATE'),('storage_gateway_requests','ingress_bytes','UPDATE'),
+   ('storage_gateway_requests','egress_bytes','UPDATE'),('storage_gateway_requests','duration_ms','UPDATE'),
+   ('storage_gc_allocations','state','UPDATE'),('storage_gc_allocations','resolved_at','UPDATE'),
+   ('storage_event_branches','endpoint_id','UPDATE'),('storage_event_branches','database_name','UPDATE'),
+   ('storage_event_branches','timeline_id','UPDATE'),('storage_event_branches','generation','UPDATE'),
+   ('storage_event_branches','dirty','UPDATE'),('storage_event_branches','error_code','UPDATE'),('storage_event_branches','updated_at','UPDATE'),
+   ('audit_events','actor_id','INSERT'),('audit_events','action','INSERT'),('audit_events','resource_type','INSERT'),
+   ('audit_events','resource_id','INSERT'),('audit_events','outcome','INSERT'),('audit_events','request_id','INSERT')
+  ) required(relation,column_name,privilege) WHERE NOT has_column_privilege(current_user,relation,column_name,privilege)
+ )
+ AND NOT EXISTS (
+  SELECT 1 FROM (VALUES ('storage_gateway_lock_project(text,text)'),('storage_gateway_lock_branch(text,text)'),('storage_gateway_lock_instance(text,text)')) required(signature)
+  WHERE NOT has_function_privilege(current_user,signature,'EXECUTE')
+ )
  FROM pg_roles r WHERE r.rolname=current_user`).Scan(&safe, &ready)
 	if err != nil || !safe || !ready {
 		return errors.New("restricted Storage role and schema 072 required")

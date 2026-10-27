@@ -3,6 +3,10 @@
 -- The role must be fresh, NOSUPERUSER NOCREATEDB NOCREATEROLE NOBYPASSRLS,
 -- have no parent role memberships, own no application objects and receive no
 -- default table privileges. Do not reuse the API/Worker database identity.
+-- Startup also rejects CREATE on the active metadata schema and any parent-role
+-- membership, including NOINHERIT membership that could permit SET ROLE.
+-- Each listed table/column grant and each row-lock EXECUTE is required: granting
+-- only SELECT without INSERT must not pass startup/readiness.
 GRANT USAGE ON SCHEMA public TO :"gateway_role";
 GRANT SELECT ON schema_migrations,projects,branches,endpoints,object_storage_instances,
  organizations,organization_members,project_grants,backend_credentials,backend_storage_signing TO :"gateway_role";

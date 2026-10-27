@@ -7,7 +7,7 @@ Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适
 
 功能进度与当前优先级见 [已验收/剩余清单](docs/FUNCTIONAL-STATUS-2026-10-21.md)：22 组固定基础已有回执；五组专项后置，五组业务及三组运维/TLS/发行继续。复用来源未变的既有验收。
 
-最新开发增量：2026-10-27 [独立 Edge 部署与传输验收](docs/DELIVERY-2026-10-27-EDGE-BOOTSTRAP.md)：专用 mTLS 正反例、无 token 进程和入口切换已验收，新增 A/B 工具三组自检通过；客户执行、计量及版本切换继续。
+最新开发增量：2026-10-27 [Functions 执行与用量](docs/DELIVERY-2026-10-27-FUNCTION-EXECUTION.md)：原 canary 的 A/B/回滚三轮 HTTP、SSE、WebSocket 和可信资源观察已验收，原代码与 SQL 恢复；用量界面、最终保全及 Storage 网关接管继续。构建交 GitHub CI，D 盘保持至少 40GiB 空闲。
 
 最新部署：Core 195 / schema 073 / Native Storage 7；API/Worker 源码 `b45365f`，独立 Functions Edge 已启用，Storage 仍为旧入口。070–073 已应用并冻结，具体保全与验收范围见上述报告。
 

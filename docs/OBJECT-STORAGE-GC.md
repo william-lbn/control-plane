@@ -67,12 +67,32 @@ DELETE 后必须再次 HEAD 确认 `NoSuchKey` 才记 `deleted`。网络错误/�
 
 `storage_gc_proof.go` 定义内部 adapter 合同和严格检查，`assets/storage-gc.sql` 是只读 current-directory inventory 组件，**不是原生格式升级，也不能单独证明历史无引用**。没有用户可提交 proof 的 HTTP 接口，没有 bypass 开关。
 
-完整回收要求 native authority 提供受栅栏保护的全部 Timeline 清单，包括当前、子分支、已保留删除、reset 备份、离线和 metadata 未映射的 Timeline；每个 Timeline 下所有数据库都需完成身份核验和完整引用扫描。必须覆盖 objects、所有状态 multipart_parts、其他物理引用与未知结果；当前目录无引用的已提交观察 LSN 必须严格早于该 Timeline 的有效 `min_readable_lsn`。LSN 用数值比较；有效边界必须包含 PITR、保留窗口、子分支和 lease pins。栅栏需一直保持到 DELETE，阻止新增引用/克隆/reset/旧 LSN lease。缺项、离线、未知、未保护的并发、重复/循环身份或任一引用都拒绝。
+完整回收要求 native authority 提供受栅栏保护的全部 Timeline 清单，包括当前、子分支、已保留删除、reset 备份、离线和 metadata 未映射的 Timeline；每个 Timeline 下所有数据库都需完成身份核验和完整引用扫描。必须覆盖 objects、所有状态 multipart_parts、其他物理引用与未知结果；当前目录无引用的保守观察上界必须严格早于该 Timeline 包含全部 pins 的有效 deletion-safe horizon。LSN 用数值比较；不能直接把现有 `min_readable_lsn` 当作包含全部旧 lease 的物理删除边界。栅栏需一直保持到 DELETE，阻止新增引用/克隆/reset/旧 LSN lease。缺项、离线、未知、未保护的并发、重复/循环身份或任一引用都拒绝。
 
 现有 deployed API 尚无这样的完整 inventory/fence/horizon 联合证明，`nativeStorageGCProof` 明确返回 unavailable。`may_reference` 没有转换为 orphan 的路径；metadata branch 列表、项目过期、墙钟年龄、applied GC cutoff 和一次 current manifest 查询都不能替代该证明。完整已发布历史回收仍需 native 实现与独立新增功能验收，不能以本增量关闭 S03。
 
-## 新增验证与验收边界
+## 已落地但未激活的历史回收 v1
 
-新增 `TestStorageGC*` 单元组覆盖 ownership、重复 marker、错 size/version、权限/网络未知、DELETE 后确认、namespace/store 隔离，以及历史/子分支/retained/MPU/未知结果/数值 LSN/不完整 inventory/fence 等 proof 拒绝路径。新增 `TestStorageGCPostgres*` 只在独立 `control_ci` schema 中验证前置登记、终态证据、计划幂等/冲突、权限/跨项目拒绝、执行重放和未知结果核对；backing 是专用测试 HTTP/fake，不接触 live 业务对象。
+`074_storage_gc_history_proofs.sql` 仅追加控制面不可变 proof/intent/result 证据表；未修改 070–073，也未在集群应用。独立 `assets/storage-gc-history.sql` 是显式 opt-in 的 GC history instrumentation v1，installation authority 固定 `version=1/base_format=7/project/incarnation/schema_sha256`。原生 Storage 7 的 enable、replay、普通 PUT、gateway 初始化均不调用它，也不新增 gateway metadata 权限。当前 public GC 路由仍只回收 `never_published`，返回的 `published_history_gc=held_native_proof_unavailable` 保持真实。
+
+这次新增的实装包括独立 native SQL installer、真实 PostgreSQL table-lock/epoch reader、跨 snapshot 证明引擎、持久 quarantine、控制面追加证据和内部 collector pipeline；不是仅新增一个 accepts-proof validator。生产 native authority 仍明确 unavailable，没有 HTTP proof 上传或启用开关，因此不能把本代码增量记为 published/history GC 运行闭环。
+
+每个 `objects` / `multipart_parts` INSERT、指针替换 UPDATE、DELETE 都由 ALWAYS row trigger 在同一事务增加对应 blob 的 epoch，COPY 和导入的正常行写入也经过同一路径。一次“出现又删除”会增加 epoch；整笔回滚则 pointer 和 epoch 一并回滚。所有状态的 multipart parts 都算真实引用，abort/completed 不作省略。没有实现的 version-history/新引用表、字段或原生格式会被精确 Native7 表/列 allowlist 拒绝，不被 installer 静默收编。
+
+首轮在真实 SHARE table locks 下读取完整当前引用、epoch、installation 和 schema/ACL/function/trigger fingerprint，再读取 `pg_current_wal_insert_lsn()` 作为保守**观察上界**。它不是 mutation 的 commit LSN，不据此判断某笔未知事务提交。先前未决引用写入被表锁等待；之后才提交的引用必然改变 epoch。次轮必须在同一 native topology revision 下覆盖所有原 scope，确认 epoch/incarnation/fingerprint 不变、当前仍无引用，并要求每个 shard 的保守有效下界严格越过该首轮上界。下界取 planned、applied 和全部 child/lease/restore/standby pins 的数值最小值；完整性未知、旧 lease、offload 不可读、creating/importing、缺数据库或任一 generation 变化均 hold。
+
+执行还以项目行 `FOR NO KEY UPDATE` 排空所有现有 API/gateway 的项目 `FOR SHARE` I/O 准入锁，阻止新的对象读写，并保持操作员与 allocation 锁至结束。NO KEY UPDATE 允许独立证据连接的外键 KEY SHARE 校验，避免自相阻挡。该控制面 I/O 排空不能替代原生拓扑/lease 栅栏。
+
+临时 SHARE 锁不能单独覆盖 S3 DELETE：锁连接可能在请求期间断开。内部 pipeline 因此先提交不可变意图，调用 native authority 持久登记全局 retirement，再在每个当前数据库提交不可逆 per-blob quarantine。ALWAYS trigger 拒绝 retired key 的重引入，即使 SQL 锁已经释放、甚至 session 处于 replica mode；任一部分 quarantine 未确认就不删除。原 `may_reference` 分配终态始终不被降级。原计划/意图/结果保留，未知 DELETE 可以对原 baseline 重查确切 backing 身份和不存在状态。
+
+普通 writer 只需原有对象/parts DML，不能直接写 epochs、删除 retirement、调用内部 trigger function、TRUNCATE 绕开行追踪或 disable trigger。installer 拒绝非预期默认写权限；reader 对 relation owner、ACL、函数源码/search_path/SECURITY DEFINER、trigger enabled 状态、所有列和约束做 attestation。`control_probe` / 数据库 superuser 属于可信平台边界：拥有对象或超级权限者本就能 DROP/重写存储系统，不能宣称 SQL trigger 能抵御恶意 superuser。普通应用 SQL 身份不可获得这些权限；观察到 instrumentation 变化时失败关闭，不重装覆盖原 authority。
+
+**仍缺的 upstream/native 接口**：`storageGCHistoryAuthority.WithFence` 的生产实现必须原子覆盖 controller attachment generations 和所有 shard、attached/offloaded/creating/importing/detached 状态及所有数据库；连续阻挡相关拓扑、restore、lease 和发布竞争，并持久保存全局 per-key retirement。未来从 quarantine WAL 之前创建的 clone/PITR/import/attach，也必须在任何 SQL 开放前安装该 deny。不能依靠客户端锁/一次 HEAD/一个即将到期的 token 作此保证。当前本地 Neon 的 `timeline_and_offloaded` 分两次取 map、不含完整 creating/importing；`min_readable_lsn=max(planned,applied)` 明确不覆盖仍有效的旧 lease；二者都不足以实现上述 authority。当前 provider 因而保持 unavailable，任何内部调用只留下 held 证据，不开启物理删除。
+
+新增 `TestStorageGCHistory*` 两个 pure / 四个 PostgreSQL 组分别验证双 snapshot 的 transient reintroduction、全类 pins/全 shard/拓扑缺项、scope lease 生命周期，以及真实 SQL epoch 原子性、共享 COPY、rollback、持久 quarantine/replica 模式、受限角色、独立连接阻挡、未知版本表/被禁 trigger 拒绝、不可变 proof 日志、意图先于 DELETE 和中断结果保留。Native authority 在 pipeline 测试中是显式协议模型；这些测试不代表真实 upstream endpoint 已实现。新组尚未执行，构建与功能结果由后续 CI 回执记录；既有已通过的 orphan/用量业务组不重复运行。
+
+## 已有 orphan 增量验证与验收边界
+
+既有 `TestStorageGC*` 单元组覆盖 ownership、重复 marker、错 size/version、权限/网络未知、DELETE 后确认、namespace/store 隔离，以及历史/子分支/retained/MPU/未知结果/数值 LSN/不完整 inventory/fence 等 proof 拒绝路径。既有 `TestStorageGCPostgres*` 只在独立 `control_ci` schema 中验证前置登记、终态证据、计划幂等/冲突、权限/跨项目拒绝、执行重放和未知结果核对；backing 是专用测试 HTTP/fake，不接触 live 业务对象。
 
 主代理已完成 4 组新增纯函数、5 组 PostgreSQL 检查、vet 和相关编译，详见 2026-10-27 增量回执。尚未部署或执行 live 删除；源码检查不替代实机证据。现场物理删除功能只允许使用全新专用 project、allocation 和 backing bytes；既有业务数据、原 Secret/PVC、历史对象均保持。吞吐、压力、完整 5 GiB、跨实例故障可靠性、HA/DR 与完整历史 GC 另有门槛。

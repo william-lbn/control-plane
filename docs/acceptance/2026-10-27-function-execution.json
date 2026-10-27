@@ -1,0 +1,189 @@
+{
+  "result": "pass",
+  "status": "execution_verified_ui_and_final_guard_pending",
+  "stages": [
+    {
+      "binding": {
+        "project": "prj_49cbd55439af9b94",
+        "branch": "br_49cbd55439af9b94",
+        "function_id": "fnc_8af2a6cda36ff9a6",
+        "deployment_id": "fdp_2cea68b2a8aafb77",
+        "version": "A",
+        "stage": "probe-a"
+      },
+      "checks": [
+        "http_version_body",
+        "sse_first_chunk_before_release",
+        "websocket_protocol_text_binary_close",
+        "bounded_resource_fixture",
+        "trusted_receipts_original_boot_counters"
+      ],
+      "receipts": [
+        {
+          "request_id": "fer_f630ca4b9593649d47cdc7e5",
+          "deployment_id": "fdp_2cea68b2a8aafb77"
+        },
+        {
+          "request_id": "fer_a93280de1bb16e588432e6c1",
+          "deployment_id": "fdp_2cea68b2a8aafb77"
+        },
+        {
+          "request_id": "fer_a832819cf72e766ef4ae691d",
+          "deployment_id": "fdp_2cea68b2a8aafb77"
+        },
+        {
+          "request_id": "fer_b4e983a2e4b4a5a6afe53d58",
+          "deployment_id": "fdp_2cea68b2a8aafb77"
+        }
+      ],
+      "observation": {
+        "completion_receipts": 5,
+        "boots": [
+          "444955c9c50ede18c01ecc504b890ead"
+        ],
+        "samples": [
+          53
+        ],
+        "source": "authenticated_supervisor_cgroup_v2"
+      }
+    },
+    {
+      "binding": {
+        "project": "prj_49cbd55439af9b94",
+        "branch": "br_49cbd55439af9b94",
+        "function_id": "fnc_8af2a6cda36ff9a6",
+        "deployment_id": "fdp_200397ce8b7a98f5",
+        "version": "B",
+        "stage": "probe-b"
+      },
+      "checks": [
+        "http_version_body",
+        "sse_first_chunk_before_release",
+        "websocket_protocol_text_binary_close",
+        "bounded_resource_fixture",
+        "trusted_receipts_original_boot_counters"
+      ],
+      "receipts": [
+        {
+          "request_id": "fer_8da47f99768455ff0dd9bd86",
+          "deployment_id": "fdp_200397ce8b7a98f5"
+        },
+        {
+          "request_id": "fer_73ad9e6e1b7db22001284b54",
+          "deployment_id": "fdp_200397ce8b7a98f5"
+        },
+        {
+          "request_id": "fer_80d753735ef632b1f16337a5",
+          "deployment_id": "fdp_200397ce8b7a98f5"
+        },
+        {
+          "request_id": "fer_504e523b93c4c74f5aac1031",
+          "deployment_id": "fdp_200397ce8b7a98f5"
+        }
+      ],
+      "observation": {
+        "completion_receipts": 12,
+        "boots": [
+          "36ad10996986a3bc34b3e34a85b53559"
+        ],
+        "samples": [
+          13
+        ],
+        "source": "authenticated_supervisor_cgroup_v2"
+      }
+    },
+    {
+      "binding": {
+        "project": "prj_49cbd55439af9b94",
+        "branch": "br_49cbd55439af9b94",
+        "function_id": "fnc_8af2a6cda36ff9a6",
+        "deployment_id": "fdp_3740de65982352c9",
+        "version": "A",
+        "stage": "probe-rollback-a"
+      },
+      "checks": [
+        "http_version_body",
+        "sse_first_chunk_before_release",
+        "websocket_protocol_text_binary_close",
+        "bounded_resource_fixture",
+        "trusted_receipts_original_boot_counters"
+      ],
+      "receipts": [
+        {
+          "request_id": "fer_668aa9e83926f6ddce32c2eb",
+          "deployment_id": "fdp_3740de65982352c9"
+        },
+        {
+          "request_id": "fer_c58df132a73178afb74ab47b",
+          "deployment_id": "fdp_3740de65982352c9"
+        },
+        {
+          "request_id": "fer_b9e23e066f76c4ffceeefcd7",
+          "deployment_id": "fdp_3740de65982352c9"
+        },
+        {
+          "request_id": "fer_b6116f8040f2d71cb4f5aacb",
+          "deployment_id": "fdp_3740de65982352c9"
+        }
+      ],
+      "observation": {
+        "completion_receipts": 17,
+        "boots": [
+          "8a2ca5b4ae25cac3ad0f0a3a66e72c51"
+        ],
+        "samples": [
+          12
+        ],
+        "source": "authenticated_supervisor_cgroup_v2"
+      }
+    }
+  ],
+  "active_stream_redeploy_rejected_409": true,
+  "original_bundle_digest": "ca92c3c4861e0e28cbcc397cefb05a8b76c661e493339aa77bcd5973af492da5",
+  "original_sql_generation": 2,
+  "original_sql_public_and_console": [
+    {
+      "http_status": 200,
+      "database": "catalog_backend_renamed",
+      "rows": 1
+    },
+    {
+      "http_status": 200,
+      "database": "catalog_backend_renamed",
+      "rows": 1
+    }
+  ],
+  "original_bundle_environment_restored": true,
+  "effective_public_idle_policy_restored": true,
+  "original_policy_flags_absent_in_snapshot": true,
+  "owned_function_and_writer_stopped": true,
+  "performance_reliability_tests_run": false,
+  "credential_values_exported": false,
+  "date": "2026-10-27",
+  "core_revision": 196,
+  "metadata_schema": 73,
+  "native_storage_format": 7,
+  "new_ui_compile_and_live_check": "pending",
+  "new_gateway_ci_and_takeover": "pending",
+  "final_preservation_and_logout": "pending",
+  "original_policy_row_proof": "pending",
+  "accepted_baseline_groups": 22,
+  "business_groups_open": [
+    "S03",
+    "S05",
+    "L02",
+    "L03",
+    "F06"
+  ],
+  "other_groups_open": [
+    "O01",
+    "T01",
+    "O02"
+  ],
+  "source_ci": {
+    "commit": "4e6f95f80f98a053223b9dcb7c6df4a028796e61",
+    "run_id": 40404830036,
+    "checks": 15,
+    "conclusion": "success"
+  }
+}
