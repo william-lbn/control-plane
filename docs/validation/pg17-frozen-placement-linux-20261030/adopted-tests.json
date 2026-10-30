@@ -1,0 +1,508 @@
+[
+  {
+    "root": "TestDSGAFiniteTaskLimitSurvivesFrozenPlanAndRunner",
+    "status": "pass",
+    "report": "/data/neon-build/validation/pg17-control-placement-20261030t132340z",
+    "terminal_cases": [
+      {
+        "name": "TestDSGAFiniteTaskLimitSurvivesFrozenPlanAndRunner",
+        "status": "pass",
+        "elapsed": 0.01
+      }
+    ],
+    "classification": "PG17-U-CP-PLACEMENT"
+  },
+  {
+    "root": "TestDSGAProjectPublicAcceptanceAndImmutableReplay",
+    "status": "pass",
+    "report": "/data/neon-build/validation/pg17-control-placement-20261030t132340z",
+    "terminal_cases": [
+      {
+        "name": "TestDSGAProjectPublicAcceptanceAndImmutableReplay",
+        "status": "pass",
+        "elapsed": 0.93
+      }
+    ],
+    "classification": "PG17-S-CP-PLACEMENT"
+  },
+  {
+    "root": "TestDSGAReservationVM2ForwardMigrationPreservesOriginalAndRejectsPartial",
+    "status": "pass",
+    "report": "/data/neon-build/validation/pg17-control-placement-20261030t132340z",
+    "terminal_cases": [
+      {
+        "name": "TestDSGAReservationVM2ForwardMigrationPreservesOriginalAndRejectsPartial",
+        "status": "pass",
+        "elapsed": 0.62
+      }
+    ],
+    "classification": "PG17-S-CP-PLACEMENT"
+  },
+  {
+    "root": "TestDSGAReservationVM3ForwardMigrationPreservesV1V2AndRequiresPlacement",
+    "status": "pass",
+    "report": "/data/neon-build/validation/pg17-control-placement-20261030t132907z",
+    "terminal_cases": [
+      {
+        "name": "TestDSGAReservationVM3ForwardMigrationPreservesV1V2AndRequiresPlacement/unknown_version",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAReservationVM3ForwardMigrationPreservesV1V2AndRequiresPlacement/missing_placement",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAReservationVM3ForwardMigrationPreservesV1V2AndRequiresPlacement/null_placement",
+        "status": "pass",
+        "elapsed": 0.01
+      },
+      {
+        "name": "TestDSGAReservationVM3ForwardMigrationPreservesV1V2AndRequiresPlacement/bad_selector",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAReservationVM3ForwardMigrationPreservesV1V2AndRequiresPlacement/empty_hosts",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAReservationVM3ForwardMigrationPreservesV1V2AndRequiresPlacement/duplicate_hosts",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAReservationVM3ForwardMigrationPreservesV1V2AndRequiresPlacement/null_host",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAReservationVM3ForwardMigrationPreservesV1V2AndRequiresPlacement/missing_limits",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAReservationVM3ForwardMigrationPreservesV1V2AndRequiresPlacement",
+        "status": "pass",
+        "elapsed": 0.7
+      }
+    ],
+    "classification": "PG17-S-CP-PLACEMENT"
+  },
+  {
+    "root": "TestDSGAResourcePolicySnapshotOwnsLimitsAndPools",
+    "status": "pass",
+    "report": "/data/neon-build/validation/pg17-control-placement-20261030t132340z",
+    "terminal_cases": [
+      {
+        "name": "TestDSGAResourcePolicySnapshotOwnsLimitsAndPools",
+        "status": "pass",
+        "elapsed": 0
+      }
+    ],
+    "classification": "PG17-U-CP-PLACEMENT"
+  },
+  {
+    "root": "TestDSGAResourcePublicPolicyRequiresV3PlacementBeforeReservation",
+    "status": "pass",
+    "report": "/data/neon-build/validation/pg17-control-placement-20261030t132907z",
+    "terminal_cases": [
+      {
+        "name": "TestDSGAResourcePublicPolicyRequiresV3PlacementBeforeReservation/historical_v1",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAResourcePublicPolicyRequiresV3PlacementBeforeReservation/complete_v2_without_placement",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAResourcePublicPolicyRequiresV3PlacementBeforeReservation/v3_missing_placement",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAResourcePublicPolicyRequiresV3PlacementBeforeReservation",
+        "status": "pass",
+        "elapsed": 0
+      }
+    ],
+    "classification": "PG17-U-CP-PLACEMENT"
+  },
+  {
+    "root": "TestDSGAResourceRendererOriginalPairAndRunnerContract",
+    "status": "pass",
+    "report": "/data/neon-build/validation/pg17-control-placement-20261030t132340z",
+    "terminal_cases": [
+      {
+        "name": "TestDSGAResourceRendererOriginalPairAndRunnerContract",
+        "status": "pass",
+        "elapsed": 0.01
+      }
+    ],
+    "classification": "PG17-U-CP-PLACEMENT"
+  },
+  {
+    "root": "TestDSGAResourceRendererRejectsPartialAndHistoricalBudget",
+    "status": "pass",
+    "report": "/data/neon-build/validation/pg17-control-placement-20261030t132340z",
+    "terminal_cases": [
+      {
+        "name": "TestDSGAResourceRendererRejectsPartialAndHistoricalBudget/historical",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAResourceRendererRejectsPartialAndHistoricalBudget/missing",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAResourceRendererRejectsPartialAndHistoricalBudget/over_guest",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAResourceRendererRejectsPartialAndHistoricalBudget/undersized",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAResourceRendererRejectsPartialAndHistoricalBudget/zero_outside",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAResourceRendererRejectsPartialAndHistoricalBudget/duplicate_pool",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAResourceRendererRejectsPartialAndHistoricalBudget",
+        "status": "pass",
+        "elapsed": 0.01
+      }
+    ],
+    "classification": "PG17-U-CP-PLACEMENT"
+  },
+  {
+    "root": "TestDSGASystemChargedDomainSurvivesOriginalPlanAndRunner",
+    "status": "pass",
+    "report": "/data/neon-build/validation/pg17-control-placement-20261030t132340z",
+    "terminal_cases": [
+      {
+        "name": "TestDSGASystemChargedDomainSurvivesOriginalPlanAndRunner",
+        "status": "pass",
+        "elapsed": 0.01
+      }
+    ],
+    "classification": "PG17-U-CP-PLACEMENT"
+  },
+  {
+    "root": "TestDSGAVM2UnboundRecoveryNeverPostsAndBoundRecoveryNeverAdoptsPlacement",
+    "status": "pass",
+    "report": "/data/neon-build/validation/pg17-control-placement-20261030t132340z",
+    "terminal_cases": [
+      {
+        "name": "TestDSGAVM2UnboundRecoveryNeverPostsAndBoundRecoveryNeverAdoptsPlacement",
+        "status": "pass",
+        "elapsed": 1
+      }
+    ],
+    "classification": "PG17-S-CP-PLACEMENT"
+  },
+  {
+    "root": "TestDSGAVM3FreezesSysfsPlacementAndRejectsRuntimeDrift",
+    "status": "pass",
+    "report": "/data/neon-build/validation/pg17-control-placement-20261030t132340z",
+    "terminal_cases": [
+      {
+        "name": "TestDSGAVM3FreezesSysfsPlacementAndRejectsRuntimeDrift/missing_selector",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVM3FreezesSysfsPlacementAndRejectsRuntimeDrift/host",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVM3FreezesSysfsPlacementAndRejectsRuntimeDrift/or_arch_bypass",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVM3FreezesSysfsPlacementAndRejectsRuntimeDrift/qmp",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVM3FreezesSysfsPlacementAndRejectsRuntimeDrift/pool",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVM3FreezesSysfsPlacementAndRejectsRuntimeDrift",
+        "status": "pass",
+        "elapsed": 0.01
+      }
+    ],
+    "classification": "PG17-U-CP-PLACEMENT"
+  },
+  {
+    "root": "TestDSGAVM3RejectsIncompletePlacementBeforeProducingTemplate",
+    "status": "pass",
+    "report": "/data/neon-build/validation/pg17-control-placement-20261030t132340z",
+    "terminal_cases": [
+      {
+        "name": "TestDSGAVM3RejectsIncompletePlacementBeforeProducingTemplate/bad_label",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVM3RejectsIncompletePlacementBeforeProducingTemplate/bad_value",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVM3RejectsIncompletePlacementBeforeProducingTemplate/two_hosts",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVM3RejectsIncompletePlacementBeforeProducingTemplate/invalid_host",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVM3RejectsIncompletePlacementBeforeProducingTemplate/v2_hidden_placement",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVM3RejectsIncompletePlacementBeforeProducingTemplate/unknown_version",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVM3RejectsIncompletePlacementBeforeProducingTemplate/missing",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVM3RejectsIncompletePlacementBeforeProducingTemplate/missing_pool",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVM3RejectsIncompletePlacementBeforeProducingTemplate/wrong_os",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVM3RejectsIncompletePlacementBeforeProducingTemplate/wrong_arch",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVM3RejectsIncompletePlacementBeforeProducingTemplate/no_hosts",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVM3RejectsIncompletePlacementBeforeProducingTemplate/four_hosts",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVM3RejectsIncompletePlacementBeforeProducingTemplate/duplicate",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVM3RejectsIncompletePlacementBeforeProducingTemplate/missing_selector",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVM3RejectsIncompletePlacementBeforeProducingTemplate",
+        "status": "pass",
+        "elapsed": 0.01
+      }
+    ],
+    "classification": "PG17-U-CP-PLACEMENT"
+  },
+  {
+    "root": "TestDSGAVM3SnapshotOwnsPlacementAndHistoricalVersionsStayFrozen",
+    "status": "pass",
+    "report": "/data/neon-build/validation/pg17-control-placement-20261030t132907z",
+    "terminal_cases": [
+      {
+        "name": "TestDSGAVM3SnapshotOwnsPlacementAndHistoricalVersionsStayFrozen",
+        "status": "pass",
+        "elapsed": 0
+      }
+    ],
+    "classification": "PG17-U-CP-PLACEMENT"
+  },
+  {
+    "root": "TestDSGAVMProductionBindingResumesUnknownConfigAndNeverRecreatesBoundUID",
+    "status": "pass",
+    "report": "/data/neon-build/validation/pg17-control-placement-20261030t132340z",
+    "terminal_cases": [
+      {
+        "name": "TestDSGAVMProductionBindingResumesUnknownConfigAndNeverRecreatesBoundUID",
+        "status": "pass",
+        "elapsed": 1.03
+      }
+    ],
+    "classification": "PG17-S-CP-PLACEMENT"
+  },
+  {
+    "root": "TestDSGAVMRecoveryRejectsStartupDriftAndAllowsOnlyRuntimeUse",
+    "status": "pass",
+    "report": "/data/neon-build/validation/pg17-control-placement-20261030t132340z",
+    "terminal_cases": [
+      {
+        "name": "TestDSGAVMRecoveryRejectsStartupDriftAndAllowsOnlyRuntimeUse/command",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVMRecoveryRejectsStartupDriftAndAllowsOnlyRuntimeUse/mount",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVMRecoveryRejectsStartupDriftAndAllowsOnlyRuntimeUse/memory_bounds",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVMRecoveryRejectsStartupDriftAndAllowsOnlyRuntimeUse/bootstrap",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVMRecoveryRejectsStartupDriftAndAllowsOnlyRuntimeUse/tls",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVMRecoveryRejectsStartupDriftAndAllowsOnlyRuntimeUse/account",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVMRecoveryRejectsStartupDriftAndAllowsOnlyRuntimeUse/memory_use",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVMRecoveryRejectsStartupDriftAndAllowsOnlyRuntimeUse/cpu_use",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVMRecoveryRejectsStartupDriftAndAllowsOnlyRuntimeUse/image",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVMRecoveryRejectsStartupDriftAndAllowsOnlyRuntimeUse",
+        "status": "pass",
+        "elapsed": 0
+      }
+    ],
+    "classification": "PG17-U-CP-PLACEMENT"
+  },
+  {
+    "root": "TestDSGAVMTemplateFreezesOfficialRuntimeAndTLS",
+    "status": "pass",
+    "report": "/data/neon-build/validation/pg17-control-placement-20261030t132340z",
+    "terminal_cases": [
+      {
+        "name": "TestDSGAVMTemplateFreezesOfficialRuntimeAndTLS",
+        "status": "pass",
+        "elapsed": 0.01
+      }
+    ],
+    "classification": "PG17-U-CP-PLACEMENT"
+  },
+  {
+    "root": "TestDSGAVMTemplateRejectsUnfrozenAndCRDIncompatibleInputs",
+    "status": "pass",
+    "report": "/data/neon-build/validation/pg17-control-placement-20261030t132340z",
+    "terminal_cases": [
+      {
+        "name": "TestDSGAVMTemplateRejectsUnfrozenAndCRDIncompatibleInputs/architecture",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVMTemplateRejectsUnfrozenAndCRDIncompatibleInputs/scheduler",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVMTemplateRejectsUnfrozenAndCRDIncompatibleInputs/account",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVMTemplateRejectsUnfrozenAndCRDIncompatibleInputs/slot_513",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVMTemplateRejectsUnfrozenAndCRDIncompatibleInputs/missing_profile",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVMTemplateRejectsUnfrozenAndCRDIncompatibleInputs/kernel_tag",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVMTemplateRejectsUnfrozenAndCRDIncompatibleInputs/disk_overflow",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVMTemplateRejectsUnfrozenAndCRDIncompatibleInputs/disk_rounding",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVMTemplateRejectsUnfrozenAndCRDIncompatibleInputs/issuer",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVMTemplateRejectsUnfrozenAndCRDIncompatibleInputs/unroutable_endpoint",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVMTemplateRejectsUnfrozenAndCRDIncompatibleInputs/missing_credentials",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVMTemplateRejectsUnfrozenAndCRDIncompatibleInputs/runner_tag",
+        "status": "pass",
+        "elapsed": 0
+      },
+      {
+        "name": "TestDSGAVMTemplateRejectsUnfrozenAndCRDIncompatibleInputs",
+        "status": "pass",
+        "elapsed": 0.01
+      }
+    ],
+    "classification": "PG17-U-CP-PLACEMENT"
+  }
+]

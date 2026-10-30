@@ -26,7 +26,7 @@ func TestDSGAReservationVM2ForwardMigrationPreservesOriginalAndRejectsPartial(t 
 	f.exec(strings.Replace(text[start:end], "CREATE FUNCTION", "CREATE OR REPLACE FUNCTION", 1))
 	p, _, plan := dsgaPlanFixture(t)
 	plan.VM = dsgaVMProfileFixture()
-	plan.VM.ProtocolVersion, plan.VM.ResourceLimits = 1, nil
+	plan.VM.ProtocolVersion, plan.VM.ResourceLimits, plan.VM.Placement = 1, nil, nil
 	draft := dsgaCreationDraft{1, "historical", "main", "test-region", p, plan}
 	raw, err := json.Marshal(draft)
 	if err != nil {
@@ -60,6 +60,7 @@ func TestDSGAReservationVM2ForwardMigrationPreservesOriginalAndRejectsPartial(t 
 		t.Fatal("new v1 reservation bypassed v2 producer contract")
 	}
 	plan.VM = dsgaVMProfileFixture()
+	plan.VM.ProtocolVersion, plan.VM.Placement = 2, nil
 	draft.Plan = plan
 	draft.ResourceName = "current"
 	raw, err = json.Marshal(draft)

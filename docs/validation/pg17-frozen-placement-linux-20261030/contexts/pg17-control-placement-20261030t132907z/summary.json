@@ -1,0 +1,68 @@
+{
+  "id": "PG17-CP-PLACEMENT",
+  "source_start": {
+    "commit": "d84c0b73004a7d8cc3e89f3c3f0e3f06cfa8cba9",
+    "branch": "codex/dsga-control-plane-v3-20261020",
+    "status": "## codex/dsga-control-plane-v3-20261020...origin/codex/dsga-control-plane-v3-20261020\n M api/internal/control/dsga_creation_credentials_test.go\n M api/internal/control/dsga_project_reservation.go\n M api/internal/control/dsga_reservation_vm_v2_test.go\n M api/internal/control/dsga_resource_renderer_test.go\n M api/internal/control/dsga_vm.go\n M api/internal/control/dsga_vm_test.go\n?? api/internal/control/dsga_placement.go\n?? api/internal/control/dsga_placement_test.go\n?? api/internal/control/dsga_reservation_vm_v3_test.go\n?? api/internal/control/migrations/900000067_dsga_reservation_vm_v3_placement.sql",
+    "go_mod_sha256": "ddff7ecb9b262cbaf528f635b7c81f9248fcafb5314c30297d6752d6e97566dd",
+    "go_sum_sha256": "2a02fdfec9d6a72bab97603094b2d5ad832319c7f38dcd4cb1fb94fa40c53943"
+  },
+  "source_end": {
+    "commit": "d84c0b73004a7d8cc3e89f3c3f0e3f06cfa8cba9",
+    "branch": "codex/dsga-control-plane-v3-20261020",
+    "status": "## codex/dsga-control-plane-v3-20261020...origin/codex/dsga-control-plane-v3-20261020\n M api/internal/control/dsga_creation_credentials_test.go\n M api/internal/control/dsga_project_reservation.go\n M api/internal/control/dsga_reservation_vm_v2_test.go\n M api/internal/control/dsga_resource_renderer_test.go\n M api/internal/control/dsga_vm.go\n M api/internal/control/dsga_vm_test.go\n?? api/internal/control/dsga_placement.go\n?? api/internal/control/dsga_placement_test.go\n?? api/internal/control/dsga_reservation_vm_v3_test.go\n?? api/internal/control/migrations/900000067_dsga_reservation_vm_v3_placement.sql",
+    "go_mod_sha256": "ddff7ecb9b262cbaf528f635b7c81f9248fcafb5314c30297d6752d6e97566dd",
+    "go_sum_sha256": "2a02fdfec9d6a72bab97603094b2d5ad832319c7f38dcd4cb1fb94fa40c53943"
+  },
+  "command": [
+    "go",
+    "test",
+    "-mod=readonly",
+    "-json",
+    "-race",
+    "-count=1",
+    "-p=2",
+    "-timeout=20m",
+    "./internal/control",
+    "-run",
+    "^(TestDSGAResourcePublicPolicyRequiresV3PlacementBeforeReservation|TestDSGAVM3SnapshotOwnsPlacementAndHistoricalVersionsStayFrozen|TestDSGAReservationVM3ForwardMigrationPreservesV1V2AndRequiresPlacement)$"
+  ],
+  "elapsed_wall_seconds": 29.61494210100136,
+  "exit_code": 0,
+  "toolchain": {
+    "go_env": {
+      "CGO_ENABLED": "1",
+      "GOARCH": "amd64",
+      "GOCACHE": "/root/.cache/go-build",
+      "GOMODCACHE": "/go/pkg/mod",
+      "GOOS": "linux",
+      "GOPATH": "/go",
+      "GOVERSION": "go1.27.1"
+    },
+    "go_version": "go version go1.27.1 linux/amd64",
+    "kernel": "6.8.0-147-generic"
+  },
+  "source_manifest": {
+    "count": 1026,
+    "sha256": "c8caa23613a7842d366bf05a0c85e4d2cf851e9c328a46d156a62944ec7a07d3"
+  },
+  "source_manifest_verified": true,
+  "counts": {
+    "root": {
+      "pass": 3,
+      "fail": 0,
+      "skip": 0
+    },
+    "subcase": {
+      "pass": 11,
+      "fail": 0,
+      "skip": 0
+    }
+  },
+  "missing_roots": [],
+  "unexpected_roots": [],
+  "module_unchanged": true,
+  "test_boundary": "仅本功能/直接影响renderer、原计划、绑定恢复和前向迁移根；专用真实metadata PG17/schema，Kube为TLS peer；DB fsync=off不作为持久/崩溃证据，不是集群/E2E。",
+  "report": "/data/neon-build/validation/pg17-control-placement-20261030t132907z",
+  "passed": true
+}

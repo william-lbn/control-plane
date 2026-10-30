@@ -1,0 +1,47 @@
+{
+  "id": "PG17-FROZEN-PLACEMENT-LINUX-20261030",
+  "passed": true,
+  "counts": {
+    "root": {
+      "pass": 17,
+      "fail": 0,
+      "skip": 0
+    },
+    "subcase": {
+      "pass": 57,
+      "fail": 0,
+      "skip": 0
+    }
+  },
+  "state": {
+    "commit": "d84c0b73004a7d8cc3e89f3c3f0e3f06cfa8cba9",
+    "branch": "codex/dsga-control-plane-v3-20261020",
+    "status": "M api/internal/control/dsga_creation_credentials_test.go\n M api/internal/control/dsga_project_reservation.go\n M api/internal/control/dsga_reservation_vm_v2_test.go\n M api/internal/control/dsga_resource_renderer_test.go\n M api/internal/control/dsga_vm.go\n M api/internal/control/dsga_vm_test.go\n?? api/internal/control/dsga_placement.go\n?? api/internal/control/dsga_placement_test.go\n?? api/internal/control/dsga_reservation_vm_v3_test.go\n?? api/internal/control/migrations/900000067_dsga_reservation_vm_v3_placement.sql\n?? docs/validation/"
+  },
+  "source_contexts": [
+    {
+      "report": "/data/neon-build/validation/pg17-control-placement-20261030t132340z",
+      "manifest": {
+        "count": 1026,
+        "sha256": "fe69a1d8f94f9e02530d8282bc1c25718e0a0aa15202e94e13a137461deb76da"
+      },
+      "adopted_roots": 14
+    },
+    {
+      "report": "/data/neon-build/validation/pg17-control-placement-20261030t132907z",
+      "manifest": {
+        "count": 1026,
+        "sha256": "c8caa23613a7842d366bf05a0c85e4d2cf851e9c328a46d156a62944ec7a07d3"
+      },
+      "adopted_roots": 3
+    }
+  ],
+  "classification_counts": {
+    "PG17-U-CP-PLACEMENT": 12,
+    "PG17-S-CP-PLACEMENT": 5
+  },
+  "boundary": "单元/真实隔离metadata PG17及TLS Kube peer；未连接集群、未创建实际VM，不是KVM/物理内存E2E。元DBfsync=off仅语义加速，不证明崩溃持久性。",
+  "compatibility": "新生产policy/新reservation仅VM profile v3；历史v1只读，v2资源合同及已绑定同UID原QMP投影保留；v2未绑定prepareVM在任何Kube请求前拒绝。",
+  "module_changed": false,
+  "submitted_or_pushed_at_evidence_capture": false
+}

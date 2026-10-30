@@ -78,11 +78,16 @@ func TestDSGACredentialSourceSnapshotIsolationAndUnsafeInputs(t *testing.T) {
 // 来源，真实Bind回调固定VM/Config UID。所有敏感失败信息只报告错误类别。
 func credentialSourceFixture(t *testing.T, legacy ...bool) (context.Context, *server, string, *creationTestAPI, dsgaCreationInput, *dsgaCreationBinding, **core.Secret) {
 	t.Helper()
+	return credentialSourceFixtureWithVM(t, dsgaVMProfileFixture(), legacy...)
+}
+
+func credentialSourceFixtureWithVM(t *testing.T, profile dsgaVMProfile, legacy ...bool) (context.Context, *server, string, *creationTestAPI, dsgaCreationInput, *dsgaCreationBinding, **core.Secret) {
+	t.Helper()
 	ctx, s, old, f, input := dsgaBindingFixture(t)
 	p, policy, _ := dsgaPlanFixture(t)
 	p.ProjectID, p.BranchID, p.EndpointID, p.TenantID, p.TimelineID = input.Payload.ProjectID, input.Payload.BranchID, input.Payload.EndpointID, input.Payload.TenantID, input.Payload.TimelineID
 	policy.Namespace = f.kube.namespace
-	policy.VM = dsgaVMProfileFixture()
+	policy.VM = profile.clone()
 	plan, err := newDSGACreationPlan(p, policy, time.Now())
 	if err != nil {
 		t.Fatal(err)

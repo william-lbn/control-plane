@@ -1,0 +1,35 @@
+{
+  "preflight": "/data/neon-build/validation/control-plane-go1271-preflight-20261030",
+  "go1271_preflight_exit_code": 0,
+  "toolchain": {
+    "go_env": {
+      "CGO_ENABLED": "1",
+      "GOARCH": "amd64",
+      "GOCACHE": "/root/.cache/go-build",
+      "GOMODCACHE": "/go/pkg/mod",
+      "GOOS": "linux",
+      "GOPATH": "/go",
+      "GOVERSION": "go1.27.1"
+    },
+    "go_version": "go version go1.27.1 linux/amd64",
+    "kernel": "6.8.0-147-generic"
+  },
+  "gofmt": {
+    "tool": "/data/neon-build/cache/buildkit/runc-overlayfs/snapshots/snapshots/614/fs/golang.org/toolchain@v0.0.1-go1.27.1.linux-amd64/bin/gofmt",
+    "sha256": "86dd91f69254432a37ca365f964720677040fd6f049a412c23e25f8b3812f342",
+    "origin": "官方GOTOOLCHAIN=go1.27.1已校验下载的不可变缓存，只读执行不修改cache",
+    "formatted_files": [
+      "dsga_vm.go",
+      "dsga_placement.go",
+      "dsga_project_reservation.go",
+      "dsga_vm_test.go",
+      "dsga_resource_renderer_test.go",
+      "dsga_reservation_vm_v2_test.go",
+      "dsga_creation_credentials_test.go",
+      "dsga_placement_test.go",
+      "dsga_reservation_vm_v3_test.go"
+    ]
+  },
+  "go_mod_matches_frozen_commit": true,
+  "go_sum_matches_frozen_commit": true
+}

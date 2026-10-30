@@ -69,6 +69,7 @@ func TestDSGAResourceRendererRejectsPartialAndHistoricalBudget(t *testing.T) {
 			case "historical":
 				plan.VM.ProtocolVersion = 1
 				plan.VM.ResourceLimits = nil
+				plan.VM.Placement = nil
 				if plan.VM.validate() != nil {
 					t.Fatal("historical read compatibility lost")
 				}
@@ -107,7 +108,7 @@ func TestDSGAResourcePolicySnapshotOwnsLimitsAndPools(t *testing.T) {
 	}
 }
 
-func TestDSGAResourcePublicPolicyRequiresV2BeforeReservation(t *testing.T) {
+func TestDSGAResourcePublicPolicyRequiresV3PlacementBeforeReservation(t *testing.T) {
 	_, base, _ := dsgaPlanFixture(t)
 	base.VM = dsgaVMProfileFixture()
 	policy := dsgaProjectPolicy{1, "test-region", createBounds{500, 2000, 1024, 4096}, base}
@@ -116,13 +117,27 @@ func TestDSGAResourcePublicPolicyRequiresV2BeforeReservation(t *testing.T) {
 	if _, err := readDSGAProjectPolicy("neon"); err != nil {
 		t.Fatal(err)
 	}
-	policy.Creation.VM.ProtocolVersion = 1
-	policy.Creation.VM.ResourceLimits = nil
-	raw, _ = json.Marshal(policy)
-	t.Setenv("NEON_DSGA_CREATION_POLICY", string(raw))
-	if _, err := readDSGAProjectPolicy("neon"); err == nil {
-		t.Fatal("new public reservation accepted missing original resource budget")
+
+	for name, mutate := range map[string]func(*dsgaVMProfile){
+		"historical_v1":                 func(v *dsgaVMProfile) { v.ProtocolVersion = 1; v.ResourceLimits = nil; v.Placement = nil },
+		"complete_v2_without_placement": func(v *dsgaVMProfile) { v.ProtocolVersion = 2; v.Placement = nil },
+		"v3_missing_placement":          func(v *dsgaVMProfile) { v.Placement = nil },
+	} {
+		t.Run(name, func(t *testing.T) {
+			candidate := policy
+			candidate.Creation.VM = dsgaVMProfileFixture()
+			mutate(&candidate.Creation.VM)
+			if name == "complete_v2_without_placement" && candidate.Creation.VM.validateResourceBudget(candidate.Creation.Budget) != nil {
+				t.Fatal("legacy v2 fixture lost its valid original budget")
+			}
+			raw, _ := json.Marshal(candidate)
+			t.Setenv("NEON_DSGA_CREATION_POLICY", string(raw))
+			if _, err := readDSGAProjectPolicy("neon"); err == nil {
+				t.Fatal("new public reservation accepted missing frozen v3 placement")
+			}
+		})
 	}
+
 }
 
 // 生产Plan clone→JSON持久读者→Renderer→实际Runner Decoder的有限任务数合同。

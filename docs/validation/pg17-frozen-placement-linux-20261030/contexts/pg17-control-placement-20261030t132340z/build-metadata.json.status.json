@@ -1,0 +1,4 @@
+{
+  "not_produced": true,
+  "reason": "失败的BuildKit RUN不生成成功构建provenance；实际测试/源码证据保存在同目录summary/source-files及原始日志。"
+}

@@ -29,12 +29,15 @@ type dsgaVMProfile struct {
 	ServiceAccount   string `json:"service_account"`
 	TLSClusterIssuer string `json:"tls_cluster_issuer"`
 	// v2显式冻结整个Guest初始聚合额度，不从RSS或固定比例猜预算。v1仅供历史
-	// 只读解码；新生产/恢复启动必须有v2，不能从当前env补入旧计划。
+	// 只读解码；新生产必须v3。历史v2仅按已绑定同UID核对，不能从env补计划。
 	ResourceLimits *resourceguard.Limits `json:"resource_limits,omitempty"`
+	// v3把节点授权作为原创建事实冻结；指针子结构保持profile可比较零值。
+	// 旧v1/v2不得从当前env/节点快照补入放置，也不因此取得新VM创建权限。
+	Placement *dsgaVMPlacement `json:"placement,omitempty"`
 }
 
 func (v dsgaVMProfile) validate() error {
-	if (v.ProtocolVersion != 1 && v.ProtocolVersion != 2) || (v.Architecture != "amd64" && v.Architecture != "arm64") ||
+	if (v.ProtocolVersion != 1 && v.ProtocolVersion != 2 && v.ProtocolVersion != 3) || (v.Architecture != "amd64" && v.Architecture != "arm64") ||
 		!dsgaPinnedImage.MatchString(v.RunnerImage) || !dsgaPinnedImage.MatchString(v.KernelImage) ||
 		v.RootDiskBytes < 1<<30 || v.RootDiskBytes > 1<<63-1 || v.RootDiskBytes%(1<<20) != 0 {
 		return errDSGACreationPlan
@@ -45,7 +48,7 @@ func (v dsgaVMProfile) validate() error {
 		}
 	}
 	if v.ProtocolVersion == 1 {
-		if v.ResourceLimits != nil {
+		if v.ResourceLimits != nil || v.Placement != nil {
 			return errDSGACreationPlan
 		}
 		return nil
@@ -53,11 +56,17 @@ func (v dsgaVMProfile) validate() error {
 	if v.ResourceLimits == nil || v.ResourceLimits.Validate() != nil || uint64(v.ResourceLimits.MemoryMaxBytes)%(64<<10) != 0 {
 		return errDSGACreationPlan
 	}
-	return nil
+	if v.ProtocolVersion == 2 {
+		if v.Placement != nil {
+			return errDSGACreationPlan
+		}
+		return nil
+	}
+	return v.Placement.validate(v.Architecture)
 }
 
 func (v dsgaVMProfile) validateResourceBudget(b dsgaBootstrapBudget) error {
-	if v.validate() != nil || v.ProtocolVersion != 2 || v.ResourceLimits == nil || b.validate() != nil {
+	if v.validate() != nil || (v.ProtocolVersion != 2 && v.ProtocolVersion != 3) || v.ResourceLimits == nil || b.validate() != nil {
 		return errDSGACreationPlan
 	}
 	upper, err := v.ResourceLimits.TotalUpperBytes()
@@ -73,6 +82,7 @@ func (v dsgaVMProfile) clone() dsgaVMProfile {
 		copy.HugePools = append([]resourceguard.HugePool(nil), copy.HugePools...)
 		v.ResourceLimits = &copy
 	}
+	v.Placement = v.Placement.clone()
 	return v
 }
 
@@ -95,7 +105,11 @@ func renderDSGAVM(p createPayload, plan dsgaCreationPlan) (*vmv1.VirtualMachine,
 	}
 	v := plan.VM
 	architecture := vmv1.CPUArchitecture(v.Architecture)
+	// v2原投影保持QMP供同UID历史核对；v3生产固定Sysfs，不能由env切换。
 	scaling := vmv1.CpuScalingModeQMP
+	if v.ProtocolVersion == 3 {
+		scaling = vmv1.CpuScalingModeSysfs
+	}
 	grace := int64(5)
 	boolean := func(value bool) *bool { return &value }
 	quantity := func(bytes uint64) resource.Quantity { return *resource.NewQuantity(int64(bytes), resource.BinarySI) }
@@ -136,6 +150,9 @@ func renderDSGAVM(p createPayload, plan dsgaCreationPlan) (*vmv1.VirtualMachine,
 			Disks: []vmv1.Disk{{Name: "compute-config", MountPath: dsgaConfigMount, ReadOnly: boolean(true), Watch: boolean(false),
 				DiskSource: vmv1.DiskSource{Secret: &core.SecretVolumeSource{SecretName: name + "-config", Items: []core.KeyToPath{{Key: "config.json", Path: "config.json"}}}}}},
 		}}
+	if v.ProtocolVersion == 3 {
+		v.Placement.apply(vm)
+	}
 	if _, err := vm.ValidateCreate(); err != nil {
 		return nil, errDSGACreationPlan
 	}
@@ -177,6 +194,11 @@ func (binding *dsgaCreationBinding) prepareVM(ctx context.Context) (*vmv1.Virtua
 	plan, err := current.creationPlan(ctx)
 	if err != nil {
 		return nil, err
+	}
+	// 历史v2只允许已绑定同UID的原对象恢复核对；未绑定不能借兼容路径
+	// 新POST一个没有冻结节点授权的VM。检查先于任何Kube请求，不补env。
+	if plan.VM.ProtocolVersion != 3 && current.vmUID == "" {
+		return nil, errDSGACreationPlan
 	}
 	wanted, err := renderDSGAVM(current.intent.createPayload, plan)
 	if err != nil {

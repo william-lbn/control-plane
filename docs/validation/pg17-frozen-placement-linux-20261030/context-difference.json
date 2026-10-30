@@ -1,0 +1,14 @@
+{
+  "changed_between_contexts": [
+    "api/internal/control/dsga_placement_test.go",
+    "api/internal/control/dsga_reservation_vm_v3_test.go",
+    "api/internal/control/dsga_resource_renderer_test.go",
+    "api/internal/control/dsga_vm.go"
+  ],
+  "production_vm_change_is_only_documented_comment": true,
+  "frozen_files_unchanged": {
+    "api/go.mod": true,
+    "api/go.sum": true,
+    "api/internal/control/migrations/900000066_dsga_reservation_vm_v2.sql": true
+  }
+}

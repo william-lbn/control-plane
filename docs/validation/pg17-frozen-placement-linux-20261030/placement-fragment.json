@@ -1,0 +1,19 @@
+{
+  "creation": {
+    "vm": {
+      "protocol_version": 3,
+      "placement": {
+        "node_selector": {
+          "kubernetes.io/os": "linux",
+          "kubernetes.io/arch": "amd64",
+          "neon.tech/pg17-memory-pool": "worker-117-worker-118-worker-119"
+        },
+        "allowed_node_names": [
+          "worker-117",
+          "worker-118",
+          "worker-119"
+        ]
+      }
+    }
+  }
+}

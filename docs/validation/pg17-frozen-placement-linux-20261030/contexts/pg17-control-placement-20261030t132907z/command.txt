@@ -1,0 +1,1 @@
+go test -mod=readonly -json -race -count=1 -p=2 -timeout=20m ./internal/control -run '^(TestDSGAResourcePublicPolicyRequiresV3PlacementBeforeReservation|TestDSGAVM3SnapshotOwnsPlacementAndHistoricalVersionsStayFrozen|TestDSGAReservationVM3ForwardMigrationPreservesV1V2AndRequiresPlacement)$'
