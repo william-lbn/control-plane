@@ -100,6 +100,7 @@ func (gateway *computeGateway) routes(agentNamespace, agentAccount string) (*htt
 			return nil, err
 		}
 		mux.Handle("POST /computes/{compute}/dsga-credentials", broker)
+		mux.HandleFunc("POST /computes/{compute}/dsga-array-credentials", broker.serveArrayCredentials)
 		proxy := newDSGAProxy(broker)
 		mux.Handle("/dsg/v1/", proxy)
 	}

@@ -1,0 +1,41 @@
+{
+  "scope": "PG-neutral array request-bound issuer narrow extension; real TLS/local Kube model only",
+  "base_git": "be30ba5e8d774781ff76194128720dd6f5d6e045",
+  "branch": "codex/dsga-control-plane-v3-20261020",
+  "owned_source": {
+    "api/internal/control/dsga_credentials.go": "5f203c4ddff44fead3a7f50f1172a3c066ab9d8f2871c3c5b9219400f871fa48",
+    "api/internal/control/compute_gateway.go": "a3b8c4de270fd6da87a2218bcc1917e04bfa2b2032fc2fc01abe1c2ef659989c",
+    "api/internal/control/dsga_array_credentials.go": "b442cc2ad23645d547b500b67c66d95ccba28a01575ff43443673f924ab7b507",
+    "api/internal/control/dsga_array_credentials_test.go": "44fdaecd990efc88ac3cc6394f41f8ba0bd56ef8437227a7f1ff05cc9f6eb5f4"
+  },
+  "source_count": 532,
+  "validation": {
+    "path": "/data/neon-build/validation/cp-array-issuer-go-20261031T184534Z-94cf4f",
+    "roots": [
+      "TestDSGAArrayBrokerBoundScopeRequestAndLegacyCompatibility",
+      "TestDSGAArrayBrokerRejectsProtocolScopeAndRequestAliases",
+      "TestDSGAArrayBrokerRequiresCurrentOriginalOwnerAndReadAfterKeyFence",
+      "TestDSGAArrayBrokerSignedRequestCannotBeTampered",
+      "TestDSGAArrayBrokerDefaultClosedAndGenericBearerNotAuthority",
+      "TestDSGAGatewayDefaultClosedAndPartialIdentityFailsStartup",
+      "TestDSGABrokerIssuesOnlyBoundShortTokenOverActualTLS",
+      "TestDSGABrokerRequiresReadyOriginalBootstrapAndConfigUID",
+      "TestDSGABrokerRejectsForeignConfigKeysAndChangedOwner",
+      "TestDSGABrokerRejectsMalformedRequestsAndVerifiedTLSWithoutBoundSNI"
+    ],
+    "root_count": 10,
+    "subcase_count": 77,
+    "fail": 0,
+    "skip": 0,
+    "race": true,
+    "go_version": "go1.27.1"
+  },
+  "module_unchanged": true,
+  "new_route": "POST /computes/{compute}/dsga-array-credentials",
+  "scope_claim": "compute_ctl:dsga:array-authority",
+  "request_protocol_version": 1,
+  "legacy_response_unchanged": true,
+  "private_seed_read_or_printed_by_agent": false,
+  "kubernetes_apiserver_RBAC_or_E2E": false,
+  "full_control_plane_goal_complete": false
+}

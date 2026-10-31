@@ -132,9 +132,18 @@ func dsgaSubjectProject(snapshot *journal.Snapshot, endpoint string) (string, bo
 // 单一Bearer、有限body/总期限先行；完成真实主体与owner核验后才能读取私钥，
 // 读取配置/私钥后再核验同一owner。仍无跨对象原子许可，最终PG/Runner须fence。
 func (broker *dsgaCredentialBroker) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	broker.serveCredentials(w, r, false)
+}
+
+// array仅由固定新路由的私有wrapper置真，不能由请求scope选择签发权限。
+func (broker *dsgaCredentialBroker) serveCredentials(w http.ResponseWriter, r *http.Request, array bool) {
 	w.Header().Set("Cache-Control", "no-store")
 	deny := func(code int) { http.Error(w, "DSGA credential request rejected", code) }
 	workload := r.PathValue("compute")
+	if array && (r.URL.Path != "/computes/"+workload+"/dsga-array-credentials" || r.URL.EscapedPath() != r.URL.Path || r.URL.RawQuery != "" || r.URL.ForceQuery || r.URL.Fragment != "") {
+		deny(http.StatusForbidden)
+		return
+	}
 	if r.Method != http.MethodPost || !computeWorkloadPattern.MatchString(workload) || r.TLS == nil ||
 		r.TLS.ServerName != workload+"-management."+broker.kube.namespace+".svc" || len(r.Header.Values("Authorization")) != 1 {
 		deny(http.StatusForbidden)
@@ -156,13 +165,36 @@ func (broker *dsgaCredentialBroker) ServeHTTP(w http.ResponseWriter, r *http.Req
 	}
 	r.Body = http.MaxBytesReader(w, r.Body, 8*1024)
 	defer r.Body.Close()
-	decoder := json.NewDecoder(r.Body)
-	decoder.DisallowUnknownFields()
+
 	var claim owner.Ownership
-	if decoder.Decode(&claim) != nil || decoder.Decode(new(any)) != io.EOF || claim.Namespace != broker.kube.namespace || claim.VMName != workload {
+	var request *dsgaArrayRequestBinding
+	if array {
+		raw, err := io.ReadAll(r.Body)
+		if err != nil {
+			deny(http.StatusBadRequest)
+			return
+		}
+		envelope, err := decodeDSGAArrayCredentialEnvelope(raw)
+		if err != nil {
+			deny(http.StatusBadRequest)
+			return
+		}
+		claim = envelope.Owner
+		binding := envelope.Request
+		request = &binding
+	} else {
+		decoder := json.NewDecoder(r.Body)
+		decoder.DisallowUnknownFields()
+		if decoder.Decode(&claim) != nil || decoder.Decode(new(any)) != io.EOF {
+			deny(http.StatusBadRequest)
+			return
+		}
+	}
+	if claim.Namespace != broker.kube.namespace || claim.VMName != workload {
 		deny(http.StatusBadRequest)
 		return
 	}
+
 	store, err := journal.NewStore(broker.vms.NeonvmV1().VirtualMachines(broker.kube.namespace), journal.Binding{
 		Namespace: claim.Namespace, Name: claim.VMName, VMUID: claim.VMUID, Incarnation: claim.Incarnation,
 	})
@@ -205,11 +237,25 @@ func (broker *dsgaCredentialBroker) ServeHTTP(w http.ResponseWriter, r *http.Req
 	// 不复用general computeJWT、admin或Hadron的其他权限。
 	// 此令牌不是预算、物理回收或VM许可，也不推进PG issuer floor；原生
 	// 端点仍核对boot/完整意图/floor，最终资源域仍须验证预算并独立fence。
-	claims, _ := json.Marshal(map[string]any{"aud": "neon-dsga", "scope": "compute_ctl:dsga", "compute_id": workload,
+
+	tokenClaims := map[string]any{"aud": "neon-dsga", "scope": "compute_ctl:dsga", "compute_id": workload,
 		"vm_uid": string(claim.VMUID), "compute_instance_id": instance, "issuer_epoch": claim.IssuerEpoch,
-		"nbf": now.Add(-2 * time.Second).Unix(), "exp": expiry})
+		"nbf": now.Add(-2 * time.Second).Unix(), "exp": expiry}
+	if request != nil {
+		tokenClaims["scope"] = dsgaArrayAuthorityScope
+		tokenClaims["request"] = *request
+	}
+	claims, _ := json.Marshal(tokenClaims)
+
 	input := base64.RawURLEncoding.EncodeToString(header) + "." + base64.RawURLEncoding.EncodeToString(claims)
 	token := input + "." + base64.RawURLEncoding.EncodeToString(ed25519.Sign(key, []byte(input)))
-	jsonResponse(w, http.StatusOK, map[string]any{"token_type": "Bearer", "access_token": token, "expires_at": expiry,
-		"compute_id": workload, "vm_uid": string(claim.VMUID), "compute_instance_id": instance, "issuer_epoch": claim.IssuerEpoch})
+
+	response := map[string]any{"token_type": "Bearer", "access_token": token, "expires_at": expiry,
+		"compute_id": workload, "vm_uid": string(claim.VMUID), "compute_instance_id": instance, "issuer_epoch": claim.IssuerEpoch}
+	if request != nil {
+		response["scope"] = dsgaArrayAuthorityScope
+		response["request"] = *request
+	}
+	jsonResponse(w, http.StatusOK, response)
+
 }

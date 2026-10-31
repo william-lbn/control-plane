@@ -1,0 +1,17 @@
+{
+	"Path": "github.com/neondatabase/autoscaling",
+	"Version": "v0.0.0-20261020225115-3eeafd997c8c",
+	"Replace": {
+		"Path": "github.com/william-lbn/autoscaling",
+		"Version": "v0.0.0-20261026070212-565410ad3787",
+		"Time": "2026-10-26T07:02:12Z",
+		"Dir": "/go/pkg/mod/github.com/william-lbn/autoscaling@v0.0.0-20261026070212-565410ad3787",
+		"GoMod": "/go/pkg/mod/cache/download/github.com/william-lbn/autoscaling/@v/v0.0.0-20261026070212-565410ad3787.mod",
+		"GoVersion": "1.24.0",
+		"Sum": "h1:tDQuvxYzH+8BMgOA8OEsYSEV4DJ4A1wpxlqxXZ0J63g=",
+		"GoModSum": "h1:5qW3EK3EXET9Tg0MQLNpUnvqE42xJ7iXytCBbD3BOHI="
+	},
+	"Dir": "/go/pkg/mod/github.com/william-lbn/autoscaling@v0.0.0-20261026070212-565410ad3787",
+	"GoMod": "/go/pkg/mod/cache/download/github.com/william-lbn/autoscaling/@v/v0.0.0-20261026070212-565410ad3787.mod",
+	"GoVersion": "1.24.0"
+}

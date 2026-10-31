@@ -1,0 +1,8 @@
+独立复审：数组请求绑定JWT签发窄扩（2026-11-01）
+复审者：主协调代理，独立于四源实现者。
+逐读新精确解码器、原签发流程diff、固定新route及新增真实TLS负例；核验四源与冻结hash一致。
+先前发现的大小写别名/同义双拼写、missing/null及裸问号查询两项阻断已由新精确三层必填键与ForceQuery关闭。
+新scope仅由固定私有route选择，body binding只接受POST及三个固定Root路径和非零小写SHA；不允许调用者指定scope。
+原主体TokenReview/Pod及Lease-journal-Lease核验、读key后二次owner fence保留；不写密钥。旧route请求及响应不增加字段。
+实际新cohort94cf4f：532COPY、Go1.27.1、race、10根77子例、零失败零跳过，result build/test均0；旧a2cdc0为历史，不能认证新四源。
+结论：该组件可阶段提交。此验证为真实loopback TLS与Kube模型，不是实际apiserver/RBAC/PG/normal/K8s端到端，完整控制面目标未完成。

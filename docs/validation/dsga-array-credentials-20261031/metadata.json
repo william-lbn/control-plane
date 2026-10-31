@@ -1,0 +1,28 @@
+{
+  "nonce": "20261031T182727Z-a2cdc0",
+  "unit": "cp-array-issuer-20261031t182727z-a2cdc0",
+  "roots": [
+    "TestDSGAArrayBrokerBoundScopeRequestAndLegacyCompatibility",
+    "TestDSGAArrayBrokerRejectsProtocolScopeAndRequestAliases",
+    "TestDSGAArrayBrokerRequiresCurrentOriginalOwnerAndReadAfterKeyFence",
+    "TestDSGAArrayBrokerSignedRequestCannotBeTampered",
+    "TestDSGAArrayBrokerDefaultClosedAndGenericBearerNotAuthority",
+    "TestDSGAGatewayDefaultClosedAndPartialIdentityFailsStartup",
+    "TestDSGABrokerIssuesOnlyBoundShortTokenOverActualTLS",
+    "TestDSGABrokerRequiresReadyOriginalBootstrapAndConfigUID",
+    "TestDSGABrokerRejectsForeignConfigKeysAndChangedOwner",
+    "TestDSGABrokerRejectsMalformedRequestsAndVerifiedTLSWithoutBoundSNI"
+  ],
+  "command": "go test -mod=readonly -race -count=1 -p=2 -timeout=10m -json -run '^(TestDSGAArrayBrokerBoundScopeRequestAndLegacyCompatibility|TestDSGAArrayBrokerRejectsProtocolScopeAndRequestAliases|TestDSGAArrayBrokerRequiresCurrentOriginalOwnerAndReadAfterKeyFence|TestDSGAArrayBrokerSignedRequestCannotBeTampered|TestDSGAArrayBrokerDefaultClosedAndGenericBearerNotAuthority|TestDSGAGatewayDefaultClosedAndPartialIdentityFailsStartup|TestDSGABrokerIssuesOnlyBoundShortTokenOverActualTLS|TestDSGABrokerRequiresReadyOriginalBootstrapAndConfigUID|TestDSGABrokerRejectsForeignConfigKeysAndChangedOwner|TestDSGABrokerRejectsMalformedRequestsAndVerifiedTLSWithoutBoundSNI)$' ./internal/control",
+  "source_count": 532,
+  "dockerfile_sha256": "88657ad12cd9c21b9e8c02bc6a4777aded85f96350396b31c3e226a4c81b1d96",
+  "client_limits": {
+    "memory": "2G",
+    "cpus": 2
+  },
+  "executor_limits": {
+    "GOMAXPROCS": 2,
+    "hard_memory": "not set; BuildKit executor separate"
+  },
+  "go_mod_toolchain_preserved": "go1.26.0/toolchain go1.27.1"
+}
