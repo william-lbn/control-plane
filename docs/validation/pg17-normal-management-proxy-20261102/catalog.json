@@ -1,0 +1,27 @@
+{
+  "protocol_version": 1,
+  "scope": "pg17-normal-management-four-fixed-routes",
+  "target_backend_versions": [
+    17
+  ],
+  "postgres_versions_actually_tested": [],
+  "unit_roots": [
+    "TestDSGANormalProxyFixedRoutesPreserveBytes",
+    "TestDSGANormalProxyKeepsOriginalOwnerAndServiceGates"
+  ],
+  "unit_subtests": 6,
+  "race": true,
+  "actual_result": "/data/neon-build/validation/pg17-k8s-management-proxy-offline-race-20261102T070842Z-da4c5d/result.json",
+  "source_lock": "/data/neon-build/validation/pg17-k8s-management-proxy-offline-race-20261102T070842Z-da4c5d/source-final-lock.json",
+  "CLI_build_smoke_only": {
+    "reused_from": "/data/neon-build/validation/pg17-k8s-management-proxy-go-20261102T055011Z-ed459e/export/compute-gateway.real",
+    "sha256": "94d74a88d89884d4982af6d118a804c5e0ad6ad400e9427b32aac55a2f0afa8d",
+    "size": 49918112
+  },
+  "peer_is_model": true,
+  "single_service_actual": 0,
+  "Source": false,
+  "normal": false,
+  "K8s": false,
+  "E": 0
+}

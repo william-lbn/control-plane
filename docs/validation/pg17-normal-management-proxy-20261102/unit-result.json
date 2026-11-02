@@ -1,0 +1,17 @@
+{
+  "unit_exit": 0,
+  "seconds": 87.67083569499664,
+  "passed_roots": [
+    "TestDSGANormalProxyFixedRoutesPreserveBytes",
+    "TestDSGANormalProxyKeepsOriginalOwnerAndServiceGates"
+  ],
+  "passed_subtests": 6,
+  "failed": [],
+  "skipped": [],
+  "CLI_reused": true,
+  "classification": "TLS broker/proxy U with protocol model peer, no K8s/PG",
+  "Source": false,
+  "normal": false,
+  "K8s": false,
+  "E": 0
+}

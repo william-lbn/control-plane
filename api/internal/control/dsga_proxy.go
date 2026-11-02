@@ -159,7 +159,7 @@ func (proxy *dsgaProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
 	case "/dsg/v1/capabilities", "/dsg/v1/memory", "/dsg/v1/initialization", "/dsg/v1/budget/shared", "/dsg/v1/work/state", "/dsg/v1/connections/state", "/dsg/v1/work/prepared", "/dsg/v1/work/dsm", "/dsg/v1/resource/identity", "/dsg/v1/resource/process", "/dsg/v1/resource/state":
 		known = r.Method == http.MethodGet
-	case "/dsg/v1/resize", "/dsg/v1/issuer/fence", "/dsg/v1/resource/fence", "/dsg/v1/resource/apply", "/dsg/v1/resource/replay-original":
+	case "/dsg/v1/resize", "/dsg/v1/issuer/fence", "/dsg/v1/resource/fence", "/dsg/v1/resource/apply", "/dsg/v1/resource/replay-original", "/dsg/v1/resource/normal-apply", "/dsg/v1/resource/normal-replay-original", "/dsg/v1/resource/normal-recover":
 		execution, known = true, r.Method == http.MethodPost
 	case "/dsg/v1/resize/status", "/dsg/v1/resize/cancel",
 		"/dsg/v1/admission", "/dsg/v1/admission/status",
@@ -168,7 +168,7 @@ func (proxy *dsgaProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// 这里只扩展固定路由名单，仍逐次核验原VM/Service/current owner；
 		// 原生Rust按完整请求再核对执行epoch，网关不代造预算或执行回执。
 		known = r.Method == http.MethodPost
-	case "/dsg/v1/resource/observe":
+	case "/dsg/v1/resource/observe", "/dsg/v1/resource/normal-observe":
 		// Guest资源对账独立于PG boot，仍按正式TokenReview/Lease/原Service链
 		// 校验；只是固定路径转发，不能在网关代造Root限额或VM许可。
 		known = r.Method == http.MethodPost

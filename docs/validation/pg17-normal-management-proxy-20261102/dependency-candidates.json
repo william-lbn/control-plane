@@ -1,0 +1,33 @@
+{
+  "candidate_locks": {
+    "api/go.mod": {
+      "live_sha256": "ddff7ecb9b262cbaf528f635b7c81f9248fcafb5314c30297d6752d6e97566dd",
+      "candidate_sha256": "c061f93066f1361c03c71b3903c68481f0d2f40b474812a5c93d9b59a6468028",
+      "candidate_file": "/data/neon-build/validation/pg17-k8s-management-proxy-final-freeze-r2-20261102/go.mod.candidate",
+      "diff_file": "/data/neon-build/validation/pg17-k8s-management-proxy-final-freeze-r2-20261102/go.mod.candidate.diff"
+    },
+    "api/go.sum": {
+      "live_sha256": "2a02fdfec9d6a72bab97603094b2d5ad832319c7f38dcd4cb1fb94fa40c53943",
+      "candidate_sha256": "0d68937d558273f6bb77391f148ac71ede06429d48fb84a61a94fc7abaf57828",
+      "candidate_file": "/data/neon-build/validation/pg17-k8s-management-proxy-final-freeze-r2-20261102/go.sum.candidate",
+      "diff_file": "/data/neon-build/validation/pg17-k8s-management-proxy-final-freeze-r2-20261102/go.sum.candidate.diff"
+    }
+  },
+  "AS": {
+    "version": "v0.0.0-20261102045912-d74e02db0da6",
+    "origin_hash": "d74e02db0da6cca1a21d824959ca133b8a0821fe",
+    "Sum": "h1:iS3papprZgLLSTUM5Kaf61diXg9h8NNx805yesaQDfk=",
+    "GoModSum": "h1:5qW3EK3EXET9Tg0MQLNpUnvqE42xJ7iXytCBbD3BOHI="
+  },
+  "original_staging_pin": {
+    "module": "k8s.io/mount-utils",
+    "version": "v0.31.7",
+    "reason": "dependency replaces are not transitive; exact Kubernetes1.31.7 staging mapping"
+  },
+  "only_Root_may_write_live_locks": true,
+  "tested_source": "/data/neon-build/validation/pg17-k8s-management-proxy-offline-race-20261102T070842Z-da4c5d/source",
+  "toolchain": {
+    "version": "go1.27.1",
+    "official_archive_sha256": "63d339f0da5ab53635a56f2490a7984dfe12dfcff22ad749f63edaf590168445"
+  }
+}
