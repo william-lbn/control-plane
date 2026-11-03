@@ -1,0 +1,32 @@
+{
+  "status": "PASS_SOURCE_AND_THREE_TARGETED_RACE_ROOTS_READY_FOR_ROOT_COMMIT",
+  "owned_files": [
+    {
+      "path": "api/internal/control/compute_gateway.go",
+      "sha256": "2dfc31ddb4e89d7fd2a98831f514be034dd83b20cab8e2c10bf51e6d8b231289"
+    },
+    {
+      "path": "api/internal/control/compute_gateway_configure_listener_test.go",
+      "sha256": "4bbb838d03e68ab14f1fbf12d5f5863a3f6750d873fff73572d7afcf5632b72e"
+    }
+  ],
+  "base_git": "b23c1181b872573ea38244045e953557508a603d",
+  "production_delta": "仅既有DSGA独立mux注册原gateway.configure；8443/处理器/协议/身份门不变",
+  "tests": {
+    "scope": "UNIT only, mock Kube/backend不冒真实K8s/TLS/configure",
+    "roots": 3,
+    "pass_events": 7,
+    "race": true,
+    "fail_events": 0,
+    "skip_events": 0,
+    "actual_cgroup": "300000 100000\n3221225472\nlow 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\n",
+    "event_file": "/data/neon-build/validation/pg17-gateway-configure-listener-20261103T054846Z-a4dee8/unit.stdout"
+  },
+  "actual_build": "only_Gateway_CGO0_build_in_progress",
+  "actual_post_configure": false,
+  "old_failed_runs_preserved": [
+    "77aff0 ccache read-only temp",
+    "0d3655 unit mock HTTP被生产HTTPS门拒"
+  ],
+  "independent_source_review": "/data/neon-k8s-pg17/runs/gateway-configure-source-review-20261103T054313Z-0e2198/readonly-review.json; fixture only now NewTLSServer"
+}

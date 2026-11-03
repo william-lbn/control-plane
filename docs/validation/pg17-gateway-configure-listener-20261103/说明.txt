@@ -1,0 +1,4 @@
+PG17受信Compute首次配置的必要管理接线
+在既有控制面独占TLS的8444监听器上注册同一个原configure处理器；8443旧perCompute TLS合同不改，原90秒/空scope/aud=[compute] JWT、精确SNI、完整Spec身份和固定后端3080检查均保持。Agent SA与DSGA scoped JWT不能因此获得configure权限；不向Guest分发TLS私钥，不改变已封存Runtime数据合同。
+实际3根7项race通过：原compute JWT正控200，SA及有效签名scoped token401且后端调用0，错误SNI/tenant403且后端调用0。独审无阻断。初次ccache只读HOME环境失败与HTTP假Kube被生产HTTPS门拒均留原票，没有冒PASS。单Gateway静态ELF正在后续构建，实际K8s configure尚未执行。
+此为旧b23快照的PG17必要接线；未获取或实现最终最新完整控制面目标，PG17真实K8s验收后仍必须重新获取届时最新自有控制面按最终计划完整对接。
