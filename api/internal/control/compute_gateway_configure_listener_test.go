@@ -21,13 +21,16 @@ type configureListenerTransport func(*http.Request) (*http.Response, error)
 func (f configureListenerTransport) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
 // 只用单元fixture验证正式routes派发和原configure鉴权，不把mock算作真实K8s/TLS。
-func configureListenerUnit(t *testing.T) (*http.ServeMux, ed25519.PrivateKey, map[string]any, *atomic.Int64) {
+func configureListenerUnit(t *testing.T, shape ...func(map[string]any)) (*http.ServeMux, ed25519.PrivateKey, map[string]any, *atomic.Int64) {
 	t.Helper()
 	_, key, e := ed25519.GenerateKey(rand.Reader)
 	if e != nil {
 		t.Fatal(e)
 	}
 	config := map[string]any{"spec": map[string]any{"mode": "Primary", "tenant_id": "unit-tenant", "timeline_id": "unit-timeline", "cluster": map[string]any{"cluster_id": "unit-project", "settings": []any{map[string]any{"name": "neon.tenant_id", "value": "unit-tenant"}, map[string]any{"name": "neon.timeline_id", "value": "unit-timeline"}, map[string]any{"name": "neon.pageserver_connstring", "value": "unit-pageserver:6400"}}}}}
+	for _, change := range shape {
+		change(config)
+	}
 	installComputeJWK(config, key)
 	raw, _ := json.Marshal(config)
 	endpoint := "ep_0123456789abcdef"
@@ -45,6 +48,10 @@ func configureListenerUnit(t *testing.T) (*http.ServeMux, ed25519.PrivateKey, ma
 	t.Cleanup(kube.Close)
 	gateway := &computeGateway{kube: &kubeClient{base: kube.URL, namespace: "neon", http: kube.Client()}, http: &http.Client{Transport: configureListenerTransport(func(r *http.Request) (*http.Response, error) {
 		calls.Add(1)
+		forwarded, err := io.ReadAll(r.Body)
+		if err != nil || !bytes.Equal(forwarded, raw) {
+			t.Error("original complete configuration body changed")
+		}
 		if r.Method != "POST" || r.URL.Host != "127.0.0.1:3080" || r.URL.Path != "/configure" {
 			t.Error("original fixed target changed")
 		}
@@ -113,5 +120,29 @@ func TestGatewayDedicatedConfigureKeepsOriginalSNIAndSpecIdentityGates(t *testin
 	})
 	if calls.Load() != 0 {
 		t.Fatal("rejected identity reached backend")
+	}
+}
+
+func TestGatewayDedicatedConfigureNativeTopLevelIdentity(t *testing.T) {
+	mux, key, config, calls := configureListenerUnit(t, func(c map[string]any) {
+		spec := c["spec"].(map[string]any)
+		spec["pageserver_connstring"] = "unit-pageserver:6400"
+		nested(c, "spec", "cluster").(map[string]any)["settings"] = []any{map[string]any{"name": "shared_buffers", "value": "2MB"}}
+	})
+	token := computeJWT(key, "ep_0123456789abcdef", time.Now())
+	sni := "cp-0123456789abcdef-management.neon.svc"
+	if w := configureListenerRequest(mux, token, sni, config); w.Code != 200 || calls.Load() != 1 {
+		t.Fatal("unchanged native top-level configuration did not reach fixed backend")
+	}
+	for _, field := range []string{"tenant_id", "timeline_id", "pageserver_connstring"} {
+		t.Run(field, func(t *testing.T) {
+			raw, _ := json.Marshal(config)
+			var changed map[string]any
+			_ = json.Unmarshal(raw, &changed)
+			changed["spec"].(map[string]any)[field] = "foreign"
+			if w := configureListenerRequest(mux, token, sni, changed); w.Code != 403 || calls.Load() != 1 {
+				t.Fatal("changed native identity crossed gateway")
+			}
+		})
 	}
 }

@@ -1,0 +1,35 @@
+{
+  "base_head": "578f3f9a65ba47befda7154b0b12bc0628cd8e13",
+  "owned_files": {
+    "api/internal/control/compute_gateway.go": "a671c2fbafd37367e24464db34e3d9fe19613a5eb7834d068af619fe8cd00670",
+    "api/internal/control/compute_gateway_test.go": "93697482e33b418a6854ce1fc002587a0177e663182127d8666f668e88de60b0",
+    "api/internal/control/compute_gateway_configure_listener_test.go": "8946ba97d6ce1e198f868c960546c690e79e679b01ed9f434c125d168f5ec328"
+  },
+  "result_SHA256": "ca50c7b8ee9e2a4b2ccdc184d9b4cfa802b555d0c3351e092db6a773d773b04a",
+  "independent_review_SHA256": "0c32f2a0803ba2a8f095569f55edcd45210fea75e1b6234a57edfa19a11d48e1",
+  "roots": [
+    "TestGatewayDedicatedConfigureAcceptsOriginalComputeJWT",
+    "TestGatewayDedicatedConfigureRejectsServiceAccountAndScopedJWT",
+    "TestGatewayDedicatedConfigureKeepsOriginalSNIAndSpecIdentityGates",
+    "TestGatewayDedicatedConfigureNativeTopLevelIdentity",
+    "TestGatewayJWTRejectsReplayAndConfusedIdentity",
+    "TestGatewayPreservesNativePrimaryDefaultAndRestrictsTopology",
+    "TestGatewayComputeIdentityFailsClosedOnMalformedSpec",
+    "TestGatewayNativeTopLevelIdentityKeepsLegacyFallback",
+    "TestGatewayCurrentSealedNativeShapePrivate"
+  ],
+  "pass_events": 54,
+  "race": 0,
+  "skip": 0,
+  "seconds": 215.8957405280089,
+  "artifact": {
+    "path": "/data/neon-build/validation/pg17-gateway-native-top-level-identity-20261103T212331Z-ba6b33/export/compute-gateway",
+    "sha256": "da038c18d522a75257b11506b8e3b1aa0888d85760ac53d1f7850c6c70dba0fa",
+    "bytes": 71137040
+  },
+  "private_current_body_SHA256": "14ab7284544632eca361b2cd6dccabf69024144f23281b6999fae2439357f0da",
+  "private_test_or_body_committed": false,
+  "deployed": false,
+  "PG17_SQL_or_memory_E2E_passed": false,
+  "latest_full_control_plane_phase_started": false
+}

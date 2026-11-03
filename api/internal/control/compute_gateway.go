@@ -336,7 +336,12 @@ func sameComputeIdentity(stored, requested map[string]any) bool {
 	}
 	settings := func(config map[string]any) (map[string]string, bool) {
 		values := map[string]string{}
-		items, ok := nested(config, "spec", "cluster", "settings").([]any)
+		// native 的 settings 可省略；顶层身份字段仍由下方逐项严格核验。
+		raw := nested(config, "spec", "cluster", "settings")
+		if raw == nil {
+			return values, true
+		}
+		items, ok := raw.([]any)
 		if !ok {
 			return nil, false
 		}
@@ -363,8 +368,20 @@ func sameComputeIdentity(stored, requested map[string]any) bool {
 	if !validA || !validB {
 		return false
 	}
-	for _, key := range []string{"neon.tenant_id", "neon.timeline_id", "neon.pageserver_connstring"} {
-		if a[key] == "" || a[key] != b[key] {
+	// 与 native ParsedSpec 同序：有值的顶层字段优先，null/省略才回退旧GUC。
+	// 不能要求现代配置重复提供GUC；完整非catalog原始字段仍在下方冻结比较。
+	effective := func(config map[string]any, gucs map[string]string, field string) (string, bool) {
+		if raw := nested(config, "spec", field); raw != nil {
+			value, ok := raw.(string)
+			return value, ok && value != ""
+		}
+		value := gucs["neon."+field]
+		return value, value != ""
+	}
+	for _, field := range []string{"tenant_id", "timeline_id", "pageserver_connstring"} {
+		original, validOriginal := effective(stored, a, field)
+		incoming, validIncoming := effective(requested, b, field)
+		if !validOriginal || !validIncoming || original != incoming {
 			return false
 		}
 	}

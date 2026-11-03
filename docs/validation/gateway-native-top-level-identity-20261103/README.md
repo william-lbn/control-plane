@@ -1,0 +1,11 @@
+# Gateway兼容native顶层Compute身份
+
+本轮真实PG17配置使用native顶层tenant_id、timeline_id、pageserver_connstring。旧Gateway错误地要求同时具备三个legacy GUC，导致原封不动的已封存配置也被403拒绝。实际32B响应SHA与Gateway转发前“Configuration identity mismatch”固定分支完全匹配；该次请求没有送到Compute，不把客户端退出0当配置成功。
+
+身份比较现在沿native ParsedSpec的优先级：非null顶层字段优先，省略/null才回退旧GUC。仍要求三身份非空且相同；重复或错误类型GUC、格式错误顶层字段继续拒绝。完整非catalog原始字段、compute_ctl_config、默认/标记mode、JWT、SNI、目标Service与原Body转发均保持原约束，不按PG大版本分叉。
+
+9个针对性测试根、54个PASS事件，race/skip均为0，实际215.896秒；覆盖native顶层请求实际通过正式HTTP handler到固定backend、三身份改写拒绝、旧格式/混合/空值回退、重复/类型/未知拓扑拒绝及既有JWT/SNI负例。另在不可变快照用只读私有挂载验证真实14ab封存正文的自身份；该测试和正文未加入源码仓库，日志不打印配置或密钥。HTTP fixture不冒充真实集群回归。
+
+仅Gateway正式ELF编译成功：da038c18d522a75257b11506b8e3b1aa0888d85760ac53d1f7850c6c70dba0fa。实际来源为当前旧必要控制面578基线加精确三文件；依赖go.mod/go.sum保持，AS模块仍fff，不把继承旧lock字段d126冒当前版本。原始证据：/data/neon-build/validation/pg17-gateway-native-top-level-identity-20261103T212331Z-ba6b33；独审0c32f2a0。
+
+此为PG17内存主链直接必需的Gateway缺口修复，不代表已获取或实现最终最新控制面。本镜像部署后仍须以新独立nonce执行已明确转发前拒绝的配置，再验证真实SQL、资格及内存动作；保留原403及所有once标记，未知效果禁止自动重发。
