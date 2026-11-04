@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"crypto/ed25519"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"io"
@@ -45,14 +47,15 @@ func newDSGAProxy(broker *dsgaCredentialBroker) *dsgaProxy {
 }
 
 type dsgaProxyClaims struct {
-	Audience          string        `json:"aud"`
-	Scope             string        `json:"scope"`
-	ComputeID         string        `json:"compute_id"`
-	VMUID             string        `json:"vm_uid"`
-	ComputeInstanceID string        `json:"compute_instance_id"`
-	IssuerEpoch       dsgapi.Uint64 `json:"issuer_epoch"`
-	Expires           uint64        `json:"exp"`
-	NotBefore         uint64        `json:"nbf"`
+	Audience          string                   `json:"aud"`
+	Scope             string                   `json:"scope"`
+	ComputeID         string                   `json:"compute_id"`
+	VMUID             string                   `json:"vm_uid"`
+	ComputeInstanceID string                   `json:"compute_instance_id"`
+	IssuerEpoch       dsgapi.Uint64            `json:"issuer_epoch"`
+	Expires           uint64                   `json:"exp"`
+	NotBefore         uint64                   `json:"nbf"`
+	Request           *dsgaArrayRequestBinding `json:"request,omitempty"`
 }
 
 // 与Rust deny_unknown_fields一致，还拒绝重复JSON成员，避免不同解析器对
@@ -118,13 +121,57 @@ func validDSGAProxyJWT(token, workload string, config dsgaCredentialConfig, now 
 		return claims, false
 	}
 	raw, err := base64.RawURLEncoding.Strict().DecodeString(parts[1])
-	if err != nil || dsgaTokenObject(raw, &claims) != nil || claims.Audience != "neon-dsga" || claims.Scope != "compute_ctl:dsga" ||
+	if err != nil || dsgaTokenObject(raw, &claims) != nil || claims.Audience != "neon-dsga" ||
 		claims.ComputeID != workload || config.Spec.Dynamic.ProtocolVersion != 2 || claims.VMUID != config.Spec.Dynamic.VMUID || claims.ComputeInstanceID != config.Spec.Dynamic.ComputeInstanceID ||
 		dsgapi.ValidateID(claims.VMUID, "VM") != nil || dsgapi.ValidateID(claims.ComputeInstanceID, "Compute") != nil || claims.IssuerEpoch == 0 ||
 		claims.Expires <= uint64(now.Unix()) || claims.NotBefore > uint64(now.Unix()) || claims.Expires <= claims.NotBefore || claims.Expires-claims.NotBefore > 300 {
 		return claims, false
 	}
+	if !validDSGAProxyScope(raw, &claims) {
+		return claims, false
+	}
 	return claims, true
+}
+
+// 只扩展既有数组专用凭据，不让普通scope携带request或专用scope进入普通路由。
+// request沿原签发器的四字段合同严格解析；重复、未知、别名和null均拒绝。
+func validDSGAProxyScope(raw []byte, claims *dsgaProxyClaims) bool {
+	var fields map[string]json.RawMessage
+	if claims == nil || json.Unmarshal(raw, &fields) != nil {
+		return false
+	}
+	for key := range fields {
+		if strings.EqualFold(key, "request") && key != "request" {
+			return false
+		}
+	}
+	request, present := fields["request"]
+	switch claims.Scope {
+	case "compute_ctl:dsga":
+		return !present && claims.Request == nil
+	case dsgaArrayAuthorityScope:
+		if !present || claims.Request == nil {
+			return false
+		}
+		if _, err := dsgaArrayExactObject(request, "protocol_version", "method", "path", "body_sha256"); err != nil {
+			return false
+		}
+		if dsgaTokenObject(request, claims.Request) != nil || claims.Request.validate() != nil {
+			return false
+		}
+		return true
+	default:
+		return false
+	}
+}
+
+func dsgaProxyArrayPath(path string) bool {
+	switch path {
+	case "/dsg/v1/resource/array-authorize", "/dsg/v1/resource/array-observe", "/dsg/v1/resource/array-replay-original":
+		return true
+	default:
+		return false
+	}
 }
 
 func (proxy *dsgaProxy) current(ctx context.Context, store *journal.Store, claims dsgaProxyClaims) (*journal.Snapshot, error) {
@@ -159,7 +206,7 @@ func (proxy *dsgaProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.URL.Path {
 	case "/dsg/v1/capabilities", "/dsg/v1/memory", "/dsg/v1/initialization", "/dsg/v1/budget/shared", "/dsg/v1/work/state", "/dsg/v1/connections/state", "/dsg/v1/work/prepared", "/dsg/v1/work/dsm", "/dsg/v1/resource/identity", "/dsg/v1/resource/process", "/dsg/v1/resource/state":
 		known = r.Method == http.MethodGet
-	case "/dsg/v1/resize", "/dsg/v1/issuer/fence", "/dsg/v1/resource/fence", "/dsg/v1/resource/apply", "/dsg/v1/resource/replay-original", "/dsg/v1/resource/normal-apply", "/dsg/v1/resource/normal-replay-original", "/dsg/v1/resource/normal-recover":
+	case "/dsg/v1/resize", "/dsg/v1/issuer/fence", "/dsg/v1/resource/fence", "/dsg/v1/resource/apply", "/dsg/v1/resource/replay-original", "/dsg/v1/resource/normal-apply", "/dsg/v1/resource/normal-replay-original", "/dsg/v1/resource/normal-recover", "/dsg/v1/resource/array-authorize", "/dsg/v1/resource/array-replay-original":
 		execution, known = true, r.Method == http.MethodPost
 	case "/dsg/v1/resize/status", "/dsg/v1/resize/cancel",
 		"/dsg/v1/admission", "/dsg/v1/admission/status",
@@ -170,7 +217,7 @@ func (proxy *dsgaProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		// 这里只扩展固定路由名单，仍逐次核验原VM/Service/current owner；
 		// 原生Rust按完整请求再核对执行epoch，网关不代造预算或执行回执。
 		known = r.Method == http.MethodPost
-	case "/dsg/v1/resource/observe", "/dsg/v1/resource/normal-observe":
+	case "/dsg/v1/resource/observe", "/dsg/v1/resource/normal-observe", "/dsg/v1/resource/array-observe":
 		// Guest资源对账独立于PG boot，仍按正式TokenReview/Lease/原Service链
 		// 校验；只是固定路径转发，不能在网关代造Root限额或VM许可。
 		known = r.Method == http.MethodPost
@@ -224,6 +271,19 @@ func (proxy *dsgaProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	claims, valid := validDSGAProxyJWT(bearer, workload, config, time.Now())
 	if !valid {
 		deny(http.StatusUnauthorized)
+		return
+	}
+	// 签名绑定收到的原始正文，不能先重编码、换path或借通用token授权数组。
+	// 原Owner/Config/Service双读仍在后方逐次执行，专用scope不替代任何来源门。
+	arrayPath := dsgaProxyArrayPath(r.URL.Path)
+	if claims.Scope == dsgaArrayAuthorityScope {
+		digest := sha256.Sum256(body)
+		if !arrayPath || claims.Request == nil || claims.Request.Method != r.Method || claims.Request.Path != r.URL.Path || claims.Request.BodySHA256 != hex.EncodeToString(digest[:]) {
+			deny(http.StatusForbidden)
+			return
+		}
+	} else if arrayPath {
+		deny(http.StatusForbidden)
 		return
 	}
 	vm, err := proxy.broker.vms.NeonvmV1().VirtualMachines(proxy.broker.kube.namespace).Get(preflight, workload, metav1.GetOptions{})

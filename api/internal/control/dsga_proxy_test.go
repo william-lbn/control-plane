@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"context"
 	"crypto/ed25519"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"io"
 	"net"
@@ -561,4 +563,220 @@ func TestDSGAProxyAdmissionRoutesRetainOuterGates(t *testing.T) {
 			}
 		})
 	}
+}
+
+// 通过原TLS生产mux先实际签发array grant，再走同一proxy；只有最后Native处理器为夹具。
+func proxyArrayGrant(t *testing.T, f *brokerTestAPI, client *http.Client, base, path string, body []byte) string {
+	t.Helper()
+	f.mu.Lock()
+	claim := owner.Ownership{Namespace: f.vm.Namespace, VMName: f.vm.Name, VMUID: f.vm.UID,
+		Incarnation: f.vm.Spec.DSGABootstrap.Incarnation, LeaseUID: f.lease.UID,
+		HolderID: *f.lease.Spec.HolderIdentity, IssuerEpoch: 1}
+	f.mu.Unlock()
+	digest := sha256.Sum256(body)
+	envelope := dsgaArrayCredentialEnvelope{ProtocolVersion: 1, Owner: claim,
+		Request: dsgaArrayRequestBinding{1, http.MethodPost, path, hex.EncodeToString(digest[:])}}
+	raw, _ := json.Marshal(envelope)
+	code, data := brokerRequest(t, client, base+"/computes/"+brokerTestWorkload+"/dsga-array-credentials", raw)
+	var grant struct {
+		AccessToken string `json:"access_token"`
+	}
+	if code != http.StatusOK || json.Unmarshal(data, &grant) != nil || grant.AccessToken == "" {
+		t.Fatalf("actual TLS array credential grant failed: HTTP %d", code)
+	}
+	return grant.AccessToken
+}
+
+func TestDSGAProxyArrayAuthorityRoutesPreserveOriginalBytesAndGrant(t *testing.T) {
+	for _, path := range []string{"/dsg/v1/resource/array-authorize", "/dsg/v1/resource/array-observe", "/dsg/v1/resource/array-replay-original"} {
+		t.Run(strings.TrimPrefix(path, "/dsg/v1/resource/"), func(t *testing.T) {
+			var calls atomic.Int32
+			body := []byte("{\n \"protocol_version\":1, \"opaque\":\"原始字节\" }\n")
+			var token string
+			f, client, base, _ := proxyFixture(t, func(w http.ResponseWriter, r *http.Request) {
+				calls.Add(1)
+				got, _ := io.ReadAll(r.Body)
+				if r.Method != http.MethodPost || r.URL.Path != path || !bytes.Equal(got, body) || r.Header.Get("Authorization") != "Bearer "+token || r.Header.Get("Idempotency-Key") != "" || r.Header.Get("X-Forwarded-Host") != "" {
+					t.Error("array proxy changed original request or leaked caller headers")
+				}
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{"native_array_fixture":true}`))
+			})
+			token = proxyArrayGrant(t, f, client, base, path, body)
+			code, data := proxyRequest(t, client, http.MethodPost, base+path, token, body)
+			if code != http.StatusOK || calls.Load() != 1 || string(data) != `{"native_array_fixture":true}` {
+				t.Fatalf("array original route failed: HTTP %d, Native calls %d", code, calls.Load())
+			}
+		})
+	}
+}
+
+func TestDSGAProxyArrayAuthorityRejectsScopeAndBodyConfusion(t *testing.T) {
+	for _, scenario := range []string{"generic_array", "array_generic", "different_array_path", "body_byte_changed", "body_whitespace_changed", "wrong_method", "query_alias", "near_path"} {
+		t.Run(scenario, func(t *testing.T) {
+			var calls atomic.Int32
+			f, client, base, generic := proxyFixture(t, func(w http.ResponseWriter, r *http.Request) { calls.Add(1); w.WriteHeader(http.StatusOK) })
+			path, body := "/dsg/v1/resource/array-authorize", []byte(`{"protocol_version":1}`)
+			token := proxyArrayGrant(t, f, client, base, path, body)
+			method := http.MethodPost
+			switch scenario {
+			case "generic_array":
+				token = generic
+			case "array_generic":
+				path, method, body = "/dsg/v1/memory", http.MethodGet, nil
+			case "different_array_path":
+				path = "/dsg/v1/resource/array-replay-original"
+			case "body_byte_changed":
+				body = []byte(`{"protocol_version":2}`)
+			case "body_whitespace_changed":
+				body = []byte(`{ "protocol_version":1}`)
+			case "wrong_method":
+				method, body = http.MethodGet, nil
+			case "query_alias":
+				path += "?mode=authorize"
+			case "near_path":
+				path += "/extra"
+			}
+			code, _ := proxyRequest(t, client, method, base+path, token, body)
+			if code < 400 || calls.Load() != 0 {
+				t.Fatalf("unsafe array %s reached Native (HTTP %d)", scenario, code)
+			}
+		})
+	}
+}
+
+func TestDSGAProxyArrayAuthorityRetainsOwnerConfigServiceGates(t *testing.T) {
+	for _, scenario := range []string{"holder_changed", "lease_expired", "lease_future", "config_UID", "service_selector", "service_port", "service_deleting"} {
+		t.Run(scenario, func(t *testing.T) {
+			var calls atomic.Int32
+			f, client, base, _ := proxyFixture(t, func(w http.ResponseWriter, r *http.Request) { calls.Add(1); w.WriteHeader(http.StatusOK) })
+			path, body := "/dsg/v1/resource/array-authorize", []byte(`{"protocol_version":1}`)
+			token := proxyArrayGrant(t, f, client, base, path, body)
+			f.mu.Lock()
+			switch scenario {
+			case "holder_changed":
+				holder := "dsga-" + strings.Repeat("c", 32) + ".replacement"
+				f.lease.Spec.HolderIdentity = &holder
+			case "lease_expired":
+				old := metav1.NewMicroTime(time.Now().Add(-time.Minute))
+				f.lease.Spec.RenewTime = &old
+			case "lease_future":
+				future := metav1.NewMicroTime(time.Now().Add(time.Minute))
+				f.lease.Spec.RenewTime = &future
+			case "config_UID":
+				f.vm.Spec.DSGABootstrap.ConfigSecretUID = "recreated-config"
+			case "service_selector":
+				f.service.Spec.Selector["vm.neon.tech/name"] = "cp-ffffffffffffffff"
+			case "service_port":
+				f.service.Spec.Ports[0].TargetPort = intstr.FromInt(9999)
+			case "service_deleting":
+				now := metav1.Now()
+				f.service.DeletionTimestamp = &now
+			}
+			f.mu.Unlock()
+			code, _ := proxyRequest(t, client, http.MethodPost, base+path, token, body)
+			if code < 400 || calls.Load() != 0 {
+				t.Fatalf("unsafe source %s reached Native (HTTP %d)", scenario, code)
+			}
+		})
+	}
+}
+
+func TestDSGAProxyArrayAuthorityStrictSignedRequestClaims(t *testing.T) {
+	for _, scenario := range []string{"missing_request", "null_request", "unknown_request", "request_alias", "request_duplicate", "method_alias", "generic_request", "generic_null_request", "unknown_member", "wrong_protocol", "bad_digest"} {
+		t.Run(scenario, func(t *testing.T) {
+			var calls atomic.Int32
+			f, client, base, _ := proxyFixture(t, func(w http.ResponseWriter, r *http.Request) { calls.Add(1); w.WriteHeader(http.StatusOK) })
+			path, body := "/dsg/v1/resource/array-authorize", []byte(`{"protocol_version":1}`)
+			token := proxyArrayGrant(t, f, client, base, path, body)
+			parts := strings.Split(token, ".")
+			raw, err := base64.RawURLEncoding.DecodeString(parts[1])
+			if err != nil {
+				t.Fatal("fixture token decode")
+			}
+			var claims map[string]json.RawMessage
+			if json.Unmarshal(raw, &claims) != nil {
+				t.Fatal("fixture token claims")
+			}
+			switch scenario {
+			case "missing_request":
+				delete(claims, "request")
+			case "null_request":
+				claims["request"] = json.RawMessage("null")
+			case "unknown_request":
+				claims["request"] = json.RawMessage(strings.TrimSuffix(string(claims["request"]), "}") + `,"extra":true}`)
+			case "request_alias":
+				claims["Request"] = claims["request"]
+				delete(claims, "request")
+			case "request_duplicate":
+				claims["request"] = json.RawMessage(strings.Replace(string(claims["request"]), `"protocol_version":1`, `"protocol_version":1,"protocol_version":1`, 1))
+			case "method_alias":
+				claims["request"] = json.RawMessage(strings.Replace(string(claims["request"]), `"method":`, `"Method":`, 1))
+			case "generic_request":
+				claims["scope"] = json.RawMessage(`"compute_ctl:dsga"`)
+			case "generic_null_request":
+				claims["scope"] = json.RawMessage(`"compute_ctl:dsga"`)
+				claims["request"] = json.RawMessage("null")
+			case "unknown_member":
+				claims["unknown"] = json.RawMessage("true")
+			case "wrong_protocol":
+				claims["request"] = json.RawMessage(strings.Replace(string(claims["request"]), `"protocol_version":1`, `"protocol_version":2`, 1))
+			case "bad_digest":
+				claims["request"] = json.RawMessage(strings.Replace(string(claims["request"]), `"body_sha256":"`, `"body_sha256":"z`, 1))
+			}
+			raw, _ = json.Marshal(claims)
+			f.mu.Lock()
+			seed := append([]byte(nil), f.credentials.Data["controlSigningSeed"]...)
+			f.mu.Unlock()
+			token = proxySigned(ed25519.NewKeyFromSeed(seed), raw)
+			code, _ := proxyRequest(t, client, http.MethodPost, base+path, token, body)
+			if code < 400 || calls.Load() != 0 {
+				t.Fatalf("ambiguous signed %s reached Native (HTTP %d)", scenario, code)
+			}
+		})
+	}
+}
+
+func TestDSGAProxyArrayObserveIndependentFromBlockedAuthority(t *testing.T) {
+	entered, release := make(chan struct{}), make(chan struct{})
+	defer close(release)
+	var observed atomic.Int32
+	f, client, base, _ := proxyFixture(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/dsg/v1/resource/array-authorize" {
+			close(entered)
+			<-release
+		} else {
+			observed.Add(1)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"fixture":true}`))
+	})
+	f.proxy.execution.Transport.(*http.Transport).MaxConnsPerHost = 1
+	body := []byte(`{"protocol_version":1}`)
+	execToken := proxyArrayGrant(t, f, client, base, "/dsg/v1/resource/array-authorize", body)
+	observeToken := proxyArrayGrant(t, f, client, base, "/dsg/v1/resource/array-observe", body)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		request, _ := http.NewRequest(http.MethodPost, base+"/dsg/v1/resource/array-authorize", bytes.NewReader(body))
+		request.Header.Set("Authorization", "Bearer "+execToken)
+		request.Header.Set("Content-Type", "application/json")
+		response, err := client.Do(request)
+		if err == nil {
+			_, _ = io.Copy(io.Discard, response.Body)
+			response.Body.Close()
+		}
+	}()
+	select {
+	case <-entered:
+	case <-time.After(3 * time.Second):
+		t.Fatal("array authority did not reach Native")
+	}
+	started := time.Now()
+	code, _ := proxyRequest(t, client, http.MethodPost, base+"/dsg/v1/resource/array-observe", observeToken, body)
+	if code != http.StatusOK || observed.Load() != 1 || time.Since(started) > 2*time.Second {
+		t.Fatal("array observation blocked behind authority execution")
+	}
+	// 等待执行在handler退出时结束；release由defer关闭，连接池仍由原fixture清理。
+	_ = done
 }
