@@ -144,3 +144,61 @@ func TestDSGAInitializationHistoryUnsignedBootAndFailedCommitRecovery(t *testing
 		t.Fatal("boot outside uint64 range was stored or truncated")
 	}
 }
+
+// TestDSGAInitializationHistoryPublishesOnlyFreshSameSource覆盖真实Driver调用链，
+// 成功必须产生原registry PUT；Native503/同名替换不能借旧历史继续发布。
+func TestDSGAInitializationHistoryPublishesOnlyFreshSameSource(t *testing.T) {
+	ctx, binding, f, _, _, client, state, _ := initializationBindingFixture(t)
+	if _, err := binding.observeAndRecordInitializationWithHTTP(ctx, client); err != nil {
+		t.Fatal(err)
+	}
+	if state.calls.Load() != 1 || state.routePuts.Load() != 1 {
+		t.Fatal("Driver did not use one fresh NativeProbe and real publisher")
+	}
+	state.mu.Lock()
+	var routes map[string]map[string]json.RawMessage
+	err := json.Unmarshal(state.routeRaw, &routes)
+	state.status = 503
+	state.mu.Unlock()
+	if err != nil || len(routes[selector(binding.intent.EndpointID)]["managed_binding"]) == 0 {
+		t.Fatal("Driver did not register typed managed binding")
+	}
+	if _, err := binding.observeAndRecordInitializationWithHTTP(ctx, client); err == nil {
+		t.Fatal("Native503 accepted")
+	}
+	if state.routePuts.Load() != 1 {
+		t.Fatal("Native503 published route")
+	}
+	state.mu.Lock()
+	state.status = 0
+	state.afterRead = func() { f.mu.Lock(); f.vm.UID = "replaced-vm"; f.mu.Unlock() }
+	state.mu.Unlock()
+	if _, err := binding.observeAndRecordInitializationWithHTTP(ctx, client); err == nil {
+		t.Fatal("same-name VM drift accepted")
+	}
+	if state.routePuts.Load() != 1 {
+		t.Fatal("VM drift published route")
+	}
+	t.Run("same-UID-config-drift", checkDSGAInitializationHistoryConfigDrift)
+}
+
+// 同一Native响应期间的同UID配置漂移必须在publisher CAS前阻断，不覆盖原历史事实。
+func checkDSGAInitializationHistoryConfigDrift(t *testing.T) {
+	ctx, binding, f, _, _, client, state, _ := initializationBindingFixture(t)
+	state.mu.Lock()
+	state.afterRead = func() {
+		f.mu.Lock()
+		defer f.mu.Unlock()
+		var config map[string]any
+		json.Unmarshal(f.secret.Data["config.json"], &config)
+		config["spec"].(map[string]any)["branch_id"] = "br_foreign_fixture"
+		f.secret.Data["config.json"], _ = json.Marshal(config)
+	}
+	state.mu.Unlock()
+	if _, err := binding.observeAndRecordInitializationWithHTTP(ctx, client); err == nil {
+		t.Fatal("config drift accepted")
+	}
+	if state.routePuts.Load() != 0 {
+		t.Fatal("config drift published route")
+	}
+}

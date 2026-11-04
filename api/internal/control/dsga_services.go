@@ -1,7 +1,6 @@
 package control
 
 import (
-	"bytes"
 	"context"
 	"errors"
 	"net"
@@ -22,9 +21,14 @@ func renderDSGAService(vm *vmv1.VirtualMachine, p createPayload, plan dsgaCreati
 		plan.validate(p) != nil || dsgapi.ValidateID(operation, "creation Operation") != nil || (kind != "postgres" && kind != "management") {
 		return nil, errDSGACreationIdentity
 	}
-	name, port, portName := vm.Name, int32(55433), "postgres"
+	name, port, portName := vm.Name, int32(dsgaPostgresPort), "postgres"
 	if kind == "management" {
 		name, port, portName = vm.Name+"-management", 3080, "compute-control"
+	}
+	// SQL按已有Helm用命名目标，management仍沿原3080目标。
+	targetPort := intstr.FromString("postgres")
+	if kind == "management" {
+		targetPort = intstr.FromInt32(port)
 	}
 	controller, blocking := true, false
 	return &core.Service{ObjectMeta: metav1.ObjectMeta{Namespace: vm.Namespace, Name: name,
@@ -32,7 +36,7 @@ func renderDSGAService(vm *vmv1.VirtualMachine, p createPayload, plan dsgaCreati
 		Annotations:     map[string]string{dsgaCredentialOperation: operation, dsgaCredentialIncarnation: plan.Incarnation, dsgaCredentialCompute: plan.ComputeInstanceID},
 		OwnerReferences: []metav1.OwnerReference{{APIVersion: vmv1.SchemeGroupVersion.String(), Kind: "VirtualMachine", Name: vm.Name, UID: vm.UID, Controller: &controller, BlockOwnerDeletion: &blocking}}},
 		Spec: core.ServiceSpec{Type: core.ServiceTypeClusterIP, SessionAffinity: core.ServiceAffinityNone,
-			Selector: map[string]string{"vm.neon.tech/name": vm.Name}, Ports: []core.ServicePort{{Name: portName, Protocol: core.ProtocolTCP, Port: port, TargetPort: intstr.FromInt32(port)}}}}, nil
+			Selector: map[string]string{"vm.neon.tech/name": vm.Name}, Ports: []core.ServicePort{{Name: portName, Protocol: core.ProtocolTCP, Port: port, TargetPort: targetPort}}}}, nil
 }
 
 // API分配的ClusterIP/IPFamilies可按平台默认产生，其余路由语义必须与原构造
@@ -141,7 +145,7 @@ func (binding *dsgaCreationBinding) prepareServices(ctx context.Context) error {
 		return errDSGACreationIdentity
 	}
 	data, err := current.renderDSGABootstrap(ctx, vm)
-	if err != nil || len(config.Data) != 1 || !bytes.Equal(config.Data["config.json"], data["config.json"]) {
+	if err != nil || !sameDSGABootstrapData(config.Data, data) {
 		return errDSGACreationIdentity
 	}
 	for _, kind := range []string{"postgres", "management"} {

@@ -70,7 +70,7 @@ func TestDSGAVMTemplateFreezesOfficialRuntimeAndTLS(t *testing.T) {
 	if json.Unmarshal(raw, &config) != nil || config.Ctl.TLS.Key != vm.Spec.TLS.MountPath+"/tls.key" || config.Ctl.TLS.Cert != vm.Spec.TLS.MountPath+"/tls.crt" {
 		t.Fatal("Compute paths differ from actual official TLS mount filenames")
 	}
-	if strings.Contains(strings.Join(vm.Spec.Guest.Args, " "), "--dev") || !strings.Contains(strings.Join(vm.Spec.Guest.Args, " "), "host=/var/db/postgres/compute/dsg_socket port=55433") {
+	if strings.Contains(strings.Join(vm.Spec.Guest.Args, " "), "--dev") || !strings.Contains(strings.Join(vm.Spec.Guest.Args, " "), "host=/var/db/postgres/compute/dsg_socket port=55432") {
 		t.Fatal("production CLI used development bypass or TCP superuser monitor")
 	}
 	if len(vm.Spec.Guest.Env) != 3 || vm.Spec.Guest.Env[0].Value != "17" || vm.Spec.EnableSSH == nil || *vm.Spec.EnableSSH {

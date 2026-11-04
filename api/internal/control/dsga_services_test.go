@@ -296,3 +296,44 @@ func TestDSGAServicesRejectForeignRouteAndNoRepairWrites(t *testing.T) {
 		})
 	}
 }
+
+func TestDSGAServicesRejectNoncanonicalBootstrapDocuments(t *testing.T) {
+	ctx, binding, services, api, _ := dsgaServicesSourceFixture(t, "success")
+	api.mu.Lock()
+	original := api.secret.DeepCopy()
+	api.mu.Unlock()
+	before := servicesFact(t, ctx, binding)
+	for name, data := range noncanonicalDSGABootstrapData(t, original.Data) {
+		t.Run(name, func(t *testing.T) {
+			api.mu.Lock()
+			api.secret = original.DeepCopy()
+			api.secret.Data = data
+			api.mu.Unlock()
+			if binding.prepareServices(ctx) == nil {
+				t.Fatal("noncanonical documents accepted")
+			}
+			services.mu.Lock()
+			posts := services.posts
+			services.mu.Unlock()
+			if posts != 0 || servicesFact(t, ctx, binding) != before {
+				t.Fatal("noncanonical documents changed service state")
+			}
+		})
+	}
+	api.mu.Lock()
+	api.secret = original.DeepCopy()
+	api.mu.Unlock()
+	if err := binding.prepareServices(ctx); err != nil {
+		t.Fatal("unchanged canonical documents rejected")
+	}
+	fixed := servicesFact(t, ctx, binding)
+	if binding.prepareServices(ctx) != nil || servicesFact(t, ctx, binding) != fixed {
+		t.Fatal("canonical restoration changed original service identity")
+	}
+	services.mu.Lock()
+	posts := services.posts
+	services.mu.Unlock()
+	if posts != 2 {
+		t.Fatal("canonical recovery recreated services")
+	}
+}

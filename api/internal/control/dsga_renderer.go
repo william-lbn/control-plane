@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"strconv"
 
 	"github.com/william-lbn/control-plane/api/internal/functionsql"
 )
@@ -78,7 +79,7 @@ func renderDSGAComputeBootstrap(p createPayload, plan dsgaCreationPlan, vmUID st
 		option("fsync", "on", "bool"),
 		option("wal_level", "logical", "enum"),
 		option("wal_log_hints", "on", "bool"),
-		option("port", "55433", "integer"),
+		option("port", strconv.Itoa(dsgaPostgresPort), "integer"),
 		option("listen_addresses", "0.0.0.0", "string"),
 		option("password_encryption", "scram-sha-256", "enum"),
 		option("restart_after_crash", "off", "bool"),

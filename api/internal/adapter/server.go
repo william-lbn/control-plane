@@ -22,6 +22,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	dsgapi "github.com/neondatabase/autoscaling/pkg/api/dsga"
 )
 
 type Kubernetes interface {
@@ -164,19 +166,20 @@ func (s *Server) path(collection, name string) string {
 }
 
 type route struct {
-	ProjectID  string            `json:"project_id"`
-	BranchID   string            `json:"branch_id"`
-	TenantID   string            `json:"tenant_id"`
-	Kind       string            `json:"kind"`
-	Workload   string            `json:"workload"`
-	Address    string            `json:"address"`
-	Role       string            `json:"role"`
-	Verifier   string            `json:"verifier"`
-	Roles      map[string]string `json:"roles"`
-	AllowedIPs []string          `json:"allowed_ips"`
-	State      string            `json:"state"`
-	NodeID     uint64            `json:"pageserver_node_id"`
-	Template   map[string]any    `json:"vm_template"`
+	ProjectID      string            `json:"project_id"`
+	BranchID       string            `json:"branch_id"`
+	TenantID       string            `json:"tenant_id"`
+	Kind           string            `json:"kind"`
+	Workload       string            `json:"workload"`
+	Address        string            `json:"address"`
+	Role           string            `json:"role"`
+	Verifier       string            `json:"verifier"`
+	Roles          map[string]string `json:"roles"`
+	AllowedIPs     []string          `json:"allowed_ips"`
+	State          string            `json:"state"`
+	NodeID         uint64            `json:"pageserver_node_id"`
+	Template       map[string]any    `json:"vm_template"`
+	ManagedBinding json.RawMessage   `json:"managed_binding,omitempty"`
 }
 
 func (s *Server) routes(ctx context.Context) (map[string]route, error) {
@@ -192,8 +195,46 @@ func (s *Server) routes(ctx context.Context) (map[string]route, error) {
 	if err != nil || len(raw) > 2<<20 {
 		return nil, errors.New("invalid routes encoding/size")
 	}
-	var routes map[string]route
-	if err = json.Unmarshal(raw, &routes); err != nil || routes == nil {
+	// 全registry只增加顶层唯一key/尾随检查；合法legacy的opaque策略字段
+	// 仍沿原json.Unmarshal语义，不受managed递归深度上限影响。
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	opening, err := decoder.Token()
+	if err != nil || opening != json.Delim('{') {
+		return nil, errors.New("invalid route document")
+	}
+	routes := make(map[string]route)
+	for decoder.More() {
+		token, err := decoder.Token()
+		key, ok := token.(string)
+		if err != nil || !ok {
+			return nil, errors.New("invalid route document")
+		}
+		if _, exists := routes[key]; exists {
+			return nil, errors.New("invalid route document")
+		}
+		var record json.RawMessage
+		var item route
+		var fields map[string]json.RawMessage
+		if decoder.Decode(&record) != nil || json.Unmarshal(record, &item) != nil || json.Unmarshal(record, &fields) != nil {
+			return nil, errors.New("invalid route document")
+		}
+		if _, managed := fields["managed_binding"]; managed {
+			// 管理路由从真实reader入口拒绝重复/未知Binding字段；这里
+			// 只校静态合同，fresh VM/Config/Service读取仍在原selected路径。
+			if dsgapi.ValidateObservationJSON(record, 2<<20, 65536) != nil {
+				return nil, errors.New("invalid route document")
+			}
+			var binding ManagedSQLBinding
+			if dsgapi.UnmarshalObject(item.ManagedBinding, &binding) != nil || binding.Validate() != nil {
+				return nil, errors.New("invalid route document")
+			}
+		}
+		routes[key] = item
+	}
+	if closing, err := decoder.Token(); err != nil || closing != json.Delim('}') {
+		return nil, errors.New("invalid route document")
+	}
+	if decoder.Decode(new(any)) != io.EOF {
 		return nil, errors.New("invalid route document")
 	}
 	return routes, nil
@@ -245,9 +286,19 @@ func (s *Server) selected(w http.ResponseWriter, r *http.Request) (string, route
 		s.unavailable(w, "route_validation", err)
 		return "", route{}, false
 	}
+	if len(item.ManagedBinding) != 0 {
+		if err = s.validateManagedSQLRoute(r.Context(), key, item); err != nil {
+			s.unavailable(w, "managed_route", err)
+			return "", route{}, false
+		}
+	}
 	return key, item, true
 }
 func (s *Server) validateRoute(key string, item route) error {
+	if len(item.ManagedBinding) != 0 {
+		_, err := s.managedSQLBinding(key, item)
+		return err
+	}
 	if item.ProjectID == "" || item.BranchID == "" || !dnsName.MatchString(item.Workload) || (item.Kind != "neonvm" && item.Kind != "deployment") {
 		return errors.New("invalid route identity")
 	}

@@ -18,6 +18,21 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+// 同一immutable Config须保留canonical renderer的全部文档；只比config.json
+// 或仅放宽文档数会把资源来源缺失、额外文档及逐字节漂移漏过。
+func sameDSGABootstrapData(actual, wanted map[string][]byte) bool {
+	if len(actual) != len(wanted) {
+		return false
+	}
+	for key, value := range wanted {
+		got, ok := actual[key]
+		if !ok || !bytes.Equal(got, value) {
+			return false
+		}
+	}
+	return true
+}
+
 // 与Rust原生初始化观察合同逐字段对应。它不授予普通SQL准入或VM执行权；原生
 // observed含真实boot，后续预算/准入必须再次使用该实例身份并独立对账。
 type dsgaInitializationResponse struct {
@@ -30,14 +45,24 @@ type dsgaInitializationResponse struct {
 	AuthenticationPolicyVerified bool                `json:"authentication_policy_verified"`
 	OrdinaryRolesVerified        bool                `json:"ordinary_roles_verified"`
 	Observed                     dsgapi.Snapshot     `json:"observed"`
+	configSHA256                 string
+	secretDataSHA256             string
 }
 
 func (fact dsgaInitializationResponse) validate(p createPayload, plan dsgaCreationPlan, vmUID string) error {
 	wanted, err := plan.nativeBootstrap(p, vmUID)
-	if err != nil || fact.ProtocolVersion != 1 || fact.VMShrinkPermit || !fact.AuthenticationPolicyVerified || !fact.OrdinaryRolesVerified ||
-		fact.OperationUUID != plan.OperationUUID || fact.TenantID != p.TenantID || fact.TimelineID != p.TimelineID || fact.Startup != wanted ||
-		fact.Observed.Validate() != nil || fact.Observed.Instance.VMUID != vmUID || fact.Observed.Instance.ComputeInstanceID != plan.ComputeInstanceID ||
-		uint64(fact.Observed.MaximumBuffers)*8192 != plan.Budget.MaximumBufferBytes || uint64(fact.Observed.LowBuffers)*8192 < plan.Budget.BootstrapBufferBytes {
+	if err != nil {
+		return errDSGACreationIdentity
+	}
+	return fact.validateStartup(p, plan.OperationUUID, wanted)
+}
+
+// validateStartup同时供原Driver及封存Config路由入口复用；不把HTTP running当Native初始化。
+func (fact dsgaInitializationResponse) validateStartup(p createPayload, operation string, wanted dsgaNativeBootstrap) error {
+	if fact.ProtocolVersion != 1 || fact.VMShrinkPermit || !fact.AuthenticationPolicyVerified || !fact.OrdinaryRolesVerified ||
+		fact.OperationUUID != operation || fact.TenantID != p.TenantID || fact.TimelineID != p.TimelineID || fact.Startup != wanted ||
+		fact.Observed.Validate() != nil || fact.Observed.Instance.VMUID != wanted.VMUID || fact.Observed.Instance.ComputeInstanceID != wanted.ComputeInstanceID ||
+		uint64(fact.Observed.MaximumBuffers)*8192 != wanted.MaximumBufferBytes || uint64(fact.Observed.LowBuffers)*8192 < wanted.BootstrapBufferBytes {
 		return errDSGACreationIdentity
 	}
 	return nil
@@ -112,8 +137,8 @@ func (binding *dsgaCreationBinding) observeInitializationWithHTTP(ctx context.Co
 	if err != nil || string(config.UID) != current.configUID || bootstrap.CheckReady(vm, config, false) != nil {
 		return empty, errDSGACreationIdentity
 	}
-	wanted, err := renderDSGAComputeBootstrap(p, plan, current.vmUID, source.credentials)
-	if err != nil || len(config.Data) != 1 || !bytes.Equal(config.Data["config.json"], wanted) {
+	wanted, err := current.renderDSGABootstrap(ctx, vm)
+	if err != nil || !sameDSGABootstrapData(config.Data, wanted) {
 		return empty, errDSGACreationIdentity
 	}
 	service, err := clients.CoreV1().Services(plan.Namespace).Get(ctx, name+"-management", metav1.GetOptions{})
@@ -164,5 +189,8 @@ func (binding *dsgaCreationBinding) observeInitializationWithHTTP(ctx context.Co
 	if err := current.confirmCredentialSource(ctx, latest, source); err != nil {
 		return empty, err
 	}
+	// 固定本次Native GET前已验证的immutable配置快照，CAS前再比同一UID/hash。
+	fact.configSHA256 = managedSQLDigest(config.Data["config.json"])
+	fact.secretDataSHA256 = managedSQLDataDigest(config.Data)
 	return fact, nil
 }

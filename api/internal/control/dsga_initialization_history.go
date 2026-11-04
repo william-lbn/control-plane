@@ -28,6 +28,10 @@ func (binding *dsgaCreationBinding) observeAndRecordInitializationWithHTTP(ctx c
 	if err := binding.recordInitialization(ctx, fact); err != nil {
 		return dsgaInitializationResponse{}, err
 	}
+	// 真实Native事实已记录后自动进入同一生产publisher；失败不能推进SQL/ready阶段。
+	if err := binding.publishInitializedSQLRoute(ctx, fact); err != nil {
+		return dsgaInitializationResponse{}, err
+	}
 	return fact, nil
 }
 

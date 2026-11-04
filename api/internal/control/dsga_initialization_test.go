@@ -5,9 +5,11 @@ import (
 	"crypto/ed25519"
 	"encoding/base64"
 	"encoding/json"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -47,6 +49,9 @@ type initializationTestState struct {
 	encoding  string
 	afterRead func()
 	calls     atomic.Int32
+	routePuts atomic.Int32
+	routeRaw  []byte
+	status    int
 }
 
 func initializationBindingFixture(t *testing.T) (context.Context, *dsgaCreationBinding, *creationTestAPI, **core.Secret, *core.Service, *http.Client, *initializationTestState, dsgaInitializationResponse) {
@@ -70,9 +75,43 @@ func initializationBindingFixture(t *testing.T) (context.Context, *dsgaCreationB
 	service := services.objects[vm.Name+"-management"].DeepCopy()
 	services.mu.Unlock()
 	nativeTarget := net.JoinHostPort(service.Spec.ClusterIP, "3080")
+	// 同一真实Driver fixture增加SQL Service及原registry CAS；全部是synthetic数据。
+	state := &initializationTestState{}
+	registry := &core.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: vm.Namespace, Name: routesSecret, UID: "fixture-route-registry", ResourceVersion: "1"},
+		Type: core.SecretTypeOpaque, Data: map[string][]byte{"routes.json": []byte("{}")}}
+
 	api := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") != "Bearer creation-kube-identity" {
 			creationStatus(w, 403)
+			return
+		}
+		if r.URL.Path == f.kube.path("secret", routesSecret) {
+			f.mu.Lock()
+			defer f.mu.Unlock()
+			w.Header().Set("Content-Type", "application/json")
+			if r.Method == http.MethodPut {
+				var proposed core.Secret
+				if json.NewDecoder(r.Body).Decode(&proposed) != nil || proposed.UID != registry.UID || proposed.ResourceVersion != registry.ResourceVersion {
+					creationStatus(w, 409)
+					return
+				}
+				proposed.ResourceVersion = strconv.Itoa(int(state.routePuts.Add(1)) + 1)
+				registry = proposed.DeepCopy()
+				state.mu.Lock()
+				state.routeRaw = append([]byte(nil), registry.Data["routes.json"]...)
+				state.mu.Unlock()
+			} else if r.Method != http.MethodGet {
+				creationStatus(w, 405)
+				return
+			}
+			_ = json.NewEncoder(w).Encode(registry)
+			return
+		}
+		if r.Method == http.MethodGet && r.URL.Path == f.kube.path("service", vm.Name) {
+			services.mu.Lock()
+			defer services.mu.Unlock()
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(services.objects[vm.Name])
 			return
 		}
 		if r.Method == http.MethodGet && (r.URL.Path == f.kube.path("secret", vm.Name+"-credentials") || r.URL.Path == f.kube.path("service", vm.Name+"-management")) {
@@ -91,7 +130,7 @@ func initializationBindingFixture(t *testing.T) (context.Context, *dsgaCreationB
 	t.Cleanup(api.Close)
 	f.kube.base, f.kube.http = api.URL, api.Client()
 	fact := initializationFactFixture(t, binding.intent.createPayload, plan, string(vm.UID))
-	state := &initializationTestState{}
+
 	state.raw, _ = json.Marshal(fact)
 	native := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		state.calls.Add(1)
@@ -113,7 +152,7 @@ func initializationBindingFixture(t *testing.T) (context.Context, *dsgaCreationB
 			t.Error("native request used foreign/broad credential")
 		}
 		state.mu.Lock()
-		body, encoding, hook := append([]byte(nil), state.raw...), state.encoding, state.afterRead
+		body, encoding, hook, status := append([]byte(nil), state.raw...), state.encoding, state.afterRead, state.status
 		state.mu.Unlock()
 		if hook != nil {
 			hook()
@@ -122,6 +161,9 @@ func initializationBindingFixture(t *testing.T) (context.Context, *dsgaCreationB
 		w.Header().Set("Cache-Control", "no-store")
 		if encoding != "" {
 			w.Header().Set("Content-Encoding", encoding)
+		}
+		if status != 0 {
+			w.WriteHeader(status)
 		}
 		_, _ = w.Write(body)
 	}))
@@ -252,5 +294,60 @@ func TestDSGAInitializationJWTDoesNotGrantGeneralProxyAuthority(t *testing.T) {
 	raw = []byte(strings.Replace(string(raw), "compute_ctl:dsga_initialization", "compute_ctl:dsga", 1))
 	if _, valid := validDSGAProxyJWT(proxySigned(key, raw), brokerTestWorkload, config, now); !valid {
 		t.Fatal("scope control fixture has a foreign signature or identity")
+	}
+}
+
+// 以下变化只改变synthetic immutable Config文档，不读取生产Secret。
+func noncanonicalDSGABootstrapData(t *testing.T, original map[string][]byte) map[string]map[string][]byte {
+	t.Helper()
+	if len(original) < 2 {
+		t.Fatal("fixture did not use canonical multi-document renderer")
+	}
+	clone := func() map[string][]byte {
+		out := make(map[string][]byte, len(original))
+		for key, value := range original {
+			out[key] = append([]byte(nil), value...)
+		}
+		return out
+	}
+	cases := make(map[string]map[string][]byte)
+	extra := clone()
+	extra["unexpected.json"] = []byte("{}")
+	cases["extra"] = extra
+	for key := range original {
+		missing, mutated := clone(), clone()
+		delete(missing, key)
+		// 合法JSON尾部空白仍须逐字节拒绝，不能被语法错误门替代。
+		mutated[key] = append(mutated[key], '\n')
+		cases["missing_"+key], cases["mutated_"+key] = missing, mutated
+	}
+	return cases
+}
+
+func TestDSGAInitializationRejectsNoncanonicalBootstrapDocuments(t *testing.T) {
+	ctx, binding, api, _, _, client, state, _ := initializationBindingFixture(t)
+	api.mu.Lock()
+	original := api.secret.DeepCopy()
+	api.mu.Unlock()
+	if _, err := binding.observeInitializationWithHTTP(ctx, client); err != nil {
+		t.Fatal("unchanged canonical documents rejected")
+	}
+	for name, data := range noncanonicalDSGABootstrapData(t, original.Data) {
+		t.Run(name, func(t *testing.T) {
+			api.mu.Lock()
+			api.secret = original.DeepCopy()
+			api.secret.Data = data
+			api.mu.Unlock()
+			calls := state.calls.Load()
+			if _, err := binding.observeInitializationWithHTTP(ctx, client); err == nil || state.calls.Load() != calls {
+				t.Fatal("noncanonical documents reached native or produced proof")
+			}
+		})
+	}
+	api.mu.Lock()
+	api.secret = original.DeepCopy()
+	api.mu.Unlock()
+	if _, err := binding.observeInitializationWithHTTP(ctx, client); err != nil {
+		t.Fatal("canonical restoration changed observation")
 	}
 }
