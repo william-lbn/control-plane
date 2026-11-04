@@ -166,7 +166,7 @@ func TestDSGAProxyExplicitRoutesPreserveOriginalBytesAndCredential(t *testing.T)
 		w.Header().Set("Location", "https://foreign.invalid")
 		_, _ = w.Write([]byte(`{"native_fact_fixture":true}`))
 	})
-	paths := []string{"capabilities", "memory", "initialization", "budget/shared", "work/state", "connections/state", "work/prepared", "work/dsm", "resize", "resize/status", "resize/cancel", "issuer/fence", "admission", "admission/status", "admission/close-original", "admission/close-original/status"}
+	paths := []string{"capabilities", "memory", "initialization", "budget/shared", "work/state", "connections/state", "work/prepared", "work/dsm", "resize", "resize/status", "resize/cancel", "issuer/fence", "admission", "admission/status", "admission/lease", "admission/lease/rearm/status", "admission/close-original", "admission/close-original/status", "admission/continue-close", "admission/continue-close/status"}
 	for _, path := range paths {
 		method, body := http.MethodPost, []byte(`{"issuer_epoch":"18446744073709551615"}`)
 		if path == "capabilities" || path == "memory" || path == "initialization" || path == "budget/shared" || path == "work/state" || path == "connections/state" || path == "work/prepared" || path == "work/dsm" {
@@ -272,7 +272,7 @@ func TestDSGAProxyObservationIndependentFromBlockedExecution(t *testing.T) {
 	case <-time.After(3 * time.Second):
 		t.Fatal("execution did not enter")
 	}
-	for _, path := range []string{"memory", "budget/shared", "work/state", "connections/state", "work/prepared", "work/dsm", "resize/status", "resize/cancel", "admission", "admission/status", "admission/close-original", "admission/close-original/status"} {
+	for _, path := range []string{"memory", "budget/shared", "work/state", "connections/state", "work/prepared", "work/dsm", "resize/status", "resize/cancel", "admission", "admission/status", "admission/lease", "admission/lease/rearm/status", "admission/close-original", "admission/close-original/status", "admission/continue-close", "admission/continue-close/status"} {
 		method, body := http.MethodPost, []byte(`{}`)
 		if path == "memory" || path == "budget/shared" || path == "work/state" || path == "connections/state" || path == "work/prepared" || path == "work/dsm" {
 			method, body = http.MethodGet, nil
@@ -450,6 +450,114 @@ func TestDSGAProxyRejectsInvalidEnvelopeBeforeNative(t *testing.T) {
 			response.Body.Close()
 			if response.StatusCode < 400 || calls.Load() != 0 || response.Header.Get("Cache-Control") != "no-store" {
 				t.Fatal("unsafe envelope reached native", response.StatusCode)
+			}
+		})
+	}
+}
+
+// 只证明网关显式转发与原严格有类型合同；native响应为单元夹具，不冒PG执行事实。
+type admissionObserverOnlyTransport struct{}
+
+func (admissionObserverOnlyTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, net.InvalidAddrError("admission must use the independent observer pool")
+}
+
+func TestDSGAProxyAdmissionLeaseAndContinuationRoutes(t *testing.T) {
+	lease := `{"protocol_version":1,"instance":{"vm_uid":"vm-uid","compute_instance_id":"compute-1","pg_boot_id":"7"},"issuer_epoch":"1","expected_capacity_generation":"3","expected_admission_revision":"2","expected_deadline_ns":"1234","action":"renew"}`
+	continuation := `{"protocol_version":2,"original":{"protocol_version":1,"instance":{"vm_uid":"vm-uid","compute_instance_id":"compute-1","pg_boot_id":"7"},"issuer_epoch":"1","revision":"1","expected_capacity_generation":"1","open":false,"budget_commitment_id":"original-admission-budget"},"previous_close":{"protocol_version":1,"instance":{"vm_uid":"vm-uid","compute_instance_id":"compute-1","pg_boot_id":"7"},"issuer_epoch":"1","revision":"1","expected_capacity_generation":"1","open":false,"budget_commitment_id":"original-admission-budget"},"close":{"protocol_version":1,"instance":{"vm_uid":"vm-uid","compute_instance_id":"compute-1","pg_boot_id":"7"},"issuer_epoch":"1","revision":"2","expected_capacity_generation":"2","open":false,"budget_commitment_id":"original-admission-budget"}}`
+	for _, scenario := range []struct {
+		name, path, body string
+		want             int
+	}{
+		{"observe", "/dsg/v1/admission/lease", strings.Replace(strings.Replace(lease, `"renew"`, `"observe"`, 1), `"1234"`, `"0"`, 1), 200},
+		{"renew", "/dsg/v1/admission/lease", lease, 200},
+		{"rearm", "/dsg/v1/admission/lease", strings.Replace(lease, `"renew"`, `"rearm"`, 1), 200},
+		{"rearm_status", "/dsg/v1/admission/lease/rearm/status", strings.Replace(lease, `"renew"`, `"rearm"`, 1), 200},
+		{"continue_close", "/dsg/v1/admission/continue-close", continuation, 200},
+		{"continue_close_status", "/dsg/v1/admission/continue-close/status", continuation, 200},
+		{"native_unknown_member", "/dsg/v1/admission/lease", strings.TrimSuffix(lease, "}") + `,"unknown":true}`, 400},
+		{"native_zero_pg_boot", "/dsg/v1/admission/lease", strings.Replace(lease, `"pg_boot_id":"7"`, `"pg_boot_id":"0"`, 1), 400},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			// 保留空白和所有规范u64字符串；网关不重编码、更换epoch或制造deadline。
+			body := []byte(" \n" + scenario.body + "\n")
+			var calls atomic.Int32
+			f, client, base, token := proxyFixture(t, func(w http.ResponseWriter, r *http.Request) {
+				calls.Add(1)
+				actual, _ := io.ReadAll(r.Body)
+				if r.Method != http.MethodPost || r.URL.Path != scenario.path || !bytes.Equal(actual, body) || !strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ey") || r.Header.Get("Idempotency-Key") != "" || r.Header.Get("X-Forwarded-Host") != "" {
+					t.Error("original admission route, bytes or credential changed")
+				}
+				w.Header().Set("Content-Type", "application/json")
+				valid := false
+				if strings.HasPrefix(scenario.path, "/dsg/v1/admission/lease") {
+					var request dsgapi.AdmissionLeaseRequest
+					valid = json.Unmarshal(actual, &request) == nil && request.Instance == (dsgapi.Instance{VMUID: "vm-uid", ComputeInstanceID: "compute-1", PGBootID: 7}) && request.IssuerEpoch == 1
+					if scenario.path == "/dsg/v1/admission/lease/rearm/status" {
+						valid = valid && request.Action == "rearm"
+					}
+				} else {
+					var request dsgapi.AdmissionContinuationRequest
+					valid = json.Unmarshal(actual, &request) == nil && request.Close.Instance == (dsgapi.Instance{VMUID: "vm-uid", ComputeInstanceID: "compute-1", PGBootID: 7}) && request.Close.IssuerEpoch == 1
+				}
+				if !valid {
+					w.WriteHeader(http.StatusBadRequest)
+					_, _ = w.Write([]byte(`{"error":"invalid_request"}`))
+					return
+				}
+				_, _ = w.Write([]byte(`{"native_admission_fixture":true}`))
+			})
+			f.proxy.execution.Transport = admissionObserverOnlyTransport{}
+			code, data := proxyRequest(t, client, http.MethodPost, base+scenario.path, token, body)
+			if code != scenario.want || calls.Load() != 1 {
+				t.Fatalf("admission route got HTTP %d, native calls %d", code, calls.Load())
+			}
+			want := `{"native_admission_fixture":true}`
+			if scenario.want == 400 {
+				want = `{"error":"invalid_request"}`
+			}
+			if string(data) != want {
+				t.Fatal("native fact/status changed")
+			}
+		})
+	}
+}
+
+func TestDSGAProxyAdmissionRoutesRetainOuterGates(t *testing.T) {
+	for _, scenario := range []string{"wrong_method", "near_path", "query", "over_limit", "foreign_token", "owner_changed", "config_UID"} {
+		t.Run(scenario, func(t *testing.T) {
+			var calls atomic.Int32
+			f, client, base, token := proxyFixture(t, func(w http.ResponseWriter, r *http.Request) {
+				calls.Add(1)
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = w.Write([]byte(`{}`))
+			})
+			method, path, body := http.MethodPost, "/dsg/v1/admission/lease", []byte(`{}`)
+			switch scenario {
+			case "wrong_method":
+				method = http.MethodGet
+				body = nil
+			case "near_path":
+				path += "/renew"
+			case "query":
+				path += "?action=renew"
+			case "over_limit":
+				body = []byte(strings.Repeat("x", 16*1024+1))
+			case "foreign_token":
+				token = "invalid"
+			case "owner_changed":
+				f.mu.Lock()
+				holder := "dsga-" + strings.Repeat("c", 32) + ".replacement"
+				f.lease.Spec.HolderIdentity = &holder
+				f.mu.Unlock()
+			case "config_UID":
+				f.mu.Lock()
+				f.vm.Spec.DSGABootstrap.ConfigSecretUID = "recreated-config"
+				f.mu.Unlock()
+			}
+			code, _ := proxyRequest(t, client, method, base+path, token, body)
+			if code < 400 || calls.Load() != 0 {
+				t.Fatalf("unsafe admission %s reached native (HTTP %d)", scenario, code)
 			}
 		})
 	}

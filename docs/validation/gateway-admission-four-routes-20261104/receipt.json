@@ -1,0 +1,43 @@
+{
+  "scope": "定向网关TLS协议转发测试及单Gateway编译，不冒真实PG执行/资格通过",
+  "base_commit": "0fa6a26428db9dc42fdfe3f0935d5990996bdfef",
+  "source_only_owned_files": {
+    "api/internal/control/dsga_proxy.go": "861b24708f86b3eaa56c3c836bc94531eb15ed96d0a3b4ca7159bc606c1f13ff",
+    "api/internal/control/dsga_proxy_test.go": "fff12703128e8b4ad4e0dc6e630ba7a460ca4b4c9a1990c3bba4c6a5f47d6180"
+  },
+  "missing_routes_fixed": [
+    "/dsg/v1/admission/lease",
+    "/dsg/v1/admission/lease/rearm/status",
+    "/dsg/v1/admission/continue-close",
+    "/dsg/v1/admission/continue-close/status"
+  ],
+  "method": "POST only",
+  "existing_actor_UID_Secret_Service_Owner_body_limits_unchanged": true,
+  "independent_observer_connection_pool_preserved": true,
+  "source_snapshot": "exact base archive plus only owned two files; managed route WIP excluded",
+  "actual_compiled_source_regular_files": 1426,
+  "targeted_test_roots": 7,
+  "deduplicated_PASS_events": 53,
+  "fail": 0,
+  "skip": 0,
+  "race": 0,
+  "tests_exit": 0,
+  "formal_build_exit": 0,
+  "seconds": 140.568,
+  "CPU": 3,
+  "memory_bytes": 3221225472,
+  "swap_bytes": 0,
+  "tests_memory_peak": 1549733888,
+  "build_memory_peak": 1033510912,
+  "Go": "1.27.1",
+  "Gateway_ELF_SHA256": "4053a0c67f2e90da722b0822dca3dac2c788d9a03b5d90a26f2010f65aa25688",
+  "Gateway_ELF_bytes": 71140712,
+  "ELF_path": "/data/neon-build/validation/gateway-admission-four-routes-go-20261104T013620Z-8ab05a/export/compute-gateway",
+  "original_result_path": "/data/neon-build/validation/gateway-admission-four-routes-go-20261104T013620Z-8ab05a/result.json",
+  "original_result_SHA256": "0bdb63d5e628a742ebeecdb1f96c70e79d4c63ebe1743e4ad3373ce0620275df",
+  "source_proposal_path": "/data/neon-build/validation/gateway-admission-four-routes-go-20261104T013620Z-8ab05a/frozen-two-file-proposal.json",
+  "source_proposal_SHA256": "4473ef16e35917640c505f36f35131b20c43cb964e2913e4d086821972d7a41b",
+  "own_budget_reconciled": true,
+  "image_or_actual_Gateway_rollout_completed": false,
+  "real_qualification_or_memory_E_passed": false
+}
