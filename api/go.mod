@@ -115,6 +115,6 @@ require (
 	gopkg.in/ini.v1 v1.67.2 // indirect
 )
 
-replace github.com/neondatabase/autoscaling => github.com/william-lbn/autoscaling v0.0.0-20261103115459-fff0a385ee57
+replace github.com/neondatabase/autoscaling => github.com/william-lbn/autoscaling v0.0.0-20261104191350-eeba381d52e8
 
 replace k8s.io/mount-utils => k8s.io/mount-utils v0.31.7
