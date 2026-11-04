@@ -20,7 +20,6 @@ import (
 	dsgapi "github.com/neondatabase/autoscaling/pkg/api/dsga"
 	"github.com/neondatabase/autoscaling/pkg/dsga/bootstrap"
 	"github.com/william-lbn/control-plane/api/internal/adapter"
-	"github.com/william-lbn/control-plane/api/internal/functionsql"
 	core "k8s.io/api/core/v1"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
@@ -247,22 +246,22 @@ func publishManagedSQLRoute(ctx context.Context, k *kubeClient, in managedSQLRou
 	authorize func(context.Context) error) (ManagedSQLRouteReceipt, error) {
 	var receipt ManagedSQLRouteReceipt
 	if in.validate() != nil || k == nil || k.namespace != in.Binding.Namespace || observe == nil {
-		return receipt, errManagedSQLPublish
+		return receipt, managedSQLRefuse("input")
 	}
 	ctx, cancel := context.WithTimeout(ctx, 45*time.Second)
 	defer cancel()
 	for attempt := 0; attempt < 6; attempt++ {
 		source, err := readManagedSQLRouteSource(ctx, k, in)
 		if err != nil {
-			return receipt, errManagedSQLPublish
+			return receipt, managedSQLRefuse("source")
 		}
 		fact, err := observe(ctx, in, source)
 		if err != nil || validateManagedSQLNative(fact, source) != nil {
-			return receipt, errManagedSQLPublish
+			return receipt, managedSQLRefuse("native")
 		}
 		nativeRaw, err := json.Marshal(fact)
 		if err != nil {
-			return receipt, errManagedSQLPublish
+			return receipt, managedSQLRefuse("encode")
 		}
 		b := in.Binding
 		b.NativeInitializationSHA256 = managedSQLDigest(nativeRaw)
@@ -270,16 +269,17 @@ func publishManagedSQLRoute(ctx context.Context, k *kubeClient, in managedSQLRou
 		registry, err := k.request(ctx, http.MethodGet, k.path("secret", routesSecret), nil)
 		if err != nil || stringVal(nested(registry, "metadata", "uid")) != in.RegistryUID || stringVal(nested(registry, "metadata", "resourceVersion")) == "" ||
 			nested(registry, "metadata", "deletionTimestamp") != nil {
-			return receipt, errManagedSQLPublish
+			return receipt, managedSQLRefuse("registry")
 		}
 		raw, err := secretText(registry, "routes.json")
 		routes, mapErr := managedSQLRouteMap([]byte(raw))
 		if err != nil || mapErr != nil {
-			return receipt, errManagedSQLPublish
+			return receipt, managedSQLRefuse("registry")
 		}
 		key := selector(b.EndpointID)
 		route := map[string]json.RawMessage{}
 		hadPrevious := false
+		var replacement *adapter.ManagedSQLBinding
 		if previous, ok := routes[key]; ok {
 			var old struct {
 				ProjectID string            `json:"project_id"`
@@ -289,29 +289,41 @@ func publishManagedSQLRoute(ctx context.Context, k *kubeClient, in managedSQLRou
 			}
 			var oldBinding adapter.ManagedSQLBinding
 			if json.Unmarshal(previous, &old) != nil || old.ProjectID != b.ProjectID || old.BranchID != b.BranchID ||
-				dsgapi.UnmarshalObject(old.Binding, &oldBinding) != nil || oldBinding.Validate() != nil || !adapter.ManagedSQLBindingEqual(oldBinding, b) {
-				return receipt, errManagedSQLPublish
+				dsgapi.UnmarshalObject(old.Binding, &oldBinding) != nil || oldBinding.Validate() != nil {
+				return receipt, managedSQLRefuse("existing_binding")
+			}
+			if !adapter.ManagedSQLBindingEqual(oldBinding, b) {
+				if !managedSQLReplacementIdentity(oldBinding, b) {
+					return receipt, managedSQLRefuse("replacement_identity")
+				}
+				if err := managedSQLReplacementRetired(ctx, k, oldBinding); err != nil {
+					return receipt, err
+				}
+				replacement = &oldBinding
+			}
+			if old.Roles["app_owner"] != roles["app_owner"] || old.Roles["control_probe"] != roles["control_probe"] {
+				return receipt, managedSQLRefuse("roles")
 			}
 			previousMap, policyErr := managedSQLRouteMap(previous)
 			if policyErr != nil || !validManagedSQLPolicy(previousMap) {
-				return receipt, errManagedSQLPublish
+				return receipt, managedSQLRefuse("policy")
 			}
 			// 包括未知VPC/network字段在内的整份原策略保留；只替换本producer负责的字段。
 			route = previousMap
 			hadPrevious = true
-			for name, value := range old.Roles {
-				if (name == dataAPILogin(b.BranchID) || reservedFunctionRole(name)) && functionsql.ValidVerifier(value) {
-					roles[name] = value
-				}
-			}
+
 		}
 		owned := map[string]any{"project_id": b.ProjectID, "branch_id": b.BranchID, "tenant_id": b.TenantID,
 			"kind": "neonvm", "workload": source.vm.Name, "address": source.vm.Name + "." + b.Namespace + ".svc.cluster.local:55432",
 			"role": "app_owner", "verifier": roles["app_owner"], "roles": roles, "managed_binding": b}
+		// 既有route完整保留Role/策略/未知字段；受控替换仅更新managed_binding。
+		if hadPrevious {
+			owned = map[string]any{"managed_binding": b}
+		}
 		for name, value := range owned {
 			encoded, encodeErr := json.Marshal(value)
 			if encodeErr != nil {
-				return receipt, errManagedSQLPublish
+				return receipt, managedSQLRefuse("encode")
 			}
 			route[name] = encoded
 		}
@@ -323,19 +335,28 @@ func publishManagedSQLRoute(ctx context.Context, k *kubeClient, in managedSQLRou
 
 		routeRaw, err := json.Marshal(route)
 		if err != nil || adapter.ValidateManagedSQLRoute(ctx, adapterKubernetes{k}, b.Namespace, key, routeRaw) != nil {
-			return receipt, errManagedSQLPublish
+			return receipt, managedSQLRefuse("selected_route")
 		}
 		if authorize != nil && authorize(ctx) != nil {
-			return receipt, errManagedSQLPublish
+			return receipt, managedSQLRefuse("authority")
+		}
+		// Native读取之后、CAS之前再权威核同一新VM/immutable Config，不能复用旧事实。
+		if _, err := readManagedSQLRouteSource(ctx, k, in); err != nil {
+			return receipt, managedSQLRefuse("source_recheck")
+		}
+		if replacement != nil {
+			if err := managedSQLReplacementRetired(ctx, k, *replacement); err != nil {
+				return receipt, err
+			}
 		}
 		routes[key] = routeRaw
 		encoded, err := json.Marshal(routes)
 		if err != nil || len(encoded) > 2<<20 {
-			return receipt, errManagedSQLPublish
+			return receipt, managedSQLRefuse("encode")
 		}
 		data, ok := registry["data"].(map[string]any)
 		if !ok {
-			return receipt, errManagedSQLPublish
+			return receipt, managedSQLRefuse("registry")
 		}
 		data["routes.json"] = base64.StdEncoding.EncodeToString(encoded)
 		updated, err := k.request(ctx, http.MethodPut, k.path("secret", routesSecret), registry)
@@ -344,16 +365,16 @@ func publishManagedSQLRoute(ctx context.Context, k *kubeClient, in managedSQLRou
 			continue
 		}
 		if err != nil || stringVal(nested(updated, "metadata", "uid")) != in.RegistryUID || stringVal(nested(updated, "metadata", "resourceVersion")) == "" {
-			return receipt, errManagedSQLPublish
+			return receipt, managedSQLRefuse("put_unconfirmed")
 		}
 		actual, err := secretText(updated, "routes.json")
 		var actualRoutes map[string]json.RawMessage
 		if err != nil || json.Unmarshal([]byte(actual), &actualRoutes) != nil || !bytes.Equal(actualRoutes[key], routeRaw) {
-			return receipt, errManagedSQLPublish
+			return receipt, managedSQLRefuse("put_readback")
 		}
 		return ManagedSQLRouteReceipt{ProtocolVersion: 1, Selector: key, VMUID: b.VMUID, Incarnation: b.Incarnation, ConfigSecretUID: b.ConfigSecretUID, ConfigSHA256: b.ConfigSHA256, SecretDataSHA256: b.SecretDataSHA256, RegistryUID: in.RegistryUID, RegistryResourceVersion: stringVal(nested(updated, "metadata", "resourceVersion")), NativeInitializationSHA256: b.NativeInitializationSHA256}, nil
 	}
-	return receipt, errManagedSQLPublish
+	return receipt, managedSQLRefuse("conflict_exhausted")
 }
 
 // PublishManagedSQLRoute是正式orchestrator阶段：先读真实NativeProbe，再调用上述同一个publisher。

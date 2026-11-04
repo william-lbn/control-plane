@@ -1,0 +1,17 @@
+{
+  "case_id": "PG17-S-ManagedRoute-ControlledPhysicalReplacement-20261104",
+  "status": "PASS_COMPONENT_ONLY",
+  "e2e": false,
+  "source_base": "33f1cbc76cd224885af3b901dace377b1b7e8618",
+  "run": "/data/neon-build/validation/managed-route-controlled-replacement-20261104T131508Z-58b105",
+  "red_expected_old_guard_failure": true,
+  "green_roots": 10,
+  "pass_events": 64,
+  "fail": 0,
+  "skip": 0,
+  "race": true,
+  "cli_sha256": "3c61c938dbd36479bfac5af47da2358dabe7cc7b402d907cad25c3d656c2a266",
+  "receipt_sha256": "6e600aabef634900bdaed38a16ba60a1dfff5c691e2afa2f019d6127584acbf1",
+  "real_publish_not_run": true,
+  "full_latest_control_plane_not_fetched": true
+}

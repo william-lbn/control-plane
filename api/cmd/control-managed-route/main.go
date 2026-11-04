@@ -37,7 +37,7 @@ func main() {
 	receipt, err := control.PublishManagedSQLRoute(ctx, *kubeconfig, raw)
 	if err != nil {
 		// 不打印底层Kube/SQL/HTTP错误正文；其中可能含私有数据。
-		fmt.Fprintln(os.Stderr, "managed_sql_route_refused")
+		fmt.Fprintln(os.Stderr, control.ManagedSQLRouteFailureCode(err))
 		os.Exit(1)
 	}
 	if json.NewEncoder(os.Stdout).Encode(receipt) != nil {

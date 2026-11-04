@@ -23,6 +23,7 @@ import (
 	"github.com/william-lbn/control-plane/api/internal/adapter"
 	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
@@ -33,6 +34,7 @@ type managedSQLTestFixture struct {
 	k                                  *kubeClient
 	in                                 managedSQLRouteInput
 	fact                               dsgaInitializationResponse
+	getHook                            func(*http.Request) (int, map[string]any, bool)
 }
 
 func managedSQLTestMap(t *testing.T, v any) map[string]any {
@@ -120,6 +122,13 @@ func newManagedSQLFixture(t *testing.T) *managedSQLTestFixture {
 		w.Header().Set("Content-Type", "application/json")
 		if r.Method == http.MethodGet {
 			f.reads++
+			if f.getHook != nil {
+				if status, value, handled := f.getHook(r); handled {
+					w.WriteHeader(status)
+					json.NewEncoder(w).Encode(value)
+					return
+				}
+			}
 			if value, ok := f.objects[r.URL.Path]; ok {
 				json.NewEncoder(w).Encode(value)
 				return
@@ -364,5 +373,319 @@ func TestManagedSQLRouteActualBoundNativeGETAnd503(t *testing.T) {
 				t.Fatal("native gate did not control publication")
 			}
 		})
+	}
+}
+
+// 本夹具只伪造Kube API/Native响应，用于producer契约，不代表实际K8s或PG内存验收。
+func managedSQLReplacementFixture(t *testing.T) (*managedSQLTestFixture, adapter.ManagedSQLBinding, map[string]json.RawMessage) {
+	t.Helper()
+	f := newManagedSQLFixture(t)
+	if _, err := publishManagedSQLRoute(context.Background(), f.k, f.in, f.observe, nil); err != nil {
+		t.Fatal("initial fixture route", err)
+	}
+	var before map[string]json.RawMessage
+	var old adapter.ManagedSQLBinding
+	f.mutate(func(objects map[string]map[string]any) {
+		registry := objects[f.k.path("secret", routesSecret)]
+		raw, _ := secretText(registry, "routes.json")
+		var routes map[string]json.RawMessage
+		json.Unmarshal([]byte(raw), &routes)
+		json.Unmarshal(routes["ep-test"], &before)
+		json.Unmarshal(before["managed_binding"], &old)
+		old.VMUID = "old-vm-uid"
+		old.Incarnation = "abcdef1234567890abcdef1234567890"
+		old.ConfigSecretUID = "old-config-uid"
+		old.ConfigSHA256 = strings.Repeat("a", 64)
+		old.SecretDataSHA256 = strings.Repeat("b", 64)
+		before["managed_binding"], _ = json.Marshal(old)
+		before["allowed_ips"] = json.RawMessage("[]")
+		before["pageserver_node_id"] = json.RawMessage("19")
+		before["state"] = json.RawMessage("\"suspended\"")
+		before["network_acl"] = json.RawMessage("{\"default_action\":\"deny\",\"opaque\":{\"preserve\":true}}")
+		before["allowed_vpc_endpoint_ids"] = json.RawMessage("[\"vpce-fixture\"]")
+		var roles map[string]string
+		json.Unmarshal(before["roles"], &roles)
+		roles["custom_frozen_role"] = roles["app_owner"]
+		before["roles"], _ = json.Marshal(roles)
+		routes["ep-test"], _ = json.Marshal(before)
+		encoded, _ := json.Marshal(routes)
+		registry["data"].(map[string]any)["routes.json"] = base64.StdEncoding.EncodeToString(encoded)
+		f.puts = 0
+	})
+	return f, old, before
+}
+
+func managedSQLTestOldLease(f *managedSQLTestFixture, old adapter.ManagedSQLBinding) string {
+	name := journal.LeaseName(journal.Binding{Namespace: old.Namespace, Name: kubeName(old.EndpointID), VMUID: types.UID(old.VMUID), Incarnation: old.Incarnation})
+	return "/apis/coordination.k8s.io/v1/namespaces/testing/leases/" + name
+}
+func managedSQLTestPodList(owners ...string) map[string]any {
+	items := []any{}
+	for n, owner := range owners {
+		items = append(items, map[string]any{"metadata": map[string]any{"namespace": "testing", "name": "old-pod-" + strconv.Itoa(n), "uid": "old-pod-uid-" + strconv.Itoa(n),
+			"ownerReferences": []any{map[string]any{"uid": owner, "kind": "VirtualMachine", "name": "cp-test"}}}, "status": map[string]any{"phase": "Running"}})
+	}
+	return map[string]any{"apiVersion": "v1", "kind": "PodList", "metadata": map[string]any{"resourceVersion": "101"}, "items": items}
+}
+
+func TestManagedSQLRouteReplacementPreservesPolicyAndCAS(t *testing.T) {
+	f, old, before := managedSQLReplacementFixture(t)
+	if adapter.ManagedSQLBindingEqual(old, f.in.Binding) {
+		t.Fatal("public equality was relaxed")
+	}
+	f.objects[f.k.path("pod", "")] = managedSQLTestPodList("unrelated-owner")
+	f.conflicts = 1
+	receipt, err := publishManagedSQLRoute(context.Background(), f.k, f.in, f.observe, nil)
+	if err != nil || receipt.VMUID != f.in.Binding.VMUID {
+		t.Fatal("replacement refused", err)
+	}
+	puts, _ := f.counts()
+	if puts != 2 {
+		t.Fatal("CAS reread count", puts)
+	}
+	f.mu.Lock()
+	raw, _ := secretText(f.objects[f.k.path("secret", routesSecret)], "routes.json")
+	f.mu.Unlock()
+	var routes map[string]json.RawMessage
+	json.Unmarshal([]byte(raw), &routes)
+	var after map[string]json.RawMessage
+	json.Unmarshal(routes["ep-test"], &after)
+	for name, want := range before {
+		if name != "managed_binding" && !bytes.Equal(want, after[name]) {
+			t.Fatal("existing field changed", name)
+		}
+	}
+	var got adapter.ManagedSQLBinding
+	json.Unmarshal(after["managed_binding"], &got)
+	if !adapter.ManagedSQLBindingEqual(got, f.in.Binding) || got.NativeInitializationSHA256 == "" {
+		t.Fatal("new binding not installed")
+	}
+	var unrelated map[string]any
+	json.Unmarshal(routes["ep-unrelated"], &unrelated)
+	if unrelated["keep"] != "unchanged" {
+		t.Fatal("other route changed")
+	}
+}
+
+func TestManagedSQLRouteReplacementLifecycleRefuses(t *testing.T) {
+	for _, name := range []string{"lease-present", "lease-deleting", "lease-forbidden", "lease-server-error", "pod-running", "pod-failed", "pod-succeeded", "pod-terminating", "pods-forbidden", "pods-expired", "pods-malformed", "pods-no-rv", "pods-wrong-namespace", "pods-incomplete"} {
+		t.Run(name, func(t *testing.T) {
+			f, old, _ := managedSQLReplacementFixture(t)
+			lease := managedSQLTestOldLease(f, old)
+			list := managedSQLTestPodList()
+			f.objects[f.k.path("pod", "")] = list
+			switch name {
+			case "lease-present", "lease-deleting":
+				f.objects[lease] = map[string]any{"metadata": map[string]any{"uid": "old-lease"}}
+				if name == "lease-deleting" {
+					f.objects[lease]["metadata"].(map[string]any)["deletionTimestamp"] = "2026-11-04T00:00:00Z"
+				}
+			case "pod-running", "pod-failed", "pod-succeeded", "pod-terminating":
+				list = managedSQLTestPodList(old.VMUID)
+				f.objects[f.k.path("pod", "")] = list
+				pod := list["items"].([]any)[0].(map[string]any)
+				pod["metadata"].(map[string]any)["labels"] = map[string]any{"unrelated": "not-a-selector"}
+				if name == "pod-failed" {
+					pod["status"].(map[string]any)["phase"] = "Failed"
+				}
+				if name == "pod-succeeded" {
+					pod["status"].(map[string]any)["phase"] = "Succeeded"
+				}
+				if name == "pod-terminating" {
+					pod["metadata"].(map[string]any)["deletionTimestamp"] = "2026-11-04T00:00:00Z"
+				}
+			case "pods-malformed":
+				list["items"] = "not-a-list"
+			case "pods-no-rv":
+				delete(list["metadata"].(map[string]any), "resourceVersion")
+			case "pods-wrong-namespace":
+				list = managedSQLTestPodList("unrelated-owner")
+				list["items"].([]any)[0].(map[string]any)["metadata"].(map[string]any)["namespace"] = "foreign"
+				f.objects[f.k.path("pod", "")] = list
+			case "pods-incomplete":
+				list["metadata"].(map[string]any)["remainingItemCount"] = 1
+			}
+			f.getHook = func(r *http.Request) (int, map[string]any, bool) {
+				if r.URL.Path == lease && (name == "lease-forbidden" || name == "lease-server-error") {
+					if name == "lease-forbidden" {
+						return 403, nil, true
+					}
+					return 500, nil, true
+				}
+				if r.URL.Path == f.k.path("pod", "") && (name == "pods-forbidden" || name == "pods-expired") {
+					if name == "pods-forbidden" {
+						return 403, nil, true
+					}
+					return 410, nil, true
+				}
+				return 0, nil, false
+			}
+			_, err := publishManagedSQLRoute(context.Background(), f.k, f.in, f.observe, nil)
+			if err == nil {
+				t.Fatal("unsafe replacement accepted")
+			}
+			if puts, _ := f.counts(); puts != 0 {
+				t.Fatal("refusal wrote route")
+			}
+			if !errors.Is(err, errManagedSQLPublish) {
+				t.Fatal("error contract lost")
+			}
+		})
+	}
+}
+
+func TestManagedSQLRouteReplacementIdentityRefuses(t *testing.T) {
+	for _, name := range []string{"project", "endpoint", "branch", "tenant", "timeline", "compute", "credentials", "credential-data", "sql-service", "same-vm", "same-incarnation", "same-config", "same-config-hash", "same-data-hash", "role-verifier"} {
+		t.Run(name, func(t *testing.T) {
+			f, old, _ := managedSQLReplacementFixture(t)
+			f.objects[f.k.path("pod", "")] = managedSQLTestPodList()
+			switch name {
+			case "project":
+				old.ProjectID = "prj_other"
+			case "endpoint":
+				old.EndpointID = "ep_other"
+			case "branch":
+				old.BranchID = "br_other"
+			case "tenant":
+				old.TenantID = strings.Repeat("4", 32)
+			case "timeline":
+				old.TimelineID = strings.Repeat("4", 32)
+			case "compute":
+				old.ComputeInstanceID = "other-compute"
+			case "credentials":
+				old.CredentialSecretUID = "other-credentials"
+			case "credential-data":
+				old.CredentialDataSHA256 = strings.Repeat("e", 64)
+			case "sql-service":
+				old.ServiceUID = "other-sql-service"
+			case "same-vm":
+				old.VMUID = f.in.Binding.VMUID
+			case "same-incarnation":
+				old.Incarnation = f.in.Binding.Incarnation
+			case "same-config":
+				old.ConfigSecretUID = f.in.Binding.ConfigSecretUID
+			case "same-config-hash":
+				old.ConfigSHA256 = f.in.Binding.ConfigSHA256
+			case "same-data-hash":
+				old.SecretDataSHA256 = f.in.Binding.SecretDataSHA256
+			}
+			f.mutate(func(objects map[string]map[string]any) {
+				registry := objects[f.k.path("secret", routesSecret)]
+				raw, _ := secretText(registry, "routes.json")
+				var routes map[string]json.RawMessage
+				json.Unmarshal([]byte(raw), &routes)
+				var route map[string]json.RawMessage
+				json.Unmarshal(routes["ep-test"], &route)
+				route["managed_binding"], _ = json.Marshal(old)
+				if name == "role-verifier" {
+					var roles map[string]string
+					json.Unmarshal(route["roles"], &roles)
+					roles["control_probe"] = roles["app_owner"]
+					route["roles"], _ = json.Marshal(roles)
+				}
+				routes["ep-test"], _ = json.Marshal(route)
+				rawAll, _ := json.Marshal(routes)
+				registry["data"].(map[string]any)["routes.json"] = base64.StdEncoding.EncodeToString(rawAll)
+			})
+			if _, err := publishManagedSQLRoute(context.Background(), f.k, f.in, f.observe, nil); err == nil {
+				t.Fatal("identity drift accepted")
+			}
+			if puts, _ := f.counts(); puts != 0 {
+				t.Fatal("drift wrote route")
+			}
+		})
+	}
+}
+
+func TestManagedSQLRouteReplacementFinalRecheck(t *testing.T) {
+	for _, name := range []string{"vm", "config", "lease", "pod", "unknown-put"} {
+		t.Run(name, func(t *testing.T) {
+			f, old, _ := managedSQLReplacementFixture(t)
+			f.objects[f.k.path("pod", "")] = managedSQLTestPodList()
+			authorize := func(context.Context) error {
+				f.mutate(func(objects map[string]map[string]any) {
+					switch name {
+					case "vm":
+						objects[f.k.path("vm", "cp-test")]["metadata"].(map[string]any)["uid"] = "drifted-vm"
+					case "config":
+						objects[f.k.path("secret", "cp-test-config")]["metadata"].(map[string]any)["uid"] = "drifted-config"
+					case "lease":
+						objects[managedSQLTestOldLease(f, old)] = map[string]any{}
+					case "pod":
+						objects[f.k.path("pod", "")] = managedSQLTestPodList(old.VMUID)
+					case "unknown-put":
+						f.putFailure = 500
+					}
+				})
+				return nil
+			}
+			if _, err := publishManagedSQLRoute(context.Background(), f.k, f.in, f.observe, authorize); err == nil {
+				t.Fatal("late drift accepted")
+			}
+			want := 0
+			if name == "unknown-put" {
+				want = 1
+			}
+			if puts, _ := f.counts(); puts != want {
+				t.Fatal("late drift or unknown PUT retried", puts)
+			}
+		})
+	}
+}
+
+func TestManagedSQLRouteReplacementCompletePagination(t *testing.T) {
+	for _, name := range []string{"complete", "old-on-page2", "snapshot-drift", "repeat-token", "page-bound"} {
+		t.Run(name, func(t *testing.T) {
+			f, old, _ := managedSQLReplacementFixture(t)
+			f.getHook = func(r *http.Request) (int, map[string]any, bool) {
+				if r.URL.Path != f.k.path("pod", "") {
+					return 0, nil, false
+				}
+				if r.URL.Query().Get("limit") != "200" || r.URL.Query().Has("labelSelector") {
+					t.Error("unbounded or label-filtered listing")
+				}
+				list := managedSQLTestPodList()
+				token := r.URL.Query().Get("continue")
+				if token == "" {
+					list["metadata"].(map[string]any)["continue"] = "next"
+				} else {
+					switch name {
+					case "old-on-page2":
+						list = managedSQLTestPodList(old.VMUID)
+					case "snapshot-drift":
+						list["metadata"].(map[string]any)["resourceVersion"] = "102"
+					case "repeat-token":
+						list["metadata"].(map[string]any)["continue"] = "next"
+					case "page-bound":
+						list["metadata"].(map[string]any)["continue"] = token + "x"
+					}
+				}
+				return 200, list, true
+			}
+			_, err := publishManagedSQLRoute(context.Background(), f.k, f.in, f.observe, nil)
+			if (err == nil) != (name == "complete") {
+				t.Fatal("pagination outcome", name, err)
+			}
+			puts, _ := f.counts()
+			want := 0
+			if name == "complete" {
+				want = 1
+			}
+			if puts != want {
+				t.Fatal("pagination wrote unexpectedly", puts)
+			}
+		})
+	}
+}
+
+func TestManagedSQLRouteFailureCodeDoesNotExposeUnderlyingText(t *testing.T) {
+	if ManagedSQLRouteFailureCode(errors.New("synthetic-private-body")) != "managed_sql_route_refused" {
+		t.Fatal("private error leaked")
+	}
+	for _, stage := range []string{"replacement_identity", "old_lease_present", "old_lease_unknown", "old_pods_present", "old_pods_unknown", "source_recheck", "put_unconfirmed"} {
+		err := managedSQLRefuse(stage)
+		if ManagedSQLRouteFailureCode(err) != "managed_sql_route_"+stage || !errors.Is(err, errManagedSQLPublish) {
+			t.Fatal("stage contract", stage)
+		}
 	}
 }

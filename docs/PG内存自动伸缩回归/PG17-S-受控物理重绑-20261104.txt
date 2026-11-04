@@ -1,0 +1,17 @@
+PG17：保数据物理重建后的SQL路由受控重绑（组件候选）
+
+问题与行为：同一endpoint/tenant/timeline保数据退役、以新VM UID重建后，正式publisher此前仍用公共物理BindingEqual比较，正确拒绝新UID，导致Proxy继续引用旧Config。此次仅在正式publisher增加明确的物理替换分支；公共BindingEqual和Adapter唤醒严格身份比较不变。
+
+替换边界：旧/新namespace、project、endpoint、branch、tenant、timeline、compute实例名、凭据Secret UID及完整Data摘要、SQL Service UID必须一致。VM UID、实例代次与新sealed Config身份必须真正变化；同UID配置漂移仍拒绝。新VM及immutable Config必须从原Kubernetes权威入口读取。旧OwnerLease必须明确404，旧UID作为ownerReference的任何Pod（包括终态、Terminating）存在即拒绝；不依赖可修改标签。PodList按200条分页，最多32页、同resourceVersion、完整终止；403/超时/残缺/循环token均拒绝。CAS之前再读新VM/Config及旧退出事实。
+
+路由保存：既有完整RawMap中的roles、CIDR、网络策略及未知字段全部保留，只更新managed_binding；原核心角色verifier必须与同一凭据一致。Registry原UID/resourceVersion CAS保留，409才有界重新获取；PUT未知错误不自动重试。CLI只输出固定失败阶段，不泄露Kubernetes/SQL/HTTP错误正文或任何凭据。
+
+版本边界：现有ManagedSQLBinding不包含PG major。不能从旧Config摘要反推版本，也不新增假值。此次只证明相同数据/逻辑身份及新实例原Native初始化合同，不声称凭这一重绑完成跨PG大版本迁移认证。PG18仍需独立来源与发行配置，不能复用PG17验收。
+
+定向验证：20261104T131508Z-58b105，原33f快照仅覆盖4个拥有文件。RED：原guard准确拒绝成功替换用例（非编译失败）。GREEN：10 roots、64 PASS，0 fail/skip，race通过；含旧Lease存在/Unknown、任意旧UID Pod、完整分页/分页Unknown、身份漂移、CAS前迟到变化、策略未知字段完整保持、PUT500仅一次与409重新读取。正式CLI构建成功、help退出0、空输入退出1且零API。总233.700秒；父组3Gi/3CPU/swap0，峰值2431668224字节，OOM0。
+
+正式CLI ELF SHA256：3c61c938dbd36479bfac5af47da2358dabe7cc7b402d907cad25c3d656c2a266。
+最终源码/组件票SHA256：6e600aabef634900bdaed38a16ba60a1dfff5c691e2afa2f019d6127584acbf1。
+大日志及源码快照：/data/neon-build/validation/managed-route-controlled-replacement-20261104T131508Z-58b105/。
+
+实际环境状态：旧4173d9正式publisher唯一尝试拒绝且Registry未改，原失败证据保留。本提交时尚未用新CLI发布实际路由、尚未完成新VM的Proxy SQL或四个内存核心E2E验收。组件测试不得算端到端通过。该仓库当前为已有必要bridge修复；最新完整控制面仍待PG17三节点端到端达标后再获取。
