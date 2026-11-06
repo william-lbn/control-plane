@@ -1,0 +1,31 @@
+{
+  "范围": "PG17 新硬预算启动协议接入现行 SQL 发布器；只在身份和底层实际回执与封存配置一致时更新路由。",
+  "定向测试": {
+    "exit": 0,
+    "passed": [
+      "TestManagedSQLRoutePublisherBudgetBootstrap/same-budget-contract",
+      "TestManagedSQLRoutePublisherBudgetBootstrap/different-native-contract",
+      "TestManagedSQLRoutePublisherBudgetBootstrap/unsupported-contract",
+      "TestManagedSQLRoutePublisherBudgetBootstrap",
+      "TestManagedSQLRoutePublisherNativeThenCASPreservesRegistry",
+      "TestManagedSQLRouteNativeAndSourceFailuresNeverPublish/native503",
+      "TestManagedSQLRouteNativeAndSourceFailuresNeverPublish/tenant",
+      "TestManagedSQLRouteNativeAndSourceFailuresNeverPublish/startup",
+      "TestManagedSQLRouteNativeAndSourceFailuresNeverPublish/roles",
+      "TestManagedSQLRouteNativeAndSourceFailuresNeverPublish/permit",
+      "TestManagedSQLRouteNativeAndSourceFailuresNeverPublish/branch",
+      "TestManagedSQLRouteNativeAndSourceFailuresNeverPublish/credential-uid",
+      "TestManagedSQLRouteNativeAndSourceFailuresNeverPublish/credential-data",
+      "TestManagedSQLRouteNativeAndSourceFailuresNeverPublish/vm-after-native",
+      "TestManagedSQLRouteNativeAndSourceFailuresNeverPublish/lease",
+      "TestManagedSQLRouteNativeAndSourceFailuresNeverPublish/foreign-route",
+      "TestManagedSQLRouteNativeAndSourceFailuresNeverPublish/invalid-policy",
+      "TestManagedSQLRouteNativeAndSourceFailuresNeverPublish/put500",
+      "TestManagedSQLRouteNativeAndSourceFailuresNeverPublish"
+    ],
+    "skipped": []
+  },
+  "发布器SHA256": "3faae8ace0fffe293121f907f006396edfc1c1d2ec39cca175e8372d3d331b10",
+  "记录": "/data/neon-build/validation/PG17-硬预算真实SQL路由合同-20261106T131701Z-c7d4cb",
+  "真实路由发布": "另以集群回执为准"
+}

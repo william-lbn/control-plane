@@ -65,6 +65,11 @@ func (f *managedSQLTestFixture) observe(ctx context.Context, in managedSQLRouteI
 
 func newManagedSQLFixture(t *testing.T) *managedSQLTestFixture {
 	t.Helper()
+	return newManagedSQLFixtureWithBootstrap(t, 2)
+}
+
+func newManagedSQLFixtureWithBootstrap(t *testing.T, version uint32) *managedSQLTestFixture {
+	t.Helper()
 	ctx := context.Background()
 	truth := true
 	vm := new(vmv1.VirtualMachine)
@@ -98,7 +103,7 @@ func newManagedSQLFixture(t *testing.T) *managedSQLTestFixture {
 	}
 	credentials := &core.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: vm.Namespace, Name: vm.Name + "-credentials", UID: "credentials-uid", ResourceVersion: "1", Labels: vm.Labels},
 		Type: core.SecretTypeOpaque, Immutable: &truth, Data: map[string][]byte{"applicationVerifier": []byte(app), "probeVerifier": []byte(probe), "controlSigningSeed": bytes.Repeat([]byte{0x19}, 32), "probeCredentialSeed": seed}}
-	startup := dsgaNativeBootstrap{ProtocolVersion: 2, VMUID: "vm-uid", ComputeInstanceID: "compute-test", dsgaBootstrapBudget: dsgaBootstrapBudget{
+	startup := dsgaNativeBootstrap{ProtocolVersion: version, VMUID: "vm-uid", ComputeInstanceID: "compute-test", dsgaBootstrapBudget: dsgaBootstrapBudget{
 		BootstrapBufferBytes: 1 << 20, MaximumBufferBytes: 2 << 20, MinimumGuestMemoryBytes: 1 << 30, NonBufferReserveBytes: 1 << 28}}
 	body := map[string]any{"spec": map[string]any{"project_id": "prj_test", "endpoint_id": "ep_test", "branch_id": "br_test", "tenant_id": strings.Repeat("1", 32), "timeline_id": strings.Repeat("2", 32),
 		"operation_uuid": "fixture-operation", "dynamic_shared_buffers": startup, "cluster": map[string]any{"roles": []any{
@@ -185,6 +190,32 @@ func newManagedSQLFixture(t *testing.T) *managedSQLTestFixture {
 		f.fact.Observed.Arrays = append(f.fact.Observed.Arrays, dsgapi.ArrayFact{Array: kind, CommittedUpperBytes: 4096, ReleaseState: dsgapi.ReleaseNone, Provider: dsgapi.ProviderFact{Status: dsgapi.ProviderUnknown}})
 	}
 	return f
+}
+
+func TestManagedSQLRoutePublisherBudgetBootstrap(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		sealed, native uint32
+		allowed        bool
+	}{
+		{"same-budget-contract", 3, 3, true},
+		{"different-native-contract", 3, 2, false},
+		{"unsupported-contract", 4, 4, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newManagedSQLFixtureWithBootstrap(t, tc.sealed)
+			f.fact.Startup.ProtocolVersion = tc.native
+			receipt, err := publishManagedSQLRoute(context.Background(), f.k, f.in, f.observe, nil)
+			puts, _ := f.counts()
+			if tc.allowed {
+				if err != nil || receipt.NativeInitializationSHA256 == "" || puts != 1 {
+					t.Fatalf("发布回执或写入次数不符: %v, PUT=%d", err, puts)
+				}
+			} else if err == nil || puts != 0 {
+				t.Fatal("不匹配的启动协议进入 SQL 路由")
+			}
+		})
+	}
 }
 
 func TestManagedSQLRoutePublisherNativeThenCASPreservesRegistry(t *testing.T) {

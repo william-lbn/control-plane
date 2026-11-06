@@ -174,7 +174,8 @@ func readManagedSQLRouteSource(ctx context.Context, k *kubeClient, in managedSQL
 		return out, errManagedSQLPublish
 	}
 	startup, startupErr := decodeManagedSQLStartup(projection.Spec.Dynamic)
-	if startupErr != nil || startup.ProtocolVersion != 2 || startup.VMUID != b.VMUID ||
+	// 路由发布与 Agent、Gateway 共用启动协议集合；后续仍须实际 PG 回执与封存配置逐字段相符。
+	if startupErr != nil || !dsgapi.SupportedNativeBootstrapVersion(startup.ProtocolVersion) || startup.VMUID != b.VMUID ||
 		startup.ComputeInstanceID != b.ComputeInstanceID || startup.BootstrapBufferBytes == 0 || startup.BootstrapBufferBytes%8192 != 0 ||
 		startup.MaximumBufferBytes < startup.BootstrapBufferBytes || startup.MaximumBufferBytes%8192 != 0 {
 		return out, errManagedSQLPublish
