@@ -310,3 +310,40 @@ func TestDSGABootstrapBudgetNumericBoundaries(t *testing.T) {
 		})
 	}
 }
+
+func TestDSGANativeBootstrapFreezesBudgetPolicyForNewBoot(t *testing.T) {
+	p, policy, old := dsgaPlanFixture(t)
+	policy.NativeBootstrapVersion = 3
+	plan, err := newDSGACreationPlan(p, policy, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	raw, err := json.Marshal(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var loaded dsgaCreationPlan
+	if json.Unmarshal(raw, &loaded) != nil || loaded != plan {
+		t.Fatal("lost original bootstrap selection")
+	}
+	policy.NativeBootstrapVersion = 2
+	for _, sample := range []struct {
+		plan    dsgaCreationPlan
+		version uint32
+	}{{old, 2}, {loaded, 3}} {
+		native, err := sample.plan.nativeBootstrap(p, "current-vm")
+		if err != nil || native.ProtocolVersion != sample.version || native.ComputeInstanceID != sample.plan.ComputeInstanceID || native.dsgaBootstrapBudget != sample.plan.Budget {
+			t.Fatal("original bootstrap not preserved", err)
+		}
+	}
+	for _, bad := range []string{"0", "1", "4", "null"} {
+		var v dsgaNativeBootstrapVersion
+		if json.Unmarshal([]byte(bad), &v) == nil {
+			t.Fatalf("invalid explicit version %s", bad)
+		}
+	}
+	policy.NativeBootstrapVersion = 4
+	if _, err := newDSGACreationPlan(p, policy, time.Now()); err == nil {
+		t.Fatal("unknown policy version accepted")
+	}
+}

@@ -102,7 +102,7 @@ func DecodeManagedSQLConfiguration(raw []byte, b ManagedSQLBinding) (ManagedSQLC
 		VMUID             string `json:"vm_uid"`
 		ComputeInstanceID string `json:"compute_instance_id"`
 	}
-	if json.Unmarshal(c.Spec.Dynamic, &dynamic) != nil || dynamic.ProtocolVersion != 2 || dynamic.VMUID != b.VMUID || dynamic.ComputeInstanceID != b.ComputeInstanceID {
+	if json.Unmarshal(c.Spec.Dynamic, &dynamic) != nil || !dsgapi.SupportedNativeBootstrapVersion(dynamic.ProtocolVersion) || dynamic.VMUID != b.VMUID || dynamic.ComputeInstanceID != b.ComputeInstanceID {
 		return c, errManagedSQLRoute
 	}
 	return c, nil

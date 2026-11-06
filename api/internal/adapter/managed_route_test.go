@@ -52,6 +52,11 @@ func managedRouteHash(raw []byte) string { h := sha256.Sum256(raw); return hex.E
 
 func managedRouteFixture(t *testing.T) (*Server, *managedRouteTestKube, route, ManagedSQLBinding) {
 	t.Helper()
+	return managedRouteFixtureVersion(t, 2)
+}
+
+func managedRouteFixtureVersion(t *testing.T, version uint32) (*Server, *managedRouteTestKube, route, ManagedSQLBinding) {
+	t.Helper()
 	ctx := context.Background()
 	controller, immutable := true, true
 	vm := new(vmv1.VirtualMachine)
@@ -76,7 +81,7 @@ func managedRouteFixture(t *testing.T) (*Server, *managedRouteTestKube, route, M
 	vm.Status.Phase = "Running"
 	encoded := base64.StdEncoding.EncodeToString(make([]byte, 32))
 	verifier := "SCRAM-SHA-256$4096:" + base64.StdEncoding.EncodeToString(make([]byte, 16)) + "$" + encoded + ":" + encoded
-	dynamic := map[string]any{"protocol_version": 2, "vm_uid": "vm-uid", "compute_instance_id": "compute-test",
+	dynamic := map[string]any{"protocol_version": version, "vm_uid": "vm-uid", "compute_instance_id": "compute-test",
 		"bootstrap_buffer_bytes": uint64(1 << 20), "maximum_buffer_bytes": uint64(2 << 20), "minimum_guest_memory_bytes": uint64(1 << 30), "non_buffer_reserve_bytes": uint64(1 << 28)}
 	document := map[string]any{"spec": map[string]any{"project_id": "prj_test", "endpoint_id": "ep_test", "branch_id": "br_test",
 		"tenant_id": strings.Repeat("1", 32), "timeline_id": strings.Repeat("2", 32), "operation_uuid": "fixture-operation",
@@ -320,4 +325,15 @@ func TestManagedSQLRouteLegacyPortAndStrictSchema(t *testing.T) {
 			t.Fatal("registry reader wrote")
 		}
 	})
+}
+
+func TestManagedSQLRouteBudgetBootstrapSealedSource(t *testing.T) {
+	s, _, item, _ := managedRouteFixtureVersion(t, 3)
+	if err := s.validateManagedSQLRoute(context.Background(), "ep-test", item); err != nil {
+		t.Fatal(err)
+	}
+	s, _, item, _ = managedRouteFixtureVersion(t, 4)
+	if err := s.validateManagedSQLRoute(context.Background(), "ep-test", item); err == nil {
+		t.Fatal("unknown bootstrap accepted by SQL route")
+	}
 }

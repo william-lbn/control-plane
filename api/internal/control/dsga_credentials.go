@@ -91,7 +91,7 @@ func (broker *dsgaCredentialBroker) signingIdentity(ctx context.Context, workloa
 	}
 	raw := configSecret.Data["config.json"]
 	var config dsgaCredentialConfig
-	if json.Unmarshal(raw, &config) != nil || config.Spec.Dynamic == nil || config.Spec.Dynamic.ProtocolVersion != 2 ||
+	if json.Unmarshal(raw, &config) != nil || config.Spec.Dynamic == nil || !dsgapi.SupportedNativeBootstrapVersion(config.Spec.Dynamic.ProtocolVersion) ||
 		config.Spec.Dynamic.VMUID != string(claim.VMUID) || dsgapi.ValidateID(config.Spec.Dynamic.ComputeInstanceID, "Compute") != nil {
 		return nil, "", owner.ErrCredentialsDenied
 	}

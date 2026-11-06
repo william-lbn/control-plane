@@ -89,7 +89,7 @@ func (input dsgaCreationInput) creationConfig(vm *vmv1.VirtualMachine, data map[
 	}
 	var identity dsgaCredentialConfig
 	if len(data["config.json"]) == 0 || json.Unmarshal(data["config.json"], &identity) != nil || identity.Spec.Dynamic == nil ||
-		identity.Spec.Dynamic.ProtocolVersion != 2 || identity.Spec.Dynamic.VMUID != string(vm.UID) || identity.Spec.Dynamic.ComputeInstanceID != vm.Spec.DSGABootstrap.ComputeInstanceID {
+		!dsgapi.SupportedNativeBootstrapVersion(identity.Spec.Dynamic.ProtocolVersion) || identity.Spec.Dynamic.VMUID != string(vm.UID) || identity.Spec.Dynamic.ComputeInstanceID != vm.Spec.DSGABootstrap.ComputeInstanceID {
 		return nil, errDSGACreationIdentity
 	}
 	controller, blocking, immutable := true, false, true

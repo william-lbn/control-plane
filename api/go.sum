@@ -222,6 +222,8 @@ github.com/william-lbn/autoscaling v0.0.0-20261103115459-fff0a385ee57 h1:6znoEG2
 github.com/william-lbn/autoscaling v0.0.0-20261103115459-fff0a385ee57/go.mod h1:5qW3EK3EXET9Tg0MQLNpUnvqE42xJ7iXytCBbD3BOHI=
 github.com/william-lbn/autoscaling v0.0.0-20261104191350-eeba381d52e8 h1:WZeRhCCiR0GsXdxbeKis3J6Cxo5ZnFp5xXlQeclVBjs=
 github.com/william-lbn/autoscaling v0.0.0-20261104191350-eeba381d52e8/go.mod h1:5qW3EK3EXET9Tg0MQLNpUnvqE42xJ7iXytCBbD3BOHI=
+github.com/william-lbn/autoscaling v0.0.0-20261106094510-3897d1d28f21 h1:5L8vau/NV2G5OikZTaA9SFP2wDntb0fAhya2RLMjTq8=
+github.com/william-lbn/autoscaling v0.0.0-20261106094510-3897d1d28f21/go.mod h1:5qW3EK3EXET9Tg0MQLNpUnvqE42xJ7iXytCBbD3BOHI=
 github.com/x448/float16 v0.8.4 h1:qLwI1I70+NjRFUR3zs1JPUCgaCXSh3SW62uAKT1mSBM=
 github.com/x448/float16 v0.8.4/go.mod h1:14CWIYCyZA/cWjXOioeEpHeN/83MdbZDRQHoFcYsOfg=
 github.com/xdg-go/stringprep v1.0.4 h1:XLI/Ng3O1Atzq0oBs3TWm+5ZVgkq2aqdlvP9JtoZ6c8=

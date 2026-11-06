@@ -122,7 +122,7 @@ func validDSGAProxyJWT(token, workload string, config dsgaCredentialConfig, now 
 	}
 	raw, err := base64.RawURLEncoding.Strict().DecodeString(parts[1])
 	if err != nil || dsgaTokenObject(raw, &claims) != nil || claims.Audience != "neon-dsga" ||
-		claims.ComputeID != workload || config.Spec.Dynamic.ProtocolVersion != 2 || claims.VMUID != config.Spec.Dynamic.VMUID || claims.ComputeInstanceID != config.Spec.Dynamic.ComputeInstanceID ||
+		claims.ComputeID != workload || !dsgapi.SupportedNativeBootstrapVersion(config.Spec.Dynamic.ProtocolVersion) || claims.VMUID != config.Spec.Dynamic.VMUID || claims.ComputeInstanceID != config.Spec.Dynamic.ComputeInstanceID ||
 		dsgapi.ValidateID(claims.VMUID, "VM") != nil || dsgapi.ValidateID(claims.ComputeInstanceID, "Compute") != nil || claims.IssuerEpoch == 0 ||
 		claims.Expires <= uint64(now.Unix()) || claims.NotBefore > uint64(now.Unix()) || claims.Expires <= claims.NotBefore || claims.Expires-claims.NotBefore > 300 {
 		return claims, false

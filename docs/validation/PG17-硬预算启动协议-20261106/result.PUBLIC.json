@@ -1,0 +1,28 @@
+{
+  "AS": "3897d1d28f2188f5f1022843c4ecba5d644c622a",
+  "Go_module": "v0.0.0-20261106094510-3897d1d28f21",
+  "original_CP": "8823ac2b087eccc44adfbf066a094d1eee176e2f",
+  "source_lock_sha256": "bc5c9eca0d20966201ff89610504b3c8504125f41da6e0e5a04e80def0208ccd",
+  "test_output_sha256": "068a51d27a46c7406363d85109d7c1fe6303d2e27b4692e7be830ffc7a856d00",
+  "roots": [
+    "TestDSGANativeBootstrapFreezesBudgetPolicyForNewBoot",
+    "TestDSGACreationPlanFreezesIndependentIdentityAndNativeBytes",
+    "TestManagedSQLRouteBudgetBootstrapSealedSource",
+    "TestManagedSQLRouteSealedSourceAndReadonlyWake",
+    "TestDSGAProxyExplicitRoutesPreserveOriginalBytesAndCredential",
+    "TestDSGACredentialClientOwnerSDKAndProductionProxyChain"
+  ],
+  "seconds": 139.74933650705498,
+  "binaries": {
+    "compute-gateway": {
+      "sha256": "0cfb6994cd8877bdc944f8b69b7cffd4d10b7b11476deb4fff9d4fd5a4f058fe",
+      "bytes": 71732890
+    },
+    "control-adapter": {
+      "sha256": "3cf20e7b50e9d80c3de5c7f6f64c7cb1faa61baab65b0fe62e83de4e3f0ba060",
+      "bytes": 58304988
+    }
+  },
+  "后端真实四动作已验收": false,
+  "Linux证据": "/data/neon-build/validation/PG17-管理链构建与磁盘临时目录-20261106T100152Z-d9e8f6"
+}

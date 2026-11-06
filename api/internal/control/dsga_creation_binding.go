@@ -216,7 +216,7 @@ func (binding *dsgaCreationBinding) bindConfig(ctx context.Context, secret *core
 		return errDSGACreationIdentity
 	}
 	var identity dsgaCredentialConfig
-	if json.Unmarshal(secret.Data["config.json"], &identity) != nil || identity.Spec.Dynamic == nil || identity.Spec.Dynamic.ProtocolVersion != 2 ||
+	if json.Unmarshal(secret.Data["config.json"], &identity) != nil || identity.Spec.Dynamic == nil || !dsgapi.SupportedNativeBootstrapVersion(identity.Spec.Dynamic.ProtocolVersion) || identity.Spec.Dynamic.ProtocolVersion != binding.intent.Creation.NativeBootstrapVersion.selected() ||
 		identity.Spec.Dynamic.VMUID != string(ref.UID) || identity.Spec.Dynamic.ComputeInstanceID != binding.intent.Creation.ComputeInstanceID {
 		return errDSGACreationIdentity
 	}

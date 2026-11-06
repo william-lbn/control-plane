@@ -21,11 +21,32 @@ import (
 // 身份view供元数据库绑定复用；完整计划由独立严格解码器校验，不能把缺预算的
 // view当成生产启动计划。版本1先支持PG17，其他大版本完成独立适配前明确拒绝。
 type dsgaCreationIdentity struct {
-	ProtocolVersion   uint32 `json:"protocol_version"`
-	PostgresVersion   uint32 `json:"postgres_version"`
-	Namespace         string `json:"namespace"`
-	Incarnation       string `json:"incarnation"`
-	ComputeInstanceID string `json:"compute_instance_id"`
+	NativeBootstrapVersion dsgaNativeBootstrapVersion `json:"native_bootstrap_version,omitempty"`
+	ProtocolVersion        uint32                     `json:"protocol_version"`
+	PostgresVersion        uint32                     `json:"postgres_version"`
+	Namespace              string                     `json:"namespace"`
+	Incarnation            string                     `json:"incarnation"`
+	ComputeInstanceID      string                     `json:"compute_instance_id"`
+}
+
+// 历史计划缺省时继续使用 v2。显式版本只能来自平台策略，并随原创建
+// 意图冻结；新实例才可选择硬预算 v3，不在恢复时重新读取环境配置。
+type dsgaNativeBootstrapVersion uint32
+
+func (v dsgaNativeBootstrapVersion) selected() uint32 {
+	if v == 0 {
+		return dsgapi.NativeBootstrapLeaseVersion
+	}
+	return uint32(v)
+}
+
+func (v *dsgaNativeBootstrapVersion) UnmarshalJSON(raw []byte) error {
+	var selected uint32
+	if json.Unmarshal(raw, &selected) != nil || !dsgapi.SupportedNativeBootstrapVersion(selected) {
+		return errDSGACreationPlan
+	}
+	*v = dsgaNativeBootstrapVersion(selected)
+	return nil
 }
 
 // 统一bytes且不经float64；字段与原生DynamicSharedBuffersSpec逐项对应。
@@ -83,12 +104,13 @@ func (ref dsgaCredentialReference) validate() error {
 // 策略来自受信任的平台配置，不是公开创建请求中的可选字段。此值仅在接受前
 // 快照；worker只加载已经提交的完整plan，不能重读env选择模式/镜像/内存下限。
 type dsgaCreationPolicy struct {
-	Namespace       string              `json:"namespace"`
-	Image           string              `json:"image"`
-	MemorySlotBytes uint64              `json:"memory_slot_bytes"`
-	Budget          dsgaBootstrapBudget `json:"budget"`
-	VM              dsgaVMProfile       `json:"vm"`
-	Storage         dsgaStorageProfile  `json:"storage"`
+	NativeBootstrapVersion dsgaNativeBootstrapVersion `json:"native_bootstrap_version,omitempty"`
+	Namespace              string                     `json:"namespace"`
+	Image                  string                     `json:"image"`
+	MemorySlotBytes        uint64                     `json:"memory_slot_bytes"`
+	Budget                 dsgaBootstrapBudget        `json:"budget"`
+	VM                     dsgaVMProfile              `json:"vm"`
+	Storage                dsgaStorageProfile         `json:"storage"`
 }
 
 var dsgaPinnedImage = regexp.MustCompile(`^[a-z0-9][a-z0-9./:_-]*@sha256:[0-9a-f]{64}$`)
@@ -127,7 +149,7 @@ func (plan dsgaCreationPlan) validate(p createPayload) error {
 	if plan.Storage != (dsgaStorageProfile{}) && plan.Storage.validate(plan.Namespace) != nil {
 		return errDSGACreationPlan
 	}
-	if plan.ProtocolVersion != 1 || plan.PostgresVersion != 17 || len(plan.Namespace) > 63 || !dsgaPlanNamespace.MatchString(plan.Namespace) ||
+	if !dsgapi.SupportedNativeBootstrapVersion(plan.NativeBootstrapVersion.selected()) || plan.ProtocolVersion != 1 || plan.PostgresVersion != 17 || len(plan.Namespace) > 63 || !dsgaPlanNamespace.MatchString(plan.Namespace) ||
 		dsgapi.ValidateIncarnation(plan.Incarnation) != nil || dsgapi.ValidateID(plan.ComputeInstanceID, "Compute") != nil ||
 		!dsgaPinnedImage.MatchString(plan.Image) || !dsgaPlanUUID.MatchString(plan.OperationUUID) {
 		return errDSGACreationPlan
@@ -187,7 +209,7 @@ func makeDSGACreationPlan(p createPayload, policy dsgaCreationPolicy, now time.T
 	entropy[32+6] = (entropy[32+6] & 0x0f) | 0x40
 	entropy[32+8] = (entropy[32+8] & 0x3f) | 0x80
 	uuid := hex.EncodeToString(entropy[32:])
-	plan := dsgaCreationPlan{dsgaCreationIdentity: dsgaCreationIdentity{1, 17, policy.Namespace, hex.EncodeToString(entropy[:16]), "ci_" + hex.EncodeToString(entropy[16:32])},
+	plan := dsgaCreationPlan{dsgaCreationIdentity: dsgaCreationIdentity{NativeBootstrapVersion: policy.NativeBootstrapVersion, ProtocolVersion: 1, PostgresVersion: 17, Namespace: policy.Namespace, Incarnation: hex.EncodeToString(entropy[:16]), ComputeInstanceID: "ci_" + hex.EncodeToString(entropy[16:32])},
 		Image: policy.Image, OperationUUID: fmt.Sprintf("%s-%s-%s-%s-%s", uuid[:8], uuid[8:12], uuid[12:16], uuid[16:20], uuid[20:]),
 		AcceptedAt: now.UTC().Format(time.RFC3339Nano), MemorySlotBytes: policy.MemorySlotBytes, Budget: policy.Budget, VM: policy.VM.clone(), Storage: policy.Storage}
 	if err := plan.validate(p); err != nil {
@@ -203,7 +225,7 @@ func (plan dsgaCreationPlan) nativeBootstrap(p createPayload, vmUID string) (dsg
 	if dsgapi.ValidateID(vmUID, "VM") != nil {
 		return dsgaNativeBootstrap{}, errDSGACreationPlan
 	}
-	return dsgaNativeBootstrap{ProtocolVersion: 2, VMUID: vmUID, ComputeInstanceID: plan.ComputeInstanceID, dsgaBootstrapBudget: plan.Budget}, nil
+	return dsgaNativeBootstrap{ProtocolVersion: plan.NativeBootstrapVersion.selected(), VMUID: vmUID, ComputeInstanceID: plan.ComputeInstanceID, dsgaBootstrapBudget: plan.Budget}, nil
 }
 
 // 读取原Operation整份字节并与已验证binding摘要比对，再严格解析完整plan。
