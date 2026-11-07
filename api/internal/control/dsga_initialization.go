@@ -6,6 +6,7 @@ import (
 	"crypto/ed25519"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"io"
 	"mime"
 	"net"
@@ -17,6 +18,10 @@ import (
 	"github.com/neondatabase/autoscaling/pkg/dsga/bootstrap"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
+
+// 仅原实例管理端点的暂时连接不可用或明确503表示启动等待。
+// 身份、认证、格式、预算不匹配仍是原拒绝，不能靠重试变成Ready。
+var errDSGAInitializationPending = errors.New("original DSGA initialization is pending")
 
 // 同一immutable Config须保留canonical renderer的全部文档；只比config.json
 // 或仅放宽文档数会把资源来源缺失、额外文档及逐字节漂移漏过。
@@ -168,9 +173,16 @@ func (binding *dsgaCreationBinding) observeInitializationWithHTTP(ctx context.Co
 	// HTTP内部链仍须Linux网络隔离认证。
 	response, err := client.Do(request)
 	if err != nil {
+		var network *net.OpError
+		if errors.As(err, &network) || errors.Is(err, context.DeadlineExceeded) || errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+			return empty, errDSGAInitializationPending
+		}
 		return empty, errDSGACreationIdentity
 	}
 	defer response.Body.Close()
+	if response.StatusCode == http.StatusServiceUnavailable {
+		return empty, errDSGAInitializationPending
+	}
 	media, _, mediaErr := mime.ParseMediaType(response.Header.Get("Content-Type"))
 	raw, readErr := io.ReadAll(io.LimitReader(response.Body, (64<<10)+1))
 	var fact dsgaInitializationResponse

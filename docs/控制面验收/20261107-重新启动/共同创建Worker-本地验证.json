@@ -1,0 +1,76 @@
+{
+  "recorded_at": "2026-11-07T11:39:57.186380+00:00",
+  "source_base": "489fab6d6d2975a8252215b3990485224f95f4b0",
+  "branch": "codex/dsga-control-plane-v3-20261020",
+  "status": "WORKER_LOCAL_VALIDATION_PASSED_CLUSTER_CREATION_NOT_RUN",
+  "scope": "公开创建与原Worker共同编排、失败恢复、初始化观察、Ready事务及原Operation租约；外部Kube/Native为明确协议夹具，元数据库为真实独立schema",
+  "runs": [
+    {
+      "file": "worker-first.jsonl",
+      "sha256": "e8a49a0a13e57bbf916675a58c7ea270cfaa34b4a3efebe97d5aa20b2353b759",
+      "counts": {
+        "pass_root": 12,
+        "pass_sub": 40
+      },
+      "failures": [],
+      "exit": 0
+    },
+    {
+      "file": "worker-complete.jsonl",
+      "sha256": "6062655ce826af1bdc39653dc1aa392214028683d1c3783b5256ce2f1c64d407",
+      "counts": {},
+      "failures": [
+        "package",
+        "github.com/william-lbn/control-plane/api/internal/control [github.com/william-lbn/control-plane/api/internal/control.test]"
+      ],
+      "exit": 1
+    },
+    {
+      "file": "worker-complete-2.jsonl",
+      "sha256": "3ce1f77055a40004a502451b53ab0f2be55b4fd7a534b74efe691df69a0b2f2b",
+      "counts": {
+        "pass_root": 59,
+        "pass_sub": 194,
+        "fail_root": 1
+      },
+      "failures": [
+        "TestDSGACredentialSourceActualCreationRecoveryAndDatabaseGuards",
+        "package"
+      ],
+      "exit": 1
+    },
+    {
+      "file": "worker-fixture-fixed.log",
+      "sha256": "bce3892f8ce6a6f10734381c41171cb1f966ba1b962785b6e4629f75012263e3",
+      "counts": {
+        "pass_root": 1
+      },
+      "failures": [],
+      "exit": 0
+    }
+  ],
+  "conclusion": "后续定向60主用例中59项通过、1项旧迁移夹具失败；仅修复063外键回退后该项重跑通过。首次局部变量声明编译失败已修复。日志保留，不伪称一次全绿；用例计数有重叠不相加。",
+  "build_vet": [
+    {
+      "name": "worker-fixture-fixed",
+      "exit": 0
+    },
+    {
+      "name": "worker-vet",
+      "exit": 0
+    },
+    {
+      "name": "worker-build",
+      "exit": 0
+    }
+  ],
+  "creation_enabled": false,
+  "new_cluster_compute_created": false,
+  "pending": [
+    "新VM平台资格自动采集/签发与动态绑定",
+    "Owner内策略修订和实际状态公开",
+    "Mac动态ClusterIP安全传输及受限Kube身份",
+    "公开控制面PG17/PG18真实创建、SQL、内存策略及数据端到端"
+  ],
+  "archive_root": "/data/neon-control-plane/runs/20261107-控制面重新启动"
+}

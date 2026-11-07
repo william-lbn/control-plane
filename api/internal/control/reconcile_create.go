@@ -14,7 +14,7 @@ var errLeaseLost = errors.New("operation lease lost")
 
 func (s *server) assertLease(ctx context.Context, operationID, workerID string) error {
 	var valid bool
-	err := s.db.QueryRow(ctx, `SELECT state='running' AND lease_owner=$2 AND lease_expires_at>now()
+	err := s.db.QueryRow(ctx, `SELECT state='running' AND lease_owner=$2 AND lease_expires_at>clock_timestamp()
 		FROM operations WHERE id=$1`, operationID, workerID).Scan(&valid)
 	if err != nil {
 		return err
@@ -30,7 +30,7 @@ func (s *server) setCreateStep(ctx context.Context, operationID, workerID string
 		attempts=attempts+CASE WHEN $4='running' THEN 1 ELSE 0 END,updated_at=now()
 		WHERE operation_id=$1 AND ordinal=$3 AND EXISTS (
 			SELECT 1 FROM operations WHERE id=$1 AND state='running' AND lease_owner=$2
-			AND lease_expires_at>now())`, operationID, workerID, ordinal, state, detail)
+			AND lease_expires_at>clock_timestamp())`, operationID, workerID, ordinal, state, detail)
 	if err != nil {
 		return err
 	}
@@ -41,9 +41,15 @@ func (s *server) setCreateStep(ctx context.Context, operationID, workerID string
 }
 
 func assertCreateLeaseTx(ctx context.Context, tx pgx.Tx, operationID, workerID string) error {
+	// 先取得行锁，再用新的语句读取真实时钟。SELECT表达式可能在等锁前求值，
+	// 不能把同一条FOR UPDATE中的clock_timestamp当作等待后的过期核验。
+	var locked string
+	if err := tx.QueryRow(ctx, `SELECT id FROM operations WHERE id=$1 FOR UPDATE`, operationID).Scan(&locked); err != nil {
+		return err
+	}
 	var valid bool
-	err := tx.QueryRow(ctx, `SELECT state='running' AND lease_owner=$2 AND lease_expires_at>now()
-		FROM operations WHERE id=$1 FOR UPDATE`, operationID, workerID).Scan(&valid)
+	err := tx.QueryRow(ctx, `SELECT state='running' AND lease_owner=$2 AND lease_expires_at>clock_timestamp()
+		FROM operations WHERE id=$1`, operationID, workerID).Scan(&valid)
 	if err != nil {
 		return err
 	}

@@ -54,9 +54,9 @@ type initializationTestState struct {
 	status    int
 }
 
-func initializationBindingFixture(t *testing.T) (context.Context, *dsgaCreationBinding, *creationTestAPI, **core.Secret, *core.Service, *http.Client, *initializationTestState, dsgaInitializationResponse) {
+func initializationBindingFixture(t *testing.T, action ...string) (context.Context, *dsgaCreationBinding, *creationTestAPI, **core.Secret, *core.Service, *http.Client, *initializationTestState, dsgaInitializationResponse) {
 	t.Helper()
-	ctx, binding, services, f, source := dsgaServicesSourceFixture(t, "success")
+	ctx, binding, services, f, source := dsgaServicesSourceFixture(t, "success", action...)
 	if err := binding.prepareServices(ctx); err != nil {
 		t.Fatal(err)
 	}

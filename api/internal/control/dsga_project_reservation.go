@@ -404,7 +404,7 @@ func (s *server) acceptDSGAProjectReservation(ctx context.Context, r dsgaProject
  VALUES($1,'postgres','provisioning','provisioning','dsga-v1')`, p.BranchID); err != nil {
 		return false, err
 	}
-	steps := []string{"create_managed_tenant", "create_timeline", "prepare_neonvm_dsga", "wait_neonvm_running", "confirm_native_initialization", "publish_proxy_route", "sql_probe_via_proxy", "persist_ready_state"}
+	steps := dsgaProjectCreateSteps()
 	if err := addDSGACreateOperation(ctx, tx, "create_project", "project", p.ProjectID, p.ProjectID, current.Operation, r.Actor, requestID, p, plan, key, current.RequestHash, steps); err != nil {
 		return false, err
 	}

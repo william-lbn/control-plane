@@ -22,7 +22,7 @@
         "api/internal/control/handlers.go",
         "api/internal/control/worker.go"
       ],
-      "review_note": "沿用组织/项目/分支/服务身份；原Worker仍缺DSGA创建分派，不是完整产品通过。",
+      "review_note": "沿用原组织/项目/分支/服务身份和Worker，DSGA创建分派与完整步骤本地通过；新VM资格/策略仍待闭合，不是完整产品通过。",
       "acceptance_versions": []
     },
     {
@@ -710,12 +710,17 @@
       "candidate_modules": [
         "api/internal/control/create_handlers.go",
         "api/internal/control/dsga_project_reservation.go",
-        "api/internal/control/lifecycle.go"
+        "api/internal/control/lifecycle.go",
+        "api/internal/control/dsga_project_worker.go"
       ],
-      "review_note": "公开DSGA创建Handler已有，worker.go无create_project_dsga_v1分派；当前不能自动完成创建。",
+      "review_note": "公开DSGA Handler及原Worker共同链已接通，失败只保留原资源身份；本地元数据库/TLS协议与Ready事务验证通过。新VM资格与动态策略尚待接通，真实K8s自动供应未通过。",
       "acceptance_versions": [
         17,
         18
+      ],
+      "local_evidence": [
+        "共同创建Worker-本地验证.json",
+        "多版本共同合同与架构审查-本地验证.json"
       ]
     },
     {
@@ -5121,7 +5126,7 @@
       ]
     }
   ],
-  "updated_at": "2026-11-07T11:07:28.219745+00:00",
+  "updated_at": "2026-11-07T11:39:57.189175+00:00",
   "canonical_plan": "docs/平台总方案与演进规划.md",
   "official_website_commit": "5e4ffa00144b5c76b6ab9bf507166f877056b431",
   "official_operations_count": 194

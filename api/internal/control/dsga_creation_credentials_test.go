@@ -83,6 +83,11 @@ func credentialSourceFixture(t *testing.T, legacy ...bool) (context.Context, *se
 
 func credentialSourceFixtureWithVM(t *testing.T, profile dsgaVMProfile, legacy ...bool) (context.Context, *server, string, *creationTestAPI, dsgaCreationInput, *dsgaCreationBinding, **core.Secret) {
 	t.Helper()
+	return credentialSourceFixtureForAction(t, profile, "create_endpoint", legacy...)
+}
+
+func credentialSourceFixtureForAction(t *testing.T, profile dsgaVMProfile, action string, legacy ...bool) (context.Context, *server, string, *creationTestAPI, dsgaCreationInput, *dsgaCreationBinding, **core.Secret) {
+	t.Helper()
 	ctx, s, old, f, input := dsgaBindingFixture(t)
 	p, policy, _ := dsgaPlanFixture(t)
 	p.ProjectID, p.BranchID, p.EndpointID, p.TenantID, p.TimelineID = input.Payload.ProjectID, input.Payload.BranchID, input.Payload.EndpointID, input.Payload.TenantID, input.Payload.TimelineID
@@ -168,7 +173,20 @@ func credentialSourceFixtureWithVM(t *testing.T, profile dsgaVMProfile, legacy .
 	if _, err := tx.Exec(ctx, `UPDATE operations SET state='failed',lease_owner=NULL,lease_expires_at=NULL,finished_at=clock_timestamp() WHERE id=$1`, old); err != nil {
 		t.Fatal(err)
 	}
-	if err := addDSGACreateOperation(ctx, tx, "create_endpoint", "endpoint", p.EndpointID, p.ProjectID, op, "test", "source-test", p, plan, "source-key", strings.Repeat("e", 64), createSteps("create_endpoint", true)); err != nil {
+	resourceType, resourceID, steps := "endpoint", p.EndpointID, createSteps("create_endpoint", true)
+	if action == "create_project" {
+		resourceType, resourceID, steps = "project", p.ProjectID, dsgaProjectCreateSteps()
+		if _, err := tx.Exec(ctx, `UPDATE projects SET state='provisioning' WHERE id=$1`, p.ProjectID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := tx.Exec(ctx, `UPDATE branches SET state='creating' WHERE id=$1`, p.BranchID); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO branch_service_instances(branch_id,service_kind,desired_state,observed_state,driver_version) VALUES($1,'postgres','provisioning','provisioning','dsga-v1')`, p.BranchID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := addDSGACreateOperation(ctx, tx, action, resourceType, resourceID, p.ProjectID, op, "test", "source-test", p, plan, "source-key", strings.Repeat("e", 64), steps); err != nil {
 		t.Fatal(err)
 	}
 	if err := tx.Commit(ctx); err != nil {
@@ -267,7 +285,14 @@ func TestDSGACredentialSourceActualCreationRecoveryAndDatabaseGuards(t *testing.
 	f.mu.Unlock()
 	// 模拟旧已登记059库升级：只移除本次新DDL/登记，再追加迁移两次，旧绑定
 	// 的行/xmin必须保留。真实新库已由fixture的migrate完整验证。
-	if _, err := s.db.Exec(ctx, `DROP TABLE dsga_creation_credential_sources; DROP FUNCTION guard_dsga_creation_credential_source(); DELETE FROM schema_migrations WHERE version=900000060`); err != nil {
+	// 最新schema的063空观察表有外键依赖060；模拟旧059时需一并移去并
+	// 重放它。只操作本用例独立schema，先确认没有观察，不使用CASCADE。
+	var observations int
+	if err := s.db.QueryRow(ctx, `SELECT count(*) FROM dsga_creation_initialization_observations`).Scan(&observations); err != nil || observations != 0 {
+		t.Fatal("migration fixture unexpectedly contains initialization history", err)
+	}
+	if _, err := s.db.Exec(ctx, `DROP TABLE dsga_creation_initialization_observations; DROP FUNCTION guard_dsga_creation_initialization_observation();
+ DROP TABLE dsga_creation_credential_sources; DROP FUNCTION guard_dsga_creation_credential_source(); DELETE FROM schema_migrations WHERE version IN (900000060,900000063)`); err != nil {
 		t.Fatal(err)
 	}
 	if err := migrate(ctx, s.db); err != nil {

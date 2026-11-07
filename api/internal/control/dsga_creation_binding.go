@@ -53,24 +53,28 @@ func (binding *dsgaCreationBinding) lockOperation(ctx context.Context) (pgx.Tx, 
 	if err != nil {
 		return nil, err
 	}
-	ok := false
-	defer func() {
-		if !ok {
-			_ = tx.Rollback(ctx)
-		}
-	}()
+	if err := binding.lockOperationTx(ctx, tx); err != nil {
+		_ = tx.Rollback(ctx)
+		return nil, err
+	}
+	return tx, nil
+}
+
+// final Ready提交先按既有父生命周期顺序锁project/branch/endpoint，再复用此
+// 原Operation核验。普通来源绑定仍直接使用lockOperation，绝不反向锁父对象。
+func (binding *dsgaCreationBinding) lockOperationTx(ctx context.Context, tx pgx.Tx) error {
 	var action, project, resourceType, resourceID string
 	var payload []byte
-	err = tx.QueryRow(ctx, `SELECT action,project_id,resource_type,resource_id,payload
+	err := tx.QueryRow(ctx, `SELECT action,project_id,resource_type,resource_id,payload
  FROM operations WHERE id=$1 FOR UPDATE`, binding.operationID).Scan(&action, &project, &resourceType, &resourceID, &payload)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if err := binding.checkLease(ctx, tx); err != nil {
-		return nil, err
+		return err
 	}
 	if action != binding.action || sha256.Sum256(payload) != binding.digest || project != binding.intent.ProjectID {
-		return nil, errDSGACreationIdentity
+		return errDSGACreationIdentity
 	}
 	base := dsgaCreationBaseAction(action)
 	wantedType, wantedID := "project", binding.intent.ProjectID
@@ -80,7 +84,7 @@ func (binding *dsgaCreationBinding) lockOperation(ctx context.Context) (pgx.Tx, 
 		wantedType, wantedID = "endpoint", binding.intent.EndpointID
 	}
 	if base == "" || resourceType != wantedType || resourceID != wantedID {
-		return nil, errDSGACreationIdentity
+		return errDSGACreationIdentity
 	}
 	var tenant, timeline, projectState, branchState string
 	var version int
@@ -89,24 +93,23 @@ func (binding *dsgaCreationBinding) lockOperation(ctx context.Context) (pgx.Tx, 
  WHERE p.id=$1 AND b.id=$2 AND p.deleted_at IS NULL AND b.deleted_at IS NULL`, project, binding.intent.BranchID).
 		Scan(&tenant, &version, &projectState, &timeline, &branchState)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if version != int(binding.intent.Creation.PostgresVersion) || tenant != binding.intent.TenantID || timeline != binding.intent.TimelineID ||
 		(projectState != "ready" && (base != "create_project" || (projectState != "provisioning" && projectState != "error"))) ||
 		(branchState != "ready" && (base == "create_endpoint" || (branchState != "creating" && branchState != "error"))) {
-		return nil, errDSGACreationIdentity
+		return errDSGACreationIdentity
 	}
 	var endpointBranch, endpointState string
 	err = tx.QueryRow(ctx, `SELECT branch_id,state FROM endpoints WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL`, binding.intent.EndpointID, project).
 		Scan(&endpointBranch, &endpointState)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if endpointBranch != binding.intent.BranchID || (endpointState != "provisioning" && endpointState != "active" && endpointState != "error") {
-		return nil, errDSGACreationIdentity
+		return errDSGACreationIdentity
 	}
-	ok = true
-	return tx, nil
+	return nil
 }
 
 func (binding *dsgaCreationBinding) checkLease(ctx context.Context, tx pgx.Tx) error {

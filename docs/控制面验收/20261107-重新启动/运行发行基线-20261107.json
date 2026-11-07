@@ -1,0 +1,418 @@
+{
+  "captured_at": "2026-11-07T11:38:06.699126+00:00",
+  "claim": "只读运行发行基线；不是官方云版本等同声明、完整构建来源证明或控制面E2E通过",
+  "hostname": "worker-118",
+  "active_pods": [
+    {
+      "namespace": "kube-system",
+      "name": "autoscale-scheduler-57df679cf-58ndt",
+      "uid": "408aa691-3cdf-4369-b61d-26c9bda845f3",
+      "node": "worker-118",
+      "phase": "Running",
+      "containers": [
+        {
+          "name": "autoscale-scheduler",
+          "ready": true,
+          "restart_count": 0,
+          "image_id": "127.0.0.1:5001/neon-candidate/autoscale-scheduler@sha256:c47682fed7a1dca8e445f55360648e00c72def25770dbc9f99ca1e19aa9ee602"
+        }
+      ]
+    },
+    {
+      "namespace": "kube-system",
+      "name": "autoscaler-agent-69tb4",
+      "uid": "35b3e49f-603d-4adf-aea7-59f57e97e9bc",
+      "node": "worker-118",
+      "phase": "Running",
+      "containers": [
+        {
+          "name": "autoscaler-agent",
+          "ready": true,
+          "restart_count": 0,
+          "image_id": "127.0.0.1:5001/neon-candidate/autoscaler-agent@sha256:34cbdd61ac9c3977e052a62a9c2fbf7c8795dcfac76c702ed0458e32cd4ace55"
+        }
+      ]
+    },
+    {
+      "namespace": "kube-system",
+      "name": "autoscaler-agent-pqvb5",
+      "uid": "28fdaf8d-42f3-4771-80da-aee91fe9f8ad",
+      "node": "worker-119",
+      "phase": "Running",
+      "containers": [
+        {
+          "name": "autoscaler-agent",
+          "ready": true,
+          "restart_count": 0,
+          "image_id": "127.0.0.1:5001/neon-candidate/autoscaler-agent@sha256:34cbdd61ac9c3977e052a62a9c2fbf7c8795dcfac76c702ed0458e32cd4ace55"
+        }
+      ]
+    },
+    {
+      "namespace": "kube-system",
+      "name": "autoscaler-agent-v7cl5",
+      "uid": "574945bd-90bf-4f1e-a5bf-172b3b4aea76",
+      "node": "worker-117",
+      "phase": "Running",
+      "containers": [
+        {
+          "name": "autoscaler-agent",
+          "ready": true,
+          "restart_count": 0,
+          "image_id": "127.0.0.1:5001/neon-candidate/autoscaler-agent@sha256:34cbdd61ac9c3977e052a62a9c2fbf7c8795dcfac76c702ed0458e32cd4ace55"
+        }
+      ]
+    },
+    {
+      "namespace": "neon",
+      "name": "controller-db-8655744c9b-4tf85",
+      "uid": "6dbbc08b-93de-431e-be4b-c47a2f6beb15",
+      "node": "worker-118",
+      "phase": "Running",
+      "containers": [
+        {
+          "name": "postgres",
+          "ready": true,
+          "restart_count": 0,
+          "image_id": "docker.io/library/postgres@sha256:a3b7f434b2dc57ce85a67e171163eb8ab1a1ebcb39d27484661f26b1dfbe30d6"
+        }
+      ]
+    },
+    {
+      "namespace": "neon",
+      "name": "cp-24c41e23bb104ead-tjhzc",
+      "uid": "92cb527e-3209-4bbd-a21f-c4a189804771",
+      "node": "worker-117",
+      "phase": "Running",
+      "containers": [
+        {
+          "name": "neonvm-runner",
+          "ready": true,
+          "restart_count": 0,
+          "image_id": "127.0.0.1:5001/neon-candidate/neonvm-runner@sha256:b0320526e3d6c93f97a0a5a93d804482e5e895f63d0eb36fe8dbc310bcef1ff6"
+        }
+      ]
+    },
+    {
+      "namespace": "neon",
+      "name": "minio-79f6f9578d-xg9pc",
+      "uid": "931a4cfe-e868-4d9a-9ffb-99d7c234b17d",
+      "node": "worker-118",
+      "phase": "Running",
+      "containers": [
+        {
+          "name": "minio",
+          "ready": true,
+          "restart_count": 0,
+          "image_id": "127.0.0.1:5001/neon-test-only/minio@sha256:ae71c80e096ab7609b7e574b70d535a0061702ff2d505165508a1416cfc128b8"
+        }
+      ]
+    },
+    {
+      "namespace": "neon",
+      "name": "neon-compute-management-gateway-6d768b5b67-pjm5g",
+      "uid": "a5e90746-17cb-4e38-9f35-30a2d95d99bb",
+      "node": "worker-119",
+      "phase": "Running",
+      "containers": [
+        {
+          "name": "gateway",
+          "ready": true,
+          "restart_count": 0,
+          "image_id": "127.0.0.1:5001/neon-candidate/compute-gateway@sha256:3912944a07c9711d70701546e11504fd0dbe84d557a471d437f5576c0a299a94"
+        }
+      ]
+    },
+    {
+      "namespace": "neon",
+      "name": "neon-control-adapter-58b89667dd-bct6j",
+      "uid": "f6a3d9a7-f533-44ad-97e4-ae485a32dc63",
+      "node": "worker-119",
+      "phase": "Running",
+      "containers": [
+        {
+          "name": "adapter",
+          "ready": true,
+          "restart_count": 0,
+          "image_id": "127.0.0.1:5001/neon-candidate/control-adapter@sha256:bb98132de06b2c1e7d93347552ba3fb6733c824101efa8d2e126a854ec2ae0e6"
+        }
+      ]
+    },
+    {
+      "namespace": "neon",
+      "name": "neon-control-v2-db-58dcdb9949-2ccrt",
+      "uid": "e0aea5dc-2d2d-4108-81fe-5168991391e3",
+      "node": "worker-119",
+      "phase": "Running",
+      "containers": [
+        {
+          "name": "postgres",
+          "ready": true,
+          "restart_count": 0,
+          "image_id": "docker.io/library/import-2026-11-03@sha256:a3b7f434b2dc57ce85a67e171163eb8ab1a1ebcb39d27484661f26b1dfbe30d6"
+        }
+      ]
+    },
+    {
+      "namespace": "neon",
+      "name": "pageserver-5576658b64-vxshs",
+      "uid": "da02f05e-df17-4667-a601-ded5494bf476",
+      "node": "worker-119",
+      "phase": "Running",
+      "containers": [
+        {
+          "name": "pageserver",
+          "ready": true,
+          "restart_count": 0,
+          "image_id": "127.0.0.1:5001/neon-candidate/pageserver@sha256:19a7b31b32c7ef3ec5de766a36a25c3bb225c56f8b982a68e3324b52d6898c1b"
+        }
+      ]
+    },
+    {
+      "namespace": "neon",
+      "name": "proxy-6d8dbb8c8f-fll2p",
+      "uid": "f0c2019e-4001-4881-8e51-a2c5538282bb",
+      "node": "worker-119",
+      "phase": "Running",
+      "containers": [
+        {
+          "name": "proxy",
+          "ready": true,
+          "restart_count": 0,
+          "image_id": "127.0.0.1:5001/neon/proxy@sha256:a1459708aac0823600b163eb07b5f4ac320c4ae606203318aa49cdb658d6980d"
+        }
+      ]
+    },
+    {
+      "namespace": "neon",
+      "name": "safekeeper1-74f4976bbc-ssrv2",
+      "uid": "48bc7bf4-bc70-4a3f-8f17-924e0ee45c95",
+      "node": "worker-117",
+      "phase": "Running",
+      "containers": [
+        {
+          "name": "safekeeper",
+          "ready": true,
+          "restart_count": 0,
+          "image_id": "127.0.0.1:5001/neon-candidate/safekeeper@sha256:952118788c5709ad01659224995b8f78bce12ed4276b8ee1fce72bccd9fac274"
+        }
+      ]
+    },
+    {
+      "namespace": "neon",
+      "name": "safekeeper2-7754fb5b49-8qpj8",
+      "uid": "ee8a9140-14cc-4d0a-906b-0fc279401d32",
+      "node": "worker-118",
+      "phase": "Running",
+      "containers": [
+        {
+          "name": "safekeeper",
+          "ready": true,
+          "restart_count": 0,
+          "image_id": "127.0.0.1:5001/neon-candidate/safekeeper@sha256:952118788c5709ad01659224995b8f78bce12ed4276b8ee1fce72bccd9fac274"
+        }
+      ]
+    },
+    {
+      "namespace": "neon",
+      "name": "safekeeper3-78579ffcdc-6gvqg",
+      "uid": "d3a4dc41-7c83-4ab1-9e48-86747bcd5161",
+      "node": "worker-119",
+      "phase": "Running",
+      "containers": [
+        {
+          "name": "safekeeper",
+          "ready": true,
+          "restart_count": 0,
+          "image_id": "127.0.0.1:5001/neon-candidate/safekeeper@sha256:952118788c5709ad01659224995b8f78bce12ed4276b8ee1fce72bccd9fac274"
+        }
+      ]
+    },
+    {
+      "namespace": "neon",
+      "name": "storage-broker-86d6f984ff-fm65j",
+      "uid": "538e6a16-b985-494a-b568-b18712d1ab13",
+      "node": "worker-118",
+      "phase": "Running",
+      "containers": [
+        {
+          "name": "storage-broker",
+          "ready": true,
+          "restart_count": 0,
+          "image_id": "127.0.0.1:5001/neon-candidate/storage-broker@sha256:db19776abc16b104f96bcbc116300cf93eedb78b6acf43af2c1e13fe8dfcd9aa"
+        }
+      ]
+    },
+    {
+      "namespace": "neon",
+      "name": "storage-controller-7fdc66fd5-tdhl5",
+      "uid": "826f8728-30fe-47ae-a02c-bb66aee7efa3",
+      "node": "worker-119",
+      "phase": "Running",
+      "containers": [
+        {
+          "name": "controller",
+          "ready": true,
+          "restart_count": 0,
+          "image_id": "127.0.0.1:5001/neon-candidate/storage-controller@sha256:af83b80b6406ba7fcb0a64bf531644f0bdcecd41033356288d6cd99c567bb6fa"
+        }
+      ]
+    },
+    {
+      "namespace": "neonvm-system",
+      "name": "neonvm-controller-74df946d64-25cz8",
+      "uid": "07e0f137-a82f-4ae7-b589-fbd7029bf2dc",
+      "node": "worker-118",
+      "phase": "Running",
+      "containers": [
+        {
+          "name": "manager",
+          "ready": true,
+          "restart_count": 0,
+          "image_id": "127.0.0.1:5001/neon-candidate/neonvm-controller@sha256:4535077a4014a53849e0927ee9b3ddc21b3861600418930b1baf78e8267e9370"
+        }
+      ]
+    },
+    {
+      "namespace": "neonvm-system",
+      "name": "neonvm-device-plugin-6n9j2",
+      "uid": "e8cb73e1-d35a-492f-b133-02b2b85ac37c",
+      "node": "worker-117",
+      "phase": "Running",
+      "containers": [
+        {
+          "name": "generic-device-plugin",
+          "ready": true,
+          "restart_count": 0,
+          "image_id": "docker.io/library/import-2026-11-03@sha256:dc192e164c69b03f156765793a1be62ca437709ae477b27ca7d8f3dcf5021576"
+        }
+      ]
+    },
+    {
+      "namespace": "neonvm-system",
+      "name": "neonvm-device-plugin-st88t",
+      "uid": "5ea20826-056d-4653-a4b1-d86df8b3164c",
+      "node": "worker-119",
+      "phase": "Running",
+      "containers": [
+        {
+          "name": "generic-device-plugin",
+          "ready": true,
+          "restart_count": 0,
+          "image_id": "docker.io/library/import-2026-11-03@sha256:dc192e164c69b03f156765793a1be62ca437709ae477b27ca7d8f3dcf5021576"
+        }
+      ]
+    },
+    {
+      "namespace": "neonvm-system",
+      "name": "neonvm-device-plugin-th4bj",
+      "uid": "4fa4022d-368d-4934-a24b-f8ace840493b",
+      "node": "worker-118",
+      "phase": "Running",
+      "containers": [
+        {
+          "name": "generic-device-plugin",
+          "ready": true,
+          "restart_count": 0,
+          "image_id": "docker.io/squat/generic-device-plugin@sha256:dc192e164c69b03f156765793a1be62ca437709ae477b27ca7d8f3dcf5021576"
+        }
+      ]
+    },
+    {
+      "namespace": "neonvm-system",
+      "name": "neonvm-runner-image-loader-kjzjw",
+      "uid": "88ad67ba-8903-4bce-8fb5-d5f9a545028d",
+      "node": "worker-118",
+      "phase": "Running",
+      "containers": [
+        {
+          "name": "neonvm-runner-loader",
+          "ready": true,
+          "restart_count": 0,
+          "image_id": "127.0.0.1:5001/neon-candidate/neonvm-runner@sha256:b0320526e3d6c93f97a0a5a93d804482e5e895f63d0eb36fe8dbc310bcef1ff6"
+        }
+      ]
+    },
+    {
+      "namespace": "neonvm-system",
+      "name": "neonvm-runner-image-loader-nnjqm",
+      "uid": "f690641b-e81b-4a12-8d21-dfe3a3d6e7f5",
+      "node": "worker-119",
+      "phase": "Running",
+      "containers": [
+        {
+          "name": "neonvm-runner-loader",
+          "ready": true,
+          "restart_count": 0,
+          "image_id": "127.0.0.1:5001/neon-candidate/neonvm-runner@sha256:b0320526e3d6c93f97a0a5a93d804482e5e895f63d0eb36fe8dbc310bcef1ff6"
+        }
+      ]
+    },
+    {
+      "namespace": "neonvm-system",
+      "name": "neonvm-runner-image-loader-sfrs2",
+      "uid": "70d9fd6c-7b7d-40df-81f1-3040984c1828",
+      "node": "worker-117",
+      "phase": "Running",
+      "containers": [
+        {
+          "name": "neonvm-runner-loader",
+          "ready": true,
+          "restart_count": 0,
+          "image_id": "127.0.0.1:5001/neon-candidate/neonvm-runner@sha256:b0320526e3d6c93f97a0a5a93d804482e5e895f63d0eb36fe8dbc310bcef1ff6"
+        }
+      ]
+    }
+  ],
+  "virtual_machines": [
+    {
+      "name": "cp-24c41e23bb104ead",
+      "uid": "02679a05-092f-4a50-b4f2-391fae7ac63e",
+      "phase": "Running",
+      "guest_image": "127.0.0.1:5001/neon-candidate/pg18-guest@sha256:9f6e552236f06615666fe28184f4e26bae59304ba12ab16f119f5801b9407abe"
+    }
+  ],
+  "source_repositories": [
+    {
+      "name": "neon",
+      "head": "9f52acf6b9fbce6dd1b68df36ed271854913fe64",
+      "branch": "codex/dsga-neon-v3-20261019",
+      "pg_gitlinks": "160000 commit fef2816d76060532d33662695a81d2ae0594ba9b\tvendor/postgres-v17\n160000 commit 1e9bf010a841195752f2948ef54ecb34a0fcc749\tvendor/postgres-v18",
+      "worktree_clean": true
+    },
+    {
+      "name": "autoscaling",
+      "head": "fa1230d7409160cdfccbca7ac17549cd7bd00b98",
+      "branch": "codex/dsga-autoscaling-20261019",
+      "pg_gitlinks": "",
+      "worktree_clean": false
+    },
+    {
+      "name": "control-plane",
+      "head": "1bcb81b2ca4eb8748d8ca77fe51c91c0a6f0d550",
+      "branch": "codex/dsga-control-plane-v3-20261020",
+      "pg_gitlinks": "",
+      "worktree_clean": true
+    },
+    {
+      "name": "neon-helm",
+      "head": "7431f3179fa037f3248966b51b670f8a2ff6adc3",
+      "branch": "codex/dsga-neon-helm-v3-20261019",
+      "pg_gitlinks": "",
+      "worktree_clean": true
+    }
+  ],
+  "source_mapping_status": "CURRENT_CHECKOUT_HEAD_IS_NOT_A_VERIFIED_IMAGE_BUILD_SOURCE",
+  "production_release_status": "NOT_GRANTED",
+  "source_checkouts_observed_at": "2026-11-07T10:55:33.552514+00:00",
+  "previous_inventory_archive": {
+    "path": "/data/neon-control-plane/runs/20261107-控制面重新启动/architecture-review/cluster-and-source.PUBLIC.json",
+    "sha256": "8196042d46f47a1b90df4913ff7f72837e6ae814bd9b3ea4ad30123b8398a40a"
+  },
+  "inventory_scope": [
+    "neon",
+    "neonvm-system",
+    "kube-system/autoscaling"
+  ],
+  "virtual_machines_observed_at": "2026-11-07T11:37:21.934031+00:00"
+}
