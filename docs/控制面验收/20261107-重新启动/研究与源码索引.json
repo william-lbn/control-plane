@@ -74,9 +74,13 @@
   "own_main": "e15e6c79f4c5b80eb004050eeafea866ffd30c0e",
   "own_memory_branch_base": "1bcb81b2ca4eb8748d8ca77fe51c91c0a6f0d550",
   "branch": "codex/dsga-control-plane-v3-20261020",
-  "integration_method": "reviewed non-rewriting cherry-pick of five main-only business commits, pending tests",
+  "integration_method": "五项最新main业务增量已整合，经定向验证后提交2b8b9e3并推送原分支",
   "own_operation_count": 312,
   "parity_verified": false,
   "new_e2e_passes": 0,
-  "openapi_wire_compatibility_claimed": false
+  "openapi_wire_compatibility_claimed": false,
+  "official_website_commit": "5e4ffa00144b5c76b6ab9bf507166f877056b431",
+  "official_navigation_index": "官网导航来源索引.json",
+  "current_plan": "docs/平台总方案与演进规划.md",
+  "last_review_at": "2026-11-07T11:07:28.219745+00:00"
 }

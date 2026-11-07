@@ -231,6 +231,12 @@
           },
           "runtime": {
             "$ref": "#/components/schemas/RuntimeStatus"
+          },
+          "postgres_runtimes": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PostgresRuntime"
+            }
           }
         }
       },
@@ -819,8 +825,10 @@
             "type": "integer",
             "enum": [
               16,
-              17
-            ]
+              17,
+              18
+            ],
+            "description": "PostgreSQL major version. 17/18 use the same managed memory runtime; availability depends on the configured version and region release, and the creation gate."
           },
           "autoscaling": {
             "$ref": "#/components/schemas/AutoscalingBounds"
@@ -10614,6 +10622,68 @@
           }
         },
         "description": "Durable metadata read without waking SQL or a Guest. Invocation and edge counts cover retained lifetime; admission, dispatch and completion remain distinct. Resource observations are cumulative per original boot, never summed per concurrent request. Missing/stale observations do not imply zero CPU or memory. No automatic credit debit or integrated memory GB-hour estimate."
+      },
+      "PostgresRuntime": {
+        "type": "object",
+        "required": [
+          "postgres_version",
+          "region_id",
+          "create_enabled",
+          "memory_scaling",
+          "bounds",
+          "memory_slot_mib"
+        ],
+        "properties": {
+          "postgres_version": {
+            "type": "integer",
+            "enum": [
+              16,
+              17,
+              18
+            ]
+          },
+          "region_id": {
+            "type": "string"
+          },
+          "create_enabled": {
+            "type": "boolean",
+            "description": "Platform creation gate; not observed Compute readiness or production certification."
+          },
+          "memory_scaling": {
+            "type": "string",
+            "enum": [
+              "vm",
+              "vm_and_postgres"
+            ]
+          },
+          "bounds": {
+            "type": "object",
+            "required": [
+              "min_cpu_milli",
+              "max_cpu_milli",
+              "min_memory_mib",
+              "max_memory_mib"
+            ],
+            "properties": {
+              "min_cpu_milli": {
+                "type": "integer"
+              },
+              "max_cpu_milli": {
+                "type": "integer"
+              },
+              "min_memory_mib": {
+                "type": "integer"
+              },
+              "max_memory_mib": {
+                "type": "integer"
+              }
+            }
+          },
+          "memory_slot_mib": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
       }
     },
     "responses": {

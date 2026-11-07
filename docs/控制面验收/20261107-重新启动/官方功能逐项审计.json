@@ -1,5 +1,5 @@
 {
-  "scope": "继承135项完整需求并新增自有PG内存核心产品项；逐项代码映射进行中，不将文件存在当功能通过",
+  "scope": "135项官方产品需求+1项自有PG内存增强+6项自托管运营发行要求；本轮PG17/18，不含PG16。模块定位不是通过，外部依赖和Beta/roadmap不混为已交付。",
   "features": [
     {
       "id": "NEON-CP-00-01",
@@ -9,13 +9,21 @@
         "https://neon.com/docs/concepts/the-object-model"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "BOUNDED_CODE_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "任何接口、Console、凭据和日志均核同一原资源归属；跨组织和分支负路径拒绝",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/dsga_project_handler.go",
+        "api/internal/control/dsga_runtime_release.go",
+        "api/internal/control/handlers.go",
+        "api/internal/control/worker.go"
+      ],
+      "review_note": "沿用组织/项目/分支/服务身份；原Worker仍缺DSGA创建分派，不是完整产品通过。",
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-00-02",
@@ -26,13 +34,21 @@
         "https://neon.com/docs/reference/api/key-concepts"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "CONTRACT_LOCAL_TESTED",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
-        "逐一覆盖锁定193个operation的参数/响应/错误；不以返回200或路由存在代替资源生效",
+        "逐一覆盖锁定194个operation的参数/响应/错误；不以返回200或路由存在代替资源生效",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/dsga_project_handler.go",
+        "api/internal/control/dsga_runtime_release.go",
+        "api/internal/control/handlers.go",
+        "api/internal/control/worker.go"
+      ],
+      "review_note": "自有v1路由与OpenAPI测试已过；官方v2逐项语义及wire兼容尚未验收，不宣称312接口覆盖194官方操作。",
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-00-03",
@@ -44,13 +60,20 @@
       "official_operation_ids": [
         "getProjectOperation"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "scheduling/running/finished/failed/error/cancelling/cancelled/skipped各状态可观察；完成前不能当真实供应成功",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/dsga_project_handler.go",
+        "api/internal/control/dsga_runtime_release.go",
+        "api/internal/control/handlers.go",
+        "api/internal/control/worker.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-00-04",
@@ -94,13 +117,20 @@
         "listSharedProjects",
         "listSnapshots"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "多页无丢失/重复；429/423按官方响应处理，丢回复先查原operation/资源而非盲重建",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/dsga_project_handler.go",
+        "api/internal/control/dsga_runtime_release.go",
+        "api/internal/control/handlers.go",
+        "api/internal/control/worker.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-00-05",
@@ -113,13 +143,21 @@
       "official_operation_ids": [
         "getActiveRegions"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "LOCAL_CANDIDATE_TESTED",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "UI/API都按实际可用区域和后端版本拒绝无能力组合；不得自动把现有PG升级大版本",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/dsga_project_handler.go",
+        "api/internal/control/dsga_runtime_release.go",
+        "api/internal/control/handlers.go",
+        "api/internal/control/worker.go"
+      ],
+      "review_note": "PG17/18可信目录及公开投影、历史PG17前向迁移已本地测试；创建开关关闭，Worker完整资格/策略链尚未接通。",
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-00-06",
@@ -130,13 +168,21 @@
         "https://neon.com/docs/introduction/roadmap"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "OFFICIAL_CLASSIFICATION_REVIEWED",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "官方beta限制、legacy兼容和roadmap分别标记；未查到资料不推定不需要",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/dsga_project_handler.go",
+        "api/internal/control/dsga_runtime_release.go",
+        "api/internal/control/handlers.go",
+        "api/internal/control/worker.go"
+      ],
+      "review_note": "以20261107冻结官网区分GA/Beta/roadmap；分类不是本项目实现状态。",
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-00-07",
@@ -155,13 +201,20 @@
         "createProjectBranchRole",
         "createProjectBranchTrigger"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "创建/删除/恢复分支核PG/Auth/Storage/Functions/AI各自复制或重建语义，不能只增删一行CP元数据",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/dsga_project_handler.go",
+        "api/internal/control/dsga_runtime_release.go",
+        "api/internal/control/handlers.go",
+        "api/internal/control/worker.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-01-01",
@@ -171,13 +224,22 @@
         "https://neon.com/docs/manage/accounts"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "正常与错误登录、邮箱变更确认、社交身份解绑按文档验证，禁止越权接管",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/console_mfa.go",
+        "api/internal/control/console_oidc_config.go",
+        "api/internal/control/console_sessions.go",
+        "api/internal/control/console_sso.go",
+        "api/internal/control/console_sso_settings.go",
+        "api/internal/control/invitations.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-01-02",
@@ -187,13 +249,22 @@
         "https://neon.com/docs/manage/accounts"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "资料更新与密码修改核原会话；日志/响应不泄漏秘密",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/console_mfa.go",
+        "api/internal/control/console_oidc_config.go",
+        "api/internal/control/console_sessions.go",
+        "api/internal/control/console_sso.go",
+        "api/internal/control/console_sso_settings.go",
+        "api/internal/control/invitations.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-01-03",
@@ -203,13 +274,22 @@
         "https://neon.com/docs/manage/accounts"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "真实TOTP验证；移除24小时冷却与取消、通知、冷却期仍有效",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/console_mfa.go",
+        "api/internal/control/console_oidc_config.go",
+        "api/internal/control/console_sessions.go",
+        "api/internal/control/console_sso.go",
+        "api/internal/control/console_sso_settings.go",
+        "api/internal/control/invitations.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-01-04",
@@ -219,13 +299,22 @@
         "https://neon.com/docs/manage/accounts"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "真实WebAuthn挑战/来源验证，设备多凭据及24小时取消窗口，不用静态开关代替",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/console_mfa.go",
+        "api/internal/control/console_oidc_config.go",
+        "api/internal/control/console_sessions.go",
+        "api/internal/control/console_sso.go",
+        "api/internal/control/console_sso_settings.go",
+        "api/internal/control/invitations.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-01-05",
@@ -236,13 +325,22 @@
         "https://neon.com/docs/manage/account-recovery"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "删除/恢复边界及资源归属正确，冷却后不可虚假恢复，邮件/身份丢失走明确支持流程",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/console_mfa.go",
+        "api/internal/control/console_oidc_config.go",
+        "api/internal/control/console_sessions.go",
+        "api/internal/control/console_sso.go",
+        "api/internal/control/console_sso_settings.go",
+        "api/internal/control/invitations.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-01-06",
@@ -256,13 +354,22 @@
         "getCurrentUserInfo",
         "getCurrentUserOrganizations"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "认证上下文与有效作用域正确，不能从请求体自报身份",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/console_mfa.go",
+        "api/internal/control/console_oidc_config.go",
+        "api/internal/control/console_sessions.go",
+        "api/internal/control/console_sso.go",
+        "api/internal/control/console_sso_settings.go",
+        "api/internal/control/invitations.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-02-01",
@@ -280,13 +387,19 @@
         "getOrganizationSpendingLimit",
         "getOrganizationVPCEndpointDetails"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "组织隔离、删除前置与剩余资源处理完整；自有代码尚未评估",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/authorization.go",
+        "api/internal/control/invitations.go",
+        "api/internal/control/organizations.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-02-02",
@@ -304,13 +417,19 @@
         "removeOrganizationMember",
         "updateOrganizationMember"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "邀请/接受/移除/排序分页真实执行，唯一Admin不可被降级，重复操作不越权",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/authorization.go",
+        "api/internal/control/invitations.go",
+        "api/internal/control/organizations.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-02-03",
@@ -324,13 +443,19 @@
         "removeProjectMemberRole",
         "setProjectMemberRole"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "按Admin/Editor/Viewer/Collaborator与项目viewer/editor/admin做允许/拒绝矩阵，包含Viewer自建项目例外",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/authorization.go",
+        "api/internal/control/invitations.go",
+        "api/internal/control/organizations.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-02-04",
@@ -343,13 +468,19 @@
         "grantPermissionToProject",
         "listProjectPermissions"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "权限叠加不能降低组织基线；旧member/项目sharing保留迁移，不混淆新旧Collaborator",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/authorization.go",
+        "api/internal/control/invitations.go",
+        "api/internal/control/organizations.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-02-05",
@@ -367,13 +498,19 @@
         "revokePermissionFromProject",
         "setProjectMemberRole"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "撤销显式授权后组织继承仍适用；Viewer不可读取连接串/密码",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/authorization.go",
+        "api/internal/control/invitations.go",
+        "api/internal/control/organizations.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-02-06",
@@ -383,13 +520,19 @@
         "https://neon.com/docs/manage/orgs-manage"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "未完成2FA或passkey的成员不能继续访问受限组织，角色变更与重新登录生效",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/authorization.go",
+        "api/internal/control/invitations.go",
+        "api/internal/control/organizations.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-02-07",
@@ -399,13 +542,19 @@
         "https://neon.com/docs/manage/orgs-add-members-by-domain"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "DNS所有权核验后才自动加入；域移除和现有成员行为按文档区分",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/authorization.go",
+        "api/internal/control/invitations.go",
+        "api/internal/control/organizations.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-02-08",
@@ -419,13 +568,19 @@
         "listApiKeys",
         "revokeApiKey"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "秘密仅创建时展示、不可再次获取；撤销立即且永久；替换先创建再撤销可无停顿",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/authorization.go",
+        "api/internal/control/invitations.go",
+        "api/internal/control/organizations.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-02-09",
@@ -440,13 +595,19 @@
         "listOrgApiKeys",
         "revokeOrgApiKey"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "仅组织Admin创建；单项目key为Editor级，不能删除项目/管理权限/新建项目/越出项目",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/authorization.go",
+        "api/internal/control/invitations.go",
+        "api/internal/control/organizations.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-02-10",
@@ -476,13 +637,19 @@
         "updateNeonAuthOrganizationPlugin",
         "updateOrganizationMember"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "组织key不能替代个人Admin执行邀请、移除成员、项目转移等明确受限动作",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/authorization.go",
+        "api/internal/control/invitations.go",
+        "api/internal/control/organizations.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-02-11",
@@ -499,13 +666,19 @@
         "transferProjectsFromOrgToOrg",
         "transferProjectsFromUserToOrg"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "源/目标权限、配额、旧key失效和claim URL状态验证，丢回复不可重复转移",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/authorization.go",
+        "api/internal/control/invitations.go",
+        "api/internal/control/organizations.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-03-01",
@@ -527,12 +700,22 @@
         "createProjectEndpoint",
         "createProjectTransferRequest"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "CONFIRMED_INTEGRATION_GAP",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "创建事务与异步供应均完成后才能连接，异常不得留下对外假可用资源",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/create_handlers.go",
+        "api/internal/control/dsga_project_reservation.go",
+        "api/internal/control/lifecycle.go"
+      ],
+      "review_note": "公开DSGA创建Handler已有，worker.go无create_project_dsga_v1分派；当前不能自动完成创建。",
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -547,12 +730,21 @@
         "listProjects",
         "listSharedProjects"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "组织过滤、分页、可恢复项目筛选和权限过滤与Console一致",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/create_handlers.go",
+        "api/internal/control/dsga_project_reservation.go",
+        "api/internal/control/lifecycle.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -590,12 +782,21 @@
         "updateProjectBranchTrigger",
         "updateProjectEndpoint"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "默认配置只影响文档规定对象，不静默篡改已有实例或历史保留",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/create_handlers.go",
+        "api/internal/control/dsga_project_reservation.go",
+        "api/internal/control/lifecycle.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -615,12 +816,21 @@
         "updateProjectBranchTrigger",
         "updateProjectEndpoint"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "按compute/storage/transfer实际计量触发规定行为；与账单邮件阈值严格区分",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/create_handlers.go",
+        "api/internal/control/dsga_project_reservation.go",
+        "api/internal/control/lifecycle.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -640,12 +850,22 @@
         "updateProjectBranchTrigger",
         "updateProjectEndpoint"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "IMPLEMENTATION_NOT_CONFIRMED",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "计划更新、待更新版本、提前应用、连接中断处理可验，不以CP配置写入代替实际更新",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/create_handlers.go",
+        "api/internal/control/dsga_project_reservation.go",
+        "api/internal/control/lifecycle.go"
+      ],
+      "review_note": "公开路由/模块未发现完整维护窗口及计划更新编排，需按发行与运维方案闭合。",
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -673,12 +893,21 @@
         "deleteProjectVPCEndpoint",
         "recoverProject"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "按官方窗口列表→恢复→数据校验；过期/无权限/资源冲突拒绝，不能只恢复元数据",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/create_handlers.go",
+        "api/internal/control/dsga_project_reservation.go",
+        "api/internal/control/lifecycle.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -692,12 +921,21 @@
         "acceptProjectTransferRequest",
         "createProjectTransferRequest"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "请求、接受、权限和claim状态可靠，原组织project-scoped key语义随转移正确变化",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/create_handlers.go",
+        "api/internal/control/dsga_project_reservation.go",
+        "api/internal/control/lifecycle.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -718,12 +956,29 @@
         "createProjectBranchRole",
         "createProjectBranchTrigger"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "父子数据写入隔离、历史时点一致、非法LSN/过期历史拒绝",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/branch_expiration.go",
+        "api/internal/control/branch_reset_backings.go",
+        "api/internal/control/branch_reset_backup_probe.go",
+        "api/internal/control/branch_reset_bootstrap.go",
+        "api/internal/control/branch_reset_catalog.go",
+        "api/internal/control/branch_reset_catalog_sql.go",
+        "api/internal/control/branch_reset_config.go",
+        "api/internal/control/branch_reset_probe.go",
+        "api/internal/control/branch_reset_routes.go",
+        "api/internal/control/branch_reset_source.go",
+        "api/internal/control/create_handlers.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -746,12 +1001,29 @@
         "deleteProjectBranchTrigger",
         "setDefaultProjectBranch"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "区分root/default/protected；Console production与API main命名差异不造成错误对象操作",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/branch_expiration.go",
+        "api/internal/control/branch_reset_backings.go",
+        "api/internal/control/branch_reset_backup_probe.go",
+        "api/internal/control/branch_reset_bootstrap.go",
+        "api/internal/control/branch_reset_catalog.go",
+        "api/internal/control/branch_reset_catalog_sql.go",
+        "api/internal/control/branch_reset_config.go",
+        "api/internal/control/branch_reset_probe.go",
+        "api/internal/control/branch_reset_routes.go",
+        "api/internal/control/branch_reset_source.go",
+        "api/internal/control/create_handlers.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -783,12 +1055,29 @@
         "updateProjectBranchFunction",
         "updateProjectBranchTrigger"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "名称/状态/资源和实际branch一致，分页/计数权限一致",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/branch_expiration.go",
+        "api/internal/control/branch_reset_backings.go",
+        "api/internal/control/branch_reset_backup_probe.go",
+        "api/internal/control/branch_reset_bootstrap.go",
+        "api/internal/control/branch_reset_catalog.go",
+        "api/internal/control/branch_reset_catalog_sql.go",
+        "api/internal/control/branch_reset_config.go",
+        "api/internal/control/branch_reset_probe.go",
+        "api/internal/control/branch_reset_routes.go",
+        "api/internal/control/branch_reset_source.go",
+        "api/internal/control/create_handlers.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -808,12 +1097,29 @@
         "createProjectBranchRole",
         "createProjectBranchTrigger"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "真实复制schema而不暴露生产数据，依赖对象/默认角色按官方限制核验",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/branch_expiration.go",
+        "api/internal/control/branch_reset_backings.go",
+        "api/internal/control/branch_reset_backup_probe.go",
+        "api/internal/control/branch_reset_bootstrap.go",
+        "api/internal/control/branch_reset_catalog.go",
+        "api/internal/control/branch_reset_catalog_sql.go",
+        "api/internal/control/branch_reset_config.go",
+        "api/internal/control/branch_reset_probe.go",
+        "api/internal/control/branch_reset_routes.go",
+        "api/internal/control/branch_reset_source.go",
+        "api/internal/control/create_handlers.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -830,12 +1136,29 @@
         "updateProjectBranchFunction",
         "updateProjectBranchTrigger"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "过期、延期、取消期限及有子分支/保护状态正确；删除真正释放对应服务",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/branch_expiration.go",
+        "api/internal/control/branch_reset_backings.go",
+        "api/internal/control/branch_reset_backup_probe.go",
+        "api/internal/control/branch_reset_bootstrap.go",
+        "api/internal/control/branch_reset_catalog.go",
+        "api/internal/control/branch_reset_catalog_sql.go",
+        "api/internal/control/branch_reset_config.go",
+        "api/internal/control/branch_reset_probe.go",
+        "api/internal/control/branch_reset_routes.go",
+        "api/internal/control/branch_reset_source.go",
+        "api/internal/control/create_handlers.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -846,12 +1169,29 @@
         "https://neon.com/docs/manage/branches"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "按官方自动归档/恢复语义验证，不凭UI归档标识认定存储已处理",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/branch_expiration.go",
+        "api/internal/control/branch_reset_backings.go",
+        "api/internal/control/branch_reset_backup_probe.go",
+        "api/internal/control/branch_reset_bootstrap.go",
+        "api/internal/control/branch_reset_catalog.go",
+        "api/internal/control/branch_reset_catalog_sql.go",
+        "api/internal/control/branch_reset_config.go",
+        "api/internal/control/branch_reset_probe.go",
+        "api/internal/control/branch_reset_routes.go",
+        "api/internal/control/branch_reset_source.go",
+        "api/internal/control/create_handlers.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -868,12 +1208,29 @@
         "updateProjectBranchFunction",
         "updateProjectBranchTrigger"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "受保护不可误删，密码/子分支保护规则和IP Allow范围按官方合同执行",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/branch_expiration.go",
+        "api/internal/control/branch_reset_backings.go",
+        "api/internal/control/branch_reset_backup_probe.go",
+        "api/internal/control/branch_reset_bootstrap.go",
+        "api/internal/control/branch_reset_catalog.go",
+        "api/internal/control/branch_reset_catalog_sql.go",
+        "api/internal/control/branch_reset_config.go",
+        "api/internal/control/branch_reset_probe.go",
+        "api/internal/control/branch_reset_routes.go",
+        "api/internal/control/branch_reset_source.go",
+        "api/internal/control/create_handlers.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -887,12 +1244,29 @@
       "official_operation_ids": [
         "restoreProjectBranch"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "恢复前备份分支、原连接语义、实际数据及依赖服务一致；失败保留可观察状态",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/branch_expiration.go",
+        "api/internal/control/branch_reset_backings.go",
+        "api/internal/control/branch_reset_backup_probe.go",
+        "api/internal/control/branch_reset_bootstrap.go",
+        "api/internal/control/branch_reset_catalog.go",
+        "api/internal/control/branch_reset_catalog_sql.go",
+        "api/internal/control/branch_reset_config.go",
+        "api/internal/control/branch_reset_probe.go",
+        "api/internal/control/branch_reset_routes.go",
+        "api/internal/control/branch_reset_source.go",
+        "api/internal/control/create_handlers.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -906,12 +1280,29 @@
         "getProjectBranchSchema",
         "getProjectBranchSchemaComparison"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "对比正确database/role/branch与历史点，schema较大限制透明，不能把diff当自动迁移",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/branch_expiration.go",
+        "api/internal/control/branch_reset_backings.go",
+        "api/internal/control/branch_reset_backup_probe.go",
+        "api/internal/control/branch_reset_bootstrap.go",
+        "api/internal/control/branch_reset_catalog.go",
+        "api/internal/control/branch_reset_catalog_sql.go",
+        "api/internal/control/branch_reset_config.go",
+        "api/internal/control/branch_reset_probe.go",
+        "api/internal/control/branch_reset_routes.go",
+        "api/internal/control/branch_reset_source.go",
+        "api/internal/control/create_handlers.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -929,12 +1320,29 @@
         "startAnonymization",
         "updateMaskingRules"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "实际数据脱敏、规则读写、进度/失败与复制隔离，敏感原数据不能因创建接口成功泄漏",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/branch_expiration.go",
+        "api/internal/control/branch_reset_backings.go",
+        "api/internal/control/branch_reset_backup_probe.go",
+        "api/internal/control/branch_reset_bootstrap.go",
+        "api/internal/control/branch_reset_catalog.go",
+        "api/internal/control/branch_reset_catalog_sql.go",
+        "api/internal/control/branch_reset_config.go",
+        "api/internal/control/branch_reset_probe.go",
+        "api/internal/control/branch_reset_routes.go",
+        "api/internal/control/branch_reset_source.go",
+        "api/internal/control/create_handlers.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -955,12 +1363,48 @@
         "suspendProjectEndpoint",
         "updateProjectEndpoint"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "真实读写权限、连接URI、相同分支数据与复制可见性正确",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/bounds.go",
+        "api/internal/control/dsga_array_credentials.go",
+        "api/internal/control/dsga_creation.go",
+        "api/internal/control/dsga_creation_auth.go",
+        "api/internal/control/dsga_creation_binding.go",
+        "api/internal/control/dsga_creation_credentials.go",
+        "api/internal/control/dsga_creation_plan.go",
+        "api/internal/control/dsga_credential_producer.go",
+        "api/internal/control/dsga_credentials.go",
+        "api/internal/control/dsga_initialization.go",
+        "api/internal/control/dsga_initialization_history.go",
+        "api/internal/control/dsga_kube.go",
+        "api/internal/control/dsga_legacy_guard.go",
+        "api/internal/control/dsga_listener.go",
+        "api/internal/control/dsga_placement.go",
+        "api/internal/control/dsga_project_handler.go",
+        "api/internal/control/dsga_project_reservation.go",
+        "api/internal/control/dsga_proxy.go",
+        "api/internal/control/dsga_renderer.go",
+        "api/internal/control/dsga_resource_renderer.go",
+        "api/internal/control/dsga_route.go",
+        "api/internal/control/dsga_route_replacement.go",
+        "api/internal/control/dsga_runtime_release.go",
+        "api/internal/control/dsga_services.go",
+        "api/internal/control/dsga_storage_client.go",
+        "api/internal/control/dsga_tenant.go",
+        "api/internal/control/dsga_timeline.go",
+        "api/internal/control/dsga_vm.go",
+        "api/internal/control/idle_window.go",
+        "api/internal/control/reconcile_create.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -974,12 +1418,48 @@
         "createProjectEndpoint",
         "updateProjectEndpoint"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "规格由准确能力来源限定，非法组合写前拒绝；实际PG/Guest/VM/Host资源回读",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/bounds.go",
+        "api/internal/control/dsga_array_credentials.go",
+        "api/internal/control/dsga_creation.go",
+        "api/internal/control/dsga_creation_auth.go",
+        "api/internal/control/dsga_creation_binding.go",
+        "api/internal/control/dsga_creation_credentials.go",
+        "api/internal/control/dsga_creation_plan.go",
+        "api/internal/control/dsga_credential_producer.go",
+        "api/internal/control/dsga_credentials.go",
+        "api/internal/control/dsga_initialization.go",
+        "api/internal/control/dsga_initialization_history.go",
+        "api/internal/control/dsga_kube.go",
+        "api/internal/control/dsga_legacy_guard.go",
+        "api/internal/control/dsga_listener.go",
+        "api/internal/control/dsga_placement.go",
+        "api/internal/control/dsga_project_handler.go",
+        "api/internal/control/dsga_project_reservation.go",
+        "api/internal/control/dsga_proxy.go",
+        "api/internal/control/dsga_renderer.go",
+        "api/internal/control/dsga_resource_renderer.go",
+        "api/internal/control/dsga_route.go",
+        "api/internal/control/dsga_route_replacement.go",
+        "api/internal/control/dsga_runtime_release.go",
+        "api/internal/control/dsga_services.go",
+        "api/internal/control/dsga_storage_client.go",
+        "api/internal/control/dsga_tenant.go",
+        "api/internal/control/dsga_timeline.go",
+        "api/internal/control/dsga_vm.go",
+        "api/internal/control/idle_window.go",
+        "api/internal/control/reconcile_create.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -993,12 +1473,49 @@
       "official_operation_ids": [
         "updateProjectEndpoint"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "CONFIRMED_INTEGRATION_GAP",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "实际负载下Grow/Shrink/Regrow、边界/滞回和故障恢复，PG17安全normal门槛全部保留",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/bounds.go",
+        "api/internal/control/dsga_array_credentials.go",
+        "api/internal/control/dsga_creation.go",
+        "api/internal/control/dsga_creation_auth.go",
+        "api/internal/control/dsga_creation_binding.go",
+        "api/internal/control/dsga_creation_credentials.go",
+        "api/internal/control/dsga_creation_plan.go",
+        "api/internal/control/dsga_credential_producer.go",
+        "api/internal/control/dsga_credentials.go",
+        "api/internal/control/dsga_initialization.go",
+        "api/internal/control/dsga_initialization_history.go",
+        "api/internal/control/dsga_kube.go",
+        "api/internal/control/dsga_legacy_guard.go",
+        "api/internal/control/dsga_listener.go",
+        "api/internal/control/dsga_placement.go",
+        "api/internal/control/dsga_project_handler.go",
+        "api/internal/control/dsga_project_reservation.go",
+        "api/internal/control/dsga_proxy.go",
+        "api/internal/control/dsga_renderer.go",
+        "api/internal/control/dsga_resource_renderer.go",
+        "api/internal/control/dsga_route.go",
+        "api/internal/control/dsga_route_replacement.go",
+        "api/internal/control/dsga_runtime_release.go",
+        "api/internal/control/dsga_services.go",
+        "api/internal/control/dsga_storage_client.go",
+        "api/internal/control/dsga_tenant.go",
+        "api/internal/control/dsga_timeline.go",
+        "api/internal/control/dsga_vm.go",
+        "api/internal/control/idle_window.go",
+        "api/internal/control/reconcile_create.go"
+      ],
+      "review_note": "bounds.go仍为传统VM范围；Agent按VM UID静态资格/自动策略配置需产品化，不能仅写元数据即标伸缩完成。",
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -1014,12 +1531,48 @@
         "startProjectEndpoint",
         "suspendProjectEndpoint"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "空闲真停止、连接真唤醒、已有会话/后台工作负载语义与计量一致",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/bounds.go",
+        "api/internal/control/dsga_array_credentials.go",
+        "api/internal/control/dsga_creation.go",
+        "api/internal/control/dsga_creation_auth.go",
+        "api/internal/control/dsga_creation_binding.go",
+        "api/internal/control/dsga_creation_credentials.go",
+        "api/internal/control/dsga_creation_plan.go",
+        "api/internal/control/dsga_credential_producer.go",
+        "api/internal/control/dsga_credentials.go",
+        "api/internal/control/dsga_initialization.go",
+        "api/internal/control/dsga_initialization_history.go",
+        "api/internal/control/dsga_kube.go",
+        "api/internal/control/dsga_legacy_guard.go",
+        "api/internal/control/dsga_listener.go",
+        "api/internal/control/dsga_placement.go",
+        "api/internal/control/dsga_project_handler.go",
+        "api/internal/control/dsga_project_reservation.go",
+        "api/internal/control/dsga_proxy.go",
+        "api/internal/control/dsga_renderer.go",
+        "api/internal/control/dsga_resource_renderer.go",
+        "api/internal/control/dsga_route.go",
+        "api/internal/control/dsga_route_replacement.go",
+        "api/internal/control/dsga_runtime_release.go",
+        "api/internal/control/dsga_services.go",
+        "api/internal/control/dsga_storage_client.go",
+        "api/internal/control/dsga_tenant.go",
+        "api/internal/control/dsga_timeline.go",
+        "api/internal/control/dsga_vm.go",
+        "api/internal/control/idle_window.go",
+        "api/internal/control/reconcile_create.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -1035,12 +1588,48 @@
         "startProjectEndpoint",
         "suspendProjectEndpoint"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "API async完成与真正连接/进程生命周期一致；迟到响应不能复活已删实例",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/bounds.go",
+        "api/internal/control/dsga_array_credentials.go",
+        "api/internal/control/dsga_creation.go",
+        "api/internal/control/dsga_creation_auth.go",
+        "api/internal/control/dsga_creation_binding.go",
+        "api/internal/control/dsga_creation_credentials.go",
+        "api/internal/control/dsga_creation_plan.go",
+        "api/internal/control/dsga_credential_producer.go",
+        "api/internal/control/dsga_credentials.go",
+        "api/internal/control/dsga_initialization.go",
+        "api/internal/control/dsga_initialization_history.go",
+        "api/internal/control/dsga_kube.go",
+        "api/internal/control/dsga_legacy_guard.go",
+        "api/internal/control/dsga_listener.go",
+        "api/internal/control/dsga_placement.go",
+        "api/internal/control/dsga_project_handler.go",
+        "api/internal/control/dsga_project_reservation.go",
+        "api/internal/control/dsga_proxy.go",
+        "api/internal/control/dsga_renderer.go",
+        "api/internal/control/dsga_resource_renderer.go",
+        "api/internal/control/dsga_route.go",
+        "api/internal/control/dsga_route_replacement.go",
+        "api/internal/control/dsga_runtime_release.go",
+        "api/internal/control/dsga_services.go",
+        "api/internal/control/dsga_storage_client.go",
+        "api/internal/control/dsga_tenant.go",
+        "api/internal/control/dsga_timeline.go",
+        "api/internal/control/dsga_vm.go",
+        "api/internal/control/idle_window.go",
+        "api/internal/control/reconcile_create.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -1054,12 +1643,48 @@
       "official_operation_ids": [
         "createProjectEndpoint"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "replica实际拒写、数据可见性、生命周期与收费正确；不擅自假定跨区域支持",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/bounds.go",
+        "api/internal/control/dsga_array_credentials.go",
+        "api/internal/control/dsga_creation.go",
+        "api/internal/control/dsga_creation_auth.go",
+        "api/internal/control/dsga_creation_binding.go",
+        "api/internal/control/dsga_creation_credentials.go",
+        "api/internal/control/dsga_creation_plan.go",
+        "api/internal/control/dsga_credential_producer.go",
+        "api/internal/control/dsga_credentials.go",
+        "api/internal/control/dsga_initialization.go",
+        "api/internal/control/dsga_initialization_history.go",
+        "api/internal/control/dsga_kube.go",
+        "api/internal/control/dsga_legacy_guard.go",
+        "api/internal/control/dsga_listener.go",
+        "api/internal/control/dsga_placement.go",
+        "api/internal/control/dsga_project_handler.go",
+        "api/internal/control/dsga_project_reservation.go",
+        "api/internal/control/dsga_proxy.go",
+        "api/internal/control/dsga_renderer.go",
+        "api/internal/control/dsga_resource_renderer.go",
+        "api/internal/control/dsga_route.go",
+        "api/internal/control/dsga_route_replacement.go",
+        "api/internal/control/dsga_runtime_release.go",
+        "api/internal/control/dsga_services.go",
+        "api/internal/control/dsga_storage_client.go",
+        "api/internal/control/dsga_tenant.go",
+        "api/internal/control/dsga_timeline.go",
+        "api/internal/control/dsga_vm.go",
+        "api/internal/control/idle_window.go",
+        "api/internal/control/reconcile_create.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -1073,12 +1698,48 @@
         "getConnectionURI",
         "updateProjectEndpoint"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "direct/pooled URI正确，事务池不支持的会话功能给出明确限制与替代路径",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/bounds.go",
+        "api/internal/control/dsga_array_credentials.go",
+        "api/internal/control/dsga_creation.go",
+        "api/internal/control/dsga_creation_auth.go",
+        "api/internal/control/dsga_creation_binding.go",
+        "api/internal/control/dsga_creation_credentials.go",
+        "api/internal/control/dsga_creation_plan.go",
+        "api/internal/control/dsga_credential_producer.go",
+        "api/internal/control/dsga_credentials.go",
+        "api/internal/control/dsga_initialization.go",
+        "api/internal/control/dsga_initialization_history.go",
+        "api/internal/control/dsga_kube.go",
+        "api/internal/control/dsga_legacy_guard.go",
+        "api/internal/control/dsga_listener.go",
+        "api/internal/control/dsga_placement.go",
+        "api/internal/control/dsga_project_handler.go",
+        "api/internal/control/dsga_project_reservation.go",
+        "api/internal/control/dsga_proxy.go",
+        "api/internal/control/dsga_renderer.go",
+        "api/internal/control/dsga_resource_renderer.go",
+        "api/internal/control/dsga_route.go",
+        "api/internal/control/dsga_route_replacement.go",
+        "api/internal/control/dsga_runtime_release.go",
+        "api/internal/control/dsga_services.go",
+        "api/internal/control/dsga_storage_client.go",
+        "api/internal/control/dsga_tenant.go",
+        "api/internal/control/dsga_timeline.go",
+        "api/internal/control/dsga_vm.go",
+        "api/internal/control/idle_window.go",
+        "api/internal/control/reconcile_create.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -1092,12 +1753,49 @@
       "official_operation_ids": [
         "getProjectEndpoint"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "LOCAL_CANDIDATE_PARTIAL",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "版本/待更新/更新窗口/重启生效和数据持久性验证，不能以旧镜像标签冒称最新",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/bounds.go",
+        "api/internal/control/dsga_array_credentials.go",
+        "api/internal/control/dsga_creation.go",
+        "api/internal/control/dsga_creation_auth.go",
+        "api/internal/control/dsga_creation_binding.go",
+        "api/internal/control/dsga_creation_credentials.go",
+        "api/internal/control/dsga_creation_plan.go",
+        "api/internal/control/dsga_credential_producer.go",
+        "api/internal/control/dsga_credentials.go",
+        "api/internal/control/dsga_initialization.go",
+        "api/internal/control/dsga_initialization_history.go",
+        "api/internal/control/dsga_kube.go",
+        "api/internal/control/dsga_legacy_guard.go",
+        "api/internal/control/dsga_listener.go",
+        "api/internal/control/dsga_placement.go",
+        "api/internal/control/dsga_project_handler.go",
+        "api/internal/control/dsga_project_reservation.go",
+        "api/internal/control/dsga_proxy.go",
+        "api/internal/control/dsga_renderer.go",
+        "api/internal/control/dsga_resource_renderer.go",
+        "api/internal/control/dsga_route.go",
+        "api/internal/control/dsga_route_replacement.go",
+        "api/internal/control/dsga_runtime_release.go",
+        "api/internal/control/dsga_services.go",
+        "api/internal/control/dsga_storage_client.go",
+        "api/internal/control/dsga_tenant.go",
+        "api/internal/control/dsga_timeline.go",
+        "api/internal/control/dsga_vm.go",
+        "api/internal/control/idle_window.go",
+        "api/internal/control/reconcile_create.go"
+      ],
+      "review_note": "已有可信创建版本选择候选；发行推广、维护更新、实例实际版本统一管理待实现。",
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -1111,12 +1809,48 @@
       "official_operation_ids": [
         "getProjectEndpoint"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "真实PG/VM/node故障恢复与会话损失边界分开记录，不能承诺未经实测的RPO/RTO",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/bounds.go",
+        "api/internal/control/dsga_array_credentials.go",
+        "api/internal/control/dsga_creation.go",
+        "api/internal/control/dsga_creation_auth.go",
+        "api/internal/control/dsga_creation_binding.go",
+        "api/internal/control/dsga_creation_credentials.go",
+        "api/internal/control/dsga_creation_plan.go",
+        "api/internal/control/dsga_credential_producer.go",
+        "api/internal/control/dsga_credentials.go",
+        "api/internal/control/dsga_initialization.go",
+        "api/internal/control/dsga_initialization_history.go",
+        "api/internal/control/dsga_kube.go",
+        "api/internal/control/dsga_legacy_guard.go",
+        "api/internal/control/dsga_listener.go",
+        "api/internal/control/dsga_placement.go",
+        "api/internal/control/dsga_project_handler.go",
+        "api/internal/control/dsga_project_reservation.go",
+        "api/internal/control/dsga_proxy.go",
+        "api/internal/control/dsga_renderer.go",
+        "api/internal/control/dsga_resource_renderer.go",
+        "api/internal/control/dsga_route.go",
+        "api/internal/control/dsga_route_replacement.go",
+        "api/internal/control/dsga_runtime_release.go",
+        "api/internal/control/dsga_services.go",
+        "api/internal/control/dsga_storage_client.go",
+        "api/internal/control/dsga_tenant.go",
+        "api/internal/control/dsga_timeline.go",
+        "api/internal/control/dsga_vm.go",
+        "api/internal/control/idle_window.go",
+        "api/internal/control/reconcile_create.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -1133,12 +1867,44 @@
         "listProjectBranchDatabases",
         "updateProjectBranchDatabase"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "实际Postgres目录与CP同步、reserved名和所有权约束验证，SQL旁路变化可对账",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/catalog.go",
+        "api/internal/control/catalog_backend_rename.go",
+        "api/internal/control/catalog_backend_rename_secret.go",
+        "api/internal/control/catalog_baseline_credentials.go",
+        "api/internal/control/catalog_current_inventory.go",
+        "api/internal/control/catalog_current_observation.go",
+        "api/internal/control/catalog_fork_backings.go",
+        "api/internal/control/catalog_fork_exclusions.go",
+        "api/internal/control/catalog_fork_inspection.go",
+        "api/internal/control/catalog_identity_baselines.go",
+        "api/internal/control/catalog_identity_restore.go",
+        "api/internal/control/catalog_inheritance.go",
+        "api/internal/control/catalog_inheritance_admission.go",
+        "api/internal/control/catalog_inheritance_bootstrap.go",
+        "api/internal/control/catalog_inheritance_store.go",
+        "api/internal/control/catalog_inventory.go",
+        "api/internal/control/catalog_mutation_results.go",
+        "api/internal/control/catalog_object_bindings.go",
+        "api/internal/control/catalog_platform_identities.go",
+        "api/internal/control/catalog_platform_store.go",
+        "api/internal/control/catalog_rename.go",
+        "api/internal/control/catalog_rename_admission.go",
+        "api/internal/control/catalog_rename_driver.go",
+        "api/internal/control/catalog_rename_results.go",
+        "api/internal/control/connection_defaults.go",
+        "api/internal/control/proxy.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -1156,12 +1922,44 @@
         "listProjectBranchRoles",
         "resetProjectBranchRolePassword"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "neon_superuser语义不等于真实超级用户，API/SQL角色区别和NOLOGIN限制按官方执行",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/catalog.go",
+        "api/internal/control/catalog_backend_rename.go",
+        "api/internal/control/catalog_backend_rename_secret.go",
+        "api/internal/control/catalog_baseline_credentials.go",
+        "api/internal/control/catalog_current_inventory.go",
+        "api/internal/control/catalog_current_observation.go",
+        "api/internal/control/catalog_fork_backings.go",
+        "api/internal/control/catalog_fork_exclusions.go",
+        "api/internal/control/catalog_fork_inspection.go",
+        "api/internal/control/catalog_identity_baselines.go",
+        "api/internal/control/catalog_identity_restore.go",
+        "api/internal/control/catalog_inheritance.go",
+        "api/internal/control/catalog_inheritance_admission.go",
+        "api/internal/control/catalog_inheritance_bootstrap.go",
+        "api/internal/control/catalog_inheritance_store.go",
+        "api/internal/control/catalog_inventory.go",
+        "api/internal/control/catalog_mutation_results.go",
+        "api/internal/control/catalog_object_bindings.go",
+        "api/internal/control/catalog_platform_identities.go",
+        "api/internal/control/catalog_platform_store.go",
+        "api/internal/control/catalog_rename.go",
+        "api/internal/control/catalog_rename_admission.go",
+        "api/internal/control/catalog_rename_driver.go",
+        "api/internal/control/catalog_rename_results.go",
+        "api/internal/control/connection_defaults.go",
+        "api/internal/control/proxy.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -1176,12 +1974,44 @@
         "getProjectBranchRolePassword",
         "resetProjectBranchRolePassword"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "只有授权身份能看/改原角色秘密；重置后旧连接凭据行为和新连接生效可核",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/catalog.go",
+        "api/internal/control/catalog_backend_rename.go",
+        "api/internal/control/catalog_backend_rename_secret.go",
+        "api/internal/control/catalog_baseline_credentials.go",
+        "api/internal/control/catalog_current_inventory.go",
+        "api/internal/control/catalog_current_observation.go",
+        "api/internal/control/catalog_fork_backings.go",
+        "api/internal/control/catalog_fork_exclusions.go",
+        "api/internal/control/catalog_fork_inspection.go",
+        "api/internal/control/catalog_identity_baselines.go",
+        "api/internal/control/catalog_identity_restore.go",
+        "api/internal/control/catalog_inheritance.go",
+        "api/internal/control/catalog_inheritance_admission.go",
+        "api/internal/control/catalog_inheritance_bootstrap.go",
+        "api/internal/control/catalog_inheritance_store.go",
+        "api/internal/control/catalog_inventory.go",
+        "api/internal/control/catalog_mutation_results.go",
+        "api/internal/control/catalog_object_bindings.go",
+        "api/internal/control/catalog_platform_identities.go",
+        "api/internal/control/catalog_platform_store.go",
+        "api/internal/control/catalog_rename.go",
+        "api/internal/control/catalog_rename_admission.go",
+        "api/internal/control/catalog_rename_driver.go",
+        "api/internal/control/catalog_rename_results.go",
+        "api/internal/control/connection_defaults.go",
+        "api/internal/control/proxy.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -1192,12 +2022,44 @@
         "https://neon.com/docs/manage/database-access"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "GRANT/REVOKE/默认权限/Public schema和实际SQL正负访问矩阵，不能只隐藏UI入口",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/catalog.go",
+        "api/internal/control/catalog_backend_rename.go",
+        "api/internal/control/catalog_backend_rename_secret.go",
+        "api/internal/control/catalog_baseline_credentials.go",
+        "api/internal/control/catalog_current_inventory.go",
+        "api/internal/control/catalog_current_observation.go",
+        "api/internal/control/catalog_fork_backings.go",
+        "api/internal/control/catalog_fork_exclusions.go",
+        "api/internal/control/catalog_fork_inspection.go",
+        "api/internal/control/catalog_identity_baselines.go",
+        "api/internal/control/catalog_identity_restore.go",
+        "api/internal/control/catalog_inheritance.go",
+        "api/internal/control/catalog_inheritance_admission.go",
+        "api/internal/control/catalog_inheritance_bootstrap.go",
+        "api/internal/control/catalog_inheritance_store.go",
+        "api/internal/control/catalog_inventory.go",
+        "api/internal/control/catalog_mutation_results.go",
+        "api/internal/control/catalog_object_bindings.go",
+        "api/internal/control/catalog_platform_identities.go",
+        "api/internal/control/catalog_platform_store.go",
+        "api/internal/control/catalog_rename.go",
+        "api/internal/control/catalog_rename_admission.go",
+        "api/internal/control/catalog_rename_driver.go",
+        "api/internal/control/catalog_rename_results.go",
+        "api/internal/control/connection_defaults.go",
+        "api/internal/control/proxy.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -1211,12 +2073,44 @@
       "official_operation_ids": [
         "getConnectionURI"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "project/branch/db/role/compute/pooler选项准确；SNI/TLS验证与凭据避免写入日志",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/catalog.go",
+        "api/internal/control/catalog_backend_rename.go",
+        "api/internal/control/catalog_backend_rename_secret.go",
+        "api/internal/control/catalog_baseline_credentials.go",
+        "api/internal/control/catalog_current_inventory.go",
+        "api/internal/control/catalog_current_observation.go",
+        "api/internal/control/catalog_fork_backings.go",
+        "api/internal/control/catalog_fork_exclusions.go",
+        "api/internal/control/catalog_fork_inspection.go",
+        "api/internal/control/catalog_identity_baselines.go",
+        "api/internal/control/catalog_identity_restore.go",
+        "api/internal/control/catalog_inheritance.go",
+        "api/internal/control/catalog_inheritance_admission.go",
+        "api/internal/control/catalog_inheritance_bootstrap.go",
+        "api/internal/control/catalog_inheritance_store.go",
+        "api/internal/control/catalog_inventory.go",
+        "api/internal/control/catalog_mutation_results.go",
+        "api/internal/control/catalog_object_bindings.go",
+        "api/internal/control/catalog_platform_identities.go",
+        "api/internal/control/catalog_platform_store.go",
+        "api/internal/control/catalog_rename.go",
+        "api/internal/control/catalog_rename_admission.go",
+        "api/internal/control/catalog_rename_driver.go",
+        "api/internal/control/catalog_rename_results.go",
+        "api/internal/control/connection_defaults.go",
+        "api/internal/control/proxy.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -1227,12 +2121,44 @@
         "https://neon.com/docs/serverless/serverless-driver"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "真实查询、事务、超时及鉴权边界，CP提供的URI/角色和Proxy实际相同",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/catalog.go",
+        "api/internal/control/catalog_backend_rename.go",
+        "api/internal/control/catalog_backend_rename_secret.go",
+        "api/internal/control/catalog_baseline_credentials.go",
+        "api/internal/control/catalog_current_inventory.go",
+        "api/internal/control/catalog_current_observation.go",
+        "api/internal/control/catalog_fork_backings.go",
+        "api/internal/control/catalog_fork_exclusions.go",
+        "api/internal/control/catalog_fork_inspection.go",
+        "api/internal/control/catalog_identity_baselines.go",
+        "api/internal/control/catalog_identity_restore.go",
+        "api/internal/control/catalog_inheritance.go",
+        "api/internal/control/catalog_inheritance_admission.go",
+        "api/internal/control/catalog_inheritance_bootstrap.go",
+        "api/internal/control/catalog_inheritance_store.go",
+        "api/internal/control/catalog_inventory.go",
+        "api/internal/control/catalog_mutation_results.go",
+        "api/internal/control/catalog_object_bindings.go",
+        "api/internal/control/catalog_platform_identities.go",
+        "api/internal/control/catalog_platform_store.go",
+        "api/internal/control/catalog_rename.go",
+        "api/internal/control/catalog_rename_admission.go",
+        "api/internal/control/catalog_rename_driver.go",
+        "api/internal/control/catalog_rename_results.go",
+        "api/internal/control/connection_defaults.go",
+        "api/internal/control/proxy.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -1252,12 +2178,44 @@
         "updateProjectBranchTrigger",
         "updateProjectEndpoint"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "真实复制、WAL保留、restart和不支持的拓扑明示，不能把项目开关当复制已运行",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/catalog.go",
+        "api/internal/control/catalog_backend_rename.go",
+        "api/internal/control/catalog_backend_rename_secret.go",
+        "api/internal/control/catalog_baseline_credentials.go",
+        "api/internal/control/catalog_current_inventory.go",
+        "api/internal/control/catalog_current_observation.go",
+        "api/internal/control/catalog_fork_backings.go",
+        "api/internal/control/catalog_fork_exclusions.go",
+        "api/internal/control/catalog_fork_inspection.go",
+        "api/internal/control/catalog_identity_baselines.go",
+        "api/internal/control/catalog_identity_restore.go",
+        "api/internal/control/catalog_inheritance.go",
+        "api/internal/control/catalog_inheritance_admission.go",
+        "api/internal/control/catalog_inheritance_bootstrap.go",
+        "api/internal/control/catalog_inheritance_store.go",
+        "api/internal/control/catalog_inventory.go",
+        "api/internal/control/catalog_mutation_results.go",
+        "api/internal/control/catalog_object_bindings.go",
+        "api/internal/control/catalog_platform_identities.go",
+        "api/internal/control/catalog_platform_store.go",
+        "api/internal/control/catalog_rename.go",
+        "api/internal/control/catalog_rename_admission.go",
+        "api/internal/control/catalog_rename_driver.go",
+        "api/internal/control/catalog_rename_results.go",
+        "api/internal/control/connection_defaults.go",
+        "api/internal/control/proxy.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -1276,12 +2234,28 @@
         "updateProjectBranchTrigger",
         "updateProjectEndpoint"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "配置范围/plan门禁、真实可恢复LSN和过期不可恢复边界，不能用当前时间推历史存在",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/branch_reset_backings.go",
+        "api/internal/control/branch_reset_backup_probe.go",
+        "api/internal/control/branch_reset_bootstrap.go",
+        "api/internal/control/branch_reset_catalog.go",
+        "api/internal/control/branch_reset_catalog_sql.go",
+        "api/internal/control/branch_reset_config.go",
+        "api/internal/control/branch_reset_probe.go",
+        "api/internal/control/branch_reset_routes.go",
+        "api/internal/control/branch_reset_source.go",
+        "api/internal/control/restore.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -1294,12 +2268,28 @@
       "official_operation_ids": [
         "restoreProjectBranch"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "数据校验、原branch/连接行为、备份分支保留和失败可恢复性实测",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/branch_reset_backings.go",
+        "api/internal/control/branch_reset_backup_probe.go",
+        "api/internal/control/branch_reset_bootstrap.go",
+        "api/internal/control/branch_reset_catalog.go",
+        "api/internal/control/branch_reset_catalog_sql.go",
+        "api/internal/control/branch_reset_config.go",
+        "api/internal/control/branch_reset_probe.go",
+        "api/internal/control/branch_reset_routes.go",
+        "api/internal/control/branch_reset_source.go",
+        "api/internal/control/restore.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -1310,12 +2300,28 @@
         "https://neon.com/docs/postgres/backup-restore/time-travel-assist"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "只读一致性、临时endpoint寿命和费用、历史窗限制，原生产状态不被回滚",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/branch_reset_backings.go",
+        "api/internal/control/branch_reset_backup_probe.go",
+        "api/internal/control/branch_reset_bootstrap.go",
+        "api/internal/control/branch_reset_catalog.go",
+        "api/internal/control/branch_reset_catalog_sql.go",
+        "api/internal/control/branch_reset_config.go",
+        "api/internal/control/branch_reset_probe.go",
+        "api/internal/control/branch_reset_routes.go",
+        "api/internal/control/branch_reset_source.go",
+        "api/internal/control/restore.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -1334,12 +2340,28 @@
         "setSnapshotSchedule",
         "updateSnapshot"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "实存快照、来源branch/时间、保留和额度验证，删除与对象存储实际生命周期闭合",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/branch_reset_backings.go",
+        "api/internal/control/branch_reset_backup_probe.go",
+        "api/internal/control/branch_reset_bootstrap.go",
+        "api/internal/control/branch_reset_catalog.go",
+        "api/internal/control/branch_reset_catalog_sql.go",
+        "api/internal/control/branch_reset_config.go",
+        "api/internal/control/branch_reset_probe.go",
+        "api/internal/control/branch_reset_routes.go",
+        "api/internal/control/branch_reset_source.go",
+        "api/internal/control/restore.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -1353,12 +2375,28 @@
         "getSnapshotSchedule",
         "setSnapshotSchedule"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "时区/计划/配额、重复投递及故障补偿由明确合同验证，不能仅保存cron字符串",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/branch_reset_backings.go",
+        "api/internal/control/branch_reset_backup_probe.go",
+        "api/internal/control/branch_reset_bootstrap.go",
+        "api/internal/control/branch_reset_catalog.go",
+        "api/internal/control/branch_reset_catalog_sql.go",
+        "api/internal/control/branch_reset_config.go",
+        "api/internal/control/branch_reset_probe.go",
+        "api/internal/control/branch_reset_routes.go",
+        "api/internal/control/branch_reset_source.go",
+        "api/internal/control/restore.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -1373,12 +2411,28 @@
         "finalizeRestoreBranch",
         "restoreSnapshot"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "检查未finalize分支→确认实际数据→finalize切换；失败不得假完成或丢原数据",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/branch_reset_backings.go",
+        "api/internal/control/branch_reset_backup_probe.go",
+        "api/internal/control/branch_reset_bootstrap.go",
+        "api/internal/control/branch_reset_catalog.go",
+        "api/internal/control/branch_reset_catalog_sql.go",
+        "api/internal/control/branch_reset_config.go",
+        "api/internal/control/branch_reset_probe.go",
+        "api/internal/control/branch_reset_routes.go",
+        "api/internal/control/branch_reset_source.go",
+        "api/internal/control/restore.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -1390,12 +2444,28 @@
         "https://neon.com/docs/manage/backup-pg-dump-automate"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "真实格式/版本/角色兼容与回灌校验；用户工具/外部S3流程与内建PITR分开",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/branch_reset_backings.go",
+        "api/internal/control/branch_reset_backup_probe.go",
+        "api/internal/control/branch_reset_bootstrap.go",
+        "api/internal/control/branch_reset_catalog.go",
+        "api/internal/control/branch_reset_catalog_sql.go",
+        "api/internal/control/branch_reset_config.go",
+        "api/internal/control/branch_reset_probe.go",
+        "api/internal/control/branch_reset_routes.go",
+        "api/internal/control/branch_reset_source.go",
+        "api/internal/control/restore.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -1406,13 +2476,23 @@
         "https://neon.com/docs/get-started/query-with-neon-sql-editor"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "真实SQL与结果/错误/取消，明确选中db/role/branch；不能只返回模拟表格",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/saved_queries.go",
+        "api/internal/control/sql_history.go",
+        "api/internal/control/sql_history_delete.go",
+        "api/internal/control/sql_history_names.go",
+        "api/internal/control/sql_history_policy.go",
+        "api/internal/control/sql_history_sharing.go",
+        "api/internal/control/sql_script.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-08-02",
@@ -1423,13 +2503,23 @@
         "https://neon.com/docs/security/ai-use-in-neon"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "历史/隐私授权和生成SQL需用户确认执行，AI描述不能作为已运行结果",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/saved_queries.go",
+        "api/internal/control/sql_history.go",
+        "api/internal/control/sql_history_delete.go",
+        "api/internal/control/sql_history_names.go",
+        "api/internal/control/sql_history_policy.go",
+        "api/internal/control/sql_history_sharing.go",
+        "api/internal/control/sql_script.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-08-03",
@@ -1439,13 +2529,23 @@
         "https://neon.com/docs/get-started/query-with-neon-sql-editor"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "真实计划及执行副作用提示、权限、取消和结果；不伪造成本数据",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/saved_queries.go",
+        "api/internal/control/sql_history.go",
+        "api/internal/control/sql_history_delete.go",
+        "api/internal/control/sql_history_names.go",
+        "api/internal/control/sql_history_policy.go",
+        "api/internal/control/sql_history_sharing.go",
+        "api/internal/control/sql_script.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-08-04",
@@ -1455,13 +2555,23 @@
         "https://neon.com/docs/guides/tables"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "真实事务与约束错误、JSON/CSV导出、跨branch隔离及授权矩阵",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/saved_queries.go",
+        "api/internal/control/sql_history.go",
+        "api/internal/control/sql_history_delete.go",
+        "api/internal/control/sql_history_names.go",
+        "api/internal/control/sql_history_policy.go",
+        "api/internal/control/sql_history_sharing.go",
+        "api/internal/control/sql_script.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-08-05",
@@ -1471,13 +2581,23 @@
         "https://neon.com/docs/guides/tables"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "真实DDL/RLS与SQL结果一致，失败不留下UI已生效假象；ORM迁移工具不冒充内建",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/saved_queries.go",
+        "api/internal/control/sql_history.go",
+        "api/internal/control/sql_history_delete.go",
+        "api/internal/control/sql_history_names.go",
+        "api/internal/control/sql_history_policy.go",
+        "api/internal/control/sql_history_sharing.go",
+        "api/internal/control/sql_script.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-09-01",
@@ -1487,13 +2607,19 @@
         "https://neon.com/docs/introduction/monitoring-page"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "各指标单位、时间窗、retention与真实生产者关联，不能以静态数值/采样冒充预算资格",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/handlers.go",
+        "api/internal/control/monitor.go",
+        "api/internal/control/runtime.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-09-02",
@@ -1504,13 +2630,19 @@
         "https://neon.com/docs/introduction/monitor-query-performance"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "实际查询、统计来源和访问权限核验，慢查询/停止后的行为按文档记录",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/handlers.go",
+        "api/internal/control/monitor.go",
+        "api/internal/control/runtime.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-09-03",
@@ -1525,13 +2657,19 @@
         "listProjectBranchLogFields",
         "queryProjectBranchLogs"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "服务与分支范围、搜索/字段值分页、live流、下载及保留；敏感信息不泄漏",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/handlers.go",
+        "api/internal/control/monitor.go",
+        "api/internal/control/runtime.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-09-04",
@@ -1544,13 +2682,19 @@
         "getProjectOperation",
         "listProjectOperations"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "显示真实pending/error/retry状态与原operation ID，不能把丢回复当NoEffect",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/handlers.go",
+        "api/internal/control/monitor.go",
+        "api/internal/control/runtime.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-09-05",
@@ -1561,13 +2705,19 @@
         "https://neon.com/docs/reference/metrics-logs"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "真实导出、组织/项目权限、secret轮换和保留限制按集成文档验证",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/handlers.go",
+        "api/internal/control/monitor.go",
+        "api/internal/control/runtime.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-09-06",
@@ -1579,13 +2729,19 @@
       "official_operation_ids": [
         "getProjectAdvisorSecurityIssues"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "真实Data API/数据库分析依赖、severity过滤及权限；alpha不冒充稳定SLA，公开spec有操作但编辑文档链接404仍须保留此需求",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/handlers.go",
+        "api/internal/control/monitor.go",
+        "api/internal/control/runtime.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-09-07",
@@ -1597,13 +2753,19 @@
         "https://neon.com/docs/introduction/support"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "故障可观察、支持入口和通知来源真实；运营承诺/工单不靠UI文案替代",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/handlers.go",
+        "api/internal/control/monitor.go",
+        "api/internal/control/runtime.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-10-01",
@@ -1622,13 +2784,19 @@
         "updateProjectBranchTrigger",
         "updateProjectEndpoint"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "真实Proxy连接拒绝与已授权连接放行；不误称对Functions/Storage/AI全部生效",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/kube.go",
+        "api/internal/control/platform_policy.go",
+        "api/internal/control/proxy.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-10-02",
@@ -1647,13 +2815,20 @@
         "listOrganizationVPCEndpointsAllRegions",
         "listProjectVPCEndpoints"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "Endpoint restriction/provider资源真实生效；公共/私有路径正负访问、撤销与恢复",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/kube.go",
+        "api/internal/control/platform_policy.go",
+        "api/internal/control/proxy.go"
+      ],
+      "delivery_boundary": "外部云/商业/认证依赖单独记录；不以软件配置冒称实际认证或官方托管覆盖。",
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-10-03",
@@ -1664,13 +2839,19 @@
         "https://neon.com/security"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "真实传输/存储配置、密钥使用/轮换证据；不能把供应商认证徽标当自有系统认证",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/kube.go",
+        "api/internal/control/platform_policy.go",
+        "api/internal/control/proxy.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-10-04",
@@ -1681,13 +2862,19 @@
         "https://neon.com/docs/manage/api-keys"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "实际撤销/替换和租户隔离，日志/错误响应不泄漏秘密",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/kube.go",
+        "api/internal/control/platform_policy.go",
+        "api/internal/control/proxy.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-10-05",
@@ -1697,13 +2884,20 @@
         "https://neon.com/docs/security/hipaa"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "按官方受限功能、Console/API审计与pgAudit范围分别验；合规认证由独立流程获得",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/kube.go",
+        "api/internal/control/platform_policy.go",
+        "api/internal/control/proxy.go"
+      ],
+      "delivery_boundary": "外部云/商业/认证依赖单独记录；不以软件配置冒称实际认证或官方托管覆盖。",
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-10-06",
@@ -1715,13 +2909,20 @@
         "https://neon.com/docs/ai-gateway/data-retention"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "说明与真实配置/提供方合同一致；未认证不展示已获SOC/ISO/HIPAA",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/kube.go",
+        "api/internal/control/platform_policy.go",
+        "api/internal/control/proxy.go"
+      ],
+      "delivery_boundary": "外部云/商业/认证依赖单独记录；不以软件配置冒称实际认证或官方托管覆盖。",
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-11-01",
@@ -1732,13 +2933,26 @@
         "https://neon.com/docs/introduction/agent-plan"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "功能门禁和资源配额API/Console/执行器一致；不硬编码历史价格或旧plan额度",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/billing_checkout.go",
+        "api/internal/control/billing_checkout_worker.go",
+        "api/internal/control/billing_crypto.go",
+        "api/internal/control/billing_inbox_worker.go",
+        "api/internal/control/billing_invoices.go",
+        "api/internal/control/billing_money.go",
+        "api/internal/control/billing_reconcile.go",
+        "api/internal/control/billing_settings.go",
+        "api/internal/control/billing_webhook.go",
+        "api/internal/control/service_plans.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-11-02",
@@ -1753,13 +2967,26 @@
         "getConsumptionHistoryPerProject",
         "getConsumptionHistoryPerProjectV2"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "单位/周期/组织项目分支归属正确，账单与原计量可对账，不能以请求参数自报用量",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/billing_checkout.go",
+        "api/internal/control/billing_checkout_worker.go",
+        "api/internal/control/billing_crypto.go",
+        "api/internal/control/billing_inbox_worker.go",
+        "api/internal/control/billing_invoices.go",
+        "api/internal/control/billing_money.go",
+        "api/internal/control/billing_reconcile.go",
+        "api/internal/control/billing_settings.go",
+        "api/internal/control/billing_webhook.go",
+        "api/internal/control/service_plans.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-11-03",
@@ -1769,13 +2996,26 @@
         "https://neon.com/docs/introduction/manage-billing"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "真实支付提供方状态、invoice下载、失败/重试与用户通知；测试环境不能假真扣款",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/billing_checkout.go",
+        "api/internal/control/billing_checkout_worker.go",
+        "api/internal/control/billing_crypto.go",
+        "api/internal/control/billing_inbox_worker.go",
+        "api/internal/control/billing_invoices.go",
+        "api/internal/control/billing_money.go",
+        "api/internal/control/billing_reconcile.go",
+        "api/internal/control/billing_settings.go",
+        "api/internal/control/billing_webhook.go",
+        "api/internal/control/service_plans.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-11-04",
@@ -1786,13 +3026,26 @@
         "https://neon.com/docs/manage/orgs-manage"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "plan变更兼容现有资源和额度，不能静默删数据或只更UI标签",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/billing_checkout.go",
+        "api/internal/control/billing_checkout_worker.go",
+        "api/internal/control/billing_crypto.go",
+        "api/internal/control/billing_inbox_worker.go",
+        "api/internal/control/billing_invoices.go",
+        "api/internal/control/billing_money.go",
+        "api/internal/control/billing_reconcile.go",
+        "api/internal/control/billing_settings.go",
+        "api/internal/control/billing_webhook.go",
+        "api/internal/control/service_plans.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-11-05",
@@ -1806,13 +3059,26 @@
         "getOrganizationSpendingLimit",
         "setOrganizationSpendingLimit"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "80%/100%邮件和Console banner、cents参数及删除幂等；当前官方只通知仍继续计费",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/billing_checkout.go",
+        "api/internal/control/billing_checkout_worker.go",
+        "api/internal/control/billing_crypto.go",
+        "api/internal/control/billing_inbox_worker.go",
+        "api/internal/control/billing_invoices.go",
+        "api/internal/control/billing_money.go",
+        "api/internal/control/billing_reconcile.go",
+        "api/internal/control/billing_settings.go",
+        "api/internal/control/billing_webhook.go",
+        "api/internal/control/service_plans.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-11-06",
@@ -1830,13 +3096,26 @@
         "updateProjectBranchTrigger",
         "updateProjectEndpoint"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "独立于总美元通知，准确compute/storage/transfer配额触发及恢复真实执行",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/billing_checkout.go",
+        "api/internal/control/billing_checkout_worker.go",
+        "api/internal/control/billing_crypto.go",
+        "api/internal/control/billing_inbox_worker.go",
+        "api/internal/control/billing_invoices.go",
+        "api/internal/control/billing_money.go",
+        "api/internal/control/billing_reconcile.go",
+        "api/internal/control/billing_settings.go",
+        "api/internal/control/billing_webhook.go",
+        "api/internal/control/service_plans.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-11-07",
@@ -1850,13 +3129,27 @@
         "transferProjectsFromOrgToOrg",
         "transferProjectsFromUserToOrg"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "提供方订单/组织/项目所有权与实际账单一致，不能用普通plan UI替代市场订阅",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/billing_checkout.go",
+        "api/internal/control/billing_checkout_worker.go",
+        "api/internal/control/billing_crypto.go",
+        "api/internal/control/billing_inbox_worker.go",
+        "api/internal/control/billing_invoices.go",
+        "api/internal/control/billing_money.go",
+        "api/internal/control/billing_reconcile.go",
+        "api/internal/control/billing_settings.go",
+        "api/internal/control/billing_webhook.go",
+        "api/internal/control/service_plans.go"
+      ],
+      "delivery_boundary": "外部云/商业/认证依赖单独记录；不以软件配置冒称实际认证或官方托管覆盖。",
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-12-01",
@@ -1875,12 +3168,27 @@
         "disableNeonAuth",
         "getNeonAuth"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "真实neon_auth数据、独立Auth URL/session/JWKS与branch clone/delete，原分支用户不串用",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/managed_auth.go",
+        "api/internal/control/managed_auth_contract.go",
+        "api/internal/control/managed_auth_driver.go",
+        "api/internal/control/managed_auth_factor_crypto.go",
+        "api/internal/control/managed_auth_factor_rebind.go",
+        "api/internal/control/managed_auth_integrations.go",
+        "api/internal/control/managed_auth_mail.go",
+        "api/internal/control/managed_auth_organizations.go",
+        "api/internal/control/managed_auth_relay.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -1895,12 +3203,27 @@
         "getNeonAuthEmailAndPasswordConfig",
         "updateNeonAuthEmailAndPasswordConfig"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "实际验证/重置token、过期/重复使用/账号枚举边界与邮件流程",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/managed_auth.go",
+        "api/internal/control/managed_auth_contract.go",
+        "api/internal/control/managed_auth_driver.go",
+        "api/internal/control/managed_auth_factor_crypto.go",
+        "api/internal/control/managed_auth_factor_rebind.go",
+        "api/internal/control/managed_auth_integrations.go",
+        "api/internal/control/managed_auth_mail.go",
+        "api/internal/control/managed_auth_organizations.go",
+        "api/internal/control/managed_auth_relay.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -1924,12 +3247,27 @@
         "updateBranchNeonAuthOauthProvider",
         "updateNeonAuthOauthProvider"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "真实OAuth callback、localhost白名单、错branch/域拒绝与secret轮换",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/managed_auth.go",
+        "api/internal/control/managed_auth_contract.go",
+        "api/internal/control/managed_auth_driver.go",
+        "api/internal/control/managed_auth_factor_crypto.go",
+        "api/internal/control/managed_auth_factor_rebind.go",
+        "api/internal/control/managed_auth_integrations.go",
+        "api/internal/control/managed_auth_mail.go",
+        "api/internal/control/managed_auth_organizations.go",
+        "api/internal/control/managed_auth_relay.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -1947,12 +3285,27 @@
         "deleteNeonAuthUser",
         "updateNeonAuthUserRole"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "真实用户目录和访问结果、管理员作用域，CP账号角色与应用Auth角色严格分开",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/managed_auth.go",
+        "api/internal/control/managed_auth_contract.go",
+        "api/internal/control/managed_auth_driver.go",
+        "api/internal/control/managed_auth_factor_crypto.go",
+        "api/internal/control/managed_auth_factor_rebind.go",
+        "api/internal/control/managed_auth_integrations.go",
+        "api/internal/control/managed_auth_mail.go",
+        "api/internal/control/managed_auth_organizations.go",
+        "api/internal/control/managed_auth_relay.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -1968,12 +3321,27 @@
         "getNeonAuthPluginConfigs",
         "updateNeonAuthMagicLinkPlugin"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "真实短期JWT、claims/issuer/JWKS，OTP/链接一次性及过期行为；只用官方支持插件",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/managed_auth.go",
+        "api/internal/control/managed_auth_contract.go",
+        "api/internal/control/managed_auth_driver.go",
+        "api/internal/control/managed_auth_factor_crypto.go",
+        "api/internal/control/managed_auth_factor_rebind.go",
+        "api/internal/control/managed_auth_integrations.go",
+        "api/internal/control/managed_auth_mail.go",
+        "api/internal/control/managed_auth_organizations.go",
+        "api/internal/control/managed_auth_relay.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -1989,12 +3357,27 @@
         "updateNeonAuthOrganizationPlugin",
         "updateNeonAuthPhoneNumberPlugin"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "租户/成员与电话验证及外部短信依赖分开，不能与Neon CP组织混为同一权限域",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/managed_auth.go",
+        "api/internal/control/managed_auth_contract.go",
+        "api/internal/control/managed_auth_driver.go",
+        "api/internal/control/managed_auth_factor_crypto.go",
+        "api/internal/control/managed_auth_factor_rebind.go",
+        "api/internal/control/managed_auth_integrations.go",
+        "api/internal/control/managed_auth_mail.go",
+        "api/internal/control/managed_auth_organizations.go",
+        "api/internal/control/managed_auth_relay.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -2014,12 +3397,27 @@
         "updateNeonAuthOAuthClient",
         "updateNeonAuthOAuthProviderPlugin"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "OAuth2.1 client类型、redirect/secret rotation/revoke、public/confidential和PKCE按准确合同",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/managed_auth.go",
+        "api/internal/control/managed_auth_contract.go",
+        "api/internal/control/managed_auth_driver.go",
+        "api/internal/control/managed_auth_factor_crypto.go",
+        "api/internal/control/managed_auth_factor_rebind.go",
+        "api/internal/control/managed_auth_integrations.go",
+        "api/internal/control/managed_auth_mail.go",
+        "api/internal/control/managed_auth_organizations.go",
+        "api/internal/control/managed_auth_relay.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -2034,12 +3432,27 @@
         "sendNeonAuthEmailProviderTest",
         "updateNeonAuthEmailProvider"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "真实配置校验、发送结果/失败，不把保存SMTP JSON当已发送；旧测试邮件API保留迁移",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/managed_auth.go",
+        "api/internal/control/managed_auth_contract.go",
+        "api/internal/control/managed_auth_driver.go",
+        "api/internal/control/managed_auth_factor_crypto.go",
+        "api/internal/control/managed_auth_factor_rebind.go",
+        "api/internal/control/managed_auth_integrations.go",
+        "api/internal/control/managed_auth_mail.go",
+        "api/internal/control/managed_auth_organizations.go",
+        "api/internal/control/managed_auth_relay.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -2053,12 +3466,27 @@
         "getNeonAuthWebhookConfig",
         "updateNeonAuthWebhookConfig"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "真实交付、鉴权/签名、重试与密钥处理按官方限制，不假设exactly-once",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/managed_auth.go",
+        "api/internal/control/managed_auth_contract.go",
+        "api/internal/control/managed_auth_driver.go",
+        "api/internal/control/managed_auth_factor_crypto.go",
+        "api/internal/control/managed_auth_factor_rebind.go",
+        "api/internal/control/managed_auth_integrations.go",
+        "api/internal/control/managed_auth_mail.go",
+        "api/internal/control/managed_auth_organizations.go",
+        "api/internal/control/managed_auth_relay.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -2087,12 +3515,28 @@
         "updateNeonAuthEmailServer",
         "updateNeonAuthOauthProvider"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "旧provider16操作仍列在API盘点；迁移前不静默删除用户、session或旧接口",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/managed_auth.go",
+        "api/internal/control/managed_auth_contract.go",
+        "api/internal/control/managed_auth_driver.go",
+        "api/internal/control/managed_auth_factor_crypto.go",
+        "api/internal/control/managed_auth_factor_rebind.go",
+        "api/internal/control/managed_auth_integrations.go",
+        "api/internal/control/managed_auth_mail.go",
+        "api/internal/control/managed_auth_organizations.go",
+        "api/internal/control/managed_auth_relay.go"
+      ],
+      "delivery_boundary": "旧Stack Auth迁移兼容，不能重新把旧产品作为当前Auth默认。",
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -2109,12 +3553,21 @@
         "getProjectBranchDataAPI",
         "updateProjectBranchDataAPI"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "真实HTTPS服务/URL与数据库绑定，配置错误不对外假可用",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/data_api.go",
+        "api/internal/control/data_api_console.go",
+        "api/internal/control/data_api_driver.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -2130,12 +3583,21 @@
         "deleteProjectJWKS",
         "getProjectJWKS"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "真实issuer/audience/角色/GRANT/RLS正负矩阵，过期/错签名/跨分支拒绝",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/data_api.go",
+        "api/internal/control/data_api_console.go",
+        "api/internal/control/data_api_driver.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -2146,12 +3608,21 @@
         "https://neon.com/docs/data-api/overview"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "数据面PostgREST兼容面逐项实测，类型/错误/事务边界清楚，CP开关不能代替真实访问",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/data_api.go",
+        "api/internal/control/data_api_console.go",
+        "api/internal/control/data_api_driver.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -2169,13 +3640,17 @@
         "revokeCredential",
         "rotateCredential"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "API key仅管理用，runtime credential只按scopes调用服务；跨项目/分支祖先负路径",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/backend_credentials.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-14-02",
@@ -2188,13 +3663,18 @@
         "revealCredential",
         "rotateCredential"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "CONFIRMED_SEMANTIC_DIFFERENCE",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "原credential作用域和anchor不随轮换改变；改scope需新建再撤销，S3/bearer形式共同失效",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/backend_credentials.go"
+      ],
+      "review_note": "backend_credentials.go轮换UPDATE仍可修改scopes与branch_scope；官网要求创建后scope/branch不可变。需在C3评审兼容迁移并定向修正，不冒称已一致。",
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-14-03",
@@ -2207,13 +3687,18 @@
       "official_operation_ids": [
         "createCredential"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "BOUNDED_CODE_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "同branch及现有/未来后代允许，父/兄弟/其他项目拒绝；默认分支credential范围广须明确展示",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/backend_credentials.go"
+      ],
+      "review_note": "verifyBackendCredential已有递归lineage及self/self_and_descendants检查，可复用；本轮新后端未验收。",
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-15-01",
@@ -2232,12 +3717,56 @@
         "listProjectBranchBuckets",
         "presignProjectBranchBucketObject"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "private/public_read真实生效；不能用不支持的S3 ACL/policy接口冒充配置",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/object_storage.go",
+        "api/internal/control/object_storage_attributes.go",
+        "api/internal/control/object_storage_blob.go",
+        "api/internal/control/object_storage_capacity.go",
+        "api/internal/control/object_storage_checksums.go",
+        "api/internal/control/object_storage_copy.go",
+        "api/internal/control/object_storage_copy_conditions.go",
+        "api/internal/control/object_storage_cors.go",
+        "api/internal/control/object_storage_delete_batch.go",
+        "api/internal/control/object_storage_driver.go",
+        "api/internal/control/object_storage_list.go",
+        "api/internal/control/object_storage_metadata.go",
+        "api/internal/control/object_storage_metadata_patch.go",
+        "api/internal/control/object_storage_multipart.go",
+        "api/internal/control/object_storage_multipart_admin.go",
+        "api/internal/control/object_storage_multipart_checksums.go",
+        "api/internal/control/object_storage_multipart_rest.go",
+        "api/internal/control/object_storage_multipart_s3.go",
+        "api/internal/control/object_storage_object_settings.go",
+        "api/internal/control/object_storage_s3.go",
+        "api/internal/control/object_storage_s3_capabilities.go",
+        "api/internal/control/object_storage_s3_config.go",
+        "api/internal/control/object_storage_s3_post.go",
+        "api/internal/control/object_storage_s3_settings.go",
+        "api/internal/control/object_storage_settings.go",
+        "api/internal/control/object_storage_settings_native.go",
+        "api/internal/control/object_storage_stream.go",
+        "api/internal/control/object_storage_upload.go",
+        "api/internal/control/storage_gateway.go",
+        "api/internal/control/storage_gateway_api.go",
+        "api/internal/control/storage_gateway_events.go",
+        "api/internal/control/storage_gateway_usage.go",
+        "api/internal/control/storage_gc.go",
+        "api/internal/control/storage_gc_history.go",
+        "api/internal/control/storage_gc_history_epoch.go",
+        "api/internal/control/storage_gc_history_journal.go",
+        "api/internal/control/storage_gc_journal.go",
+        "api/internal/control/storage_gc_proof.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -2254,12 +3783,56 @@
         "listProjectBranchBucketObjects",
         "presignProjectBranchBucketObject"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "真实对象及元数据/分页/前缀边界、branch隔离；bulk delete失败结果可对账",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/object_storage.go",
+        "api/internal/control/object_storage_attributes.go",
+        "api/internal/control/object_storage_blob.go",
+        "api/internal/control/object_storage_capacity.go",
+        "api/internal/control/object_storage_checksums.go",
+        "api/internal/control/object_storage_copy.go",
+        "api/internal/control/object_storage_copy_conditions.go",
+        "api/internal/control/object_storage_cors.go",
+        "api/internal/control/object_storage_delete_batch.go",
+        "api/internal/control/object_storage_driver.go",
+        "api/internal/control/object_storage_list.go",
+        "api/internal/control/object_storage_metadata.go",
+        "api/internal/control/object_storage_metadata_patch.go",
+        "api/internal/control/object_storage_multipart.go",
+        "api/internal/control/object_storage_multipart_admin.go",
+        "api/internal/control/object_storage_multipart_checksums.go",
+        "api/internal/control/object_storage_multipart_rest.go",
+        "api/internal/control/object_storage_multipart_s3.go",
+        "api/internal/control/object_storage_object_settings.go",
+        "api/internal/control/object_storage_s3.go",
+        "api/internal/control/object_storage_s3_capabilities.go",
+        "api/internal/control/object_storage_s3_config.go",
+        "api/internal/control/object_storage_s3_post.go",
+        "api/internal/control/object_storage_s3_settings.go",
+        "api/internal/control/object_storage_settings.go",
+        "api/internal/control/object_storage_settings_native.go",
+        "api/internal/control/object_storage_stream.go",
+        "api/internal/control/object_storage_upload.go",
+        "api/internal/control/storage_gateway.go",
+        "api/internal/control/storage_gateway_api.go",
+        "api/internal/control/storage_gateway_events.go",
+        "api/internal/control/storage_gateway_usage.go",
+        "api/internal/control/storage_gc.go",
+        "api/internal/control/storage_gc_history.go",
+        "api/internal/control/storage_gc_history_epoch.go",
+        "api/internal/control/storage_gc_history_journal.go",
+        "api/internal/control/storage_gc_journal.go",
+        "api/internal/control/storage_gc_proof.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -2273,12 +3846,56 @@
       "official_operation_ids": [
         "presignProjectBranchBucketObject"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "真实分片/完成/取消、过期/签名/路径范围；不把管理API URL当S3数据接口",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/object_storage.go",
+        "api/internal/control/object_storage_attributes.go",
+        "api/internal/control/object_storage_blob.go",
+        "api/internal/control/object_storage_capacity.go",
+        "api/internal/control/object_storage_checksums.go",
+        "api/internal/control/object_storage_copy.go",
+        "api/internal/control/object_storage_copy_conditions.go",
+        "api/internal/control/object_storage_cors.go",
+        "api/internal/control/object_storage_delete_batch.go",
+        "api/internal/control/object_storage_driver.go",
+        "api/internal/control/object_storage_list.go",
+        "api/internal/control/object_storage_metadata.go",
+        "api/internal/control/object_storage_metadata_patch.go",
+        "api/internal/control/object_storage_multipart.go",
+        "api/internal/control/object_storage_multipart_admin.go",
+        "api/internal/control/object_storage_multipart_checksums.go",
+        "api/internal/control/object_storage_multipart_rest.go",
+        "api/internal/control/object_storage_multipart_s3.go",
+        "api/internal/control/object_storage_object_settings.go",
+        "api/internal/control/object_storage_s3.go",
+        "api/internal/control/object_storage_s3_capabilities.go",
+        "api/internal/control/object_storage_s3_config.go",
+        "api/internal/control/object_storage_s3_post.go",
+        "api/internal/control/object_storage_s3_settings.go",
+        "api/internal/control/object_storage_settings.go",
+        "api/internal/control/object_storage_settings_native.go",
+        "api/internal/control/object_storage_stream.go",
+        "api/internal/control/object_storage_upload.go",
+        "api/internal/control/storage_gateway.go",
+        "api/internal/control/storage_gateway_api.go",
+        "api/internal/control/storage_gateway_events.go",
+        "api/internal/control/storage_gateway_usage.go",
+        "api/internal/control/storage_gc.go",
+        "api/internal/control/storage_gc_history.go",
+        "api/internal/control/storage_gc_history_epoch.go",
+        "api/internal/control/storage_gc_history_journal.go",
+        "api/internal/control/storage_gc_journal.go",
+        "api/internal/control/storage_gc_proof.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -2292,12 +3909,56 @@
       "official_operation_ids": [
         "getProjectBranchStorage"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "子分支修改/删除不污染parent，删除分支后的原对象/URL权限按实际语义回收",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/object_storage.go",
+        "api/internal/control/object_storage_attributes.go",
+        "api/internal/control/object_storage_blob.go",
+        "api/internal/control/object_storage_capacity.go",
+        "api/internal/control/object_storage_checksums.go",
+        "api/internal/control/object_storage_copy.go",
+        "api/internal/control/object_storage_copy_conditions.go",
+        "api/internal/control/object_storage_cors.go",
+        "api/internal/control/object_storage_delete_batch.go",
+        "api/internal/control/object_storage_driver.go",
+        "api/internal/control/object_storage_list.go",
+        "api/internal/control/object_storage_metadata.go",
+        "api/internal/control/object_storage_metadata_patch.go",
+        "api/internal/control/object_storage_multipart.go",
+        "api/internal/control/object_storage_multipart_admin.go",
+        "api/internal/control/object_storage_multipart_checksums.go",
+        "api/internal/control/object_storage_multipart_rest.go",
+        "api/internal/control/object_storage_multipart_s3.go",
+        "api/internal/control/object_storage_object_settings.go",
+        "api/internal/control/object_storage_s3.go",
+        "api/internal/control/object_storage_s3_capabilities.go",
+        "api/internal/control/object_storage_s3_config.go",
+        "api/internal/control/object_storage_s3_post.go",
+        "api/internal/control/object_storage_s3_settings.go",
+        "api/internal/control/object_storage_settings.go",
+        "api/internal/control/object_storage_settings_native.go",
+        "api/internal/control/object_storage_stream.go",
+        "api/internal/control/object_storage_upload.go",
+        "api/internal/control/storage_gateway.go",
+        "api/internal/control/storage_gateway_api.go",
+        "api/internal/control/storage_gateway_events.go",
+        "api/internal/control/storage_gateway_usage.go",
+        "api/internal/control/storage_gc.go",
+        "api/internal/control/storage_gc_history.go",
+        "api/internal/control/storage_gc_history_epoch.go",
+        "api/internal/control/storage_gc_history_journal.go",
+        "api/internal/control/storage_gc_journal.go",
+        "api/internal/control/storage_gc_proof.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -2308,12 +3969,56 @@
         "https://neon.com/docs/storage/s3-compatibility"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "path-style与SigV4，已支持操作逐项验证；不支持的S3功能返回规定错误，不能宣称完整AWS S3等价",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/object_storage.go",
+        "api/internal/control/object_storage_attributes.go",
+        "api/internal/control/object_storage_blob.go",
+        "api/internal/control/object_storage_capacity.go",
+        "api/internal/control/object_storage_checksums.go",
+        "api/internal/control/object_storage_copy.go",
+        "api/internal/control/object_storage_copy_conditions.go",
+        "api/internal/control/object_storage_cors.go",
+        "api/internal/control/object_storage_delete_batch.go",
+        "api/internal/control/object_storage_driver.go",
+        "api/internal/control/object_storage_list.go",
+        "api/internal/control/object_storage_metadata.go",
+        "api/internal/control/object_storage_metadata_patch.go",
+        "api/internal/control/object_storage_multipart.go",
+        "api/internal/control/object_storage_multipart_admin.go",
+        "api/internal/control/object_storage_multipart_checksums.go",
+        "api/internal/control/object_storage_multipart_rest.go",
+        "api/internal/control/object_storage_multipart_s3.go",
+        "api/internal/control/object_storage_object_settings.go",
+        "api/internal/control/object_storage_s3.go",
+        "api/internal/control/object_storage_s3_capabilities.go",
+        "api/internal/control/object_storage_s3_config.go",
+        "api/internal/control/object_storage_s3_post.go",
+        "api/internal/control/object_storage_s3_settings.go",
+        "api/internal/control/object_storage_settings.go",
+        "api/internal/control/object_storage_settings_native.go",
+        "api/internal/control/object_storage_stream.go",
+        "api/internal/control/object_storage_upload.go",
+        "api/internal/control/storage_gateway.go",
+        "api/internal/control/storage_gateway_api.go",
+        "api/internal/control/storage_gateway_events.go",
+        "api/internal/control/storage_gateway_usage.go",
+        "api/internal/control/storage_gc.go",
+        "api/internal/control/storage_gc_history.go",
+        "api/internal/control/storage_gc_history_epoch.go",
+        "api/internal/control/storage_gc_history_journal.go",
+        "api/internal/control/storage_gc_journal.go",
+        "api/internal/control/storage_gc_proof.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -2327,12 +4032,56 @@
       "official_operation_ids": [
         "queryProjectBranchLogs"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "身份、scope、错误分支与签名错误区分；敏感密钥不记录",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/object_storage.go",
+        "api/internal/control/object_storage_attributes.go",
+        "api/internal/control/object_storage_blob.go",
+        "api/internal/control/object_storage_capacity.go",
+        "api/internal/control/object_storage_checksums.go",
+        "api/internal/control/object_storage_copy.go",
+        "api/internal/control/object_storage_copy_conditions.go",
+        "api/internal/control/object_storage_cors.go",
+        "api/internal/control/object_storage_delete_batch.go",
+        "api/internal/control/object_storage_driver.go",
+        "api/internal/control/object_storage_list.go",
+        "api/internal/control/object_storage_metadata.go",
+        "api/internal/control/object_storage_metadata_patch.go",
+        "api/internal/control/object_storage_multipart.go",
+        "api/internal/control/object_storage_multipart_admin.go",
+        "api/internal/control/object_storage_multipart_checksums.go",
+        "api/internal/control/object_storage_multipart_rest.go",
+        "api/internal/control/object_storage_multipart_s3.go",
+        "api/internal/control/object_storage_object_settings.go",
+        "api/internal/control/object_storage_s3.go",
+        "api/internal/control/object_storage_s3_capabilities.go",
+        "api/internal/control/object_storage_s3_config.go",
+        "api/internal/control/object_storage_s3_post.go",
+        "api/internal/control/object_storage_s3_settings.go",
+        "api/internal/control/object_storage_settings.go",
+        "api/internal/control/object_storage_settings_native.go",
+        "api/internal/control/object_storage_stream.go",
+        "api/internal/control/object_storage_upload.go",
+        "api/internal/control/storage_gateway.go",
+        "api/internal/control/storage_gateway_api.go",
+        "api/internal/control/storage_gateway_events.go",
+        "api/internal/control/storage_gateway_usage.go",
+        "api/internal/control/storage_gc.go",
+        "api/internal/control/storage_gc_history.go",
+        "api/internal/control/storage_gc_history_epoch.go",
+        "api/internal/control/storage_gc_history_journal.go",
+        "api/internal/control/storage_gc_journal.go",
+        "api/internal/control/storage_gc_proof.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -2349,12 +4098,56 @@
         "listProjectBranchFunctions",
         "updateProjectBranchFunction"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "BOUNDED_CODE_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "真实构建/部署状态、slug/URL、版本和删除；API成功不等于函数可调用",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/function_object_delivery.go",
+        "api/internal/control/function_output.go",
+        "api/internal/control/function_output_collect.go",
+        "api/internal/control/function_output_shutdown.go",
+        "api/internal/control/function_trigger_scheduler.go",
+        "api/internal/control/function_triggers.go",
+        "api/internal/control/functions_artifact_gateway.go",
+        "api/internal/control/functions_artifacts.go",
+        "api/internal/control/functions_backing_store.go",
+        "api/internal/control/functions_bootstrap.go",
+        "api/internal/control/functions_bootstrap_store.go",
+        "api/internal/control/functions_branch_copy.go",
+        "api/internal/control/functions_branch_copy_driver.go",
+        "api/internal/control/functions_branch_copy_store.go",
+        "api/internal/control/functions_branch_snapshots.go",
+        "api/internal/control/functions_deploy_driver.go",
+        "api/internal/control/functions_edge_broker.go",
+        "api/internal/control/functions_environment.go",
+        "api/internal/control/functions_http_policy.go",
+        "api/internal/control/functions_instances.go",
+        "api/internal/control/functions_invoke.go",
+        "api/internal/control/functions_logs.go",
+        "api/internal/control/functions_manager_identity.go",
+        "api/internal/control/functions_metering.go",
+        "api/internal/control/functions_observation.go",
+        "api/internal/control/functions_platform.go",
+        "api/internal/control/functions_public.go",
+        "api/internal/control/functions_publish.go",
+        "api/internal/control/functions_read.go",
+        "api/internal/control/functions_recovery.go",
+        "api/internal/control/functions_resources.go",
+        "api/internal/control/functions_role.go",
+        "api/internal/control/functions_sql_secret.go",
+        "api/internal/control/functions_sql_store.go",
+        "api/internal/control/functions_stop.go",
+        "api/internal/control/functions_websocket_csp.go",
+        "api/internal/control/functions_write.go"
+      ],
+      "review_note": "Functions发布已有模块；create_handlers仅支持inherit_paused/omit，与官网子分支继承后可调用语义需对齐。",
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -2365,12 +4158,55 @@
         "https://neon.com/docs/compute/functions/environment-variables"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "自动连接/branch参数与用户变量限制，secret隔离、分支克隆和重新部署实际生效",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/function_object_delivery.go",
+        "api/internal/control/function_output.go",
+        "api/internal/control/function_output_collect.go",
+        "api/internal/control/function_output_shutdown.go",
+        "api/internal/control/function_trigger_scheduler.go",
+        "api/internal/control/function_triggers.go",
+        "api/internal/control/functions_artifact_gateway.go",
+        "api/internal/control/functions_artifacts.go",
+        "api/internal/control/functions_backing_store.go",
+        "api/internal/control/functions_bootstrap.go",
+        "api/internal/control/functions_bootstrap_store.go",
+        "api/internal/control/functions_branch_copy.go",
+        "api/internal/control/functions_branch_copy_driver.go",
+        "api/internal/control/functions_branch_copy_store.go",
+        "api/internal/control/functions_branch_snapshots.go",
+        "api/internal/control/functions_deploy_driver.go",
+        "api/internal/control/functions_edge_broker.go",
+        "api/internal/control/functions_environment.go",
+        "api/internal/control/functions_http_policy.go",
+        "api/internal/control/functions_instances.go",
+        "api/internal/control/functions_invoke.go",
+        "api/internal/control/functions_logs.go",
+        "api/internal/control/functions_manager_identity.go",
+        "api/internal/control/functions_metering.go",
+        "api/internal/control/functions_observation.go",
+        "api/internal/control/functions_platform.go",
+        "api/internal/control/functions_public.go",
+        "api/internal/control/functions_publish.go",
+        "api/internal/control/functions_read.go",
+        "api/internal/control/functions_recovery.go",
+        "api/internal/control/functions_resources.go",
+        "api/internal/control/functions_role.go",
+        "api/internal/control/functions_sql_secret.go",
+        "api/internal/control/functions_sql_store.go",
+        "api/internal/control/functions_stop.go",
+        "api/internal/control/functions_websocket_csp.go",
+        "api/internal/control/functions_write.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -2381,12 +4217,55 @@
         "https://neon.com/docs/compute/functions/reference/runtime-limits"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "Node24/固定2048MiB、15分钟TTFB/heartbeat/waitUntil和5秒退出窗口按锁定合同测试，429可重试",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/function_object_delivery.go",
+        "api/internal/control/function_output.go",
+        "api/internal/control/function_output_collect.go",
+        "api/internal/control/function_output_shutdown.go",
+        "api/internal/control/function_trigger_scheduler.go",
+        "api/internal/control/function_triggers.go",
+        "api/internal/control/functions_artifact_gateway.go",
+        "api/internal/control/functions_artifacts.go",
+        "api/internal/control/functions_backing_store.go",
+        "api/internal/control/functions_bootstrap.go",
+        "api/internal/control/functions_bootstrap_store.go",
+        "api/internal/control/functions_branch_copy.go",
+        "api/internal/control/functions_branch_copy_driver.go",
+        "api/internal/control/functions_branch_copy_store.go",
+        "api/internal/control/functions_branch_snapshots.go",
+        "api/internal/control/functions_deploy_driver.go",
+        "api/internal/control/functions_edge_broker.go",
+        "api/internal/control/functions_environment.go",
+        "api/internal/control/functions_http_policy.go",
+        "api/internal/control/functions_instances.go",
+        "api/internal/control/functions_invoke.go",
+        "api/internal/control/functions_logs.go",
+        "api/internal/control/functions_manager_identity.go",
+        "api/internal/control/functions_metering.go",
+        "api/internal/control/functions_observation.go",
+        "api/internal/control/functions_platform.go",
+        "api/internal/control/functions_public.go",
+        "api/internal/control/functions_publish.go",
+        "api/internal/control/functions_read.go",
+        "api/internal/control/functions_recovery.go",
+        "api/internal/control/functions_resources.go",
+        "api/internal/control/functions_role.go",
+        "api/internal/control/functions_sql_secret.go",
+        "api/internal/control/functions_sql_store.go",
+        "api/internal/control/functions_stop.go",
+        "api/internal/control/functions_websocket_csp.go",
+        "api/internal/control/functions_write.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -2398,12 +4277,55 @@
         "https://neon.com/docs/compute/functions/websockets"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "当前public URL无平台门禁，由handler真实验JWT/key；不得把functions:invoke enum当已存在平台鉴权",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/function_object_delivery.go",
+        "api/internal/control/function_output.go",
+        "api/internal/control/function_output_collect.go",
+        "api/internal/control/function_output_shutdown.go",
+        "api/internal/control/function_trigger_scheduler.go",
+        "api/internal/control/function_triggers.go",
+        "api/internal/control/functions_artifact_gateway.go",
+        "api/internal/control/functions_artifacts.go",
+        "api/internal/control/functions_backing_store.go",
+        "api/internal/control/functions_bootstrap.go",
+        "api/internal/control/functions_bootstrap_store.go",
+        "api/internal/control/functions_branch_copy.go",
+        "api/internal/control/functions_branch_copy_driver.go",
+        "api/internal/control/functions_branch_copy_store.go",
+        "api/internal/control/functions_branch_snapshots.go",
+        "api/internal/control/functions_deploy_driver.go",
+        "api/internal/control/functions_edge_broker.go",
+        "api/internal/control/functions_environment.go",
+        "api/internal/control/functions_http_policy.go",
+        "api/internal/control/functions_instances.go",
+        "api/internal/control/functions_invoke.go",
+        "api/internal/control/functions_logs.go",
+        "api/internal/control/functions_manager_identity.go",
+        "api/internal/control/functions_metering.go",
+        "api/internal/control/functions_observation.go",
+        "api/internal/control/functions_platform.go",
+        "api/internal/control/functions_public.go",
+        "api/internal/control/functions_publish.go",
+        "api/internal/control/functions_read.go",
+        "api/internal/control/functions_recovery.go",
+        "api/internal/control/functions_resources.go",
+        "api/internal/control/functions_role.go",
+        "api/internal/control/functions_sql_secret.go",
+        "api/internal/control/functions_sql_store.go",
+        "api/internal/control/functions_stop.go",
+        "api/internal/control/functions_websocket_csp.go",
+        "api/internal/control/functions_write.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -2420,12 +4342,55 @@
         "listProjectBranchTriggers",
         "updateProjectBranchTrigger"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "UTC cron、对象过滤、跨branch复制/禁用和目标function路径真实执行",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/function_object_delivery.go",
+        "api/internal/control/function_output.go",
+        "api/internal/control/function_output_collect.go",
+        "api/internal/control/function_output_shutdown.go",
+        "api/internal/control/function_trigger_scheduler.go",
+        "api/internal/control/function_triggers.go",
+        "api/internal/control/functions_artifact_gateway.go",
+        "api/internal/control/functions_artifacts.go",
+        "api/internal/control/functions_backing_store.go",
+        "api/internal/control/functions_bootstrap.go",
+        "api/internal/control/functions_bootstrap_store.go",
+        "api/internal/control/functions_branch_copy.go",
+        "api/internal/control/functions_branch_copy_driver.go",
+        "api/internal/control/functions_branch_copy_store.go",
+        "api/internal/control/functions_branch_snapshots.go",
+        "api/internal/control/functions_deploy_driver.go",
+        "api/internal/control/functions_edge_broker.go",
+        "api/internal/control/functions_environment.go",
+        "api/internal/control/functions_http_policy.go",
+        "api/internal/control/functions_instances.go",
+        "api/internal/control/functions_invoke.go",
+        "api/internal/control/functions_logs.go",
+        "api/internal/control/functions_manager_identity.go",
+        "api/internal/control/functions_metering.go",
+        "api/internal/control/functions_observation.go",
+        "api/internal/control/functions_platform.go",
+        "api/internal/control/functions_public.go",
+        "api/internal/control/functions_publish.go",
+        "api/internal/control/functions_read.go",
+        "api/internal/control/functions_recovery.go",
+        "api/internal/control/functions_resources.go",
+        "api/internal/control/functions_role.go",
+        "api/internal/control/functions_sql_secret.go",
+        "api/internal/control/functions_sql_store.go",
+        "api/internal/control/functions_stop.go",
+        "api/internal/control/functions_websocket_csp.go",
+        "api/internal/control/functions_write.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -2436,12 +4401,55 @@
         "https://neon.com/docs/compute/functions/triggers/overview"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "重复/乱序、72小时窗口、2xx完成语义、503 Retry-After与X-Neon头去伪造按合同测",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/function_object_delivery.go",
+        "api/internal/control/function_output.go",
+        "api/internal/control/function_output_collect.go",
+        "api/internal/control/function_output_shutdown.go",
+        "api/internal/control/function_trigger_scheduler.go",
+        "api/internal/control/function_triggers.go",
+        "api/internal/control/functions_artifact_gateway.go",
+        "api/internal/control/functions_artifacts.go",
+        "api/internal/control/functions_backing_store.go",
+        "api/internal/control/functions_bootstrap.go",
+        "api/internal/control/functions_bootstrap_store.go",
+        "api/internal/control/functions_branch_copy.go",
+        "api/internal/control/functions_branch_copy_driver.go",
+        "api/internal/control/functions_branch_copy_store.go",
+        "api/internal/control/functions_branch_snapshots.go",
+        "api/internal/control/functions_deploy_driver.go",
+        "api/internal/control/functions_edge_broker.go",
+        "api/internal/control/functions_environment.go",
+        "api/internal/control/functions_http_policy.go",
+        "api/internal/control/functions_instances.go",
+        "api/internal/control/functions_invoke.go",
+        "api/internal/control/functions_logs.go",
+        "api/internal/control/functions_manager_identity.go",
+        "api/internal/control/functions_metering.go",
+        "api/internal/control/functions_observation.go",
+        "api/internal/control/functions_platform.go",
+        "api/internal/control/functions_public.go",
+        "api/internal/control/functions_publish.go",
+        "api/internal/control/functions_read.go",
+        "api/internal/control/functions_recovery.go",
+        "api/internal/control/functions_resources.go",
+        "api/internal/control/functions_role.go",
+        "api/internal/control/functions_sql_secret.go",
+        "api/internal/control/functions_sql_store.go",
+        "api/internal/control/functions_stop.go",
+        "api/internal/control/functions_websocket_csp.go",
+        "api/internal/control/functions_write.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -2456,12 +4464,55 @@
         "listProjectBranchCustomDomains",
         "registerProjectBranchCustomDomain"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "真实域所有权、证书/路由、冲突/删除；缺外部DNS事实不得标可用",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/function_object_delivery.go",
+        "api/internal/control/function_output.go",
+        "api/internal/control/function_output_collect.go",
+        "api/internal/control/function_output_shutdown.go",
+        "api/internal/control/function_trigger_scheduler.go",
+        "api/internal/control/function_triggers.go",
+        "api/internal/control/functions_artifact_gateway.go",
+        "api/internal/control/functions_artifacts.go",
+        "api/internal/control/functions_backing_store.go",
+        "api/internal/control/functions_bootstrap.go",
+        "api/internal/control/functions_bootstrap_store.go",
+        "api/internal/control/functions_branch_copy.go",
+        "api/internal/control/functions_branch_copy_driver.go",
+        "api/internal/control/functions_branch_copy_store.go",
+        "api/internal/control/functions_branch_snapshots.go",
+        "api/internal/control/functions_deploy_driver.go",
+        "api/internal/control/functions_edge_broker.go",
+        "api/internal/control/functions_environment.go",
+        "api/internal/control/functions_http_policy.go",
+        "api/internal/control/functions_instances.go",
+        "api/internal/control/functions_invoke.go",
+        "api/internal/control/functions_logs.go",
+        "api/internal/control/functions_manager_identity.go",
+        "api/internal/control/functions_metering.go",
+        "api/internal/control/functions_observation.go",
+        "api/internal/control/functions_platform.go",
+        "api/internal/control/functions_public.go",
+        "api/internal/control/functions_publish.go",
+        "api/internal/control/functions_read.go",
+        "api/internal/control/functions_recovery.go",
+        "api/internal/control/functions_resources.go",
+        "api/internal/control/functions_role.go",
+        "api/internal/control/functions_sql_secret.go",
+        "api/internal/control/functions_sql_store.go",
+        "api/internal/control/functions_stop.go",
+        "api/internal/control/functions_websocket_csp.go",
+        "api/internal/control/functions_write.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -2474,12 +4525,55 @@
       "official_operation_ids": [
         "queryProjectBranchLogs"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "部署失败和运行失败、时间/branch范围、retention及下载一致",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ],
+      "candidate_modules": [
+        "api/internal/control/function_object_delivery.go",
+        "api/internal/control/function_output.go",
+        "api/internal/control/function_output_collect.go",
+        "api/internal/control/function_output_shutdown.go",
+        "api/internal/control/function_trigger_scheduler.go",
+        "api/internal/control/function_triggers.go",
+        "api/internal/control/functions_artifact_gateway.go",
+        "api/internal/control/functions_artifacts.go",
+        "api/internal/control/functions_backing_store.go",
+        "api/internal/control/functions_bootstrap.go",
+        "api/internal/control/functions_bootstrap_store.go",
+        "api/internal/control/functions_branch_copy.go",
+        "api/internal/control/functions_branch_copy_driver.go",
+        "api/internal/control/functions_branch_copy_store.go",
+        "api/internal/control/functions_branch_snapshots.go",
+        "api/internal/control/functions_deploy_driver.go",
+        "api/internal/control/functions_edge_broker.go",
+        "api/internal/control/functions_environment.go",
+        "api/internal/control/functions_http_policy.go",
+        "api/internal/control/functions_instances.go",
+        "api/internal/control/functions_invoke.go",
+        "api/internal/control/functions_logs.go",
+        "api/internal/control/functions_manager_identity.go",
+        "api/internal/control/functions_metering.go",
+        "api/internal/control/functions_observation.go",
+        "api/internal/control/functions_platform.go",
+        "api/internal/control/functions_public.go",
+        "api/internal/control/functions_publish.go",
+        "api/internal/control/functions_read.go",
+        "api/internal/control/functions_recovery.go",
+        "api/internal/control/functions_resources.go",
+        "api/internal/control/functions_role.go",
+        "api/internal/control/functions_sql_secret.go",
+        "api/internal/control/functions_sql_store.go",
+        "api/internal/control/functions_stop.go",
+        "api/internal/control/functions_websocket_csp.go",
+        "api/internal/control/functions_write.go"
+      ],
+      "acceptance_versions": [
+        17,
+        18
       ]
     },
     {
@@ -2496,13 +4590,16 @@
         "getProjectBranchRealtimeSecret",
         "rotateProjectBranchRealtimeSecret"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "IMPLEMENTATION_NOT_CONFIRMED",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "真实服务状态、secret get/rotate/revoke、子分支继承与删除回收",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [],
+      "review_note": "官网已有对应能力，但当前自有产品实现与可自托管依赖尚未确认；不得空实现或借别的功能冒充。",
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-17-02",
@@ -2513,13 +4610,16 @@
         "https://neon.com/docs/realtime/overview"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "IMPLEMENTATION_NOT_CONFIRMED",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "只读确定性SELECT、权限/参数封装、真实多客户端变更；不伪造实时返回",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [],
+      "review_note": "官网已有对应能力，但当前自有产品实现与可自托管依赖尚未确认；不得空实现或借别的功能冒充。",
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-17-03",
@@ -2529,13 +4629,16 @@
         "https://neon.com/docs/realtime/overview"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "IMPLEMENTATION_NOT_CONFIRMED",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "建立订阅可唤醒compute，持有订阅不阻止scale-to-zero；复制开关/region和重连实际验证",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [],
+      "review_note": "官网已有对应能力，但当前自有产品实现与可自托管依赖尚未确认；不得空实现或借别的功能冒充。",
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-17-04",
@@ -2545,13 +4648,16 @@
         "https://neon.com/docs/realtime/overview"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "IMPLEMENTATION_NOT_CONFIRMED",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "RLS尚不支持、协议未稳定和暂无性能保证明确；不能写成已支持RLS或已获SLA",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [],
+      "review_note": "官网已有对应能力，但当前自有产品实现与可自托管依赖尚未确认；不得空实现或借别的功能冒充。",
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-18-01",
@@ -2564,13 +4670,33 @@
       "official_operation_ids": [
         "getProjectBranchAiGateway"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "真实分支绑定和invoke权限，错host/分支/模型不越权",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/ai_budgets.go",
+        "api/internal/control/ai_credits.go",
+        "api/internal/control/ai_gateway.go",
+        "api/internal/control/ai_input_crypto.go",
+        "api/internal/control/ai_input_files.go",
+        "api/internal/control/ai_input_resolve.go",
+        "api/internal/control/ai_protocols.go",
+        "api/internal/control/ai_provider_catalog.go",
+        "api/internal/control/ai_provider_organizations.go",
+        "api/internal/control/ai_provider_settings.go",
+        "api/internal/control/ai_provider_state_crypto.go",
+        "api/internal/control/ai_provider_state_http.go",
+        "api/internal/control/ai_provider_state_reconcile.go",
+        "api/internal/control/ai_provider_state_store.go",
+        "api/internal/control/ai_provider_state_tokens.go",
+        "api/internal/control/ai_provider_worker.go",
+        "api/internal/control/ai_providers.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-18-02",
@@ -2580,13 +4706,33 @@
         "https://neon.com/docs/ai-gateway/models"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "列出可用模型/权益、region和速率限制真实，不将全局模型误做每分支可变模型配置",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/ai_budgets.go",
+        "api/internal/control/ai_credits.go",
+        "api/internal/control/ai_gateway.go",
+        "api/internal/control/ai_input_crypto.go",
+        "api/internal/control/ai_input_files.go",
+        "api/internal/control/ai_input_resolve.go",
+        "api/internal/control/ai_protocols.go",
+        "api/internal/control/ai_provider_catalog.go",
+        "api/internal/control/ai_provider_organizations.go",
+        "api/internal/control/ai_provider_settings.go",
+        "api/internal/control/ai_provider_state_crypto.go",
+        "api/internal/control/ai_provider_state_http.go",
+        "api/internal/control/ai_provider_state_reconcile.go",
+        "api/internal/control/ai_provider_state_store.go",
+        "api/internal/control/ai_provider_state_tokens.go",
+        "api/internal/control/ai_provider_worker.go",
+        "api/internal/control/ai_providers.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-18-03",
@@ -2601,13 +4747,33 @@
         "https://neon.com/docs/ai-gateway/decisions"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "实际转发与错误/stream取消/token usage；数据面依赖真实可用模型，不以假回答回归",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/ai_budgets.go",
+        "api/internal/control/ai_credits.go",
+        "api/internal/control/ai_gateway.go",
+        "api/internal/control/ai_input_crypto.go",
+        "api/internal/control/ai_input_files.go",
+        "api/internal/control/ai_input_resolve.go",
+        "api/internal/control/ai_protocols.go",
+        "api/internal/control/ai_provider_catalog.go",
+        "api/internal/control/ai_provider_organizations.go",
+        "api/internal/control/ai_provider_settings.go",
+        "api/internal/control/ai_provider_state_crypto.go",
+        "api/internal/control/ai_provider_state_http.go",
+        "api/internal/control/ai_provider_state_reconcile.go",
+        "api/internal/control/ai_provider_state_store.go",
+        "api/internal/control/ai_provider_state_tokens.go",
+        "api/internal/control/ai_provider_worker.go",
+        "api/internal/control/ai_providers.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-18-04",
@@ -2617,13 +4783,33 @@
         "https://neon.com/docs/ai-gateway/prepaid-credits"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "Admin权限、扣费/失败/重复支付/负余额边界，不能以UI余额替代账本或触发真实扣款测试",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/ai_budgets.go",
+        "api/internal/control/ai_credits.go",
+        "api/internal/control/ai_gateway.go",
+        "api/internal/control/ai_input_crypto.go",
+        "api/internal/control/ai_input_files.go",
+        "api/internal/control/ai_input_resolve.go",
+        "api/internal/control/ai_protocols.go",
+        "api/internal/control/ai_provider_catalog.go",
+        "api/internal/control/ai_provider_organizations.go",
+        "api/internal/control/ai_provider_settings.go",
+        "api/internal/control/ai_provider_state_crypto.go",
+        "api/internal/control/ai_provider_state_http.go",
+        "api/internal/control/ai_provider_state_reconcile.go",
+        "api/internal/control/ai_provider_state_store.go",
+        "api/internal/control/ai_provider_state_tokens.go",
+        "api/internal/control/ai_provider_worker.go",
+        "api/internal/control/ai_providers.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-18-05",
@@ -2633,13 +4819,33 @@
         "https://neon.com/docs/ai-gateway/data-retention"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "MODULES_LOCATED_PENDING_INDIVIDUAL_CONTRACT_REVIEW",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "明确各提供方数据路径和保留，不能沿用PG网络隔离宣传覆盖AI出站调用",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [
+        "api/internal/control/ai_budgets.go",
+        "api/internal/control/ai_credits.go",
+        "api/internal/control/ai_gateway.go",
+        "api/internal/control/ai_input_crypto.go",
+        "api/internal/control/ai_input_files.go",
+        "api/internal/control/ai_input_resolve.go",
+        "api/internal/control/ai_protocols.go",
+        "api/internal/control/ai_provider_catalog.go",
+        "api/internal/control/ai_provider_organizations.go",
+        "api/internal/control/ai_provider_settings.go",
+        "api/internal/control/ai_provider_state_crypto.go",
+        "api/internal/control/ai_provider_state_http.go",
+        "api/internal/control/ai_provider_state_reconcile.go",
+        "api/internal/control/ai_provider_state_store.go",
+        "api/internal/control/ai_provider_state_tokens.go",
+        "api/internal/control/ai_provider_worker.go",
+        "api/internal/control/ai_providers.go"
+      ],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-19-01",
@@ -2649,13 +4855,16 @@
         "https://neon.com/docs/ai/lakebase-search"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "IMPLEMENTATION_NOT_CONFIRMED",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "准确PG版本扩展安装及真实索引/查询/分词功能；CP开关不等于数据面扩展已构建",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [],
+      "review_note": "官网已有对应能力，但当前自有产品实现与可自托管依赖尚未确认；不得空实现或借别的功能冒充。",
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-19-02",
@@ -2669,13 +4878,16 @@
       "official_operation_ids": [
         "getAvailablePreloadLibraries"
       ],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "IMPLEMENTATION_NOT_CONFIRMED",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "白名单/预加载/major版本适配，pg_search/pgrag等弃用迁移记录，不随意删既有功能",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [],
+      "review_note": "官网已有对应能力，但当前自有产品实现与可自托管依赖尚未确认；不得空实现或借别的功能冒充。",
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-20-01",
@@ -2686,13 +4898,15 @@
         "https://neon.com/docs/reference/api"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "IMPLEMENTATION_NOT_CONFIRMED",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "身份/项目上下文和退出码正确；完整193 route与版本锁对照，不仅能调用自有私有接口",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-20-02",
@@ -2702,13 +4916,15 @@
         "https://neon.com/docs/reference/neon-ts"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "IMPLEMENTATION_NOT_CONFIRMED",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "声明资源、差异预览、失败/重试/secret注入和branch一致，不能把配置文件保存当已部署",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-20-03",
@@ -2718,13 +4934,15 @@
         "https://neon.com/docs/ai/neon-mcp-server"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "IMPLEMENTATION_NOT_CONFIRMED",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "真实OAuth/key、作用域和工具操作结果；破坏性/数据访问遵守明确授权，不能只返回tool名称",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-20-04",
@@ -2736,13 +4954,15 @@
         "https://neon.com/docs/guides/vercel-overview"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "IMPLEMENTATION_NOT_CONFIRMED",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "外部OAuth、repo/preview分支和环境变量/Auth URL真实联动，PR关闭清理与重试幂等",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [],
+      "acceptance_versions": []
     },
     {
       "id": "NEON-CP-20-05",
@@ -2752,20 +4972,22 @@
         "https://neon.com/docs/manage/integrations"
       ],
       "official_operation_ids": [],
-      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "code_review_status": "IMPLEMENTATION_NOT_CONFIRMED",
       "historical_evidence": [],
       "current_e2e": "NOT_RUN",
       "acceptance": [
         "从官方catalog展开每个提供方，区分Console安装和手工driver指南；未展开者保留NOT_ASSESSED而非删除",
         "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
-      ]
+      ],
+      "candidate_modules": [],
+      "acceptance_versions": []
     },
     {
       "id": "SELF-PG-MEM-01",
       "package": "CP-05",
       "feature": "动态PG共享缓冲区和真实normal安全在线降限的控制面创建、策略、观察及恢复",
       "official_sources": [],
-      "code_review_status": "CONFIRMED_INTEGRATION_GAPS",
+      "code_review_status": "CORE_ACCEPTED_CONTROL_PLANE_INCOMPLETE",
       "code_evidence": [
         "api/internal/control/worker.go",
         "api/internal/control/dsga_project_handler.go",
@@ -2781,7 +5003,126 @@
         "公开策略触发Grow/Shrink/Regrow/自动策略且真实读回",
         "同连接应用数据及WAL一致",
         "PG18复用同一上层合同独立回归"
+      ],
+      "candidate_modules": [
+        "api/internal/control/bounds.go",
+        "api/internal/control/dsga_array_credentials.go",
+        "api/internal/control/dsga_creation.go",
+        "api/internal/control/dsga_creation_auth.go",
+        "api/internal/control/dsga_creation_binding.go",
+        "api/internal/control/dsga_creation_credentials.go",
+        "api/internal/control/dsga_creation_plan.go",
+        "api/internal/control/dsga_credential_producer.go",
+        "api/internal/control/dsga_credentials.go",
+        "api/internal/control/dsga_initialization.go",
+        "api/internal/control/dsga_initialization_history.go",
+        "api/internal/control/dsga_kube.go",
+        "api/internal/control/dsga_legacy_guard.go",
+        "api/internal/control/dsga_listener.go",
+        "api/internal/control/dsga_placement.go",
+        "api/internal/control/dsga_project_handler.go",
+        "api/internal/control/dsga_project_reservation.go",
+        "api/internal/control/dsga_proxy.go",
+        "api/internal/control/dsga_renderer.go",
+        "api/internal/control/dsga_resource_renderer.go",
+        "api/internal/control/dsga_route.go",
+        "api/internal/control/dsga_route_replacement.go",
+        "api/internal/control/dsga_runtime_release.go",
+        "api/internal/control/dsga_services.go",
+        "api/internal/control/dsga_storage_client.go",
+        "api/internal/control/dsga_tenant.go",
+        "api/internal/control/dsga_timeline.go",
+        "api/internal/control/dsga_vm.go",
+        "api/internal/control/idle_window.go",
+        "api/internal/control/reconcile_create.go"
+      ],
+      "review_note": "核心PG17/PG18已各4/4；本轮公开控制面创建/动态策略/实际状态/恢复E2E未通过。",
+      "acceptance_versions": [
+        17,
+        18
+      ]
+    },
+    {
+      "id": "SELF-PLATFORM-01",
+      "package": "SELF-PLATFORM",
+      "feature": "源码/镜像/PG扩展/实际运行发行来源",
+      "official_sources": [],
+      "requirement_origin": "用户20261107生产平台与演进要求；本项目架构决定，不推断Neon私有管理后台",
+      "code_review_status": "PLANNED_REUSE_EXISTING_PLATFORM_MODULES",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "发行清单及运行digest、SQL版本、扩展和构建来源准确关联；普通postgres标签不能冒Neon Guest。"
+      ]
+    },
+    {
+      "id": "SELF-PLATFORM-02",
+      "package": "SELF-PLATFORM",
+      "feature": "平台运维角色与租户管理员分离",
+      "official_sources": [],
+      "requirement_origin": "用户20261107生产平台与演进要求；本项目架构决定，不推断Neon私有管理后台",
+      "code_review_status": "PLANNED_REUSE_EXISTING_PLATFORM_MODULES",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "组织Admin不能更改平台发行或跨租户配置；复用原平台权限，操作有审计和范围。"
+      ]
+    },
+    {
+      "id": "SELF-PLATFORM-03",
+      "package": "SELF-PLATFORM",
+      "feature": "版本化配置、秘密引用与期望实际状态",
+      "official_sources": [],
+      "requirement_origin": "用户20261107生产平台与演进要求；本项目架构决定，不推断Neon私有管理后台",
+      "code_review_status": "PLANNED_REUSE_EXISTING_PLATFORM_MODULES",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "配置revision CAS、校验/生效/观察分开；旧Operation恢复不读取新默认值；秘密不泄漏。"
+      ]
+    },
+    {
+      "id": "SELF-PLATFORM-04",
+      "package": "SELF-PLATFORM",
+      "feature": "维护更新与可恢复发行推广",
+      "official_sources": [],
+      "requirement_origin": "用户20261107生产平台与演进要求；本项目架构决定，不推断Neon私有管理后台",
+      "code_review_status": "PLANNED_REUSE_EXISTING_PLATFORM_MODULES",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "固定候选→真实E2E→维护推广→现场回读；兼容前才允许回退，不能把数据格式升级等同镜像回滚。"
+      ]
+    },
+    {
+      "id": "SELF-PLATFORM-05",
+      "package": "SELF-PLATFORM",
+      "feature": "平台元数据与密钥/对象/WAL备份恢复",
+      "official_sources": [],
+      "requirement_origin": "用户20261107生产平台与演进要求；本项目架构决定，不推断Neon私有管理后台",
+      "code_review_status": "PLANNED_REUSE_EXISTING_PLATFORM_MODULES",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "隔离环境恢复后核新产品真实业务；恢复记录明确数据范围和未验证物理故障域。"
+      ]
+    },
+    {
+      "id": "SELF-PLATFORM-06",
+      "package": "SELF-PLATFORM",
+      "feature": "上游跟踪与自有补丁收敛",
+      "official_sources": [],
+      "requirement_origin": "用户20261107生产平台与演进要求；本项目架构决定，不推断Neon私有管理后台",
+      "code_review_status": "PLANNED_REUSE_EXISTING_PLATFORM_MODULES",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "PG/Neon/AS/OS依赖逐版本记录安全差异和兼容矩阵；上游替代需同合同验证，不承诺中间件永不改动。"
       ]
     }
-  ]
+  ],
+  "updated_at": "2026-11-07T11:07:28.219745+00:00",
+  "canonical_plan": "docs/平台总方案与演进规划.md",
+  "official_website_commit": "5e4ffa00144b5c76b6ab9bf507166f877056b431",
+  "official_operations_count": 194
 }

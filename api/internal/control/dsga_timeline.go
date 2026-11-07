@@ -213,7 +213,7 @@ func validateDSGATimelineAggregate(item map[string]any, tenant, timeline string,
 			}
 		}
 	}
-	if !dsgaStorageID.MatchString(timeline) || version != 17 {
+	if !dsgaStorageID.MatchString(timeline) || !dsgaSupportedPostgresVersion(version) {
 		return errDSGACreationIdentity
 	}
 	return validateDSGATenant(map[string]any{"tenant_id": tenant, "shards": identities}, tenant)

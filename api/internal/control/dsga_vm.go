@@ -141,7 +141,7 @@ func renderDSGAVM(p createPayload, plan dsgaCreationPlan) (*vmv1.VirtualMachine,
 				// 显式走同一socket，避免默认TCP5432或对内部SU开放网络HBA。
 				Args: []string{"--pgdata", "/var/db/postgres/compute", "--connstr", "postgresql://cloud_admin@localhost/postgres?port=" + strconv.Itoa(dsgaPostgresPort), "--pgbin", "/usr/local/bin/postgres", "--compute-id", name, "--config", dsgaConfigMount + "/config.json",
 					"--filecache-connstr", "host=/var/db/postgres/compute/dsg_socket port=" + strconv.Itoa(dsgaPostgresPort) + " dbname=postgres user=cloud_admin sslmode=disable application_name=vm-monitor", "--external-http-port", "3080", "--internal-http-port", "3081"},
-				Env:   []vmv1.EnvVar{{Name: "PG_VERSION", Value: "17"}, {Name: "TENANT_ID", Value: p.TenantID}, {Name: "TIMELINE_ID", Value: p.TimelineID}},
+				Env:   []vmv1.EnvVar{{Name: "PG_VERSION", Value: strconv.FormatUint(uint64(plan.PostgresVersion), 10)}, {Name: "TENANT_ID", Value: p.TenantID}, {Name: "TIMELINE_ID", Value: p.TimelineID}},
 				Ports: []vmv1.Port{{Name: "postgres", Port: dsgaPostgresPort, Protocol: vmv1.ProtocolTCP}, {Name: "compute-control", Port: 3080, Protocol: vmv1.ProtocolTCP}, {Name: "monitor", Port: 10301, Protocol: vmv1.ProtocolTCP}},
 			},
 			// 此处是Guest PG的TLS材料，非中心Agent凭据签发监听器的私钥；

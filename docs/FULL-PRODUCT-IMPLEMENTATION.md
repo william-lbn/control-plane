@@ -1,3 +1,5 @@
+> 当前总方案与执行顺序已由 [平台总方案与演进规划](平台总方案与演进规划.md)（2026-11-07）更新。本文保留历史设计/回执，旧版本状态不代表当前完成度；已验证的数据保护、权限和恢复要求不因文档更新而取消。
+
 > 历史 2026-10-10/11 Compute 生命周期增量：[独立 Endpoint 删除与重建](ENDPOINT-DELETION.md) 提供迁移 018、OpenAPI 0.10.1（58 paths / 87 operations）、Go/React 实现；[本版交付](DELIVERY-2026-10-10-COMPUTE-LIFECYCLE.md)记录九套 UI 146 项和原失败恢复 23 项。生产门槛仍逐项保留。
 
 > Historical broad design contract; current implementation/version/acceptance are authoritative in [API.md](API.md), [PRODUCTION-GATES](PRODUCTION-GATES.md) and [local batch](DELIVERY-2026-10-15-LOCAL-BATCH.md). This design is not a claim of full Neon feature completion.

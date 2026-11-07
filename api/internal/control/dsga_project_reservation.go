@@ -17,7 +17,7 @@ import (
 
 var errDSGACreationConflict = errors.New("original DSGA creation key or inputs differ")
 var errDSGACreationAuthority = errors.New("current organization creation authority unavailable")
-var errDSGAProjectBounds = errors.New("requested PG17 resources are outside the trusted class")
+var errDSGAProjectBounds = errors.New("requested PostgreSQL resources are outside the trusted class")
 
 // 可信进程配置，不是API body。Bounds同时给默认范围和本规格允许的外边界，
 // 公开请求只能收窄；真正Guest/PG预算仍由原计划和后续领域执行器约束。
@@ -32,6 +32,7 @@ type dsgaProjectPolicy struct {
 // 明文只交给prepareDSGACredentials；原请求关联使用已有带密钥HMAC摘要。
 type dsgaProjectDescription struct {
 	Name, DefaultBranch, Region string
+	PostgresVersion             uint32
 	Bounds                      *createBounds
 }
 
@@ -65,7 +66,14 @@ func decodeDSGAObject(raw []byte, into any) error {
 
 func readDSGAProjectPolicy(namespace string) (dsgaProjectPolicy, error) {
 	var policy dsgaProjectPolicy
-	if decodeDSGAObject([]byte(os.Getenv("NEON_DSGA_CREATION_POLICY")), &policy) != nil || policy.ProtocolVersion != 1 ||
+	if decodeDSGAObject([]byte(os.Getenv("NEON_DSGA_CREATION_POLICY")), &policy) != nil {
+		return policy, errDSGACreationPlan
+	}
+	return validateDSGAProjectPolicy(namespace, policy)
+}
+
+func validateDSGAProjectPolicy(namespace string, policy dsgaProjectPolicy) (dsgaProjectPolicy, error) {
+	if policy.ProtocolVersion != 1 || !dsgaSupportedPostgresVersion(policy.Creation.postgresVersion()) ||
 		policy.Creation.Namespace != namespace || policy.Region == "" || len(policy.Region) > 128 || strings.TrimSpace(policy.Region) != policy.Region ||
 		policy.Creation.VM.ProtocolVersion != 3 || policy.Creation.VM.validateResourceBudget(policy.Creation.Budget) != nil || policy.Creation.Storage.validate(namespace) != nil || !dsgaPinnedImage.MatchString(policy.Creation.Image) || len(namespace) > 63 || !dsgaPlanNamespace.MatchString(namespace) || policy.Bounds.MinCPU < 250 || policy.Bounds.MinCPU%250 != 0 || policy.Bounds.MaxCPU < policy.Bounds.MinCPU || policy.Bounds.MaxCPU%250 != 0 || policy.Bounds.MaxCPU > 1<<31-1 ||
 		policy.Bounds.MinMem <= 0 || policy.Bounds.MaxMem < policy.Bounds.MinMem || policy.Bounds.MaxMem > 1<<31-1 {
@@ -165,7 +173,7 @@ func readDSGAReservation(ctx context.Context, tx pgx.Tx, actor, keyDigest string
 
 func (r dsgaProjectReservation) matches(org, scope, requestHash, namespace string, body dsgaProjectDescription) bool {
 	p := r.Draft.Payload
-	return r.Org == org && r.Scope == scope && r.RequestHash == requestHash && r.Draft.Plan.Namespace == namespace &&
+	return r.Draft.Plan.PostgresVersion == body.PostgresVersion && r.Org == org && r.Scope == scope && r.RequestHash == requestHash && r.Draft.Plan.Namespace == namespace &&
 		r.Draft.ResourceName == body.Name && r.Draft.DefaultBranch == body.DefaultBranch && (body.Region == "" || body.Region == r.Draft.Region) &&
 		(body.Bounds == nil || *body.Bounds == (createBounds{p.MinCPU, p.MaxCPU, p.MinMem, p.MaxMem}))
 }
@@ -218,7 +226,7 @@ func (s *server) reserveDSGAProject(ctx context.Context, actor, org, scope, key,
 	if err := checkDSGAReservationQuota(ctx, tx, org, pl, el, false); err != nil {
 		return empty, err
 	}
-	policy, err := readDSGAProjectPolicy(s.kube.namespace)
+	policy, err := selectDSGAProjectPolicy(s.kube.namespace, body.PostgresVersion, body.Region)
 	if err != nil {
 		return empty, err
 	}
@@ -372,7 +380,7 @@ func (s *server) acceptDSGAProjectReservation(ctx context.Context, r dsgaProject
 		return false, errDSGACreationPlan
 	}
 	_, err = tx.Exec(ctx, `INSERT INTO projects(id,org_id,name,tenant_id,region_id,postgres_version,state,source,default_branch_id,created_at,updated_at)
- VALUES($1,$2,$3,$4,$5,17,'provisioning','managed',$6,clock_timestamp(),clock_timestamp())`, p.ProjectID, r.Org, d.ResourceName, p.TenantID, d.Region, p.BranchID)
+ VALUES($1,$2,$3,$4,$5,$7,'provisioning','managed',$6,clock_timestamp(),clock_timestamp())`, p.ProjectID, r.Org, d.ResourceName, p.TenantID, d.Region, p.BranchID, plan.PostgresVersion)
 	if err != nil {
 		return false, err
 	}
@@ -396,7 +404,7 @@ func (s *server) acceptDSGAProjectReservation(ctx context.Context, r dsgaProject
  VALUES($1,'postgres','provisioning','provisioning','dsga-v1')`, p.BranchID); err != nil {
 		return false, err
 	}
-	steps := []string{"create_managed_tenant", "create_timeline_pg17", "prepare_neonvm_dsga", "wait_neonvm_running", "confirm_native_initialization", "publish_proxy_route", "sql_probe_via_proxy", "persist_ready_state"}
+	steps := []string{"create_managed_tenant", "create_timeline", "prepare_neonvm_dsga", "wait_neonvm_running", "confirm_native_initialization", "publish_proxy_route", "sql_probe_via_proxy", "persist_ready_state"}
 	if err := addDSGACreateOperation(ctx, tx, "create_project", "project", p.ProjectID, p.ProjectID, current.Operation, r.Actor, requestID, p, plan, key, current.RequestHash, steps); err != nil {
 		return false, err
 	}

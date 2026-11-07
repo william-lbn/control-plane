@@ -1,0 +1,113 @@
+{
+  "recorded_at": "2026-11-07T11:11:20.908073+00:00",
+  "status": "LOCAL_VALIDATION_PASSED_REAL_CONTROL_PLANE_E2E_NOT_RUN",
+  "branch": "codex/dsga-control-plane-v3-20261020",
+  "source_base": "2b8b9e3012bb59c7f2ce22a82cfc22d354454173",
+  "acceptance_versions": [
+    17,
+    18
+  ],
+  "excluded_versions": [
+    16
+  ],
+  "local_runs": [
+    {
+      "name": "multiversion-first",
+      "counts": {
+        "pass_root": 52,
+        "pass_sub": 192
+      },
+      "nonpasses": [],
+      "exit": 0,
+      "sha256": "3807e468a686250e6f45e161dce3dda741c6f70d28f2420ea851716995719344",
+      "kind": "real_isolated_metadata_and_protocol_fixtures_not_cluster"
+    },
+    {
+      "name": "multiversion-final",
+      "counts": {
+        "pass_root": 9,
+        "pass_sub": 18
+      },
+      "nonpasses": [],
+      "exit": 0,
+      "sha256": "1dd272ebd4e35e057fed14c9135bc23127f994098339b32caa10a4d9c1e9923c",
+      "kind": "real_isolated_metadata_and_protocol_fixtures_not_cluster"
+    }
+  ],
+  "creation_enabled": false,
+  "deployed_new_compute": false,
+  "linux_archive_root": "/data/neon-control-plane/runs/20261107-控制面重新启动",
+  "cluster_readonly_inventory": {
+    "path": "/data/neon-control-plane/runs/20261107-控制面重新启动/architecture-review/cluster-and-source.PUBLIC.json",
+    "sha256": "8196042d46f47a1b90df4913ff7f72837e6ae814bd9b3ea4ad30123b8398a40a",
+    "active_pods": 24,
+    "not_ready": 0,
+    "note": "只读状态，不计为新产品E2E"
+  },
+  "browser_component": {
+    "result": "PASS",
+    "scope": "BROWSER_COMPONENT_FIXTURES_ONLY_NOT_K8S_E2E",
+    "checks": [
+      "only_configured_pg17_pg18_no_pg16",
+      "pg17_selected_bounds_and_same_request_key",
+      "pg18_resets_class_bounds_and_request_identity",
+      "empty_catalog_prevents_creation",
+      "no_browser_javascript_errors"
+    ],
+    "failure": null
+  },
+  "build_vet": [
+    {
+      "command": [
+        "npx",
+        "prettier",
+        "--write",
+        "scripts/check-runtime-form.mjs",
+        "src/features/projects/CreateResources.tsx"
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "npm",
+        "run",
+        "test:runtime-form"
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "npm",
+        "run",
+        "build"
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "/Users/williamlee/.cache/neon-control-plane/toolchains/go1.27.1.darwin-arm64/go/bin/go",
+        "vet",
+        "./internal/control"
+      ],
+      "exit": 0
+    },
+    {
+      "command": [
+        "/Users/williamlee/.cache/neon-control-plane/toolchains/go1.27.1.darwin-arm64/go/bin/go",
+        "build",
+        "-o",
+        "/Users/williamlee/github/control-plane-pg-memory/.local/dev-20261107/control-api-multiversion",
+        "./cmd/control-api"
+      ],
+      "exit": 0
+    }
+  ],
+  "overlap_note": "定向运行有重叠，计数不相加冒称唯一测试数；首次52根192子通过，最终9根18子覆盖最新目录变更和迁移。",
+  "pending": [
+    "Worker正式DSGA创建分派",
+    "新VM动态资格/策略接入既有Owner",
+    "控制面实际状态/API/UI与真实K8s端到端",
+    "全部Backend当前后端联合验收",
+    "平台统一发行与运营管理"
+  ]
+}

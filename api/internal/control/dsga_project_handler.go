@@ -8,12 +8,12 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-// PG17公开项目创建的真实入口：保留原意图→一次性凭据→固定来源→同事务接受。
+// PostgreSQL公开项目创建的真实入口：保留原意图→一次性凭据→固定来源→同事务接受。
 // 只接受现有HTTP创建字段，平台VM/预算/镜像来自可信配置，不允许租户自报。
 // 本入口默认关闭，后续worker/初始化回执与完整预算链未验收前不启用生产。
 func (s *server) createDSGAProject(w http.ResponseWriter, r *http.Request, body projectCreateRequest) {
 	if os.Getenv("NEON_DSGA_CREATE_ENABLED") != "true" || s.kube == nil || len(s.idempotencyKey) < 32 {
-		fail(w, r, 503, "dsga_creation_disabled", "PG17 DSGA creation is not enabled")
+		fail(w, r, 503, "dsga_creation_disabled", "PostgreSQL DSGA creation is not enabled")
 		return
 	}
 	if !validName(body.Name, 64) || !validName(body.DefaultBranchName, 63) {
@@ -41,7 +41,7 @@ func (s *server) createDSGAProject(w http.ResponseWriter, r *http.Request, body 
 	if s.replayCreate(w, r, key, hash, "", "project") {
 		return
 	}
-	reservation, err := s.reserveDSGAProject(r.Context(), actor, org, scope, key, hash, dsgaProjectDescription{body.Name, body.DefaultBranchName, body.RegionID, body.Autoscaling})
+	reservation, err := s.reserveDSGAProject(r.Context(), actor, org, scope, key, hash, dsgaProjectDescription{Name: body.Name, DefaultBranch: body.DefaultBranchName, Region: body.RegionID, PostgresVersion: uint32(body.PostgresVersion), Bounds: body.Autoscaling})
 	if err != nil {
 		s.dsgaCreationFailure(w, r, err)
 		return
@@ -54,7 +54,7 @@ func (s *server) createDSGAProject(w http.ResponseWriter, r *http.Request, body 
 	plan.Credentials = reservation.Credentials
 	frozen, err := s.kube.prepareDSGACredentials(r.Context(), reservation.Draft.Payload, plan, reservation.Operation, dsgaCredentialInput{Password: body.Password})
 	if err != nil {
-		fail(w, r, 503, "credential_unavailable", "Original PG17 credentials could not be confirmed; retry the same request key")
+		fail(w, r, 503, "credential_unavailable", "Original PostgreSQL credentials could not be confirmed; retry the same request key")
 		return
 	}
 	reservation, err = s.pinDSGAReservationCredentials(r.Context(), reservation, frozen.Credentials)
@@ -82,11 +82,13 @@ func (s *server) dsgaCreationFailure(w http.ResponseWriter, r *http.Request, err
 		fail(w, r, 409, "idempotency_or_name_conflict", "Original creation key or resource name conflicts")
 	case errors.Is(err, errOrganizationQuota):
 		fail(w, r, 429, "organization_quota_exceeded", "Organization resources and pending creations exceed quota")
+	case errors.Is(err, errDSGARuntimeUnavailable):
+		fail(w, r, 422, "postgres_runtime_unavailable", "Choose a configured PostgreSQL version and region")
 	case errors.Is(err, errDSGAProjectBounds):
-		fail(w, r, 422, "invalid_dsga_bounds", "Requested CPU and memory must fit the trusted PG17 class and exact slot boundaries")
+		fail(w, r, 422, "invalid_dsga_bounds", "Requested CPU and memory must fit the trusted PostgreSQL class and exact slot boundaries")
 	case errors.Is(err, errDSGACreationPlan):
-		fail(w, r, 503, "dsga_creation_policy_unavailable", "Original PG17 plan or trusted creation policy is unavailable")
+		fail(w, r, 503, "dsga_creation_policy_unavailable", "Original PostgreSQL plan or trusted creation policy is unavailable")
 	default:
-		fail(w, r, 503, "dsga_creation_unavailable", "Original PG17 creation could not be confirmed; retry the same request key")
+		fail(w, r, 503, "dsga_creation_unavailable", "Original PostgreSQL creation could not be confirmed; retry the same request key")
 	}
 }

@@ -254,9 +254,9 @@ func (s *server) createProject(w http.ResponseWriter, r *http.Request) {
 	if body.PostgresVersion == 0 {
 		body.PostgresVersion = 16
 	}
-	// PG17显式进入版本化DSGA生产者；默认仍关闭，不借旧PG16凭据/Driver
-	// 忽略新增计划。原Region默认只在legacy分支应用，新路径先读原保留计划。
-	if body.PostgresVersion == 17 {
+	// 已适配PG大版本共用同一DSGA生产者，发行差异在可信计划中冻结。
+	// 原Region默认只在legacy分支应用，新路径先读原保留计划。
+	if body.PostgresVersion > 0 && uint64(body.PostgresVersion) <= uint64(^uint32(0)) && dsgaSupportedPostgresVersion(uint32(body.PostgresVersion)) {
 		s.createDSGAProject(w, r, body)
 		return
 	}

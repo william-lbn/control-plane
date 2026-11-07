@@ -91,7 +91,7 @@ func (binding *dsgaCreationBinding) lockOperation(ctx context.Context) (pgx.Tx, 
 	if err != nil {
 		return nil, err
 	}
-	if version != 17 || tenant != binding.intent.TenantID || timeline != binding.intent.TimelineID ||
+	if version != int(binding.intent.Creation.PostgresVersion) || tenant != binding.intent.TenantID || timeline != binding.intent.TimelineID ||
 		(projectState != "ready" && (base != "create_project" || (projectState != "provisioning" && projectState != "error"))) ||
 		(branchState != "ready" && (base == "create_endpoint" || (branchState != "creating" && branchState != "error"))) {
 		return nil, errDSGACreationIdentity
@@ -135,7 +135,7 @@ func (s *server) loadDSGACreationBinding(ctx context.Context, operationID, worke
 	// 先做有限大小的身份解析，再在行锁内重读全部原始payload并核对摘要。
 	// 首次读取本身不授予创建权；两次读取间的改写、换主和父生命周期变化都要拒绝。
 	if len(payload) > 1<<20 || json.Unmarshal(payload, &intent) != nil || dsgaCreationBaseAction(action) == "" || intent.ProjectID == "" || intent.BranchID == "" || intent.EndpointID == "" ||
-		intent.Creation.ProtocolVersion != 1 || intent.Creation.PostgresVersion != 17 || intent.Creation.Namespace != s.kube.namespace ||
+		intent.Creation.ProtocolVersion != 1 || !dsgaSupportedPostgresVersion(intent.Creation.PostgresVersion) || intent.Creation.Namespace != s.kube.namespace ||
 		dsgapi.ValidateIncarnation(intent.Creation.Incarnation) != nil || dsgapi.ValidateID(intent.Creation.ComputeInstanceID, "Compute") != nil {
 		return nil, errDSGACreationIdentity
 	}

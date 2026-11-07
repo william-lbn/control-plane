@@ -1,0 +1,4396 @@
+{
+  "captured_at": "2026-11-07T11:07:28.219745+00:00",
+  "official_repository": "https://github.com/neondatabase/website",
+  "commit": "5e4ffa00144b5c76b6ab9bf507166f877056b431",
+  "navigation_path": "content/docs/navigation.yaml",
+  "navigation_sha256": "4753d9fe20f92366754688d3fb8d1fd4ba140f9a9071bc998825a5de4ea8ee44",
+  "tree_entry_count": 6842,
+  "navigation_occurrences": 692,
+  "unique_entries": 626,
+  "local_page_count": 614,
+  "coverage_claim": "完整导航盘点；标记的关键合同已审，不声称626页全文审计或全部功能通过",
+  "entries": [
+    {
+      "slug": "/docs",
+      "source_sha256": null,
+      "local_source_present": false,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "get-started/why-neon",
+      "source_sha256": "f85879296f58f0748b91b7c28ea0dc2fa011e63c946de6311dafd43ca20f62ae",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "get-started/dev-experience",
+      "source_sha256": "3eff0ab4b9d326e693f1a206856b141e489f0be1ecdf1c252686e96dbda3a27b",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "get-started/built-to-scale",
+      "source_sha256": "8f1e6d57e8ff6b096a23716dce46e18f848b7391af9f076ee775521f4108f4b4",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "ai/agent-setup",
+      "source_sha256": "bb49817f1040ffc9e3119820e9e3ffe61759522b244695cd7d6078f0009e5a9f",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "get-started/full-backend-quickstart",
+      "source_sha256": "7e25e81c3f0989967198df8957d9ce41fcaea42ffbddfc4dfa470542e123d0bf",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "connect/connect-hub",
+      "source_sha256": "8ef334a7fe866cc43968b4293ad9dd713d086ef9afc109b19ddd4abc525db4c3",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "get-started/backend-overview",
+      "source_sha256": "cfa50d01c81db44d116e15523f81bce14f2902d984e01ad8b5f5285a4407b941",
+      "local_source_present": true,
+      "review_state": "KEY_CONTRACT_SECTIONS_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "get-started/signing-up",
+      "source_sha256": "4539e60623d4a16522d768974745eb8a835a8a2d3dbe0d027abdc0862533c78e",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "get-started/frameworks",
+      "source_sha256": "4609295822882bf675302fe9083d199a252de7295ef8cbdf1952d2cedea9d03e",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/astro",
+      "source_sha256": "7278c8d170911cf02d274e200aa54e29be8386ae5729c8a2de2663a502c33970",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/bun",
+      "source_sha256": "c403cdff3d6a1b74d7e182150cc67037403f054d2d0cc31d374fb778ada0fc07",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/dotnet-entity-framework",
+      "source_sha256": "ca95de7c5f19dbd02034b393c8e5adfd840c91b2defba8bcc657f80ad96044b0",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/encore",
+      "source_sha256": "44860891df332859b8d8a01424da88e558e9b8d456f38e000e10ac2f55b4ba2e",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/express",
+      "source_sha256": "7afb017080eea691cc76c11da649350363ad6d1a80d06154c71e6564beb0efcb",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/medusajs",
+      "source_sha256": "952fe026ddd1d20f8c0752cd8b8c256705e68a1ae74830ed35fb83a761cecba8",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/micronaut-kotlin",
+      "source_sha256": "b8bfa34a3365420a3d7960ba5348756584fbd77dc1ce7dfdd79455a83f2a83e3",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/nestjs",
+      "source_sha256": "dd3ac563bc9dfc15dfea2106d19e85afa28d4a73febbe5aba7a473cfdf276f42",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/nextjs",
+      "source_sha256": "f867f41171154eed8373131599e7878aa925865b2354dd13809a2164474f953d",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/node",
+      "source_sha256": "fad5e2d1bdd81d32fc8b1cb9b07c7cdbfde22eae2eac6c79206d08755a62613c",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/nuxt",
+      "source_sha256": "724956b9203768d9deb2d1c503003ecb7dd07e73b6ac7c8d538ec3c67ea634a1",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/phoenix",
+      "source_sha256": "69e43b61a4e73a2a342330fc7d045b5943c2a0b6200b69a6b8e4421cabaca3f3",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/quarkus-jdbc",
+      "source_sha256": "eb83b6a0c2a3bdbb8b9ede402c2f017d25fc2aae65cf9f6979898c7bfda6ad96",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/quarkus-reactive",
+      "source_sha256": "f19b78f2c1f0467b7f54df5bd68f4fc4f3acbad722f589c4e76e38949345471a",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/react",
+      "source_sha256": "597580f64fa287f61aa9f72b21f1cd0536ecd5d73ff44b1bd9a33a30960c9cfa",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/react-router",
+      "source_sha256": "c3cf8225e362b329ae34f70d78a46a47d207031c0593327db1db9eb2e331615e",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/reflex",
+      "source_sha256": "6e470e5e48804dca613047010d8708e6caaf82d2a6748455c8bb611b38ee253c",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/remix",
+      "source_sha256": "d83726dde6c9b3f985436b9616462a744f51c3599783dc7273bb88a19633408b",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/solid-start",
+      "source_sha256": "a5611728c2259676d6ea1c2e5586232aebfb8f0bab1c7d206f7eb84a72a60d22",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/sveltekit",
+      "source_sha256": "846f2350557b5b3cedc638be659704a9fb28a1946c44be3da5178cdf44ec3900",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/symfony",
+      "source_sha256": "f2b615334dc0e51e2bdd0abdffece5df95149b2d3184946b4e733441a168d59a",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/tanstack-start",
+      "source_sha256": "e62c5eed7aa1f3ede13de6902c9bcdf14c644aa3df9c536a471ec1c8bffb9521",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/hono",
+      "source_sha256": "3fb11c8eacb02ab2be024b0fd0b108af19d748620eef1ed7301d104a66b65210",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/redwoodsdk",
+      "source_sha256": "e403139f0bbcaa562b4552607b15244a8043daf03b523f8011f60e4a5baf52e7",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/vue",
+      "source_sha256": "c3607e8093bd1b0a849f5934881c1e1e35287e328a89a67b66bcaca3073e67ad",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "get-started/languages",
+      "source_sha256": "bb1e9347e8f536a19fd39c40d9d2a9019f058de3d30e9947b0eed45934fbe6ad",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/dotnet-npgsql",
+      "source_sha256": "12434afd2ea1b339b115d930da8b64bba446181a778a53113e2b3feb114c96f2",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/elixir",
+      "source_sha256": "e5dd18efdbefd59cf8917fbff881852949fe91d0e2e2b79892d6f9e784706b6a",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/go",
+      "source_sha256": "bd46c9c5eb29b81d118092f5f629ee9cdd35b1bfc06ecb8678c08f997e7af3f6",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/java",
+      "source_sha256": "062d48f22e4304b267168eedf305842137af6a6785b1c642c3b5bc056fb122ea",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/javascript",
+      "source_sha256": "89c1f192848dbea359e011c3669145e7b909c23cc182b761da8f1c298ea50a91",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/kotlin",
+      "source_sha256": "db60122caa11e9cb3af12b008b2fe9c0fcf9f946f62bf8726599f9698004f6d0",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/python",
+      "source_sha256": "547733566ae536ab4f780e7988687a6a8dbe4e4989a4760c4d3c1b212178e174",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/rust",
+      "source_sha256": "085d148e36079139b84a0edfbfeda419ad7858854a970a8e98c8b775fb773b88",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "get-started/orms",
+      "source_sha256": "8d69617f230d947753ebd237843cbb8bd0f6f8a8165f0d605f0b6adcc736d3d9",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/django",
+      "source_sha256": "f44e0d7ac7b5869adc08d09ee7a67908d6faff676e2e0c834e50306205cba50b",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/drizzle",
+      "source_sha256": "e9a24eb219ab48bf421f727bc09a314601e397ea8d37626c6bae86815acbda16",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/elixir-ecto",
+      "source_sha256": "88de9bb2b6d4b50bf2afc0bdf3665c5de166e0a73d9d4f1646d6f21240b66831",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/kysely",
+      "source_sha256": "33ee1185c61c756b395db60d54191432d3e7fc708c199de03c2fbe9edef00bf6",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/knex",
+      "source_sha256": "6e0343c677b537a61dba1e0d5cf8b7e71f96dc4daa41c2a421296c607a566f82",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/laravel",
+      "source_sha256": "5b37ade9ac2ca02306c36ea03bf4f1b2a41a68333ee1541c3dc75b341eb949ae",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/prisma",
+      "source_sha256": "d335d21a0121d76435f0961f1dee8fd80823b188e8e9c2c8aa53329c7e28550a",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/ruby-on-rails",
+      "source_sha256": "008dc94aac41559edcc0edd53e74e421bbc71cd88bdf26a9d580cb227939dd03",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/sqlalchemy",
+      "source_sha256": "7100631d6e0594986d2abdb12eda6de4535739a9af71a1b90c2a4e818943a798",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/tortoise-orm",
+      "source_sha256": "086cfe0665a5ff73b3d5bee9898e33352c81c08e5a8c842a46aab1d9ed4143e8",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/typeorm",
+      "source_sha256": "7f98986bc2ba18780aae20256667e53b0fe05e237d1e8874f868ddb5fb0e9c9a",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/better-drizzle",
+      "source_sha256": "66c68471b2967254d9e72c5564433ebc24c7ed0cd4709c17c25156c464736317",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "import/migrate-intro",
+      "source_sha256": "f79d36db2f506fb86d1bc571b9428f498af832ce304fb5a4fc272f93f6d8dc5f",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "import/import-data-assistant",
+      "source_sha256": "311b5831193fd28dd747b5d12f96b1a065018dd8654ccec08bff667b8c48d53a",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "import/migrate-from-postgres",
+      "source_sha256": "9474857925d860caf89d22a73854de9f3cf5caca64ce8aa886bf8f251b2ec222",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "import/pgcopydb",
+      "source_sha256": "613b8fa6e011727fc3e53e9771cf663e676c1886e1331b5e3f962785aa578028",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/logical-replication-rds-to-neon",
+      "source_sha256": "bd5aa894c70a8558dade291633f8ab7e852e463ba168758f431ffcb53e7dcd4b",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/logical-replication-alloydb",
+      "source_sha256": "2518219211da631b9940fd66563898fb79a5910e4c7c50b6814ab972f800b560",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "import/migrate-from-azure-postgres",
+      "source_sha256": "9865668766caf67a4fa2c87ecb2c8124dce7d4361891c9415b9068d432a08225",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/logical-replication-cloud-sql",
+      "source_sha256": "b8d025f0908022a38f0ed1c8540ea306bfa5751ac33c08e6002ca9030a9848cd",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "import/migrate-from-digital-ocean",
+      "source_sha256": "cf27a0ba6d715408178deb3430c06e24978c2f99e8b310ea62740f83817009d7",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "import/migrate-from-firebase",
+      "source_sha256": "675d7e2866bcdb589fb4b40c016bbbd28ff83f6ac99f0923e272a9aa703354eb",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "import/migrate-from-heroku",
+      "source_sha256": "f5d489f4d4a78edb613f9504af666424546e1a1c5409bfcf2ca8aa66fef2c874",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "import/migrate-mssql",
+      "source_sha256": "107dbc520f510889ae34b36b6d0987828da869e24118c053e225ab37b9295b2c",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "import/migrate-sqlite",
+      "source_sha256": "89aa236b8688aeade3756aab1346cb69a3da2392d9d134e54da4cf240777d673",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "import/migrate-mysql",
+      "source_sha256": "f9b10921af6df98231e080d5428636c44dcccf2b701808a3f642e45e332b5c52",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "import/migrate-from-planetscale",
+      "source_sha256": "f63dcfd55a27e2854e28c68d146b420b85b4866424014938690e31b212991f25",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "import/migrate-from-railway",
+      "source_sha256": "84d2ba9e038acafd2f81cc7f068226ce277f934d449451691b446b1397e05e20",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "import/migrate-from-render",
+      "source_sha256": "b11509f148fc0a76dd5dc642e3f944b0fe935d6df38d767699c8e7a91384cc25",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "import/migrate-from-supabase",
+      "source_sha256": "0c8ffdc68474fd303b62bf5bca83c9b724b89ee38bd5ea3be69bb526f294b2ca",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "import/migrate-from-turso",
+      "source_sha256": "1b2a6925ce8f78cd653d7247f04e7f8da56615ebaf3061e8968a57d4ccb41e63",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "import/migrate-from-neon",
+      "source_sha256": "b7a91e5eb25db493e0ed1552eae99716d37440fd0dca3770ff0b0846fda569d8",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "import/migrate-schema-only",
+      "source_sha256": "944c67c76f5ae4fd06e5a8a1b5eb2722ae88ae326c7384a245828df4cf526062",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/logical-replication-postgres-to-neon",
+      "source_sha256": "a98b7af55dcc94f955e865a625c631475035e324edd5957c1239861ac06f18e7",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/logical-replication-neon-to-neon",
+      "source_sha256": "9cd8b7d7536c7ed85c2fbf8840b3487aac66e60313c7f7a78667ddc717f35c60",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/logical-replication-lakebase-to-neon",
+      "source_sha256": "65b80c4c018a56e2f092e42405578599d14078ddd9345babe30f6a53deffc840",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/logical-replication-supabase-to-neon",
+      "source_sha256": "bc9372d78496086c2a5ea98a5f8bc551dc0c4cad4bcd8dfd35966102cb54bcf6",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "import/migrate-aws-dms",
+      "source_sha256": "531d2ff1530d89f8c9421108b2f53e10c11ec8ac5962cde0181b2acaacf3c356",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "import/region-migration",
+      "source_sha256": "cf62f900da8fe5d0954ca879502c8cba1a2de955af3509b5609bfe6e3e89e7dd",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "import/azure-regions-deprecation",
+      "source_sha256": "afaf5df682452546a4db883307d52dc558da0abdeede45b51b1191990dc3670b",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "import/migrate-neon-to-another-region",
+      "source_sha256": "a735bd09e0d0ccaf773fa83adde96c277dda02b8c4f7f20adaf33b05293388e6",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/migrate-neon-to-lakebase",
+      "source_sha256": "04f6116c404295840391a95a744997df0ff5b1168c36684a8428bcea7041501e",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/logical-replication-neon-to-lakebase",
+      "source_sha256": "866c00c7c416eeb9aa811d5164301e383b0ab80960cc49e543c9142fbf154b1f",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/export-neon-postgres-compatible",
+      "source_sha256": "e9707db032e1cec492f3a77d7cefef40184fda23440f7209cfcb19035f8432c2",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "import/import-from-csv",
+      "source_sha256": "6c7fb21664d5ff4fb9d6c462392419007b6ab13f0d06a9f3f8f02fe34852994f",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "import/import-sample-data",
+      "source_sha256": "b11d16327b4fd7bb6b079cf016dabe62634aea482e901f14e19ff4d1695ba150",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "concepts/the-object-model",
+      "source_sha256": "d856ee52fe6477f4c9aaabb47d02df79741b3bd15bc400c8acde085c3b7fcb46",
+      "local_source_present": true,
+      "review_state": "KEY_CONTRACT_SECTIONS_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "concepts/branch-your-backend",
+      "source_sha256": "1ae970ac98933216a7edc264a13c76b7de96fa7be2c56ddaf2ba075bf85fde62",
+      "local_source_present": true,
+      "review_state": "KEY_CONTRACT_SECTIONS_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "concepts/credentials-access",
+      "source_sha256": "1c2323edeb00e9f0c9d11ff8d2124cf44cecac37fecee0d2cba0ab8d0563d2cc",
+      "local_source_present": true,
+      "review_state": "KEY_CONTRACT_SECTIONS_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "postgres/overview",
+      "source_sha256": "67862f11a5bb6fa10a4a48d185a978571d3a5ed48403164ba8538c53f10061c7",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "connect/connect-intro",
+      "source_sha256": "fe86acf3f93b6d2c447ba05f8ae8ba6a63a05d341ba446fc2127b542b9f08e66",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "connect/choose-connection",
+      "source_sha256": "eac828935af40fbb06506dc60e99a017771537c1ef5650f35a95ae454afb7634",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "ai/neon-mcp-server",
+      "source_sha256": "9568a3e511353bb8db0d82297ed7149a8a8883e69f6ce440665f10d941f88168",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "connect/connect-from-any-app",
+      "source_sha256": "54ca31909d7f912b6f45db361ba722f285fa5b9f075c3afef79e0162e269bd5a",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "serverless/serverless-driver",
+      "source_sha256": "2ca0c9dd4c4a7429346ee9ca6d034b09f5143596b87dab950acba18327162c6f",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "serverless/serverless-driver-configuration",
+      "source_sha256": "f22b0cf64f5f12080004738bcd05dc5a6c1c4ac8e205abecd2ecf608c81865a8",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "get-started/query-with-neon-sql-editor",
+      "source_sha256": "dac4b1d61db737e8a5956ed30291099c6d123b7026c65ab4d7de6e14b72e4988",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "connect/query-with-psql-editor",
+      "source_sha256": "e32c4a93fac2746eb1e1f9a1a6b9ddb6979f98bf534728e4a4bee8c72163402f",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "connect/connect-pgcli",
+      "source_sha256": "77caf2503b0920aaf187c9194d97dde67514bc699a0c72732e957b1a345711f9",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "connect/connect-postgres-gui",
+      "source_sha256": "21422c2270577c77aa3665a3b219880d8cede125ac016e80982ae9b14613603f",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "connect/connect-looker-studio",
+      "source_sha256": "ba2ff8add6489cc24e8bfecc40c4ec756ef97be41b3cc1b3565652448e57bbf8",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "connect/passwordless-connect",
+      "source_sha256": "227dcd781e3d9bfed2b0fdf650f282a765aca8b1c0c0970f0e04740352ce8b78",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "connect/connect-securely",
+      "source_sha256": "ba7e935b5299e0e8783a498ed480dfb66af2d88888a821896b41a5af38538d0f",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "connect/connection-pooling",
+      "source_sha256": "33323b0b567d18185c91dc0dcd8d5b40b4dd04a39ca8fc151c2fdc4194fcf400",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/serverless-connection-pooling",
+      "source_sha256": "7d858e0d150ea5c18e038190f6b15863fef6b1f88d0043d7388c259b9b2478e0",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/benchmarking-latency",
+      "source_sha256": "1549f808cf246adf17f4915344f64dea827afe79125fefdb04ba0e5834736568",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "connect/connection-errors",
+      "source_sha256": "94b9f9c439c69c4414f3560cde0b44277b03e1550a38fcbdd964fb0f397192e9",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "connect/connection-latency",
+      "source_sha256": "64f175d42158e711b45beafb8d62b8cab1f885f66f7d8bc6f747cc4ab1bad677",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/pg-extensions",
+      "source_sha256": "57702a4abb4a8dfcdeb3061311562d45f194927064c54531a707633543b47877",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/extension-explorer",
+      "source_sha256": "1bcd30944e8eac04b43902316e9050a33c3c9a3e5fe83eaaad8bed1c05e8c580",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/postgresql-anonymizer",
+      "source_sha256": "cb0766a7fdad559c76a10b5e66d28f13880570b8ba6c9b1de18ac0d01ed5fb9a",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/btree_gin",
+      "source_sha256": "4212f680196997ebf805901c0f817621de28574bbc08eb634861d50df59344d8",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/btree_gist",
+      "source_sha256": "4d9ce7cf3fc3d453e461d3eb7a787e0abaacdb4cfe67401816f60c05d1c9063a",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/citext",
+      "source_sha256": "986e099048998f4e81d966584915a2c43a58f17c948b742929a3cbd375610b1f",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/cube",
+      "source_sha256": "4579d477ff19750267f3a2c60acc0219e44864f7079c7a36407706f185046d4e",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/dblink",
+      "source_sha256": "f516e1526679e16a3c214efae6f0c9cef454ce93987c9eecdd3d4a50ebca0cf3",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/dict_int",
+      "source_sha256": "94d43618996b10b37345b9dbcf48eb63fd37d4dc9a46387338cae6d03b26d630",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/earthdistance",
+      "source_sha256": "c8e10df726968ac6c910b79fa5b200fc1927c3e669f723bfa2b58e9f1eaf01a2",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/fuzzystrmatch",
+      "source_sha256": "25579a234dd779614574ba07594854b3d93d0c57a8f06005488c42a32fe95b1e",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/hstore",
+      "source_sha256": "ec704a8586a936b12802532fd95d8ec591253d12e9d305ec0a7f81a64b159fa2",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/intarray",
+      "source_sha256": "be13f107e5110043e73ebb4bcc43cda43b193f01f057b50a716e1e159c0145c3",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/lakebase-text",
+      "source_sha256": "f4eaccbe6d73a9c61db55ce4f0bed86252708f160db508759001fba9a58b70c3",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/lakebase-tokenizer",
+      "source_sha256": "4dfef7d172c47338c91693018d7d1626f786443115f0254e52a726a5c0ecc226",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/lakebase-vector",
+      "source_sha256": "6bfe1923f7b40e8748017143aa1cce72764983bdf2e6e43fb2bf82db9009d921",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/ltree",
+      "source_sha256": "c0ba3c07438db7501464926bae3017513af4bd5385506081b4c93b64367a9ea2",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/neon",
+      "source_sha256": "4caf1bd97d32a54c5d1a91a40e9f55e5056212cf7b9a50d9277639bc8043af2a",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/neon-utils",
+      "source_sha256": "d45e536883065ba57bb731e7a08dbaceb0e59f6bbdf67e78807456ecc1ee25ec",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/online_advisor",
+      "source_sha256": "19736667b9c63cfa602def04f9387c8770c9cb0385e5b4ae0d31280803b9e389",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/pgcrypto",
+      "source_sha256": "97f0efc914a273df834288318f1617ca977e0214dfe9a61432bc4c9b6cd89e0d",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/pgvector",
+      "source_sha256": "df4bfdb97fec2e243bd4aa3c6502c2dbc787a8a883dd7d666a8c568d92b88cc9",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/pgrag",
+      "source_sha256": "5a3bacff3a467629a72592152eac840f9b21953db23959d838ab4fccfa8c0c11",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/pg_cron",
+      "source_sha256": "9b70ae897e65f9bad6cd6b2ac4ac036d0e4956b3d35617d0693dcb174cdd2b80",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/pg_graphql",
+      "source_sha256": "b89e52310d53cbe27a4a27426931130ae0863df9e8f22d4d344992f96d1c8bef",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/pg_mooncake",
+      "source_sha256": "2772d7da5fd56391665d03bb394da43de6b199b37ce3904ca2cd623c4c86fc26",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/pg_partman",
+      "source_sha256": "2b12fb45636fc4bf49c12556bdb0cdca99044b68518d8fd87aeee835d4afc029",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/pg_prewarm",
+      "source_sha256": "1a973f64c66e83fabe8936d7d01d3e6e231d44f1e416ef4debd4500011572af1",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/pg_session_jwt",
+      "source_sha256": "bb61cbe0b932511bcbc24d54ec1cb312bc76dc9318f5dba8e7322302e572e66b",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/pg_stat_statements",
+      "source_sha256": "1cb96e404d7833620ba2228680d07e41e8ce51adc8225a782d8d36e87a6094b9",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/pg_repack",
+      "source_sha256": "5f1c200f74073cc50dcf30f254174dbf9e5c613b660606740a7333c6a90db5f3",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/pg_search",
+      "source_sha256": "eb6477ed83818a374c67336f174e28f21cabcf8278261bf200c4a0ace0e132aa",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/pg_tiktoken",
+      "source_sha256": "f3cb392c5bc7b1af48a5d1d08aa8ebe096010bf07015d9e5a4ce4b7a509a1ed7",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/pg_trgm",
+      "source_sha256": "7781f29222b5b5c62351ab12f380b3d876f90923b044e1850372c1832f8c8a81",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/pg_uuidv7",
+      "source_sha256": "d410343b348966a54dadd6ebdae078643847238b99db90d2285c1424125b5018",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/pgrowlocks",
+      "source_sha256": "52794ca2f2da705e20ef72fb5c64af5a220fafe2516de221957364ac84ddc3e7",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/pgstattuple",
+      "source_sha256": "c39ee3d14376577b85b602288158b02288c3b05c0687c58dc4264ecbd4842b6b",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/plv8",
+      "source_sha256": "60d20cb7183d3a7f37a5ae98585d5395356d2efb8733fb30da162332377df048",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/postgis",
+      "source_sha256": "d196f24b6c5806a8a5a157518de82b70942fed8631a390eb0cf870bb76f20785",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/postgis-related-extensions",
+      "source_sha256": "4775d29a6305bb2eb58935da227e7c697a387bc1c75c0e47203b46a13026ce03",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/postgres_fdw",
+      "source_sha256": "361ef6255f3653869592cbcab2c052cba69086d69ce46eebf5a7e44f9829213d",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/tablefunc",
+      "source_sha256": "e8109ee20240a24c130e8bfbe2f5959695d4c52d444786d3469c54516eb9d217",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/timescaledb",
+      "source_sha256": "f1b790cf647cf9aeddb08e728d7bce5964e38da36846de67789653d9f14ede8d",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/unaccent",
+      "source_sha256": "b1e19422e689e2397da2613279eabd686a8f47064c3543600e6715383b5a3fbb",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/uuid-ossp",
+      "source_sha256": "ef93bc95294942a425a4101ee3ddc1933315dcaff88758bbc44fa37aeb44e77d",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/wal2json",
+      "source_sha256": "48238a553cc132c4b3a9ac0b163c47daa544b4fcbe9f76af6c0e9f50c9252ace",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/xml2",
+      "source_sha256": "644e24751cd252c9a3326634a2d8da28add9c3a805045bef1e7080f258b59c12",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "ai/ai-intro",
+      "source_sha256": "4e024d7319e350937ffcca0cc5e423b75336d4410e7d8efa1d408390a786a31e",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "ai/ai-concepts",
+      "source_sha256": "129bc16b4d2dbda448322cef8d29c12a489f0e8e618c815eae5d9785ac6a8433",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "ai/langchain",
+      "source_sha256": "555f31b362e29971bcc3e3d99594956351d8219e6b6316a76b4b3aeb6545226e",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "ai/llamaindex",
+      "source_sha256": "451bfe641dddc144e035d4186cfbf0d96a90c51d873aed8f630feecfd2150dea",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "ai/semantic-kernel",
+      "source_sha256": "49c30c3ddd995cd20c72f7e94c9dde1a31715cde754a620b17b237ee1833a5ad",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "ai/inngest",
+      "source_sha256": "e5fed55e3e6328fcdae22a3da7172b42d6359781723b59a1a20494223731349c",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "ai/ai-vector-search-optimization",
+      "source_sha256": "e23811d23eeec7941776ad5bcff7e4530891cb66aeb5c50670850193454dfca6",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "ai/ai-scale-with-neon",
+      "source_sha256": "4d3e4f97106420a801c74dd970d037bc738a45a79743cc8c1177a614a8547868",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "ai/ai-google-colab",
+      "source_sha256": "c06d2686d4023f5060442875b9a98f5d9fda50c832447768cad5e1c13b25d5db",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "ai/lakebase-search",
+      "source_sha256": "536f10006783682be9d36f202a67fa56e90acebbdb781717a88f17cb5334240f",
+      "local_source_present": true,
+      "review_state": "KEY_CONTRACT_SECTIONS_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "ai/lakebase-search-get-started",
+      "source_sha256": "e76a36c31c36d7282d3a08419e5384a1fede33942313d3845cd95b5fed510bfb",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "extensions/migrate-pg-search-to-lakebase-text",
+      "source_sha256": "651e23467696e66d83a513584ebbd2a9959b9d20965c43bc252f3f014dddb613",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "postgresql/introduction",
+      "source_sha256": "592e5b4eac5c7b6e0a3457c4a779c286a80c17b4dfea9ca69afdd436b25abd2d",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "data-types/introduction",
+      "source_sha256": "10a48ae1350afb37e6d9713e0901878a707492e971dc2cccb737ca8b96d0e329",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "data-types/array",
+      "source_sha256": "aec0b03ac95e5f3336b04440c68fab3a7a1d679df36445c436001ee682a0484f",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "data-types/boolean",
+      "source_sha256": "c17809fb4aa281203b2d9873247d41ec5b57a068ffd30b98e5d2db54dc132d8c",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "data-types/date-and-time",
+      "source_sha256": "3188a810c2d3a3452eeb61481f4ead9a890b3ae1a195c290a47c51e622fae673",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "data-types/character",
+      "source_sha256": "e2d20a133e7f9e5c9b10f8b91572e86d43445589205d2d5ddaebc9789f08653c",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "data-types/json",
+      "source_sha256": "a5564399610fc0ce41e088ccde97f885d34362285b52f8b0b2b47e6a33d24401",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "data-types/decimal",
+      "source_sha256": "f3c67b23ed2c0a9538aaa140200a994d3283724aa5cca65a744c78edac92530e",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "data-types/floating-point",
+      "source_sha256": "32188aa2399c347844a1e28f8b770af09d4c1b820c11484c501c07d1887644d3",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "data-types/integer",
+      "source_sha256": "c023b4ed475f7ce355828cd1ad79e799e943655e55197f47f5adf0881254a51c",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "data-types/tsvector",
+      "source_sha256": "c0167076145c50ad7cb74304d390dd916a1c44a1d11c23740e054d55de803c51",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "data-types/uuid",
+      "source_sha256": "ba6eaf041d8005b6c0eb8bdc90f32a3a4aa50f008527bc249625c630366c427f",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/introduction",
+      "source_sha256": "8cd96e07e6c5e9b61b917189f4e9c69c017245cc4e7b6a729e0fabdac9c70bdd",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/array_agg",
+      "source_sha256": "e790469a66068262645cbec40d74fcb16ebae753c3e1b32933b8b07eefcb61ff",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/avg",
+      "source_sha256": "3e367b321de5139df6abf278f36a9a511f9d45dbc085b90c55988c4235a997b7",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/count",
+      "source_sha256": "ae0773c2dc7dc485150e200ba1211d5c0f37cc9308961571d300d17e751d7c0b",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/max",
+      "source_sha256": "209a70712932ea19f9457650b730c98a1d343219d11ff61a818bc56a5fccb6ad",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/sum",
+      "source_sha256": "281ad9c98e920badac565be8446bbdc195b8047e0f7024ab6cd18fc90a1da781",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/array_length",
+      "source_sha256": "d973fb8d9214e0d66e35a87803c71e9ac63b2214cc5062e1b821ab98ef5ea28c",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/age",
+      "source_sha256": "8241b61de73e3e53d3f283f3f61d9814b7d7a80ea816e780d1e02593c21f066f",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/current_timestamp",
+      "source_sha256": "2b2607453bf32d6e8f3c05372c5c0fa481eb4ed2af91a199c9d079c78f2f5784",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/date_trunc",
+      "source_sha256": "9a8605090f92f539f96e7347cafd5064aba32de1c7ad25730a0a3f100b0db0b5",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/extract",
+      "source_sha256": "07c9acaca36c4c6854a9bb0031f000ea2119dc483655ed0eab0a30845a2a9571",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/now",
+      "source_sha256": "ea9e1acfb8308d316d0dedd097254a717b2504b3a202861084faa0f669d5640e",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/array_to_json",
+      "source_sha256": "b78d08264dd61cad2191192187c94ae5dda6c0a6b7b5f3ec5910c61ad3ae7f13",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/json",
+      "source_sha256": "bd733c535f8cdc64181d21d2485a9c017141a5c6562c2afdea8176215fae0856",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/json_agg",
+      "source_sha256": "e93a6115e50138253a5bd75cdd38ea87b7d80cecf1af6d0f86d387a87154af49",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/json_array_elements",
+      "source_sha256": "03fe2a7b27a2fbb708884e385b0ff299ebd676dd372d4110e0b998bf43d8a7a7",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/json_build_object",
+      "source_sha256": "ddcc9c83d58f102f77a5cc2bc68920d4e9fab861065c0954c611e008eb856577",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/json_each",
+      "source_sha256": "fd7ca95cf5ae9db5418e57f173625cab75b7ad855f1eafe57cc9de91f71086f3",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/json_exists",
+      "source_sha256": "cf6af28989eb6a3ad43b525c84d4a695e33d5a810572c55169d59e206b0b45b6",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/json_extract_path",
+      "source_sha256": "cef8ff430a8718bfb6d2c5d7926bc662e1452a01388849fdc1942b4a35e12bd9",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/json_extract_path_text",
+      "source_sha256": "8eb9657e58c9d1654539b4c975427db794e5ea0a9820f959f4c151387f340c36",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/json_object",
+      "source_sha256": "39ace2e19c60016dee0b048f344a460e0e19a3d10ff712ad2535f2f451c4d9d0",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/json_populate_record",
+      "source_sha256": "c51129b11eb6e7d7cd8f07a5dc96afd3803617abf74440cdb48ac8122e48b63c",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/json_query",
+      "source_sha256": "e4125c591d004a42a9bcff4557bfbac5c77fc20ba4cd0e30355c9737dfaf3a0d",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/json_scalar",
+      "source_sha256": "3fd85d9549f006ae92635347f61f13d55a1e80e2c849ea4255ad438f04854cfb",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/json_serialize",
+      "source_sha256": "149c77ac4604e89e0c0b95432c311234d328fd0948490d0c607ebab91d150d5a",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/json_table",
+      "source_sha256": "24188f88653009ea9b697e42aab9409e5165904cad46fb6fce6f4850846d443b",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/json_to_record",
+      "source_sha256": "66c270295d85ab16cb831410f30eccbd5fd9cf674457aeffe35f30e17c6a8206",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/json_value",
+      "source_sha256": "a08bf9ee9f93c8808eadb4bdf767753272b68ac9c9a315825c52c83d29bc92f5",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/jsonb_array_elements",
+      "source_sha256": "6db8dae0b68e0ef15265d6dabb97721a02674771ecb1b70577921641e8d34b20",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/jsonb_each",
+      "source_sha256": "55a53ebb8c8116828bf5cd4b94bd6978fd9dd4e48baa775f27ecb1aa14c604b1",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/jsonb_extract_path",
+      "source_sha256": "df56fd0b614a72dd5c52eaccb415e4802926058b016f2a8c5c08aea6ec40bf60",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/jsonb_extract_path_text",
+      "source_sha256": "4a5ededf40e44823cd7b6675716055df4df4ea1912319e194d0c29bf8c22f104",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/jsonb_object",
+      "source_sha256": "d6ac9a682f77d9a00a7e852ddd7ebee7f048ce4dabe7cc6279ecf2cfab979b9a",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/jsonb_populate_record",
+      "source_sha256": "dcfbecd3f45a7d5436f66d027ec98cd6d1b583e07980ad41bde403c574874884",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/jsonb_to_record",
+      "source_sha256": "d206b75a3135b70152e138ff2f933e4e809d1e90c3f402eb3751913e842d1195",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/dense_rank",
+      "source_sha256": "a87508a517e5d8611909113c36054a4b557fc4015c3dc0afe7da95b7b9e6d875",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/window-lag",
+      "source_sha256": "1a5a1e7f3065edd6c230b96a2ed75604fe765fbaa893335edfb06a013c1708e9",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/window-lead",
+      "source_sha256": "a27ec8ecb9415d1492d9a5e1183f8ce45706eae3456b4d37206bbb3c0c89f79d",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/window-rank",
+      "source_sha256": "89545281f3d93adadeceeb43f45f1ea495d1d64eeb4e548820a6179a9678ef00",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/concat",
+      "source_sha256": "52df7d2211e9c43da4902fab1c03b1af866c403ac86c9210c834976cc6dc4d72",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/substring",
+      "source_sha256": "e08dddaa378485fc25ff967a2e24cce85283f852ee019b45b8dd0a20ec8085df",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/lower",
+      "source_sha256": "e2b044f32590ae17c648c5c9d9f4c64ffbf4cb4f2b09e84c67469987a73e6b89",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/regexp_match",
+      "source_sha256": "f2fb915355ad272687e79c8426d6e9c924793006714d66a794af4b0472002ec1",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/regexp_replace",
+      "source_sha256": "8adabec0eaf23bbf0da9f616c80fffb46176c44b9625d02aa1597414a71ff504",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/trim",
+      "source_sha256": "08879eeae46197a073a70b19bf4a39145a7987d4a355f1bafe996fb3e135405a",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/math-abs",
+      "source_sha256": "7ef96d8b8b9e3667716341293b0237be4a599a849592fe2912a7abc0e3e73146",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/math-random",
+      "source_sha256": "ab3b843a413ab1511f07fc3d02abf6622ee1666af9063848a10b514d7e2599f8",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "functions/math-round",
+      "source_sha256": "46bb484dafa8f3401e68a49c5b73de28e578a2a0d4026e3c4a842c844589b073",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "postgresql/index-types",
+      "source_sha256": "edd6fb7411398cf1dee84a8b8731586744f7d60b5e366838e2ea3b9e4f82e304",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "postgresql/query-performance",
+      "source_sha256": "334845d003ef6bd62ff8fd31c55fc8874ccf0f02650e2e2373067d9ade8e01c4",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "postgresql/query-reference",
+      "source_sha256": "c5d00422e56e75993e451fe2779f05479341081ac8763a45b12fb944e9049617",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "guides/row-level-security",
+      "source_sha256": "ec662fd9110b4e4ac25fd6974dde391b5956ec541e45122dca53c2be863c7bde",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/rls-drizzle",
+      "source_sha256": "32a09973965fc291ae4e438312313456185ac53ea638bd0ed030d2b97a69deaa",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/rls-query-execution",
+      "source_sha256": "e90fd00d91c695988e30b07a32298b9b58517a118a8e845e94710e66db6c19f9",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "postgresql/postgres-version-support",
+      "source_sha256": "b52e48c54c09f63b4282e3e12605811bc1b1340a215d354cd96bdc1b93326e6c",
+      "local_source_present": true,
+      "review_state": "KEY_CONTRACT_SECTIONS_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "postgresql/postgres-upgrade",
+      "source_sha256": "61ea24d75c3e5aec159dbd556df5dba3399697d57fe96b054256095137a7bc08",
+      "local_source_present": true,
+      "review_state": "KEY_CONTRACT_SECTIONS_REVIEWED",
+      "scope": "sql_reference_or_version_guidance"
+    },
+    {
+      "slug": "reference/compatibility",
+      "source_sha256": "9a50644a534166d56296f3a600ee941a026564625d498a55e895eadc78ef34cd",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "introduction/autoscaling",
+      "source_sha256": "1f2bd82b4d84201e66ca81db6fb828395dc718f265d3efdf62b7febb5b7d7498",
+      "local_source_present": true,
+      "review_state": "KEY_CONTRACT_SECTIONS_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "introduction/autoscaling-architecture",
+      "source_sha256": "b632987f31146ef01cb594cdaaea595e6c97418b4a5fd1cec1810b16bc497715",
+      "local_source_present": true,
+      "review_state": "KEY_CONTRACT_SECTIONS_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/autoscaling-algorithm",
+      "source_sha256": "ebb169ba89eecb395ea0e329f7a7253d9c9d2969d43d8f6098d7360e54421103",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/autoscaling-guide",
+      "source_sha256": "b8aed49723de6b7744fe9db59edf98d2d25ae1217974feee7a50d83afe7ab27a",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "introduction/scale-to-zero",
+      "source_sha256": "3601a3e30cabbcafd94f62e554aa2209ecc7c350c769ae4d6e0a5dea263b63ec",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/scale-to-zero-guide",
+      "source_sha256": "57b2e334af159aab24460caf4a6132485fce3e1adc4a23c2a04b57f2e0d267d8",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "introduction/read-replicas",
+      "source_sha256": "671481cdda5ea6e73f159a59d8c584846aee5fe06419560eb97a416784b157c1",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/read-replica-guide",
+      "source_sha256": "3fe95efb7c5df119030922882eb784e48e528ee4fefe6f29d93b7058bc63e01e",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/read-only-access-read-replicas",
+      "source_sha256": "68e1505b37efc9a0994e71c9873a5291adf5b3cce461dc713fae754a01db9096",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/read-replica-adhoc-queries",
+      "source_sha256": "cec9e002dfc7184a50944d22ae342b6c77011ba542084a5f5780669b48bc3072",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/read-replica-data-analysis",
+      "source_sha256": "b989d885e34a23f3c5b65d1ede208607c3e065cf5000ea08e468dad51c52ab1e",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/read-replica-integrations",
+      "source_sha256": "06d33db8eaa8638b698eae71a2f9bbb5aa7224217437f75a4af7a7e251e56ecd",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/read-replica-prisma",
+      "source_sha256": "27649b82802eb704efd69c46cb286bc5d3545a31144e1d1702311b1e7ec93834",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/logical-replication-guide",
+      "source_sha256": "f314bfc95cbee33044526114c3d78b0a88c0ec611f09b47044d32f78aef4d6d8",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/logical-replication-concepts",
+      "source_sha256": "f5040d05d4db39ddd69f6494f50e737b9b90e3294018fc8e65bab747afa8a0c8",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/logical-replication-neon",
+      "source_sha256": "fd6071a652ece903df57acb17d25866d8f93ecb85019d6a9f17e27552f13ee95",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/logical-replication-manage",
+      "source_sha256": "0ebde3b2887d700c208e48a2b20054d72a15f394c5ebb040c4c41358be93aebd",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/logical-replication-schema-changes",
+      "source_sha256": "ba099aa50654fa209a8e0cb23c1498400c926df8e5164f96954cc94a11e58200",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/logical-replication-tips",
+      "source_sha256": "ce49c9a1ae4986a0c258250eafae6e2c897a163f163b84ebbba852ca5662eb82",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "introduction/branching",
+      "source_sha256": "8c3b0f4ab2a311d71c0f701ef9a159c65aabb0e6f1c22404865eb5f08a8132d8",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "get-started/workflow-primer",
+      "source_sha256": "e87f11808edb34db38c2244d3d94b1495c3ac81f2fbcf941209094a61e08dd6c",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/branch-archiving",
+      "source_sha256": "56c2b5c100f93f475af257ae27b0e9b284c972004beff6cbf7060d9f27a3192a",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/branch-expiration",
+      "source_sha256": "5217b506982b5ef2a749383ec3e71e77574de5e0a05fe18a94e97c1ecc32b7f7",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/branching-schema-only",
+      "source_sha256": "2651e755eb9debdffa134368e4b8f378356396b60231059a4625482a48a1bb8c",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/reset-from-parent",
+      "source_sha256": "4ac24ea0ec2a9316da1eaaeb806a4c6971455d66bf1db3815e64f4ef66e159b3",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/branching-test-queries",
+      "source_sha256": "bb3bbcb72d4c4d98add3b0f69a53dd00f5820b0d1a1b77ec79dd3df7c67755be",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/branching-neon-cli",
+      "source_sha256": "c34bf92cf87810d0d05747580c4e891d9850c66b6784ed1aea30a2b42c1f148c",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/branching-neon-api",
+      "source_sha256": "b85f804a5f037a7aa66894b426df88d21686b12f15781a8c45372288504b5751",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "auth/branching-authentication",
+      "source_sha256": "43b9aad979dab167d3beb7f84f322616dd336ad81e403c4f1ee8e300a996c484",
+      "local_source_present": true,
+      "review_state": "KEY_CONTRACT_SECTIONS_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/neon-twin-intro",
+      "source_sha256": "dd5cb611c831116e04c719918a465d4a4768216635ddc72949e25ddf26f45ad6",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/neon-twin-full-pg-dump-restore",
+      "source_sha256": "129db995b0ac6eca9c8a89982e755dbfe36cd4bb1fc69d8f939d2d46d511c4ae",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/neon-twin-partial-pg-dump-restore",
+      "source_sha256": "c60efe9efff83511b2daa537dc8c9ea4cdd6caa355d7bd2845f24fbdf3279dbe",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "workflows/data-anonymization",
+      "source_sha256": "8cad4537a3cd9de0c347bc63d571d59b7a7a71c9a0d5c2f66914b4339e497851",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "workflows/data-anonymization-api",
+      "source_sha256": "7a063e6f2dbe22af32cc82e8563bf67a979f908db223c03f5272692723f587e8",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "workflows/data-anonymization-github-actions",
+      "source_sha256": "80368c8e0dccf39e07889c0d36c585fc2cdc37b99f990b6f9c5a371ea7722de4",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "introduction/live-sql-queries",
+      "source_sha256": "206a8e7ec982e7f90c48a5fa8e1ff236b8d8be42db972a2e8f733b63505973bb",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "introduction/reactivity",
+      "source_sha256": "43d468497104559371a15773f5d50bf66c58a5a81319384da2da3b2ffc19572c",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "data-api/overview",
+      "source_sha256": "bd4a1dc3277ab2e33ac0841c641ed5405e5ac180d23d4f23559e8abb1c0a8305",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "data-api/get-started",
+      "source_sha256": "6d4f6dc24031f4ac1b49f615b798bdcfee79843b0f95f0e8e4f7a4e4a40ab792",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "data-api/access-control",
+      "source_sha256": "ecfc92169d06f0e773ed464cff148f82c020f99a57116fee1731672dac747adf",
+      "local_source_present": true,
+      "review_state": "KEY_CONTRACT_SECTIONS_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/rls-tutorial",
+      "source_sha256": "178eda348ec522513dfa8ffd0b2076a0887f38df92062ad2c8a5c489b34a319b",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "data-api/custom-authentication-providers",
+      "source_sha256": "eef9d84d563bd49384e8fe68f625e42396e9dd7602b5261787672254a3d84919",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "data-api/database-advisor",
+      "source_sha256": "362daf84df1ced592e752f9ea6fb81f78bec811df74a2ee342ad38d9ef1b9ad0",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "reference/javascript-sdk",
+      "source_sha256": "6560a4800adc550fc2e9ea3e3fb543d03d9ee05ac310d36965c7de8817ed1672",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "data-api/sql-to-rest",
+      "source_sha256": "adfc60e8f05edc8380e1233c8ed31042011512f654af08ebd6ded46ba759649a",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "data-api/generate-types",
+      "source_sha256": "9cb1c07054f87ea1290a0c5d6ae5d4575dde7954b0ae49d1dff43788f7cc437d",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "data-api/demo",
+      "source_sha256": "ca62220b0724ca27dcfbdedafa6afb7a9682bb3be5350a0f968f71b75897832a",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "data-api/manage",
+      "source_sha256": "3328b18157d3dfb43c6ad96be701ef10a2f96fd48e102283a6b769f41124ed0a",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "data-api/troubleshooting",
+      "source_sha256": "21d48fcb7c99c1a122aca5cd9a1dca2540831dc5e61c9b85e6b9699030ee7016",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "postgres/backup-restore/backups",
+      "source_sha256": "44dc4238df18a3a10bb58aae38d99a91c61283cd899d18f0375cfa228ad044f3",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "postgres/backup-restore/branch-restore",
+      "source_sha256": "510a270c8c9a66a34e30fbf08da598c11d4aa9844fde2230e0992f0262e997df",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "postgres/backup-restore/time-travel-assist",
+      "source_sha256": "c4fcfd455667bb4f24c2772b1332bd50a7d2e776636c5ac4463129788c0ba714",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/time-travel-tutorial",
+      "source_sha256": "bf43f368859e5b2c81619d5352f2515e245be4a205bec2db9d866186c3fcd9c9",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "postgres/backup-restore/history-window",
+      "source_sha256": "0522d2e217c710bbe5de0d74b07ad962b909f1b2922b69858b11ea9864446194",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "manage/backup-pg-dump",
+      "source_sha256": "434e96b984012d3caa5690ba679672b7695eaf9d47aeae502728302f44f58502",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "manage/backup-pg-dump-automate",
+      "source_sha256": "207adb607831deef48746c078370661a084f023ab0165283d42973fef9e335cf",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "manage/backups-aws-s3-backup-part-1",
+      "source_sha256": "ed2617aaa2e0bc441101cb39d889b0d6452a82ee25d2395378c46cc87503bec8",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "manage/backups-aws-s3-backup-part-2",
+      "source_sha256": "fd0f33719ac0f6a4cdacedf5a34b4a4e0050630bc11a82ab1812a6de6f8a4e51",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "auth/overview",
+      "source_sha256": "4df8e24869ce458f099c6593d752872a15d8f55c762f5d2ab4e534def0fa0a9e",
+      "local_source_present": true,
+      "review_state": "KEY_CONTRACT_SECTIONS_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "auth/about",
+      "source_sha256": "ccebfe6d5f1acb2c3050b212cb6b9fd0e9e8ca406e161a97931306b332b633b9",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "auth/authentication-flow",
+      "source_sha256": "3539e3ac3bc4a72b3c18ba3d2d6cf9fc305741e25cd5ddee5a25907d9cc14de6",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "auth/roadmap",
+      "source_sha256": "600ae74f109d0da8da6c9e1c0e9f408ecf2120f0e06b7736cc25b407534e1a71",
+      "local_source_present": true,
+      "review_state": "KEY_CONTRACT_SECTIONS_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "auth/quick-start/nextjs-api-only",
+      "source_sha256": "b14d186843234781a28feeb2df1b1f5ebbde95128d3fe32f37d427c0f5f35163",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "auth/quick-start/react",
+      "source_sha256": "e446d7f5ac48e1debc840caacaa6c7baaa778a6eca2669af5dc41988b00ef0f1",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "auth/quick-start/tanstack-router",
+      "source_sha256": "8d086428b9fb83ef4e91279e95e4f72d6f21cadd04f6eb9d7e40af781af69c3b",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "auth/guides/email-verification",
+      "source_sha256": "aade18cfa14b77c3be746354786a84745cef2fbd15a9698b69cc1ee467cd8eae",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "auth/guides/setup-oauth",
+      "source_sha256": "442aa67471ba4ddfbcfffe0936d28b01fac81ff053b1c491e631da2c3d0c91de",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "auth/guides/password-reset",
+      "source_sha256": "62d3d7cd60b38024520c0d5b74388338b022f15264c1a870a384c47bdfd17c77",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "auth/guides/user-management",
+      "source_sha256": "84bc9595e3b706d9599ac742778896d3b997396d8431aec3f3aec791d913bf0a",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "auth/guides/configure-domains",
+      "source_sha256": "90cb5630ddf7ca8f675bbc20441443234b83cc40a191291006e93d6c06ec8f19",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "auth/guides/webhooks",
+      "source_sha256": "02b1a873ebadb657c087997ee37fa4f3f8f8689a7d2cad21ea1ee01964cb572b",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "auth/guides/customize-emails",
+      "source_sha256": "20f08392157829a830bcb3f014fb31cee2473604d3d126218e9f12125f9fa837",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "auth/production-checklist",
+      "source_sha256": "848ad02807dd116201c5c659eec2c2b45668243146e743695b576fd54c2552fc",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "auth/troubleshooting",
+      "source_sha256": "6c6358bd765954009078eb23fb65891e61556051fc2ee10cc9abc46ba467df99",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "auth/guides/manage-auth-api",
+      "source_sha256": "f713949a60fad073a2d742b4475cf9bdea17a82c78562ac74c59f64eca6985ae",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "auth/guides/plugins",
+      "source_sha256": "4a4afd61fa5cb96cb81c004616277c62ba7d7ba1fc585b034c6abccf1c5ffe22",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "auth/guides/plugins/admin",
+      "source_sha256": "6783fa03361500bdfc144f2e8c476b53ac0a5644fd0d0932fe864de6a672acf1",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "auth/guides/plugins/email-otp",
+      "source_sha256": "a41eb893e1b36d79248fa1d3b39dc9213fba4aba51c88032db8378fbd1ec5abc",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "auth/guides/plugins/jwt",
+      "source_sha256": "a92893584bd2ef2db2fcf36496bc76564909c8d0c59fce659fa764f7457de7ce",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "auth/guides/plugins/magic-link",
+      "source_sha256": "fae2e97a1807477440b5f78734926c3c3cd2628a9cef17d698f37c1d0db2496e",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "auth/guides/plugins/oauth-provider",
+      "source_sha256": "3c870a505a23699f5e678942777d0cb4ab7eeb306cdda8cc28b9079e3c716bbe",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "auth/guides/plugins/openapi",
+      "source_sha256": "77c024e5de53f4a77cc369189f6cb2465b5ebb8d2b67529e771d46cede4f2960",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "auth/guides/plugins/organization",
+      "source_sha256": "de0ab54016d6636580fef151baafd7897bd686fe44861d00d4e053dbde0d5f4d",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "auth/guides/plugins/phone-number",
+      "source_sha256": "16385d4f3f9c56ffcd725edbe3710d26b0958e282f4a49de52053c3c2f52987f",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "auth/reference/nextjs-server",
+      "source_sha256": "de7676c1afe866fb58ff41b9a4ff207d104a8bcde9cc9cf653d3016d14add235",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "auth/reference/ui-components",
+      "source_sha256": "68d7cc4a8eee723d96781e224f7b678467f237fdca381834796b57b1265c7823",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "auth/migrate/from-auth-v0.1",
+      "source_sha256": "5e3aac17484d0b44299ff7f412459484d5e4b10e5b123c0d5656eb845637488c",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "auth/migrate/from-legacy-auth",
+      "source_sha256": "6e1c481b41882a743d8f60e23abfc1905887351adc9ef6952da2e5f6c52a01b3",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "auth/migrate/from-supabase",
+      "source_sha256": "2d3de94f9d888afe9129c46b79825103e746357b2f60eaba1c2f8af7e52d1e65",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "auth/legacy/overview",
+      "source_sha256": "b839beac5bd9080b761b845dfc1d34b0cb3be7b3d6961806a15f5b5da6e09c0c",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "auth/legacy/database-integration",
+      "source_sha256": "74af249ce01a8f30da8599ac325e3c6102d864a21cdd5d9690d40bf7b2a438e6",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "realtime/overview",
+      "source_sha256": "8a50a0e38a948657c08f14cfa72f8c4770cedf04c342dcb5d4ae2305910d8ce9",
+      "local_source_present": true,
+      "review_state": "KEY_CONTRACT_SECTIONS_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "realtime/quickstart",
+      "source_sha256": "6828a01f6164da707d8e83f15f05e9cc459fe94de0f7049bad2771d7f82bc3f9",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "realtime/how-it-works",
+      "source_sha256": "ec09228c306a7d42b624b466a4aedef7d52b4bb47047e3425bf5039daa150f5e",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "realtime/guides/queries",
+      "source_sha256": "52fa4bf01bd9aa5a788d7c6876ac898e5822b0db683588936f967d34023f849e",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "realtime/guides/subscribing",
+      "source_sha256": "9cf7d69080b4dc34ec1f89d05602b86e0f0e953090a7ca7bdd0e791b21b77796",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "realtime/guides/reactivity",
+      "source_sha256": "7854e7e338b245e6d185d347950e69d7b12600f2d0afdb067f981b11c120cf00",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "realtime/guides/mutations",
+      "source_sha256": "6b3edf71fe91136c74373a21f961a4845c5fedda9fe80f48287aebaee0b20a94",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "realtime/guides/ssr",
+      "source_sha256": "51dd72c35ba6192008223c5b8104c206faa05e4785482701b392dd4ca0ac1359",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "realtime/examples/overview",
+      "source_sha256": "5b19e5ec518c863f6ca9ba9c100d7628fd918b4435b55ef8aa8319b9f17dc900",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "realtime/examples/nextjs",
+      "source_sha256": "c33b804f7c0657f6244d435cd26d9adc363b12bb5f7fda0941eb42af1e836790",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "realtime/examples/tanstack",
+      "source_sha256": "019f03ee96505ff4d351143e19c7a8d1dd3cd55f52bbcfe2343bf18a454259ce",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "realtime/examples/mastra",
+      "source_sha256": "ab93c2abe8e69a15a2ddd39ec59bb13c031139e60af2625cc75cfbab5fa845b5",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "realtime/examples/drizzle",
+      "source_sha256": "3e4ab8e40df3b9384cee6a5d444f6410b56b030a8350b7d7bfa927d4c19e0ebe",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "realtime/examples/kysely",
+      "source_sha256": "9402045326e1c6e965a25e109e049c44a63b2b6af11b9b59a094fc8593f02d7d",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "realtime/sdks/typescript",
+      "source_sha256": "ba1362fbe9bdb1f97b0f006e120d16bf0be07445c50ff8e75525eff18aeabff4",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "realtime/reference/api",
+      "source_sha256": "fa3c4b7a3efd837049ed13ffdc9b7f7c27388ac60c3b41def33fda82843745ef",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "compute/functions/overview",
+      "source_sha256": "7d0f8abc0fb040c74f6cb26fd2b5dd4b33fb6aedddbc133819b5b69550a192e0",
+      "local_source_present": true,
+      "review_state": "KEY_CONTRACT_SECTIONS_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "compute/functions/get-started",
+      "source_sha256": "997f3698908b649add088cbe4d389acb2bb024bdb791dd40aa62a31e8ddb272d",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "compute/functions/templates",
+      "source_sha256": "dc305f0f8ae37281f1abbda7252a4cdfd2d79a19a81e06702da6734fd2dea590",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "compute/functions/deploy",
+      "source_sha256": "6143364aa88d966895424f3085bb9f3cbe9cc56080f88bae301ebdee3b424ffd",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "compute/functions/custom-domains",
+      "source_sha256": "8bc45e0f5aadb9ca957132ce77d26926c3fe56992544ceed7c508017d903de6d",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "compute/functions/logs",
+      "source_sha256": "7264caf8282b2efa868fff578fb3984ac017c611355cfde1f4870fc5d90c22b9",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "compute/functions/environment-variables",
+      "source_sha256": "1cc73be62eadb65a2d0e0fef0d9cd1cdfea89c530a5b6efce9f3b5868648f35f",
+      "local_source_present": true,
+      "review_state": "KEY_CONTRACT_SECTIONS_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "compute/functions/authentication",
+      "source_sha256": "b0d6754d8b096980b067e233c72b64c47257d15459c000eb042bf5b191d439ca",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "compute/functions/triggers/overview",
+      "source_sha256": "088294f65a0215d9673f099f168d78370134a5a5eb8690be4d4fc93e0707ab2d",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "compute/functions/triggers/schedule",
+      "source_sha256": "f690d481903114b15d7237a6f03a2403f0bc953db8e4dd73416fdb6db972cc5e",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "compute/functions/triggers/object-storage",
+      "source_sha256": "1d2dc9060637e60b7d7ae3bd611e132132805926f6968556eb1655155adb9927",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "compute/functions/agents",
+      "source_sha256": "5be91b65a3920746889e06b566a24a7bb43dc9601c8889d6c103ecbc74777955",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "compute/functions/websockets",
+      "source_sha256": "53a620b488c5796429fe9e5180241cd8a301e8f1049fffafa37eb1b17788b1e8",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "compute/functions/mcp-server",
+      "source_sha256": "874d955dcb11ed716ae5724830061e79d11ec531c819f8567c7f850972457717",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "compute/functions/discord-bot",
+      "source_sha256": "31395c568dae9b287f5327061a4f0bd8bf32f3bb4252d9f2cf021b962ec483d7",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "compute/functions/telegram-bot",
+      "source_sha256": "c28a706a70ad2aa4a80730e112f037f1528bc43e8dc88d16bf0e50096bf731f6",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "compute/functions/whatsapp-bot",
+      "source_sha256": "5458be8bb39548e90ed8f61ab4b2fc0a000b13214c542ca2252181aeb78270a3",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "compute/functions/reference/runtime-limits",
+      "source_sha256": "e62004682cb106a05b5c0103c9fb40eedd187b263dc9f0edfd86af1ab6a4de06",
+      "local_source_present": true,
+      "review_state": "KEY_CONTRACT_SECTIONS_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "compute/functions/registry",
+      "source_sha256": "e1c873c20f7bb6601003fb352047c536df7f32c7b4db656f526f211450625de7",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "storage/overview",
+      "source_sha256": "613b528e026703a7f80e9112bd9c91e0763935b0725ba5638fe2005937cfbdb4",
+      "local_source_present": true,
+      "review_state": "KEY_CONTRACT_SECTIONS_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "storage/get-started",
+      "source_sha256": "7dafa769af02395d3727cdda5bc49c82f15a01ad59f33b50797c765e2eca982b",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "storage/buckets",
+      "source_sha256": "9249c791348ec895aae858ed0621279ec921a948ad90c9562275576c9449c4a4",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "storage/objects",
+      "source_sha256": "aa83eb7a725cb33c0bca0e5f83359318f0fd12e5498dcf6ea0ef15eacddd774b",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "storage/authentication",
+      "source_sha256": "911d8cc8e6f98f1218cdcdae612f362d90ded3627bc87b69761376d6f0ea3eae",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "storage/logs",
+      "source_sha256": "4170058b26a18689309ce38fa1a92d7829b7ad829f2925cf123309771d41c00b",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "storage/s3-compatibility",
+      "source_sha256": "35d0f205854938c28ff6ccfd7be41f03ed0a2378f0b80524aef2db55694b1108",
+      "local_source_present": true,
+      "review_state": "KEY_CONTRACT_SECTIONS_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "storage/troubleshooting",
+      "source_sha256": "d308d953195a4cd54ce429761fd2d72f734d171baa8c0162916710310795ccc2",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "ai-gateway/overview",
+      "source_sha256": "0a6b0d190f5b09a111851e5c1a331895a2326c9bbb3df90357d561b121f78867",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "ai-gateway/get-started",
+      "source_sha256": "2cf48c12311d7b904c8283d049f64ceaa977b53ddaab79bdb706140b025d4dee",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "ai-gateway/models",
+      "source_sha256": "81100348dfbe805abb5371d94b0471558fc71f9c1e0613e08b50407eb329bf17",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "ai-gateway/prepaid-credits",
+      "source_sha256": "9dca8418b0be479fc1cd60349eccfc28b34fad2c81b7e3e8073c14c9da60a314",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "ai-gateway/chat-completions",
+      "source_sha256": "71980b858d62d0cdd72947bd8dd3c677cae517b44aa2683d3a64a5549c006a58",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "ai-gateway/embeddings",
+      "source_sha256": "0cb5c1198ed25b67da71efd0195acbcda349ed5de2f235f57d974155047e743d",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "ai-gateway/decisions",
+      "source_sha256": "5a35da568ff00546efd8c603598d9be44ee9ae15b0d1624a0a84d8f96c9ae8e6",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "ai-gateway/openai-responses",
+      "source_sha256": "31c15106a1420d6795bee11e777c746ba27f0a2c5d64e18acec45d226f668ad6",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "ai-gateway/anthropic-messages",
+      "source_sha256": "eb0f2eb935c09d2aff297422eeafa13d20023314f7303f369adf2d71846623c1",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "ai-gateway/gemini",
+      "source_sha256": "77290f1f53f523e03bb587360aa5e02d724b4a76d27371493efeb6a5a4541fa0",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "ai-gateway/authentication",
+      "source_sha256": "8321366a651aaf36270723ac321950b641b1b143f45a53fa97b89b1de1fd6649",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "ai-gateway/data-retention",
+      "source_sha256": "015522760a05bf332b61f6b14e9534fe5af615e4011bcce3699aabfa7546acf4",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "ai-gateway/troubleshooting",
+      "source_sha256": "1123890ede8ed08f1447b9a0f0d33ba1d4db1fc73c0480cff17e3cbf67fd76d3",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "manage/platform",
+      "source_sha256": "180be949b2d5946d1d22f23302fc992377a34a256c8bd1f0e239af04e0d4d7dd",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "manage/accounts",
+      "source_sha256": "69d1ebd9a938c58a6c63ff901bd6f389b23aecee163f64d6a4b31fd2ff4c9ea3",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "manage/project-permissions-get-started",
+      "source_sha256": "53955b57c0715cf9d5c8d401101f0536d2b54e6ec90161c9724376fe8bdfb509",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "manage/user-permissions",
+      "source_sha256": "5d2093cac0e03b7020e4abe7c02ff108f527e4d43deca2144470f1a856f8a4f3",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "manage/organizations",
+      "source_sha256": "f8d8eafa473d7b07cd0ab16a6a77923a6930932d15830ede668681b147977428",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "manage/orgs-manage",
+      "source_sha256": "c04dbd895c75d160a64928b123dded39f06ee000ac4c1f2c3d6dde7ae691a848",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "manage/orgs-add-members-by-domain",
+      "source_sha256": "195f4feff740cbd36cda03aebbd7c6e8b3abb0d52385205f7b58c8a951f328e1",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "manage/orgs-project-transfer",
+      "source_sha256": "3fae35d36a9cb3b3a43a239a40eafed503435483502bcd429377c7c2c2384260",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "manage/orgs-api",
+      "source_sha256": "729534aa3fff2274f82efc915363c11caeb890dc7fe072ad47fe5c3fe3212c7b",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "manage/orgs-api-consumption",
+      "source_sha256": "fca5fb3afc12614f506f4ca8e964659dd232a2c862581a28fea2f71aa00e44c0",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "manage/orgs-cli",
+      "source_sha256": "f5a5a719f387cadac5c1e027005ce21d49dd3134e153e4414aa7700bec712f85",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/project-collaboration-guide",
+      "source_sha256": "9dcccc502301d7a67c0392c03425edbb9b2365d3f9d9994df5bebaa32a6240d6",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "manage/database-access",
+      "source_sha256": "a7f5db61a9cdfaeaf4b603e2c1414b545ec36828c65ba5fd8c284c6ef8044e90",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "manage/api-keys",
+      "source_sha256": "f7ebad3af57012f1651203e431cba1d9670e003a09a8d0861d9d80b71a36b724",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "manage/account-recovery",
+      "source_sha256": "f093b5351d3f07c06ba0cff947dd669eb29962d2162820e75dcbb95ed24fe6ff",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "manage/projects",
+      "source_sha256": "a44eebe6571b9d255bc8a1a604763f91b014fd441b0b2b644173a575dcb1af87",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/multitenancy",
+      "source_sha256": "38bf0dacfbb417b5b1869c5f0c02027274519b46dc5431c51a705fcb02d9685d",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "manage/branches",
+      "source_sha256": "a1af23d0e6601f2f2f9291a602dfda194c059ee97089658dd6599cd1f09c8c9d",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "manage/computes",
+      "source_sha256": "c5b1c60a4bf19141943d33ea65b5055f036994e24b06a0176852b06455f5a080",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "manage/roles",
+      "source_sha256": "8b6d41d9190f6181ceade4ba714e4d61d0dd0c5bd7958668e443f99127d2a4e2",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "manage/databases",
+      "source_sha256": "ae89365acd38aa1820927d07bffb0f6315612ce0cc02cf6261920db3c09e5c18",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/tables",
+      "source_sha256": "75125168a636dafa3addf3c66276de1b57e15de562d5ca16fca0f295b87e1d2e",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "manage/integrations",
+      "source_sha256": "086d92e100ea5ec961a215c264f75845fd6d5556e0cdf2903159ca37ef699a11",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "introduction/monitoring",
+      "source_sha256": "64e2a87ce9d3f83a011e3882ce0af2f6dc17f27aecde1be3abff4b119b6adde1",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "reference/metrics-logs",
+      "source_sha256": "4fb4ee2c6283f0b518c487b418462f9dd2af5b54d6b22f6a5b9264375b6ed09a",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "introduction/monitoring-page",
+      "source_sha256": "db20840766edb3dad5eab69777093a6f05b4164195d0010ac685a06187f55268",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "manage/operations",
+      "source_sha256": "a8c03f74ffb62161c9241786b4da26e699372f009c423f45732e64ede474a600",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "introduction/monitor-active-queries",
+      "source_sha256": "609328c05efb76b6e8d687cb7b97a7a4013e37ab20076e4a94864b0c69e72cda",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "introduction/monitor-query-performance",
+      "source_sha256": "d53b1659186de08478104a08dbb55bdaa21afc49f61d987340e9eda892839f85",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "introduction/monitor-logs",
+      "source_sha256": "56dd0777714da127aee401d246a775baf853e08d1bd8eb5f9c7eb1dd0fca44fe",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/datadog",
+      "source_sha256": "5ba9cf3281bffadc13385cbbef95321681c052dba6e92dd3f443a1455a8ab5c9",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/grafana-cloud",
+      "source_sha256": "f930815d6dbd3e0d79b17da78a97e673419cf8f5368b95439ab748b4d5f4c1f4",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/opentelemetry",
+      "source_sha256": "c4e59211f949b4e54de29542821582b3bf3032e0260f6a7cfafd23bf33d04b3c",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "introduction/monitor-pgadmin",
+      "source_sha256": "3080ccdf016678fbe4675bff8af73191893f963928f412920d07f2649b9d9463",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "introduction/monitor-pghero",
+      "source_sha256": "dfb3abc7c3a042354535579a3b47783f66191d763239166e6e4e1c592b789d95",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "get-started/production-checklist",
+      "source_sha256": "063e40767058c293915339a147ca39c375e89d54ec63bb2a52a5b524206cc6f7",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "manage/updates",
+      "source_sha256": "0d6b76017445a9fd42b8ec7222d9dcc4b796e56266c5b6f719647ac7c5ff7724",
+      "local_source_present": true,
+      "review_state": "KEY_CONTRACT_SECTIONS_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "manage/maintenance-updates-overview",
+      "source_sha256": "b88445ce22d3b58d69d9e3a7135cb6c7f033e024d5782eaae867125b56a73172",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "manage/platform-maintenance",
+      "source_sha256": "3181333178fd01a49a0b1eb1216c64e4d0322ac7b14d526356f539f5bb2785a0",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "introduction/regions",
+      "source_sha256": "b6ed429137e0ac95b2d7b18a1965d0b4cd9a4ab8dc4ecce26cdfdc5df3840153",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "introduction/architecture-overview",
+      "source_sha256": "c469f0299d3b64889afe34d15760f1e17af9a7c63ed4e5b8b32632badad470b5",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "introduction/compute-lifecycle",
+      "source_sha256": "164c8d3cddae3dea278d6d63c0e6e9e562da3693048ba3edd49843ebd8c4b43b",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "introduction/serverless",
+      "source_sha256": "74ef31faeb667c3a3b4801e3ba373782f5db296cb9e2379db1a3243e1590f427",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "introduction/ip-allow",
+      "source_sha256": "d53ee26783e86e0494995fcea814f1f5d07fe875179ee30211c73727920ad425",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/neon-private-networking",
+      "source_sha256": "d50be329cac5f7e44dccbace7a21e202d1cf6eaae7faee1d17b63e136245ad66",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/protected-branches",
+      "source_sha256": "5561d5514b2ad2479bda761c613b3c1cdcf73d9fe61f985704316e250ae97ced",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "introduction/high-availability",
+      "source_sha256": "f7013931649d7b8546cb3bf76e48a0b8b04ee22c9a8b6a73ecf85d7ccb1ecd24",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/backup-restore",
+      "source_sha256": "17f25c32f464f48904c9fa48d8c45894b37e5c4845371be2ae0e2ed62321d0ca",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/schema-diff",
+      "source_sha256": "6bd16079869e0e5d204f7c82f53a29adf9304f6bc9dbce33c9d6c3d40e246a5e",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/schema-diff-tutorial",
+      "source_sha256": "6f216309a868006e8dcd1ebc9c51da98d81c388479a06cd21ec10657d619fe22",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "security/security-overview",
+      "source_sha256": "825aa709a87380cc09b7d7f4fa88cdcd3ea7590ff0d6824295fc991d2758aeaf",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "security/security-reporting",
+      "source_sha256": "a8afdcff57d1151001964019486f1d9def65297aa82ef747111a3d0329a39a80",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "security/compliance",
+      "source_sha256": "9c67466e1f8cc22dc54dd43c8dcf56b78f15f7818a369088a5fdc543b7eec27d",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "security/hipaa",
+      "source_sha256": "a407349f270a6c5a7899e96b6db5101d8c7019ed647f200843136b7c7de559f0",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "security/ai-use-in-neon",
+      "source_sha256": "9ffaec07360a989143e58825423ccbab1111a8efd0f98ae35f0b620dce06ee8f",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "legal/sla",
+      "source_sha256": "3a925298cf360a9ed0454f893a858c52d36dc171f486db712447b9f426ba7165",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "security/acceptable-use-policy",
+      "source_sha256": "fc602e4c12d44b3c9a50774999b9b1de273f2844ce21fcd413cd5f3c432a7e7f",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "introduction/about-billing",
+      "source_sha256": "2dbd24a6a170336b3e6f9a2fb8902d40af187406a381350e1119b5fb07398e2a",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "introduction/plans",
+      "source_sha256": "8c4aad845add457c8028db639e45e04aff0abd0381eefad50788003a75165b24",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "introduction/agent-plan",
+      "source_sha256": "0cd5ee26bbdd01480cff580643dc4d03b1c3a61e6517e408b964eb589736ddcc",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "introduction/manage-billing",
+      "source_sha256": "af9f6a9de1307d2fb1e81c8c28989a795f5f8a3016025b837c5e708c245a024f",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "introduction/spending-notifications",
+      "source_sha256": "431c862096810aa9586f3095b4bb54df883fd42486a64bc8e5ac952acf25a8a1",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "introduction/monitor-usage",
+      "source_sha256": "ee483210b426ccb2f09efed1498f338bf7f7179ee810a4c1cdf48c253d8575fb",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "introduction/usage-calculations",
+      "source_sha256": "5f7885aa233ecf365772e1a9a21d1c85358421b8212f10cbd89b7b2cef633198",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "introduction/cost-optimization",
+      "source_sha256": "31fa1352436ee5ed2d504042c161aa70f494a8e6ff21beff986a88c437201242",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "introduction/network-transfer",
+      "source_sha256": "27480c668280229db2c71c6f79d8767201412dc46f518f6b5a7abc0598d1f4cc",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "introduction/billing-aws-marketplace",
+      "source_sha256": "a6b1624a018c3ad1c05de79f8525c681ccc91568ba006970ebe3864fa960a548",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/platform-integration-overview",
+      "source_sha256": "54e1e3b0c0de14de0aff47859851c4a45871e30d18fc6bda7f04b2a1b96e2965",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/oauth-integration",
+      "source_sha256": "01d619059ec5b68f3d000f5f98e7a2a49d92353a6e7483fb38dcf2aa57e179c9",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/embedded-postgres",
+      "source_sha256": "e812b2b98c707cb11bc241db226b3bd83ae8a0a26eb61b997ac837f0d7e1ce56",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/consumption-limits",
+      "source_sha256": "94283ab9e1d74990238587a898514ade2d44927b1523886acac2c56d1fffec96",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/consumption-metrics",
+      "source_sha256": "0586067efa02e377a3938effe55037752fcf9b0596739b4c99f573858549b83c",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/consumption-metrics-legacy",
+      "source_sha256": "4e4c2cfe3d9d3fbe6e2ca7ec28ef17f60b18bb7a0b834c7847a7d52792bf3ec2",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "reference/claimable-neon",
+      "source_sha256": "379b11b057b1db8df6a508b4eb4b194d080426295712a34560b2f1f54388c71b",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "workflows/claimable-database-integration",
+      "source_sha256": "4bc95557c1dff1fbb5a935d0623687159b10db75600e77801a8b9855127e7387",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "ai/agent-setup/claude-code",
+      "source_sha256": "7813cd68c18d75eb59b6944d24360316421da2fcbafba3f6645a83b4d3362fd0",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "ai/agent-setup/cursor",
+      "source_sha256": "2e21be06c4daa1ddb9e1283451e5cd7b8d1517eb2f60b27e3fb5d3ad716829b9",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "ai/agent-setup/codex",
+      "source_sha256": "ebc65a9e6312ebc7aaba13a4c2b77c03f2745a3dd47369009ed3ea46da67c533",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "ai/agent-setup/vscode",
+      "source_sha256": "115c78f8fe40aaaf131ca846de4baaf44b8abdfba1fb5cdcb938ce40725c9e34",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "ai/agent-setup/claude-ai",
+      "source_sha256": "7b55b646e3bf3fefe2df579aa530d44e61647a6f05fea3e77462c4150ff645b5",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "ai/agent-setup/chatgpt",
+      "source_sha256": "eb8b746bfe83f218cfc873a440c654bf33a8299a28e9c07d2aaffbf9d58e5a25",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "ai/agent-setup/grok-bot",
+      "source_sha256": "bf2cfd638574abeb842bd1e6b4e42f507b4a9a19398e600af52627470fb5537a",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "ai/connect-mcp-clients-to-neon",
+      "source_sha256": "e0a8bab280fc6086e0f6cb94f0670c2a3d8980c2bacd71dea83e4ebc9e068dec",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "ai/agent-skills",
+      "source_sha256": "7f708ed2e4dd30bd2a5e0d65e806d3373da26e277cf56b0c4ec712488728fd7c",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/ai-agent-integration",
+      "source_sha256": "a3c9857171d68c4e27f3269c350ce6878d1589e3d778453aa02dc7898605d93f",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "https://neon.com/use-cases/ai-agents",
+      "source_sha256": null,
+      "local_source_present": false,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "external_reference"
+    },
+    {
+      "slug": "ai/ai-database-versioning",
+      "source_sha256": "8aed497a8493a3b34538e76e0b4d7f90397d8feac816c7940c845265355e6472",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "reference/api",
+      "source_sha256": "443f4e461d031e3b12db4a05bd36e26d11fde577dc8646449ca7048f68511b49",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "https://neon.com/guides/agentstack-neon",
+      "source_sha256": null,
+      "local_source_present": false,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "external_reference"
+    },
+    {
+      "slug": "https://neon.com/guides/autogen-neon",
+      "source_sha256": null,
+      "local_source_present": false,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "external_reference"
+    },
+    {
+      "slug": "https://neon.com/guides/azure-ai-agent-service",
+      "source_sha256": null,
+      "local_source_present": false,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "external_reference"
+    },
+    {
+      "slug": "https://neon.com/guides/composio-crewai-neon",
+      "source_sha256": null,
+      "local_source_present": false,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "external_reference"
+    },
+    {
+      "slug": "https://neon.com/guides/langgraph-neon",
+      "source_sha256": null,
+      "local_source_present": false,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "external_reference"
+    },
+    {
+      "slug": "cli",
+      "source_sha256": "4a3a23dd3f47f965818d0eddacfe9a85705927216da94306b9223b763497c374",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/install",
+      "source_sha256": "e4f28f65a29c4c0ed29618955b3b1d5842c5ee4fe4868c585c02b272f9de25bf",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/quickstart",
+      "source_sha256": "4ad2d204e34aef8687596a345b1c5cbcab22fcec3217008b0474fe75f9320440",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/login",
+      "source_sha256": "c1c837d66d7e6da80bfc6543ad9129073626002511baa2dc7da3d99406b1b204",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/init",
+      "source_sha256": "e23104202fd3b23ee7ed76dc7cc6c46a4c5c2712d02982e1d42ba5f11aeafdec",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/ask",
+      "source_sha256": "b8878f7bf97080351a01927e67c684581d79bd0f9f0f6ed98a8260b28ae59c2b",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/docs",
+      "source_sha256": "95a44fee852d475fc8a3f8ce5034615ef898cfc94ad47321edca2e02ba252714",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/mcp",
+      "source_sha256": "46a045d3e4a7bb5b72d89e81f58ac38716fcd3c01017c2a9e2aa561fece31080",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/skills",
+      "source_sha256": "55931b0bc42addf42e98b9c77ce2c6e06d8fd56f3a5160d2b8643923ebc3a8d0",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/plugins",
+      "source_sha256": "f68dd22b4c49ff36827d7e76df98a23da319b4705b5493d5a7ae5834424c50af",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/claim",
+      "source_sha256": "fa9db0b0ad8e850139cf3417a5e685fc0b94d2b329dd96b9cfbf24118e4c8817",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/bootstrap",
+      "source_sha256": "9bee2ef0f9ee31ecd8f813759b4f3a8b4d0f42babf7a62d1944eea60e2e06f59",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/link",
+      "source_sha256": "63e741e9ffb7bb695f6ffc8a10895e2fb7433f1ce573ad6834f6aa0739b6351f",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/checkout",
+      "source_sha256": "23f44f16ef4fc719d9f0c968bd3b23b69cce595ca8e6eb72fbc92aa81a9d6619",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/git",
+      "source_sha256": "e8f77a2a234e84c0326fee605d48b7b9feb0d110978e6793202cd3626cf0e157",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/env",
+      "source_sha256": "b582157cd966d3ccdd3226870db4a8e05404cbaa91d10d7be633f277034cb6f1",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/set-context",
+      "source_sha256": "728547c58d300f5bd2b05389ffa4de70ff18f668068c3a70a6a57bbc80893c87",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/open",
+      "source_sha256": "805344614332cc4fde485a02427079199a66ceb509477c5d0588f00016e7268e",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/me",
+      "source_sha256": "541aab4fdffd33ea1e42fb48fae47d2fb2e7dd410c7977f402a120ad2f63f61f",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/profile",
+      "source_sha256": "e5584a2a8e2c317841b19420fdf8c19b789286315954d9c502be3f3556cbbb66",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/api-keys",
+      "source_sha256": "6cdf8df7a03cd7276bbdb60520e0de5775eb0721ec4e8943ff8880e8c91e788a",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/completion",
+      "source_sha256": "0ca11029175a13540f436c079046171cbc09a326a8fc7ae4e7d4d638156d19d0",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/feedback",
+      "source_sha256": "8d9913911202c5051a7b45bcaa2a37f511d39297f0e81b636c1c6e16eee0163c",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/snapshots",
+      "source_sha256": "632e5563d3da7888cf3352fc596a1abea90d9dfc1b7f5a57eafb594bebe9efef",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/diff",
+      "source_sha256": "e851aba11a70f7fec33100e972b657282c8ed0cc744333dd04e7192d351a6786",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/projects",
+      "source_sha256": "1e3112eebe9d6d7240302b615403e75816126794149fbd5fd0e640bed4daf345",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/branches",
+      "source_sha256": "6f91b7225e13a915596f023c1f113c847313d97cbada7acf47d7a195337196b1",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/postgres",
+      "source_sha256": "95ddacde899dc7a54cb61e107bb210b7d35cb1b0a5807e6a4b88eb2b5c718b31",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/databases",
+      "source_sha256": "dcb4284677eb8598d5a7f9f933293a6ac7d676e4c40dee402da6257cdcaab630",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/roles",
+      "source_sha256": "1b22eadadfb5eeb39a644f0dae915891abf682926e49534455406027b8f3770b",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/operations",
+      "source_sha256": "04966261fdbc285443c7b332209eddb13ba44596ff8728091826f6feb1ca7761",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/connection-string",
+      "source_sha256": "c219030fb0c9b97c7062267af07e5f4a3e073767abb1123fd401400f5941a9df",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/psql",
+      "source_sha256": "0b84463d29589131637562b5488aa10059241093fc0876af2d56566ccae1e3b7",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/config",
+      "source_sha256": "812413a50f88ddc7d19afccc0f433a80cf5826447df24d9415f63de874d3fb72",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/deploy",
+      "source_sha256": "3802c85b9d9b12d44efb832b1fc87f1350e50287e9552520862434667038178a",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/status",
+      "source_sha256": "f19a95e6225d5861a093f364c50cc5501c534111f6b59b0e50e321a8f0dc4e45",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/dev",
+      "source_sha256": "35582733578513d7ce774fe7384245304216db06a3bba792932ae40dbc3b31f0",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/functions",
+      "source_sha256": "90efe56fc706656b413b83c511b277b728b2eeda54913c34c8edde2b42f64f93",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/triggers",
+      "source_sha256": "a0972046ff648d5f5e94744b05dac87c2a50d1a8eac7991536589456e90265b1",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/buckets",
+      "source_sha256": "60ac2e09d03bb4d55b6f5df080dc6719569afc57926b400387ba260710b68a44",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/data-api",
+      "source_sha256": "759ce12afae2c37b2068c6168ca8eab0057235a6ad3782d60dfc978b7f8fe025",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/neon-auth",
+      "source_sha256": "4d6ea107d1813fd4699618b962a6ac5d98e90cb74884106422e59a24d8faada2",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/realtime",
+      "source_sha256": "078810c1fce069207bcfd2b13a4d8d7990cfa16333a551ff1a0985b96c7197b8",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/credentials",
+      "source_sha256": "29f48cf7de1d4632e93ca0e433a6031d5dfb3ac671016f9f88bc5111ec9069cf",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/api",
+      "source_sha256": "324840e1a97d163edb59b53d3bb021b95a50433b3ca56ec7df3766207987a97e",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/orgs",
+      "source_sha256": "613a4158c0a7a1d0473602a19277ad3f671fd8361d265f6409b3bcc6807198e8",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/ip-allow",
+      "source_sha256": "bac25658186f164fae1003d6221f2d22b138e6706424e95e6f8cfe1e3611cbe7",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/vpc",
+      "source_sha256": "3d8d89d48f667377d5a928b633d77c44aaa032fcdcb96a9c678f37adfaedc351",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/inspect",
+      "source_sha256": "79cefdb5e91c219a09dbc97d63c38bbe899d8f46b61a06e8dc80cc76d514c22f",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "cli/logs",
+      "source_sha256": "b0a17e4c30f328e7f31f02de5a1c2782dcc564ae589f6af0ef4cd1b77c3a7b95",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "reference/api/get-started",
+      "source_sha256": "b76fe3de53b82df88083e331e2e9b17372b0edb0e9338e650d0a9a776024b821",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "reference/api/key-concepts",
+      "source_sha256": "45c7046bda0eaf4f5a55643f90243a201e9251b22529b90a5e3de24f5128bd48",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "reference/api/reference",
+      "source_sha256": null,
+      "local_source_present": false,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "reference/sdk",
+      "source_sha256": "a07598a3623db2c9c44873a7bd39f37e14bc4a0b9890d86f53bf9e3d4bc79aff",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "reference/typescript-sdk",
+      "source_sha256": "88341b54cd34e3debac7bbd6fad4c6330fdeca78b77eb8fe7bf684d066b5b909",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "reference/effect-sdk",
+      "source_sha256": "c99347837bfd6cfe0c7cdb7a766af34d21cf78d356f6f2623acf2a115d4fdf3d",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "reference/migrate-api-client-to-sdk",
+      "source_sha256": "23f3398385f7b4e7c711b7b4fb9a6a998b11d0e92d037fba2fa0333ef21bbfd1",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "reference/python-sdk",
+      "source_sha256": "4ae2d3dab0e669b3d3bdf2c2b53c24a82919ec192fa87fceebbcabee94248700",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "reference/neon-ts",
+      "source_sha256": "0958b6177752fdd841c92b05f7fc19db3ae7ae8701fe707c3bb164ffe7b7a5d1",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "reference/config-runtime",
+      "source_sha256": "0f6718b8feb10eb7a4577262b14cc7685ccbaf292de30648874fecafd0b4e8d2",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/integrations",
+      "source_sha256": "da2338967ca2a366e2ca683b85e95abfe25cc60cb83cd8c54379985caa8c88af",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/auth-auth0",
+      "source_sha256": "65b4d1b3f73944b3ab6e91899eb96c4a28a8c4e4a7be1515790121def5ca7dd0",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/auth-authjs",
+      "source_sha256": "34e8650dd13ebb8ec28ebbef3c552358ca4b506368e7f3731d650f26b1c3a981",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/auth-clerk",
+      "source_sha256": "f6209d5cde4dd7411cfd4d9e5c254e74ef332aee340e1dbdf7d6706d23d71d80",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/auth-okta",
+      "source_sha256": "9cb0f9227e4fedfdaf9aad7f755c7e4d7e8c621c3a461b69acd8ad5d5d11116c",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/cloudflare-pages",
+      "source_sha256": "9f5910ccca35134d12ab28b06f21d1bd35e80716b1496104d6e528a3e21ffd73",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/cloudflare-workers",
+      "source_sha256": "a02512e580ae899edd46055b22e1e0b2558b72b1538b13d4829ebde04ff65b9d",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/heroku",
+      "source_sha256": "eaef132cc4409876d82f7313eed5fbc82c5f40bf9340558993e80c6059fbdbb6",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/koyeb",
+      "source_sha256": "ed9ab8fe6efc57fdde0b1da3e758f9d4d02bcd9df661339f2ca93bdecdc43810",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/netlify-functions",
+      "source_sha256": "c25646888cb33a84c462d5aae1768ad112117d450be82cfcd777c5cc297ffc28",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/railway",
+      "source_sha256": "792124969fa563ac31abf99fa43984c6a937408211ab82d7993c7aa621871379",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/render",
+      "source_sha256": "b748350dd4ad898f2b51ac411828541316f0aa3c64f1c548b553f4d0cf8b16bf",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/vercel-overview",
+      "source_sha256": "3c9006c5a2582ccb7adc36e1ff98a1706ffaba5f65edc0ec8225c2df5a3bda01",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/vercel-managed-integration",
+      "source_sha256": "895660b9c4c1fb655357493ea5443ccc472e8c5cf1904357bbcfbbf93cf1f905",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/neon-managed-vercel-integration",
+      "source_sha256": "38d8436fbeb0534c2354c33da47e7c020b3249d8df7ecc2818b3d1db9d8edb83",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/vercel-branch-cleanup",
+      "source_sha256": "25fe62f579ac15b5529acaa07bd7cc9ead1602b38ee74243528b89be59561d97",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/vercel-manual",
+      "source_sha256": "f3e451b103cd433aae3529c490b0e3fba7f2a3b7597a5b14e1bb968c50501de8",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/vercel-connection-methods",
+      "source_sha256": "44203b6f710d0666c02677e102b366b75678dc4b9c09e3ff0d698123239ee6fe",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "https://neon.com/guides/convex-neon",
+      "source_sha256": null,
+      "local_source_present": false,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "external_reference"
+    },
+    {
+      "slug": "guides/neon-github-integration",
+      "source_sha256": "18237cc85a983e9f690f80b1a3fd099951a46b0a79b0302367291fa0d2175095",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/file-storage",
+      "source_sha256": "7bdb105f4589feb82a6345fb5fe52083062d828ebabc551b0015cc2ff98a19ee",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/aws-s3",
+      "source_sha256": "426a003af11262073e390fdb813b0e267d6364bc309c42dfca74e6b24c98654e",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/azure-blob-storage",
+      "source_sha256": "93b4598c334e21082dd2b16b1da46e0614e13c89fc7f8a269bad69c53b76e448",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/backblaze-b2",
+      "source_sha256": "41f906f7ce8f986dba6c61c522809f9c0229374a7fdd29555ed3d98229b96c41",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/cloudflare-r2",
+      "source_sha256": "c037db839e1d63b6e864cb945fd971bd347a836c187769356a8438ed84f99aee",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/cloudinary",
+      "source_sha256": "cb71aed2766cddb460ed89dadc2ff2baeedde5349b2bc8109d65739937032270",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/imagekit",
+      "source_sha256": "187b890369466e2a34277c9e39456353a7d54eeb15b57c8e189b101b7972ae39",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/uploadcare",
+      "source_sha256": "d1c596a44a79d2c363d9e8f2b47e8cf5ef04f10ecef4a993ffd3c823cac9e618",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/askyourdatabase",
+      "source_sha256": "016e0659cb8b5abd428d9be4aefe0b4ceac7f0f37f41010d2ea6726874bee17a",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/cloudflare-hyperdrive",
+      "source_sha256": "1f5c262b29aec9deeebd4979df8fd78e08decad95c6c5e2e6a2e4ae62c29b218",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/draxlr",
+      "source_sha256": "48fe10f9feb8975f1c755b0a9533a24a893582433570a300d26111faa3f457c3",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/exograph",
+      "source_sha256": "bfe12bafe78330731a8e5a09638b8c1c99ab8a311c697a0a17aa57f690da7bc7",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/hasura",
+      "source_sha256": "c5048362a93938555a4514f645a6ac51f14c2c47eb16cdd09fcc9f8a59a3a680",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/postgrest",
+      "source_sha256": "b6a1fd0fda60c19a77a083fc2e35545b5f4ccf93ca231903b4f7b9ad1bfdce23",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/logical-replication-airbyte",
+      "source_sha256": "06be15c48f3a932b6ef73d42ceada16fddc3036db58a0a4f6ba9262ac255f19b",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/logical-replication-clickhouse",
+      "source_sha256": "d4f5b17f68d79bdf6670a08ff34519424601f63f91883904db5571af356e1781",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/logical-replication-kafka-confluent",
+      "source_sha256": "7aead27cfc2ad1e0dfdf0e41e43fe3778cc538dd22b314b2a45bba5bc35f5424",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/logical-replication-databricks",
+      "source_sha256": "92cbb55ad4d9ca7688e9f1245f35c2565e8ac79d8c7f7ca88aa549876760a834",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/logical-replication-decodable",
+      "source_sha256": "844b138c2269bcabb7952663f567c8b91527bc9e89cefa487a221596ea3c0b1a",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/logical-replication-estuary-flow",
+      "source_sha256": "b779216b9688c3469fba93818420161d92285cd35a24e77075d8269034d29fae",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/logical-replication-fivetran",
+      "source_sha256": "8b41e4fe4d85e82244e12f0b70cea0f4f02ef80b0dd4630c44a833aa4d62af4a",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/logical-replication-inngest",
+      "source_sha256": "309a2e8fd79b8e1518253715d7a6893ec614d1ed6c414e34772e638181ac9a36",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/logical-replication-materialize",
+      "source_sha256": "22457f63e5fdb447f08b04ddea91d6e11d0365d3101e07895a96255a82a91898",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/logical-replication-postgres",
+      "source_sha256": "b724e2cd6c206e16aeca8b98c3d55cc28b0fc4ee8f1bbe4cd5c9338130d61ca6",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/logical-replication-airbyte-snowflake",
+      "source_sha256": "e79e66abf761ea8584978e37abcb5f95917335dd9b306d0309873db7c308c95b",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/logical-replication-stacksync",
+      "source_sha256": "cbc7aa35da0fe7b2ac55fbaf4664d6210728b49daeed52b5be064c5dc0e677d3",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/django-migrations",
+      "source_sha256": "100029613d2d5e37cc8d6cc8fd3027467816a0dc418aab2989b1f8e65e1c1a69",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/drizzle-migrations",
+      "source_sha256": "fc9465eac75ab1a4e779ac6e39bdcddb8f454bc8fe14623e3add7db7d0ca1a07",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/entity-migrations",
+      "source_sha256": "26fd0c43e4f9da35acab30d0068cdf76df629ba0fc3af02c6c1ccc2c0e1d1f65",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/flyway",
+      "source_sha256": "426fcbd88fad4150e90980cd1b3b90729fcd9eef9636570a9d1bd6a8ec02ab92",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/flyway-multiple-environments",
+      "source_sha256": "ef35b1a698576fcc6d179872d599bbfc433c58ede9e7cd04a8be2fd417b046f2",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/laravel-migrations",
+      "source_sha256": "0232d2d40d5651650c312931458643cf9112bb1ec8e0f2142313c54d31abf1fb",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/liquibase",
+      "source_sha256": "b421700926cbfb917488b5f6ee3e19848f315ca668f3a9c405949640ff92732c",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/liquibase-workflow",
+      "source_sha256": "bd7ffde9e3308ee83f4f260247b9396de029c65c12eeb6c19d1af44b2350e70b",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/prisma-migrations",
+      "source_sha256": "804039a91cbcdb466c9893350b8ba64fe5b9437cfd696d7d0797d5e013720711",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/rails-migrations",
+      "source_sha256": "5fceed9173f077ef3a710225e9c12ea0fc0df1906d0fa81a107496a2c71a7358",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/sequelize",
+      "source_sha256": "91191b4248d6850e278d4ee11c6ce4cdf5524afdf7fad1e29a7e0589443247be",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/sqlalchemy-migrations",
+      "source_sha256": "07290af11fed957d9dbd6f7044b6cd954207df54786c73e4546f73c92458d5b7",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/aws-lambda",
+      "source_sha256": "78be661dc1fd3ce222e50ba2352c98a9722560d4d1cc05507e89731ff64d5243",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "https://neon.com/guides/query-postgres-azure-functions",
+      "source_sha256": null,
+      "local_source_present": false,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "external_reference"
+    },
+    {
+      "slug": "guides/trigger-serverless-functions",
+      "source_sha256": "7cfe4d75355cc1ef449c00f5217c8e1b1c58b894601b7918ea9a4858dd2cb535",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "local/neon-local",
+      "source_sha256": "fdaae9962793e4514b31f1916cc39ef947c088ff346ee765ac1551d8785e83e2",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "local/vscode-extension",
+      "source_sha256": "f317dd7be4e9d1140e3241abe3a91ae97f574e65eb269c6688b88f4252bf9579",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "reference/terraform",
+      "source_sha256": "cf2fbaa7afb6e063163b03089c6697782ca236bb005474ef647cd2347f695774",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/branching-github-actions",
+      "source_sha256": "d86dbf95ac5192438c6586d82a82b85f90a2b9232d6c995111c0f9daf918a3af",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "guides/branching-circleci",
+      "source_sha256": "bdfbc7078dd3e67de44a8fa4c548f233f1385c71d013bf2eeab51f6abd3c4f6a",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "reference/glossary",
+      "source_sha256": "cce6dcbb59832672a1405c74f4fc019309e3fb8a3360d0582203bf5438105fed",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "introduction/support",
+      "source_sha256": "f0486c1b5af95157f1794e8c2a98359a6990d0fa598da1c5d92e1486ef7202c7",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "introduction/feedback",
+      "source_sha256": "b4eb6a4bf47e8a15a7ed588d2e99e1582c77f03f64379bfc72a5c1ae3127252b",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "community/community-intro",
+      "source_sha256": "af256f6bd76d71f05de47911090682202bf7b1550847745e8fc2b1c195e4aa18",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "community/contribution-guide",
+      "source_sha256": "9b606c4a904d643858d1394e2958bff458b77703723e960d6ce385cdd0b10bf3",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "community/mermaid-diagrams",
+      "source_sha256": "3b783de03d9b80d1dbd294a9871e2bacad4f006b8e1ebb1aa76bc66422bc1498",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "community/component-guide",
+      "source_sha256": "b3277a1db34c22eaa765d1b7b9846e759247234e865833b80267e6f0f978704d",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "community/component-specialized",
+      "source_sha256": "d04f43e62fd8d06ee85f2e92c1cbbec49e579b835181f7c858505c16612c7d80",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "community/component-icon-guide",
+      "source_sha256": "7c2184ead5236d343dd498b904bf248a50b3ec462096b09176d8794d5ce2a505",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "community/component-architecture",
+      "source_sha256": "60eda859c30bc5d972e22e14b0980eca40ed6cb5d000d7b72482d7cdd6c58747",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "community/ai-tools",
+      "source_sha256": "e6a157c056a8c8440cf48c5779eb7650b7fdcadcef3c9e83de01893cd856d41f",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "community/llms-markdown-guide",
+      "source_sha256": "d5448fe89a79397de9a85de938a8f7b353c2be059b12f76e2354405b8d2cffdd",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "introduction/status",
+      "source_sha256": "8f0d29e168513e3ab18a537911c664c928433c4de906ab1b2ef2333c5ab13483",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "changelog",
+      "source_sha256": "64d8cc770b469f6706d78bfc2e467dcb2813eb772cb02aeb469242f5aa74af95",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "introduction/roadmap",
+      "source_sha256": "ab3d8d227460a59c484d7f802e1578014083ad30cfc978caf8d36ca40343d470",
+      "local_source_present": true,
+      "review_state": "KEY_CONTRACT_SECTIONS_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "reference/feeds",
+      "source_sha256": "801821cff109c26d112da962e049f2eec96fe0ccebbccce29d877af297932413",
+      "local_source_present": true,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "product_or_platform_or_guide"
+    },
+    {
+      "slug": "https://github.com/neondatabase/examples",
+      "source_sha256": null,
+      "local_source_present": false,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "external_reference"
+    },
+    {
+      "slug": "https://neon.com/postgresql/tutorial",
+      "source_sha256": null,
+      "local_source_present": false,
+      "review_state": "INDEXED_NOT_FULLY_REVIEWED",
+      "scope": "external_reference"
+    }
+  ]
+}

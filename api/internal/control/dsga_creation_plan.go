@@ -19,7 +19,7 @@ import (
 
 // 计划协议只描述本次创建时冻结的可信输入，不授予普通SQL、预算或VM执行许可。
 // 身份view供元数据库绑定复用；完整计划由独立严格解码器校验，不能把缺预算的
-// view当成生产启动计划。版本1先支持PG17，其他大版本完成独立适配前明确拒绝。
+// view当成生产启动计划。PG大版本属于冻结的发行输入；共同协议不随PG版本分叉。
 type dsgaCreationIdentity struct {
 	NativeBootstrapVersion dsgaNativeBootstrapVersion `json:"native_bootstrap_version,omitempty"`
 	ProtocolVersion        uint32                     `json:"protocol_version"`
@@ -104,6 +104,8 @@ func (ref dsgaCredentialReference) validate() error {
 // 策略来自受信任的平台配置，不是公开创建请求中的可选字段。此值仅在接受前
 // 快照；worker只加载已经提交的完整plan，不能重读env选择模式/镜像/内存下限。
 type dsgaCreationPolicy struct {
+	// 缺省17仅兼容已部署单版本配置；新版发行目录必须显式选择。
+	PostgresVersion        uint32                     `json:"postgres_version,omitempty"`
 	NativeBootstrapVersion dsgaNativeBootstrapVersion `json:"native_bootstrap_version,omitempty"`
 	Namespace              string                     `json:"namespace"`
 	Image                  string                     `json:"image"`
@@ -149,7 +151,7 @@ func (plan dsgaCreationPlan) validate(p createPayload) error {
 	if plan.Storage != (dsgaStorageProfile{}) && plan.Storage.validate(plan.Namespace) != nil {
 		return errDSGACreationPlan
 	}
-	if !dsgapi.SupportedNativeBootstrapVersion(plan.NativeBootstrapVersion.selected()) || plan.ProtocolVersion != 1 || plan.PostgresVersion != 17 || len(plan.Namespace) > 63 || !dsgaPlanNamespace.MatchString(plan.Namespace) ||
+	if !dsgapi.SupportedNativeBootstrapVersion(plan.NativeBootstrapVersion.selected()) || plan.ProtocolVersion != 1 || !dsgaSupportedPostgresVersion(plan.PostgresVersion) || len(plan.Namespace) > 63 || !dsgaPlanNamespace.MatchString(plan.Namespace) ||
 		dsgapi.ValidateIncarnation(plan.Incarnation) != nil || dsgapi.ValidateID(plan.ComputeInstanceID, "Compute") != nil ||
 		!dsgaPinnedImage.MatchString(plan.Image) || !dsgaPlanUUID.MatchString(plan.OperationUUID) {
 		return errDSGACreationPlan
@@ -209,7 +211,7 @@ func makeDSGACreationPlan(p createPayload, policy dsgaCreationPolicy, now time.T
 	entropy[32+6] = (entropy[32+6] & 0x0f) | 0x40
 	entropy[32+8] = (entropy[32+8] & 0x3f) | 0x80
 	uuid := hex.EncodeToString(entropy[32:])
-	plan := dsgaCreationPlan{dsgaCreationIdentity: dsgaCreationIdentity{NativeBootstrapVersion: policy.NativeBootstrapVersion, ProtocolVersion: 1, PostgresVersion: 17, Namespace: policy.Namespace, Incarnation: hex.EncodeToString(entropy[:16]), ComputeInstanceID: "ci_" + hex.EncodeToString(entropy[16:32])},
+	plan := dsgaCreationPlan{dsgaCreationIdentity: dsgaCreationIdentity{NativeBootstrapVersion: policy.NativeBootstrapVersion, ProtocolVersion: 1, PostgresVersion: policy.postgresVersion(), Namespace: policy.Namespace, Incarnation: hex.EncodeToString(entropy[:16]), ComputeInstanceID: "ci_" + hex.EncodeToString(entropy[16:32])},
 		Image: policy.Image, OperationUUID: fmt.Sprintf("%s-%s-%s-%s-%s", uuid[:8], uuid[8:12], uuid[12:16], uuid[16:20], uuid[20:]),
 		AcceptedAt: now.UTC().Format(time.RFC3339Nano), MemorySlotBytes: policy.MemorySlotBytes, Budget: policy.Budget, VM: policy.VM.clone(), Storage: policy.Storage}
 	if err := plan.validate(p); err != nil {

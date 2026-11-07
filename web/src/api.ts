@@ -88,7 +88,21 @@ export type Endpoint = {
   runtime: Runtime;
 };
 export type Feature = { enabled: boolean; reason: string };
+export type PostgresRuntime = {
+  postgres_version: number;
+  region_id: string;
+  create_enabled: boolean;
+  memory_scaling: 'vm' | 'vm_and_postgres';
+  bounds: {
+    min_cpu_milli: number;
+    max_cpu_milli: number;
+    min_memory_mib: number;
+    max_memory_mib: number;
+  };
+  memory_slot_mib: number;
+};
 export type Capabilities = {
+  postgres_runtimes?: PostgresRuntime[];
   cluster_id: string;
   observed_at: string;
   features: Record<string, Feature>;
