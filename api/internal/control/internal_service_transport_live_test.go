@@ -32,16 +32,17 @@ func TestInternalServiceTunnelLiveNativeReadOnly(t *testing.T) {
 		t.Fatal("cannot read bounded private fixture")
 	}
 	var input struct {
-		Workload      string          `json:"workload"`
-		VMUID         string          `json:"vm_uid"`
-		ServiceUID    string          `json:"service_uid"`
-		ServiceIP     string          `json:"service_ip"`
-		ConfigUID     string          `json:"config_uid"`
-		TenantID      string          `json:"tenant_id"`
-		TimelineID    string          `json:"timeline_id"`
-		OperationUUID string          `json:"operation_uuid"`
-		Startup       json.RawMessage `json:"startup"`
-		Seed          []byte          `json:"seed"`
+		Workload          string          `json:"workload"`
+		ComputeInstanceID string          `json:"compute_instance_id"`
+		VMUID             string          `json:"vm_uid"`
+		ServiceUID        string          `json:"service_uid"`
+		ServiceIP         string          `json:"service_ip"`
+		ConfigUID         string          `json:"config_uid"`
+		TenantID          string          `json:"tenant_id"`
+		TimelineID        string          `json:"timeline_id"`
+		OperationUUID     string          `json:"operation_uuid"`
+		Startup           json.RawMessage `json:"startup"`
+		Seed              []byte          `json:"seed"`
 	}
 	if dsgapi.UnmarshalObject(raw, &input) != nil || len(input.Seed) != ed25519.SeedSize ||
 		net.ParseIP(input.ServiceIP) == nil || dsgapi.ValidateID(input.VMUID, "vm") != nil ||
@@ -49,7 +50,7 @@ func TestInternalServiceTunnelLiveNativeReadOnly(t *testing.T) {
 		t.Fatal("invalid private source snapshot")
 	}
 	wanted, err := decodeManagedSQLStartup(input.Startup)
-	if err != nil || wanted.VMUID != input.VMUID || wanted.ComputeInstanceID != input.Workload {
+	if err != nil || wanted.VMUID != input.VMUID || wanted.ComputeInstanceID != input.ComputeInstanceID {
 		t.Fatal("original native startup identity mismatch")
 	}
 	via, err := internalServiceSOCKS5()
