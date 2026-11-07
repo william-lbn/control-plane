@@ -129,6 +129,11 @@ func renderDSGAComputeBootstrap(p createPayload, plan dsgaCreationPlan, vmUID st
 			"tls":  map[string]string{"key_path": dsgaTLSKey, "cert_path": dsgaTLSCert},
 		},
 	}
+	if plan.VM.generic() {
+		// 本发行没有Guest证书挂载；管理JWT公钥在原Runtime启动前已固定。
+		// 外部SQL/管理TLS仍由Proxy/Gateway承担，不能引用不存在的证书路径。
+		document["compute_ctl_config"].(map[string]any)["tls"] = nil
+	}
 	encoded, err := json.Marshal(document)
 	if err != nil || len(encoded) > 1<<20 {
 		return nil, errDSGARender

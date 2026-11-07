@@ -23,6 +23,9 @@ func renderDSGAResourceBootstrap(p createPayload, plan dsgaCreationPlan, vmUID s
 		return nil, errDSGARender
 	}
 	s := resourceguard.SourceConfig{ProtocolVersion: 1, Config: resourceguard.Config{VMUID: vmUID, ComputeInstanceID: plan.ComputeInstanceID, StateDir: resourceguard.FixedStateDir, SystemCgroup: plan.VM.ResourceLimits.SystemMemoryMaxBytes != 0}, IssuerEpoch: 1, BudgetCommitmentID: "bootstrap-" + plan.OperationUUID, Limits: *plan.VM.ResourceLimits, ControlPublicKey: base64.RawURLEncoding.EncodeToString(credentials.ControlPublicKey)}
+	if plan.VM.generic() {
+		s.Config.ExecutionModel = resourceguard.TrustedControllerExecutionModel
+	}
 	if s.Validate() != nil {
 		return nil, errDSGARender
 	}
@@ -43,5 +46,10 @@ func renderDSGABootstrapFiles(p createPayload, plan dsgaCreationPlan, vmUID stri
 	if err != nil {
 		return nil, err
 	}
-	return map[string][]byte{"config.json": native, "resource.json": resource}, nil
+	files := map[string][]byte{"config.json": native, "resource.json": resource}
+	if plan.VM.generic() {
+		files[resourceguard.PolicyTemplatesSecretKey] = append([]byte(nil), plan.VM.GenericGuest.PolicyTemplates...)
+		files[resourceguard.ComputeStartupSecretKey] = genericStartupSelection()
+	}
+	return files, nil
 }

@@ -1,6 +1,6 @@
 # C1 自动供应与通用 Guest 接线方案
 
-状态：2026-11-07 现场及源码审查后的执行设计；实现尚未全部完成。本文是[平台总方案](平台总方案与演进规划.md)的 C1 细化，不另设总计划，不代替真实验收。
+状态：2026-11-07 通用Guest与控制面启动接线已实现并通过定向测试，候选镜像已构建；真实新项目、存储认证、动态资格及在线策略仍未完成。本文是[平台总方案](平台总方案与演进规划.md)的 C1 细化，不另设总计划，不代替真实验收。
 
 ## 1. 当前已经证明什么
 
@@ -32,7 +32,7 @@ PG17/PG18 各四项内存动作及应用/WAL 已通过。控制面本轮已完�
 - 启动模板只允许明确的身份/配置槽位，不能变成任意command/env执行入口。复用原Runtime/ISO与manifest来源检查；实际argv与受验证展开结果必须一致，不能跳过旧hash校验来使新镜像通过。
 - 新Guest入口继续执行原Guest检查、资源初始化及controller-ready等待，再按既有权限降权启动。CP不能以VM command override绕过这些入口。
 - 原immutable配置的交付与一次configure幂等性采用同一启动方式，不能一边镜像内旧argv，一边CP另挂配置，形成两个权威。
-- 证书复用已有NeonVM/cert-manager支持；先确认Guest实际证书供给/轮换合同，再选择受验证发行配置。无证书/来源不一致仍拒绝，不能靠关闭TLS校验补接线。
+- 当前发行采用已验收的固定Guest启动边界：Guest内原生JWT端口，外部SQL/管理TLS由Proxy/Gateway提供。新VM profile v4不宣称未安装的Guest TLS，旧v1/v2/v3保留其原挂载合同。原生配置由可信Worker沿原Service UID/ClusterIP和每实例JWT提交；Mac通过明确的SSH SOCKS通路。集群发布仍须核验实际网络隔离，不能把内部HTTP称为链路加密。
 
 旧已验收镜像、旧计划及运行VM保持可识别；新能力用明确的发行能力/启动合同登记。具体wire版本随实现确认后固定，不提前把草案版本号写成现场已支持。
 
@@ -66,3 +66,13 @@ PG17/PG18 各四项内存动作及应用/WAL 已通过。控制面本轮已完�
 6. C1完成后接C2/C3：生命周期及现有Auth/Data API/Storage/Functions/AI Gateway真实联合链。C4补发行运营界面，C5做承诺范围内的生产放行。
 
 每条回执都标明真实/夹具、源码SHA、运行digest、原对象/动作、日志/退出状态及未覆盖范围。测试前核日志和磁盘，中途核失败/停滞，不等任务结束再检查。现有核心通过与新控制面尚未通过可以同时成立，不混用百分比。
+
+## 7. 已落地的共同启动合同
+
+Autoscaling原分支 `44e4f74682f4ffb26f1f1188e8450eb5efd5e64c` 已推送。固定启动器只允许一个Compute名称槽位，Runtime v3从原immutable配置派生管理公钥和配置摘要。完整数据库配置不进入Runner参数/ISO；原Guard、Root ready、normal硬限与所有者保护保持。
+
+控制面VM profile v4冻结公开策略模板及原三节点放置；无command/env/disk覆盖。Worker在原初始化步骤内先读原生status，只有empty才发送原配置；已有init/running不重复配置，丢回复转初始化读回，终态/原lease或VM身份丢失拒绝。仍要原初始化事实、普通SQL和实际资源观察通过后才能Ready。
+
+定向验证22主83子通过；补充提交前Running核验后11主37子通过，与前轮重叠不相加。vet、Mac API/Worker编译及Linux四个启动工具编译通过。原失败和修正记录保留。**真实公开创建仍未运行，不是控制面产品验收。**
+
+PG18通用Guest候选：`127.0.0.1:5001/neon-candidate/pg18-guest:generic-44e4f74-25800f4f`，digest `sha256:f9ad9bbce9903838b941b79b98c97957f4fa0a3c05c7b69d191ba750b98692a6`。118 Docker已可见；PG18原postgres ELF未变，候选尚未部署/端到端验收。

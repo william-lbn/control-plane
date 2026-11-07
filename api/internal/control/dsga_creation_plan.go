@@ -148,6 +148,9 @@ func (plan dsgaCreationPlan) validate(p createPayload) error {
 	if plan.VM != (dsgaVMProfile{}) && plan.VM.validate() != nil {
 		return errDSGACreationPlan
 	}
+	if plan.VM.generic() && (plan.NativeBootstrapVersion.selected() != 3 || plan.VM.ResourceLimits.SystemMemoryMaxBytes == 0 || plan.VM.GenericGuest.validateNative(plan.PostgresVersion, plan.Budget) != nil) {
+		return errDSGACreationPlan
+	}
 	if plan.Storage != (dsgaStorageProfile{}) && plan.Storage.validate(plan.Namespace) != nil {
 		return errDSGACreationPlan
 	}

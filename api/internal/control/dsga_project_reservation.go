@@ -75,8 +75,11 @@ func readDSGAProjectPolicy(namespace string) (dsgaProjectPolicy, error) {
 func validateDSGAProjectPolicy(namespace string, policy dsgaProjectPolicy) (dsgaProjectPolicy, error) {
 	if policy.ProtocolVersion != 1 || !dsgaSupportedPostgresVersion(policy.Creation.postgresVersion()) ||
 		policy.Creation.Namespace != namespace || policy.Region == "" || len(policy.Region) > 128 || strings.TrimSpace(policy.Region) != policy.Region ||
-		policy.Creation.VM.ProtocolVersion != 3 || policy.Creation.VM.validateResourceBudget(policy.Creation.Budget) != nil || policy.Creation.Storage.validate(namespace) != nil || !dsgaPinnedImage.MatchString(policy.Creation.Image) || len(namespace) > 63 || !dsgaPlanNamespace.MatchString(namespace) || policy.Bounds.MinCPU < 250 || policy.Bounds.MinCPU%250 != 0 || policy.Bounds.MaxCPU < policy.Bounds.MinCPU || policy.Bounds.MaxCPU%250 != 0 || policy.Bounds.MaxCPU > 1<<31-1 ||
+		(policy.Creation.VM.ProtocolVersion != 3 && !policy.Creation.VM.generic()) || policy.Creation.VM.validateResourceBudget(policy.Creation.Budget) != nil || policy.Creation.Storage.validate(namespace) != nil || !dsgaPinnedImage.MatchString(policy.Creation.Image) || len(namespace) > 63 || !dsgaPlanNamespace.MatchString(namespace) || policy.Bounds.MinCPU < 250 || policy.Bounds.MinCPU%250 != 0 || policy.Bounds.MaxCPU < policy.Bounds.MinCPU || policy.Bounds.MaxCPU%250 != 0 || policy.Bounds.MaxCPU > 1<<31-1 ||
 		policy.Bounds.MinMem <= 0 || policy.Bounds.MaxMem < policy.Bounds.MinMem || policy.Bounds.MaxMem > 1<<31-1 {
+		return policy, errDSGACreationPlan
+	}
+	if policy.Creation.VM.generic() && (policy.Creation.NativeBootstrapVersion.selected() != 3 || policy.Creation.VM.ResourceLimits.SystemMemoryMaxBytes == 0 || policy.Creation.VM.GenericGuest.validateNative(policy.Creation.postgresVersion(), policy.Creation.Budget) != nil) {
 		return policy, errDSGACreationPlan
 	}
 	// 先验证平台默认规格本身，区分服务配置错误与客户端非法规格。只有

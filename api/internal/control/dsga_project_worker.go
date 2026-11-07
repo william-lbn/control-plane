@@ -48,6 +48,9 @@ func (s *server) reconcileDSGAProject(ctx context.Context, binding *dsgaCreation
 	}
 	var initialization dsgaInitializationResponse
 	if err := step(4, "confirm_native_initialization", func(ctx context.Context) error {
+		if err := binding.configureGenericCompute(ctx); err != nil {
+			return err
+		}
 		var err error
 		initialization, err = binding.waitOriginalInitialization(ctx)
 		if err != nil {

@@ -17,8 +17,8 @@ import (
 )
 
 // 使用官方NeonVM字段，不生成部署/镜像。镜像必须由可信发行配置提供digest，
-// 不从租户请求或恢复时env选择。ClusterIssuer由平台已有cert-manager链签发，
-// 复用官方TLS供给/轮转；不把管理签名seed、CA私钥或业务凭据挂载给Guest。
+// 不从租户请求或恢复时env选择。旧profile保留NeonVM证书供给合同；v4沿
+// 当前固定Guest+原生JWT启动，外部TLS在Proxy/Gateway，不声明Guest证书挂载。
 type dsgaVMProfile struct {
 	ProtocolVersion  uint32 `json:"protocol_version"`
 	Architecture     string `json:"architecture"`
@@ -29,20 +29,35 @@ type dsgaVMProfile struct {
 	ServiceAccount   string `json:"service_account"`
 	TLSClusterIssuer string `json:"tls_cluster_issuer"`
 	// v2显式冻结整个Guest初始聚合额度，不从RSS或固定比例猜预算。v1仅供历史
-	// 只读解码；新生产必须v3。历史v2仅按已绑定同UID核对，不能从env补计划。
+	// 只读解码；新生产显式v3/v4。历史v2仅按已绑定同UID核对，不能从env补计划。
 	ResourceLimits *resourceguard.Limits `json:"resource_limits,omitempty"`
 	// v3把节点授权作为原创建事实冻结；指针子结构保持profile可比较零值。
 	// 旧v1/v2不得从当前env/节点快照补入放置，也不因此取得新VM创建权限。
-	Placement *dsgaVMPlacement `json:"placement,omitempty"`
+	Placement    *dsgaVMPlacement         `json:"placement,omitempty"`
+	GenericGuest *dsgaGenericGuestProfile `json:"generic_guest,omitempty"`
 }
 
 func (v dsgaVMProfile) validate() error {
-	if (v.ProtocolVersion != 1 && v.ProtocolVersion != 2 && v.ProtocolVersion != 3) || (v.Architecture != "amd64" && v.Architecture != "arm64") ||
+	if (v.ProtocolVersion != 1 && v.ProtocolVersion != 2 && v.ProtocolVersion != 3 && v.ProtocolVersion != 4) || (v.Architecture != "amd64" && v.Architecture != "arm64") ||
 		!dsgaPinnedImage.MatchString(v.RunnerImage) || !dsgaPinnedImage.MatchString(v.KernelImage) ||
 		v.RootDiskBytes < 1<<30 || v.RootDiskBytes > 1<<63-1 || v.RootDiskBytes%(1<<20) != 0 {
 		return errDSGACreationPlan
 	}
-	for _, value := range []string{v.SchedulerName, v.ServiceAccount, v.TLSClusterIssuer} {
+	issuers := []string{v.SchedulerName, v.ServiceAccount}
+	if v.generic() {
+		if v.TLSClusterIssuer != "" || v.GenericGuest == nil {
+			return errDSGACreationPlan
+		}
+		if _, err := v.GenericGuest.templates(); err != nil {
+			return err
+		}
+	} else {
+		if v.GenericGuest != nil {
+			return errDSGACreationPlan
+		}
+		issuers = append(issuers, v.TLSClusterIssuer)
+	}
+	for _, value := range issuers {
 		if len(validation.IsDNS1123Subdomain(value)) != 0 {
 			return errDSGACreationPlan
 		}
@@ -66,7 +81,7 @@ func (v dsgaVMProfile) validate() error {
 }
 
 func (v dsgaVMProfile) validateResourceBudget(b dsgaBootstrapBudget) error {
-	if v.validate() != nil || (v.ProtocolVersion != 2 && v.ProtocolVersion != 3) || v.ResourceLimits == nil || b.validate() != nil {
+	if v.validate() != nil || (v.ProtocolVersion != 2 && v.ProtocolVersion != 3 && v.ProtocolVersion != 4) || v.ResourceLimits == nil || b.validate() != nil {
 		return errDSGACreationPlan
 	}
 	upper, err := v.ResourceLimits.TotalUpperBytes()
@@ -83,6 +98,7 @@ func (v dsgaVMProfile) clone() dsgaVMProfile {
 		v.ResourceLimits = &copy
 	}
 	v.Placement = v.Placement.clone()
+	v.GenericGuest = v.GenericGuest.clone()
 	return v
 }
 
@@ -107,7 +123,7 @@ func renderDSGAVM(p createPayload, plan dsgaCreationPlan) (*vmv1.VirtualMachine,
 	architecture := vmv1.CPUArchitecture(v.Architecture)
 	// v2原投影保持QMP供同UID历史核对；v3生产固定Sysfs，不能由env切换。
 	scaling := vmv1.CpuScalingModeQMP
-	if v.ProtocolVersion == 3 {
+	if v.ProtocolVersion == 3 || v.generic() {
 		scaling = vmv1.CpuScalingModeSysfs
 	}
 	grace := int64(5)
@@ -150,8 +166,17 @@ func renderDSGAVM(p createPayload, plan dsgaCreationPlan) (*vmv1.VirtualMachine,
 			Disks: []vmv1.Disk{{Name: "compute-config", MountPath: dsgaConfigMount, ReadOnly: boolean(true), Watch: boolean(false),
 				DiskSource: vmv1.DiskSource{Secret: &core.SecretVolumeSource{SecretName: name + "-config", Items: []core.KeyToPath{{Key: "config.json", Path: "config.json"}}}}}},
 		}}
-	if v.ProtocolVersion == 3 {
+	if v.ProtocolVersion == 3 || v.generic() {
 		v.Placement.apply(vm)
+	}
+	if v.generic() {
+		// 通用Guest沿固定镜像启动；配置由原Controller交公钥ISO，再由Worker
+		// 调原生认证configure。不能恢复旧command/env/mount脚本绕过Guest检查。
+		vm.Spec.Guest.Command = nil
+		vm.Spec.Guest.Args = nil
+		vm.Spec.Guest.Env = nil
+		vm.Spec.Disks = nil
+		vm.Spec.TLS = nil
 	}
 	if _, err := vm.ValidateCreate(); err != nil {
 		return nil, errDSGACreationPlan
@@ -197,7 +222,7 @@ func (binding *dsgaCreationBinding) prepareVM(ctx context.Context) (*vmv1.Virtua
 	}
 	// 历史v2只允许已绑定同UID的原对象恢复核对；未绑定不能借兼容路径
 	// 新POST一个没有冻结节点授权的VM。检查先于任何Kube请求，不补env。
-	if plan.VM.ProtocolVersion != 3 && current.vmUID == "" {
+	if plan.VM.ProtocolVersion != 3 && !plan.VM.generic() && current.vmUID == "" {
 		return nil, errDSGACreationPlan
 	}
 	wanted, err := renderDSGAVM(current.intent.createPayload, plan)
