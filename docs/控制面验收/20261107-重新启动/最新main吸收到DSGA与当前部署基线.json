@@ -1,0 +1,280 @@
+{
+  "记录时间": "2026-11-07T13:25:07.205383+00:00",
+  "仓库": "william-lbn/control-plane",
+  "目标分支": "codex/dsga-control-plane-v3-20261020",
+  "来源main": "e15e6c79f4c5b80eb004050eeafea866ffd30c0e",
+  "合并前DSGA": "64717bd2af1ee94e465f69b5d99bce325a374531",
+  "合并提交": "522fff8513e3cd904b6589ea4617cac1aa868b3d",
+  "此前业务整合提交": "2b8b9e3012bb59c7f2ce22a82cfc22d354454173",
+  "main五项更新": [
+    "6e0214c 分支恢复身份和回滚基础",
+    "6ed00f5 Storage GC、独立数据网关和Functions用量",
+    "b45365f 客户端目录与六项新增操作",
+    "4e6f95f Functions edge隔离与恢复式功能探针",
+    "e15e6c7 Functions执行界面与受限Storage交付"
+  ],
+  "差异审计": {
+    "main增量文件数": 126,
+    "字节一致": 119,
+    "已审查叠加DSGA及文档": 7,
+    "缺失文件": 0,
+    "不同文件": {
+      "README.md": "当前方案入口",
+      "api/internal/control/cluster.go": "保留branch reset同时增加原受管实例保护",
+      "api/internal/control/compute_gateway.go": "保留configure并增加DSGA专用鉴权/原生配置身份兼容",
+      "api/internal/control/handlers.go": "保留main能力并增加postgres_runtimes",
+      "api/internal/control/main.go": "保留独立服务角色并增加迁移登记与内部通路检查",
+      "contracts/openapi-v1.json": "保留全部224 paths，增加运行时目录和PG版本能力",
+      "docs/FUNCTIONAL-STATUS-2026-10-21.md": "保留原历史状态，加当前总方案索引"
+    }
+  },
+  "合并前后文件树": "5446e23508832efdad01782229c8d2511ea7db73",
+  "合并修改业务代码": false,
+  "main是DSGA祖先": true,
+  "相对main落后提交数": 0,
+  "验证声明": "历史合并文件树完全不变，沿用已归档的受影响测试，不重复测试未修改业务。不代表控制面全功能已验收。",
+  "当前K8s适配基线": {
+    "observed_at": "2026-11-07T13:19:22.670275+00:00",
+    "hostname": "worker-118",
+    "components": [
+      {
+        "namespace": "kube-system",
+        "container": "autoscale-scheduler",
+        "image": "127.0.0.1:5001/neon-candidate/autoscale-scheduler@sha256:c47682fed7a1dca8e445f55360648e00c72def25770dbc9f99ca1e19aa9ee602",
+        "actual_image_ids": [
+          "127.0.0.1:5001/neon-candidate/autoscale-scheduler@sha256:c47682fed7a1dca8e445f55360648e00c72def25770dbc9f99ca1e19aa9ee602"
+        ],
+        "pods": [
+          "autoscale-scheduler-57df679cf-58ndt"
+        ],
+        "nodes": [
+          "worker-118"
+        ]
+      },
+      {
+        "namespace": "kube-system",
+        "container": "autoscaler-agent",
+        "image": "127.0.0.1:5001/neon-candidate/autoscaler-agent@sha256:34cbdd61ac9c3977e052a62a9c2fbf7c8795dcfac76c702ed0458e32cd4ace55",
+        "actual_image_ids": [
+          "127.0.0.1:5001/neon-candidate/autoscaler-agent@sha256:34cbdd61ac9c3977e052a62a9c2fbf7c8795dcfac76c702ed0458e32cd4ace55"
+        ],
+        "pods": [
+          "autoscaler-agent-69tb4",
+          "autoscaler-agent-pqvb5",
+          "autoscaler-agent-v7cl5"
+        ],
+        "nodes": [
+          "worker-117",
+          "worker-118",
+          "worker-119"
+        ]
+      },
+      {
+        "namespace": "neon",
+        "container": "postgres",
+        "image": "docker.io/library/postgres@sha256:a3b7f434b2dc57ce85a67e171163eb8ab1a1ebcb39d27484661f26b1dfbe30d6",
+        "actual_image_ids": [
+          "docker.io/library/import-2026-11-03@sha256:a3b7f434b2dc57ce85a67e171163eb8ab1a1ebcb39d27484661f26b1dfbe30d6",
+          "docker.io/library/postgres@sha256:a3b7f434b2dc57ce85a67e171163eb8ab1a1ebcb39d27484661f26b1dfbe30d6"
+        ],
+        "pods": [
+          "controller-db-8655744c9b-4tf85",
+          "neon-control-v2-db-58dcdb9949-2ccrt"
+        ],
+        "nodes": [
+          "worker-118",
+          "worker-119"
+        ]
+      },
+      {
+        "namespace": "neon",
+        "container": "neonvm-runner",
+        "image": "127.0.0.1:5001/neon-candidate/neonvm-runner@sha256:b0320526e3d6c93f97a0a5a93d804482e5e895f63d0eb36fe8dbc310bcef1ff6",
+        "actual_image_ids": [
+          "127.0.0.1:5001/neon-candidate/neonvm-runner@sha256:b0320526e3d6c93f97a0a5a93d804482e5e895f63d0eb36fe8dbc310bcef1ff6"
+        ],
+        "pods": [
+          "cp-24c41e23bb104ead-tjhzc"
+        ],
+        "nodes": [
+          "worker-117"
+        ]
+      },
+      {
+        "namespace": "neon",
+        "container": "minio",
+        "image": "127.0.0.1:5001/neon-test-only/minio@sha256:ae71c80e096ab7609b7e574b70d535a0061702ff2d505165508a1416cfc128b8",
+        "actual_image_ids": [
+          "127.0.0.1:5001/neon-test-only/minio@sha256:ae71c80e096ab7609b7e574b70d535a0061702ff2d505165508a1416cfc128b8"
+        ],
+        "pods": [
+          "minio-79f6f9578d-xg9pc"
+        ],
+        "nodes": [
+          "worker-118"
+        ]
+      },
+      {
+        "namespace": "neon",
+        "container": "gateway",
+        "image": "127.0.0.1:5001/neon-candidate/compute-gateway@sha256:3912944a07c9711d70701546e11504fd0dbe84d557a471d437f5576c0a299a94",
+        "actual_image_ids": [
+          "127.0.0.1:5001/neon-candidate/compute-gateway@sha256:3912944a07c9711d70701546e11504fd0dbe84d557a471d437f5576c0a299a94"
+        ],
+        "pods": [
+          "neon-compute-management-gateway-6d768b5b67-pjm5g"
+        ],
+        "nodes": [
+          "worker-119"
+        ]
+      },
+      {
+        "namespace": "neon",
+        "container": "adapter",
+        "image": "127.0.0.1:5001/neon-candidate/control-adapter@sha256:bb98132de06b2c1e7d93347552ba3fb6733c824101efa8d2e126a854ec2ae0e6",
+        "actual_image_ids": [
+          "127.0.0.1:5001/neon-candidate/control-adapter@sha256:bb98132de06b2c1e7d93347552ba3fb6733c824101efa8d2e126a854ec2ae0e6"
+        ],
+        "pods": [
+          "neon-control-adapter-58b89667dd-bct6j"
+        ],
+        "nodes": [
+          "worker-119"
+        ]
+      },
+      {
+        "namespace": "neon",
+        "container": "pageserver",
+        "image": "127.0.0.1:5001/neon-candidate/pageserver@sha256:19a7b31b32c7ef3ec5de766a36a25c3bb225c56f8b982a68e3324b52d6898c1b",
+        "actual_image_ids": [
+          "127.0.0.1:5001/neon-candidate/pageserver@sha256:19a7b31b32c7ef3ec5de766a36a25c3bb225c56f8b982a68e3324b52d6898c1b"
+        ],
+        "pods": [
+          "pageserver-5576658b64-vxshs"
+        ],
+        "nodes": [
+          "worker-119"
+        ]
+      },
+      {
+        "namespace": "neon",
+        "container": "proxy",
+        "image": "127.0.0.1:5001/neon/proxy@sha256:a1459708aac0823600b163eb07b5f4ac320c4ae606203318aa49cdb658d6980d",
+        "actual_image_ids": [
+          "127.0.0.1:5001/neon/proxy@sha256:a1459708aac0823600b163eb07b5f4ac320c4ae606203318aa49cdb658d6980d"
+        ],
+        "pods": [
+          "proxy-6d8dbb8c8f-fll2p"
+        ],
+        "nodes": [
+          "worker-119"
+        ]
+      },
+      {
+        "namespace": "neon",
+        "container": "safekeeper",
+        "image": "127.0.0.1:5001/neon-candidate/safekeeper@sha256:952118788c5709ad01659224995b8f78bce12ed4276b8ee1fce72bccd9fac274",
+        "actual_image_ids": [
+          "127.0.0.1:5001/neon-candidate/safekeeper@sha256:952118788c5709ad01659224995b8f78bce12ed4276b8ee1fce72bccd9fac274"
+        ],
+        "pods": [
+          "safekeeper1-74f4976bbc-ssrv2",
+          "safekeeper2-7754fb5b49-8qpj8",
+          "safekeeper3-78579ffcdc-6gvqg"
+        ],
+        "nodes": [
+          "worker-117",
+          "worker-118",
+          "worker-119"
+        ]
+      },
+      {
+        "namespace": "neon",
+        "container": "storage-broker",
+        "image": "127.0.0.1:5001/neon-candidate/storage-broker@sha256:db19776abc16b104f96bcbc116300cf93eedb78b6acf43af2c1e13fe8dfcd9aa",
+        "actual_image_ids": [
+          "127.0.0.1:5001/neon-candidate/storage-broker@sha256:db19776abc16b104f96bcbc116300cf93eedb78b6acf43af2c1e13fe8dfcd9aa"
+        ],
+        "pods": [
+          "storage-broker-86d6f984ff-fm65j"
+        ],
+        "nodes": [
+          "worker-118"
+        ]
+      },
+      {
+        "namespace": "neon",
+        "container": "controller",
+        "image": "127.0.0.1:5001/neon-candidate/storage-controller@sha256:af83b80b6406ba7fcb0a64bf531644f0bdcecd41033356288d6cd99c567bb6fa",
+        "actual_image_ids": [
+          "127.0.0.1:5001/neon-candidate/storage-controller@sha256:af83b80b6406ba7fcb0a64bf531644f0bdcecd41033356288d6cd99c567bb6fa"
+        ],
+        "pods": [
+          "storage-controller-7fdc66fd5-tdhl5"
+        ],
+        "nodes": [
+          "worker-119"
+        ]
+      },
+      {
+        "namespace": "neonvm-system",
+        "container": "manager",
+        "image": "127.0.0.1:5001/neon-candidate/neonvm-controller@sha256:4535077a4014a53849e0927ee9b3ddc21b3861600418930b1baf78e8267e9370",
+        "actual_image_ids": [
+          "127.0.0.1:5001/neon-candidate/neonvm-controller@sha256:4535077a4014a53849e0927ee9b3ddc21b3861600418930b1baf78e8267e9370"
+        ],
+        "pods": [
+          "neonvm-controller-74df946d64-25cz8"
+        ],
+        "nodes": [
+          "worker-118"
+        ]
+      },
+      {
+        "namespace": "neonvm-system",
+        "container": "generic-device-plugin",
+        "image": "docker.io/squat/generic-device-plugin@sha256:dc192e164c69b03f156765793a1be62ca437709ae477b27ca7d8f3dcf5021576",
+        "actual_image_ids": [
+          "docker.io/library/import-2026-11-03@sha256:dc192e164c69b03f156765793a1be62ca437709ae477b27ca7d8f3dcf5021576",
+          "docker.io/squat/generic-device-plugin@sha256:dc192e164c69b03f156765793a1be62ca437709ae477b27ca7d8f3dcf5021576"
+        ],
+        "pods": [
+          "neonvm-device-plugin-6n9j2",
+          "neonvm-device-plugin-st88t",
+          "neonvm-device-plugin-th4bj"
+        ],
+        "nodes": [
+          "worker-117",
+          "worker-118",
+          "worker-119"
+        ]
+      },
+      {
+        "namespace": "neonvm-system",
+        "container": "neonvm-runner-loader",
+        "image": "127.0.0.1:5001/neon-candidate/neonvm-runner@sha256:b0320526e3d6c93f97a0a5a93d804482e5e895f63d0eb36fe8dbc310bcef1ff6",
+        "actual_image_ids": [
+          "127.0.0.1:5001/neon-candidate/neonvm-runner@sha256:b0320526e3d6c93f97a0a5a93d804482e5e895f63d0eb36fe8dbc310bcef1ff6"
+        ],
+        "pods": [
+          "neonvm-runner-image-loader-kjzjw",
+          "neonvm-runner-image-loader-nnjqm",
+          "neonvm-runner-image-loader-sfrs2"
+        ],
+        "nodes": [
+          "worker-117",
+          "worker-118",
+          "worker-119"
+        ]
+      }
+    ],
+    "autoscaling_api_diff_from_cp_dependency": ""
+  },
+  "剩余主链": [
+    "通用Guest启动与可信实例身份绑定",
+    "原生管理认证及CP投影与当前发行一致",
+    "新实例资格与原Owner在线策略接入",
+    "公开API新建PG17/18项目、SQL、策略及真实状态端到端"
+  ],
+  "完整控制面验收": "NOT_COMPLETE"
+}
