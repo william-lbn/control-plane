@@ -183,6 +183,9 @@ func (plan dsgaCreationPlan) validate(p createPayload) error {
 		plan.Budget.MinimumGuestMemoryBytes < slot || plan.Budget.MinimumGuestMemoryBytes%slot != 0 || plan.Budget.MinimumGuestMemoryBytes > minGuest {
 		return errDSGACreationPlan
 	}
+	if err := plan.validateSupply(p); err != nil {
+		return err
+	}
 	if err := plan.Budget.validate(); err != nil {
 		return err
 	}

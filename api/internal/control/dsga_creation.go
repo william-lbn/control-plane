@@ -34,6 +34,7 @@ type dsgaCreationInput struct {
 	ExpectedConfigUID types.UID
 	BindConfig        func(context.Context, *core.Secret) error
 	Render            func(context.Context, *vmv1.VirtualMachine) (map[string][]byte, error)
+	BeforeRelease     func(context.Context, *vmv1.VirtualMachine) error
 }
 
 var errDSGACreationIdentity = errors.New("DSGA creation identity or immutable inputs differ")
@@ -211,6 +212,11 @@ func (k *kubeClient) prepareDSGACreation(ctx context.Context, input dsgaCreation
 		return nil, err
 	}
 	configUID := secret.UID
+	if input.BeforeRelease != nil {
+		if err := input.BeforeRelease(ctx, vm); err != nil {
+			return nil, err
+		}
+	}
 	if !vm.Spec.DSGABootstrap.Ready {
 		// 只用同原绑定当前完整快照CAS；普通finalizer/RV更新可安全造成冲突，
 		// 下一次原Operation重读处理，不能去掉RV或反复PATCH直到“看似成功”。

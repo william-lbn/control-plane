@@ -232,7 +232,7 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 					stepErr = s.setCreateStep(runCtx, id, workerID, 0, "running", "")
 				}
 				if stepErr == nil {
-					stepErr = s.kube.reconcileVMBounds(runCtx, p)
+					stepErr = s.reconcileEndpointBounds(runCtx, id, workerID, p)
 				}
 				if stepErr == nil {
 					stepErr = s.setCreateStep(runCtx, id, workerID, 0, "succeeded", "")

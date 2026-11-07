@@ -1,0 +1,169 @@
+{
+  "time": "2026-11-07T17:13:03.469186+00:00",
+  "branch": "codex/dsga-control-plane-v3-20261020",
+  "autoscaling_common_module": "4bac7a53bbf8daff835df7ca04fa7f658ebd5bb4",
+  "qualifier_cli": "f3e345a4cd027e3c1f19ab456377222438083119",
+  "final_run": ".local/dev-20261107/supply-validation-f3f7a3e1",
+  "result": {
+    "pass_root": 42,
+    "pass_sub": 141
+  },
+  "vet": "PASS",
+  "api_build": "PASS",
+  "worker_build": "PASS",
+  "scope": "真实隔离元数据库及Kube/原生HTTP协议夹具；不是新项目集群验收",
+  "original_failures": "原GOROOT/编译及fixture外键/生命周期/操作互斥失败全部保留；修复后有最终完整通过轮",
+  "live": "原生存储管理HTTPS/JWT五项通过；新Agent三节点Ready；通用PG17/PG18 Guest只预载；公开新项目/策略/实际内存NOT_RUN",
+  "logs": [
+    {
+      "path": ".local/dev-20261107/supply-compile-30356b44/test.jsonl",
+      "sha256": "7f57b201221bdcff376b001174e44be9faf9679d95faabaf4ed9fdf9cf8fa71d",
+      "bytes": 1371
+    },
+    {
+      "path": ".local/dev-20261107/supply-compile-30356b44/test.exit",
+      "sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+      "bytes": 1
+    },
+    {
+      "path": ".local/dev-20261107/supply-first-665cb0a6/test.jsonl",
+      "sha256": "e5dc6872e4643d2c39a44b7828bdf93e9d3530d0c544dc27913efe146154a222",
+      "bytes": 22783
+    },
+    {
+      "path": ".local/dev-20261107/supply-first-665cb0a6/test.exit",
+      "sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+      "bytes": 1
+    },
+    {
+      "path": ".local/dev-20261107/supply-validation-421d0a5b/test.jsonl",
+      "sha256": "f5ef1b4e9b2845018c7707562d7277ed127597e49e47e490224db5089ba7017f",
+      "bytes": 112460
+    },
+    {
+      "path": ".local/dev-20261107/supply-validation-421d0a5b/test.exit",
+      "sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+      "bytes": 1
+    },
+    {
+      "path": ".local/dev-20261107/supply-validation-476b8af7/test.jsonl",
+      "sha256": "ec9f4f86f460867ddb7f8bd31e03a60f306cde4313cb01fb038325f767b7680c",
+      "bytes": 1820
+    },
+    {
+      "path": ".local/dev-20261107/supply-validation-476b8af7/test.exit",
+      "sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+      "bytes": 1
+    },
+    {
+      "path": ".local/dev-20261107/supply-validation-4af74c07/test.jsonl",
+      "sha256": "947863b7baa9113bedd2681f8705a8f080bc191e7c9a9ccbfd9bfc36a0569c00",
+      "bytes": 47126
+    },
+    {
+      "path": ".local/dev-20261107/supply-validation-4af74c07/test.exit",
+      "sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "bytes": 1
+    },
+    {
+      "path": ".local/dev-20261107/supply-validation-4d717e13/test.jsonl",
+      "sha256": "f5f66eba2999123d03b19315c9d9d93d7e3e4203ed52b12f528447f7b7e3146a",
+      "bytes": 27005
+    },
+    {
+      "path": ".local/dev-20261107/supply-validation-4d717e13/test.exit",
+      "sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "bytes": 1
+    },
+    {
+      "path": ".local/dev-20261107/supply-validation-5e29b92a/test.jsonl",
+      "sha256": "714f1ac4155339b4cef3616731b2d0d8724c6956c2d8e0aec49d3a4863dd660d",
+      "bytes": 16272
+    },
+    {
+      "path": ".local/dev-20261107/supply-validation-5e29b92a/test.exit",
+      "sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+      "bytes": 1
+    },
+    {
+      "path": ".local/dev-20261107/supply-validation-70b5b065/test.jsonl",
+      "sha256": "54173cfa339f18117973f1786287f65d41f5dbc2c1dd9cf604e7bdb955acaf36",
+      "bytes": 74542
+    },
+    {
+      "path": ".local/dev-20261107/supply-validation-70b5b065/test.exit",
+      "sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+      "bytes": 1
+    },
+    {
+      "path": ".local/dev-20261107/supply-validation-8b9caf3e/test.jsonl",
+      "sha256": "18b423756711140da282d415ac4a8742ae5775f833895b673aa96b27ba42f73a",
+      "bytes": 221584
+    },
+    {
+      "path": ".local/dev-20261107/supply-validation-8b9caf3e/test.exit",
+      "sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+      "bytes": 1
+    },
+    {
+      "path": ".local/dev-20261107/supply-validation-a7ea9ec0/test.jsonl",
+      "sha256": "e57addd972fedb05ab37b5da212a137532c9c9d907756e65152b03b3615337f5",
+      "bytes": 31866
+    },
+    {
+      "path": ".local/dev-20261107/supply-validation-a7ea9ec0/test.exit",
+      "sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "bytes": 1
+    },
+    {
+      "path": ".local/dev-20261107/supply-validation-c50cdc1c/test.jsonl",
+      "sha256": "bb2a2d7382ef5f9ac80507209312271b49de34a494573bcc4411ef51192da3bc",
+      "bytes": 245617
+    },
+    {
+      "path": ".local/dev-20261107/supply-validation-c50cdc1c/test.exit",
+      "sha256": "6b86b273ff34fce19d6b804eff5a3f5747ada4eaa22f1d49c01e52ddb7875b4b",
+      "bytes": 1
+    },
+    {
+      "path": ".local/dev-20261107/supply-validation-f3f7a3e1/test.jsonl",
+      "sha256": "c42aff5149c0b02ad1aa298dfbdefc3c64c45d2b6ab99234b1d6b7d7141d9e1d",
+      "bytes": 196250
+    },
+    {
+      "path": ".local/dev-20261107/supply-validation-f3f7a3e1/vet.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": ".local/dev-20261107/supply-validation-f3f7a3e1/test.exit",
+      "sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "bytes": 1
+    },
+    {
+      "path": ".local/dev-20261107/supply-validation-f3f7a3e1/api-build.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": ".local/dev-20261107/supply-validation-f3f7a3e1/worker-build.log",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    {
+      "path": ".local/dev-20261107/supply-validation-f3f7a3e1/worker-build.exit",
+      "sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "bytes": 1
+    },
+    {
+      "path": ".local/dev-20261107/supply-validation-f3f7a3e1/vet.exit",
+      "sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "bytes": 1
+    },
+    {
+      "path": ".local/dev-20261107/supply-validation-f3f7a3e1/api-build.exit",
+      "sha256": "5feceb66ffc86f38d952786c6d696c79c2dbc239dd4e91b46729d73a27fb57e9",
+      "bytes": 1
+    }
+  ]
+}

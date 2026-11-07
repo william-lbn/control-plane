@@ -1,6 +1,6 @@
 # C1 自动供应与通用 Guest 接线方案
 
-状态：2026-11-07 通用Guest与控制面启动接线已实现并通过定向测试，候选镜像已构建；真实新项目、存储认证、动态资格及在线策略仍未完成。本文是[平台总方案](平台总方案与演进规划.md)的 C1 细化，不另设总计划，不代替真实验收。
+状态：2026-11-08 通用PG17/18 Guest已三节点预载；原生存储管理HTTPS/JWT实际验证通过。动态资格和在线策略的共同控制面接线正在最终验证，新Agent已三节点Ready；真实公开新项目端到端尚未验收。本文是[平台总方案](平台总方案与演进规划.md)的 C1 细化，不另设总计划，不代替真实验收。
 
 ## 1. 当前已经证明什么
 
@@ -76,3 +76,17 @@ Autoscaling原分支 `44e4f74682f4ffb26f1f1188e8450eb5efd5e64c` 已推送。固�
 定向验证22主83子通过；补充提交前Running核验后11主37子通过，与前轮重叠不相加。vet、Mac API/Worker编译及Linux四个启动工具编译通过。原失败和修正记录保留。**真实公开创建仍未运行，不是控制面产品验收。**
 
 PG18通用Guest候选：`127.0.0.1:5001/neon-candidate/pg18-guest:generic-44e4f74-25800f4f`，digest `sha256:f9ad9bbce9903838b941b79b98c97957f4fa0a3c05c7b69d191ba750b98692a6`。118 Docker已可见；PG18原postgres ELF未变，候选尚未部署/端到端验收。
+
+## 8. 本轮自动供应与在线策略实现边界
+
+发行目录v2要求GenericGuest profile2：固定Qualifier镜像、独立平台namespace、原只读UDS、原三节点Host租约、已支持容量目标及原自动策略参数。发布时完整冻结，租户请求不能传入这些管理配置。原catalog1/Guest1和已接受Operation保持原字节读取，不补写历史资格。
+
+原Worker在VM配置绑定之后、启动屏障释放之前，为该VM创建限定Runner权限；资格Job使用独立SA、原Scheduler及同一已调度节点，只读原Agent UDS。Job直接运行原Collector→Issuer，不依赖scratch镜像里的shell，不获取业务凭据。原Operation保存Job UID及资格来源；丢回复只核对同一对象，不开新Job重放未知签发。权限对象不是预算证明，也不新增资源分配器。
+
+原Agent从平台namespace读取runtime selection，并在同一Owner串行循环内接收资格及策略。公开PATCH沿原If-Match/Idempotency-Key/Operation，冻结单一新代次，等待Agent采纳。原待决资源动作先收敛，Unknown/fencing和真实normal硬降限保持。GET `/api/v1/projects/{project}/endpoints/{endpoint}/autoscaling`分开返回期望范围、已应用代次和真实VM/PG缓冲区/工作域memory.max；采纳代次不等于内存动作完成。读取暂时不可确认只返回503，不停SQL。
+
+创建时v2当前发行必须选择完整已验证容量范围；创建后可通过公开PATCH在该范围内选择固定容量或收窄策略。未覆盖的出生容量组合明确拒绝，不能从已有容量数字推断已认证。PG17/18共同代码、共同HTTP合同，不按版本复制业务流程。
+
+Agent镜像74024b08…、Qualifier fd07cfe0…、通用PG17 Guest78edc1fa…及通用PG18 Guest f9ad9bbc…均已在117/118/119预载。原Helm neon-autoscaler revision62已更新Agent，3/3 Ready；原VM/PG boot保持。原生存储认证5项通过。正式资格Job/公开创建/在线策略实际内存闭环仍NOT_RUN；测试夹具与编译结果单独记录。
+
+部署身份通过自有Helm `neon-control-runtime-access` 管理。它只生成SA/RBAC，不是新服务；Mac开发与集群发行复用相同身份边界。API可读取当前状态并保留新创建凭据；Worker负责原Operation外部写；Qualifier只取证并发布原资格。Kubernetes防权限提升检查保留，不授bind/escalate或cluster-admin；只读Node名单固定117/118/119。需要按VM生成的细粒度角色由原Worker创建。业务用户和Console不持这些平台SA或原生JWT。

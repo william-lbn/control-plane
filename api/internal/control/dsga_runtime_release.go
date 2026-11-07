@@ -38,7 +38,7 @@ func readDSGARuntimePolicies(namespace string) ([]dsgaProjectPolicy, error) {
 		return []dsgaProjectPolicy{policy}, nil
 	}
 	var catalog dsgaRuntimeCatalog
-	if os.Getenv("NEON_DSGA_CREATION_POLICY") != "" || decodeDSGAObject([]byte(raw), &catalog) != nil || catalog.ProtocolVersion != 1 || len(catalog.Releases) == 0 || len(catalog.Releases) > 32 {
+	if os.Getenv("NEON_DSGA_CREATION_POLICY") != "" || decodeDSGAObject([]byte(raw), &catalog) != nil || (catalog.ProtocolVersion != 1 && catalog.ProtocolVersion != 2) || len(catalog.Releases) == 0 || len(catalog.Releases) > 32 {
 		return nil, errDSGACreationPlan
 	}
 	type key struct {
@@ -47,6 +47,10 @@ func readDSGARuntimePolicies(namespace string) ([]dsgaProjectPolicy, error) {
 	}
 	seen := map[key]bool{}
 	for _, policy := range catalog.Releases {
+		// v2目录必须自动供应；历史v1仅保留原发行读取，不能默默补运行配置。
+		if catalog.ProtocolVersion == 2 && policy.Creation.VM.supply() == nil {
+			return nil, errDSGACreationPlan
+		}
 		// 新目录显式选择PG版本及硬预算合同v3；历史v2不被迁移或自动改写。
 		if policy.Creation.PostgresVersion == 0 || policy.Creation.NativeBootstrapVersion.selected() != 3 {
 			return nil, errDSGACreationPlan

@@ -11,8 +11,9 @@ import (
 // v4只冻结通用Guest的公开构建策略。它是发行意图，不是资格报告或运行时证明；
 // 真实原SecretUID/Runtime摘要仍由原Controller/Runner填写和核验。
 type dsgaGenericGuestProfile struct {
-	ProtocolVersion uint32          `json:"protocol_version"`
-	PolicyTemplates json.RawMessage `json:"policy_templates"`
+	ProtocolVersion uint32             `json:"protocol_version"`
+	PolicyTemplates json.RawMessage    `json:"policy_templates"`
+	Supply          *dsgaSupplyProfile `json:"supply,omitempty"`
 }
 type dsgaGuestPolicyTemplate struct {
 	Asset  string          `json:"asset"`
@@ -20,7 +21,10 @@ type dsgaGuestPolicyTemplate struct {
 }
 
 func (p *dsgaGenericGuestProfile) templates() ([]dsgaGuestPolicyTemplate, error) {
-	if p == nil || p.ProtocolVersion != 1 || len(p.PolicyTemplates) > 16<<10 || dsgapi.ValidateJSON(p.PolicyTemplates, 16<<10, 8192) != nil {
+	if p == nil || (p.ProtocolVersion != 1 && p.ProtocolVersion != 2) || len(p.PolicyTemplates) > 16<<10 || dsgapi.ValidateJSON(p.PolicyTemplates, 16<<10, 8192) != nil {
+		return nil, errDSGACreationPlan
+	}
+	if p.ProtocolVersion == 1 && p.Supply != nil || p.ProtocolVersion == 2 && (p.Supply == nil || p.Supply.validate() != nil) {
 		return nil, errDSGACreationPlan
 	}
 	var envelope struct {
@@ -66,6 +70,7 @@ func (p *dsgaGenericGuestProfile) clone() *dsgaGenericGuestProfile {
 	}
 	out := *p
 	out.PolicyTemplates = bytes.Clone(p.PolicyTemplates)
+	out.Supply = p.Supply.clone()
 	return &out
 }
 func (v dsgaVMProfile) generic() bool { return v.ProtocolVersion == 4 }

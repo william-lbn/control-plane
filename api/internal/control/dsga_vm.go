@@ -172,6 +172,9 @@ func renderDSGAVM(p createPayload, plan dsgaCreationPlan) (*vmv1.VirtualMachine,
 	if v.generic() {
 		// 通用Guest沿固定镜像启动；配置由原Controller交公钥ISO，再由Worker
 		// 调原生认证configure。不能恢复旧command/env/mount脚本绕过Guest检查。
+		if v.supply() != nil {
+			vm.Spec.ServiceAccountName = dsgaRunnerAccount(name)
+		}
 		vm.Spec.Guest.Command = nil
 		vm.Spec.Guest.Args = nil
 		vm.Spec.Guest.Env = nil
@@ -244,6 +247,16 @@ func (binding *dsgaCreationBinding) prepareVM(ctx context.Context) (*vmv1.Virtua
 			return current.bindVM(ctx, vm)
 		},
 		BindConfig: current.bindConfig,
+		BeforeRelease: func(ctx context.Context, vm *vmv1.VirtualMachine) error {
+			if plan.VM.supply() == nil {
+				return nil
+			}
+			// 在原Config绑定后再次核当前Operation lease，随后释放原启动屏障。
+			if _, err := current.server.loadDSGACreationBinding(ctx, current.operationID, current.workerID); err != nil {
+				return err
+			}
+			return current.server.kube.ensureDSGASupplyAccess(ctx, vm, plan)
+		},
 		Render: func(ctx context.Context, vm *vmv1.VirtualMachine) (map[string][]byte, error) {
 			if err := check(vm); err != nil {
 				return nil, err

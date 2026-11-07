@@ -56,6 +56,20 @@ func (s *server) reconcileDSGAProject(ctx context.Context, binding *dsgaCreation
 		if err != nil {
 			return err
 		}
+		if err := binding.recordInitialization(ctx, initialization); err != nil {
+			return err
+		}
+		if err := binding.provisionDSGARuntime(ctx, initialization); err != nil {
+			return err
+		}
+		originalInstance := initialization.Observed.Instance
+		initialization, err = binding.waitOriginalInitialization(ctx)
+		if err != nil {
+			return err
+		}
+		if initialization.Observed.Instance != originalInstance {
+			return errDSGACreationIdentity
+		}
 		return binding.recordInitialization(ctx, initialization)
 	}); err != nil {
 		return err

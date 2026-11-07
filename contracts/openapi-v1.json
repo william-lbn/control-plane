@@ -10684,6 +10684,136 @@
             "minimum": 1
           }
         }
+      },
+      "EndpointMemoryAutoscaling": {
+        "type": "object",
+        "required": [
+          "protocol_version",
+          "postgres_version",
+          "desired_generation",
+          "applied_generation",
+          "state",
+          "desired",
+          "actual"
+        ],
+        "properties": {
+          "protocol_version": {
+            "type": "integer",
+            "enum": [
+              1
+            ]
+          },
+          "postgres_version": {
+            "type": "integer",
+            "enum": [
+              17,
+              18
+            ]
+          },
+          "desired_generation": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "Exact unsigned 64-bit decimal string, never a floating-point counter."
+          },
+          "applied_generation": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "description": "Exact unsigned 64-bit decimal string, never a floating-point counter."
+          },
+          "state": {
+            "type": "string"
+          },
+          "desired": {
+            "type": "object",
+            "required": [
+              "min_memory_mib",
+              "max_memory_mib"
+            ],
+            "properties": {
+              "min_memory_mib": {
+                "type": "integer"
+              },
+              "max_memory_mib": {
+                "type": "integer"
+              }
+            }
+          },
+          "actual": {
+            "type": "object",
+            "required": [
+              "observed_at",
+              "vm_memory_bytes",
+              "shared_buffer_bytes",
+              "work_memory_max_bytes",
+              "capacity_generation",
+              "sql_admission_open"
+            ],
+            "properties": {
+              "observed_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "vm_memory_bytes": {
+                "type": "string",
+                "pattern": "^[0-9]+$",
+                "description": "Exact unsigned 64-bit decimal string, never a floating-point counter."
+              },
+              "shared_buffer_bytes": {
+                "type": "string",
+                "pattern": "^[0-9]+$",
+                "description": "Exact unsigned 64-bit decimal string, never a floating-point counter."
+              },
+              "work_memory_max_bytes": {
+                "type": "string",
+                "pattern": "^[0-9]+$",
+                "description": "Confirmed hard memory.max of the PostgreSQL charged work domain; not RSS and not PostgreSQL work_mem."
+              },
+              "capacity_generation": {
+                "type": "string",
+                "pattern": "^[0-9]+$",
+                "description": "Exact unsigned 64-bit decimal string, never a floating-point counter."
+              },
+              "sql_admission_open": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      },
+      "RuntimeAutoscalingBounds": {
+        "type": "object",
+        "required": [
+          "min_cpu_milli",
+          "max_cpu_milli",
+          "min_memory_mib",
+          "max_memory_mib"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "min_cpu_milli": {
+            "type": "integer",
+            "minimum": 250,
+            "multipleOf": 250,
+            "maximum": 2147483647
+          },
+          "max_cpu_milli": {
+            "type": "integer",
+            "minimum": 250,
+            "multipleOf": 250,
+            "maximum": 2147483647
+          },
+          "min_memory_mib": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "max_memory_mib": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          }
+        },
+        "description": "For configured PG memory releases only: CPU bounds remain the original accepted values. Memory must fit the original immutable class, slot alignment, and at least one qualified target. Fixed min=max is valid. Server enforces actual release capabilities."
       }
     },
     "responses": {
@@ -11712,7 +11842,14 @@
                 ],
                 "properties": {
                   "autoscaling": {
-                    "$ref": "#/components/schemas/AutoscalingBounds"
+                    "anyOf": [
+                      {
+                        "$ref": "#/components/schemas/AutoscalingBounds"
+                      },
+                      {
+                        "$ref": "#/components/schemas/RuntimeAutoscalingBounds"
+                      }
+                    ]
                   }
                 }
               }
@@ -11756,7 +11893,7 @@
             "$ref": "#/components/responses/Error"
           }
         },
-        "description": "Queues an idempotent autoscaling soft-bounds update. Reconciliation validates endpoint ownership and immutable NeonVM capacity, persists the Proxy cold-wake template with Secret resourceVersion compare-and-swap, then patches the live VM with UID/resourceVersion checks and verifies the resume template before committing endpoint metadata. Suspended endpoints update their resume template without waking compute. A live VM whose current allocation exceeds the requested maximum rejects the operation; the requested bounds must fit its immutable hard min/max. Partial external failure marks the Operation failed/retryable rather than committing success, and retry converges the same desired bounds. Connection fencing and cross-instance lifecycle races remain an independent production gate.",
+        "description": "Queues an idempotent autoscaling soft-bounds update. Reconciliation validates endpoint ownership and immutable NeonVM capacity, persists the Proxy cold-wake template with Secret resourceVersion compare-and-swap, then patches the live VM with UID/resourceVersion checks and verifies the resume template before committing endpoint metadata. Suspended endpoints update their resume template without waking compute. A live VM whose current allocation exceeds the requested maximum rejects the operation; the requested bounds must fit its immutable hard min/max. Partial external failure marks the Operation failed/retryable rather than committing success, and retry converges the same desired bounds. Connection fencing and cross-instance lifecycle races remain an independent production gate. For generic PostgreSQL memory releases, the original operation instead freezes one versioned policy intent and updates the trusted runtime selection with UID/resourceVersion checks. The same Owner confirms its applied generation; it is not restarted and the endpoint patch does not directly change VM memory or PostgreSQL hard limits. Fixed min=max is supported within the originally accepted class. Operation success confirms policy adoption, not completion of a memory action; query the autoscaling observation endpoint for physical state. Other runtime types keep their existing reconciliation contract.",
         "operationId": "updateEndpoint"
       },
       "delete": {
@@ -39271,6 +39408,59 @@
             "$ref": "#/components/responses/Error"
           },
           "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      }
+    },
+    "/api/v1/projects/{project}/endpoints/{endpoint}/autoscaling": {
+      "get": {
+        "operationId": "getEndpointMemoryAutoscaling",
+        "tags": [
+          "Compute"
+        ],
+        "summary": "Read original Owner policy and actual PostgreSQL memory",
+        "description": "PG17 and PG18 use the same versioned contract. Reads the current original Agent, VM, PostgreSQL initialization and Guest resource state. Unknown, stale or changing identities return 503; requested values and policy adoption never substitute for actual memory. This is a read-only observation, not an action completion receipt or a SQL liveness lease.",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/endpoint"
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Current policy plus coherent physical memory observation; Cache-Control: no-store",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EndpointMemoryAutoscaling"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
             "$ref": "#/components/responses/Error"
           },
           "503": {
