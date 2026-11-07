@@ -1,12 +1,12 @@
 # C1 自动供应与通用 Guest 接线方案
 
-状态：2026-11-08 通用PG17/18 Guest已三节点预载；原生存储管理HTTPS/JWT实际验证通过。动态资格和在线策略的共同控制面接线正在最终验证，新Agent已三节点Ready；真实公开新项目端到端尚未验收。本文是[平台总方案](平台总方案与演进规划.md)的 C1 细化，不另设总计划，不代替真实验收。
+状态：2026-11-08 共同启动、自动资格及在线策略实现已提交493fc61，定向42根141子、vet及API/Worker编译通过；新Agent三节点Ready。Mac受限API/Worker已启动，公开创建独立PG17项目已接受且tenant创建成功，timeline初始化因118磁盘不足、MinIO拒绝写入而失败；原Operation保留，正在释放可回收空间后恢复。完整公开新项目端到端尚未验收。本文是[平台总方案](平台总方案与演进规划.md)的C1细化，不另设总计划。
 
 ## 1. 当前已经证明什么
 
 PG17/PG18 各四项内存动作及应用/WAL 已通过。控制面本轮已完成 PG17/PG18 共同创建合同、冻结计划、原 Worker 步骤、原 VM/配置/初始化及普通 SQL Ready 检验；定向测试、Mac/Linux 编译和经118访问现有PG18只读观察通过。
 
-**尚未证明：通过公开控制面 API 自动创建一个全新项目，自动获得真实资格，修改策略后完整执行内存动作。** 已有实例的只读成功与人工发布后的核心通过，不能当作自动供应已实现。现有创建入口保持关闭，下一次验收必须使用独立项目/tenant/timeline。
+**尚未证明：通过公开控制面 API 自动创建一个全新项目，自动获得真实资格，修改策略后完整执行内存动作。** 已有实例的只读成功与人工发布后的核心通过，不能当作自动供应已实现。创建仅在隔离Mac开发控制面开启，生产放行尚未取得；本轮已使用独立项目/tenant/timeline，不能将接受请求等同于Ready。
 
 ## 2. 本次核到的真实缺口
 
@@ -90,3 +90,15 @@ PG18通用Guest候选：`127.0.0.1:5001/neon-candidate/pg18-guest:generic-44e4f7
 Agent镜像74024b08…、Qualifier fd07cfe0…、通用PG17 Guest78edc1fa…及通用PG18 Guest f9ad9bbc…均已在117/118/119预载。原Helm neon-autoscaler revision62已更新Agent，3/3 Ready；原VM/PG boot保持。原生存储认证5项通过。正式资格Job/公开创建/在线策略实际内存闭环仍NOT_RUN；测试夹具与编译结果单独记录。
 
 部署身份通过自有Helm `neon-control-runtime-access` 管理。它只生成SA/RBAC，不是新服务；Mac开发与集群发行复用相同身份边界。API可读取当前状态并保留新创建凭据；Worker负责原Operation外部写；Qualifier只取证并发布原资格。Kubernetes防权限提升检查保留，不授bind/escalate或cluster-admin；只读Node名单固定117/118/119。需要按VM生成的细粒度角色由原Worker创建。业务用户和Console不持这些平台SA或原生JWT。
+
+## 9. 公开创建首轮现场记录（2026-11-08）
+
+原分支493fc61已推送，118直接从GitHub快进获取，不传Mac业务源码。自有Helm85ebf7f的neon-control-runtime-access已部署；API/Worker使用4小时TokenRequest身份，经localhost SSH及原CA/SNI访问Kube。实际API身份读取Agent原dump-state返回200，保持GET JSON请求体，不添加旁路。
+
+首轮项目prj_c74927c7df52005c、原Operation op_51ecda4877fbebd63b6d0c78：公开POST202，原生HTTPS/JWT创建tenant成功；Pageserver向MinIO上传新tenant清单时得到XMinioStorageFull，timeline步骤失败，VM尚未创建。该失败属于实测存储容量阻塞，没有证据指向PG内存算法。保持原请求/tenant/timeline，空间恢复后按公开retry恢复同一Operation，不通过另建项目隐藏失败。
+
+清理只针对完成的可重建OCI传输包及旧单机测试原始磁盘副本：镜像内容完整校验、进程引用检查；磁盘副本先在原目录0600压缩，并验证解压SHA相同后移除未压缩副本。日志、业务数据、历史镜像、构建缓存保留。归档脚本首轮并发引用判断误把自己的另一个线程视为使用者，保护性停止且原文件保留；修复仅排除本归档进程，原失败和续跑分别保存。不将清理结果计入产品验收。
+
+Agent部署后的原PG18，经Mac→原Proxy、verify-full、普通control_probe只读SQL成功，版本180002；原VM/数据未重建。该依赖稳定性回读不替代新项目验收。
+
+本轮30份定向测试原始日志和退出码已逐文件SHA归档至118 /data/neon-control-plane/runs/20261107-控制面重新启动/validation-493fc61；公开创建、容量失败及恢复日志在同根public-create-pg17-c74927c7。新PG17 SQL/在线策略/真实硬限回读、PG18新实例及Backend联合验收仍待执行。

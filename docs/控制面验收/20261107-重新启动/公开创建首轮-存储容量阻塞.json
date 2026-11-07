@@ -1,0 +1,28 @@
+{
+  "at": "2026-11-07T17:50:04.903527+00:00",
+  "source": "493fc617cbb335309e88b0ea24a2c175b25ea50b",
+  "helm": "85ebf7f23521667fad84791b78b5fa36fac24ada",
+  "checks": {
+    "focused_tests": {
+      "roots": 42,
+      "subtests": 141,
+      "result": "PASS",
+      "archive": "/data/neon-control-plane/runs/20261107-控制面重新启动/validation-493fc61"
+    },
+    "native_storage_auth": "PASS",
+    "agent_3_nodes_ready": "PASS",
+    "mac_api_scoped_agent_proxy_get": "PASS",
+    "old_pg18_verify_full_sql_after_agent": "PASS",
+    "public_new_project_accept": "PASS",
+    "public_new_tenant_create": "PASS",
+    "public_new_timeline_create": "FAIL_XMinioStorageFull",
+    "new_vm_start": "NOT_RUN",
+    "new_qualification": "NOT_RUN",
+    "new_sql": "NOT_RUN",
+    "live_policy_and_actual_memory": "NOT_RUN",
+    "backend_joint": "NOT_RUN"
+  },
+  "original_project": "prj_c74927c7df52005c",
+  "original_operation": "op_51ecda4877fbebd63b6d0c78",
+  "retry_rule": "resolve disk capacity then explicitly retry original operation; preserve original tenant/timeline; no new project to hide failure"
+}
