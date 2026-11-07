@@ -59,6 +59,8 @@ type Config struct {
 	WakeTimeout, PollInterval                       time.Duration
 	MaxConcurrentWakes                              int
 	PageserverNodeID                                uint64
+	// 由平台可信配置绑定原生存储读客户端；选定后失败不能回退无认证代理。
+	ReadTenant func(context.Context, string) (map[string]any, error)
 }
 
 type Server struct {

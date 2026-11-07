@@ -263,3 +263,35 @@ func TestDSGAStorageProfileFrozenAndMissingHistoricalSourceRefused(t *testing.T)
 		t.Fatal("historical plan silently upgraded storage source")
 	}
 }
+
+func TestDSGAStorageReaderCannotAcquireCreateCapability(t *testing.T) {
+	for _, extraWrite := range []bool{false, true} {
+		service, secret, _ := dsgaStorageTestObjects(t)
+		if !extraWrite {
+			delete(secret.Data, "create_token")
+		}
+		c, err := dsgaStorageClientSnapshotAccess("neon", dsgaStorageProfileFixture(), service, secret, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer c.CloseIdleConnections()
+		if c.writeToken != "" || c.readToken == "" {
+			t.Fatal("read capability broadened")
+		}
+		if _, err = c.request(context.Background(), http.MethodPost, "v1/tenant", map[string]any{}); err == nil {
+			t.Fatal("reader sent creation")
+		}
+	}
+}
+func TestAdapterStorageProfileRejectsAmbiguousOrUnpinnedSource(t *testing.T) {
+	p := dsgaStorageProfileFixture()
+	raw, _ := json.Marshal(p)
+	if got, err := adapterStorageProfile(string(raw), "neon"); err != nil || got != p {
+		t.Fatal("valid profile rejected")
+	}
+	for _, value := range []string{"{}", string(raw) + "{}", strings.Replace(string(raw), `"protocol_version":1`, `"protocol_version":1,"protocol_version":1`, 1), strings.Replace(string(raw), `"port":1234`, `"port":0`, 1), strings.Replace(string(raw), `"protocol_version":1`, `"unexpected":true,"protocol_version":1`, 1)} {
+		if _, err := adapterStorageProfile(value, "neon"); err == nil {
+			t.Fatal("invalid profile accepted")
+		}
+	}
+}

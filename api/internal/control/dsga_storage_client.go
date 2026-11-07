@@ -60,6 +60,11 @@ type dsgaStorageClient struct {
 // 不互相替代，不把SA转发到controller。构造只快照复制值，不保留API对象指针；
 // 无SQL锁/磁盘写入/密钥生成。平台引用不完整或验签失败时没有降级路径。
 func newDSGAStorageClient(ctx context.Context, k *kubeClient, p dsgaStorageProfile) (*dsgaStorageClient, error) {
+	return newDSGAStorageClientAccess(ctx, k, p, true)
+}
+
+// Adapter仅核对放置，复用同一原生TLS/JWT客户端；其独立Secret不含创建令牌。
+func newDSGAStorageClientAccess(ctx context.Context, k *kubeClient, p dsgaStorageProfile, write bool) (*dsgaStorageClient, error) {
 	if k == nil || p.validate(k.namespace) != nil {
 		return nil, errDSGAStorageManagement
 	}
@@ -77,13 +82,16 @@ func newDSGAStorageClient(ctx context.Context, k *kubeClient, p dsgaStorageProfi
 	if err != nil {
 		return nil, errDSGAStorageManagement
 	}
-	return dsgaStorageClientSnapshot(k.namespace, p, service, secret)
+	return dsgaStorageClientSnapshotAccess(k.namespace, p, service, secret, write)
 }
 
 // 将两个只读API结果转成独立值和专用传输，便于分别验证平台读取与协议逻辑。
 // 只有构造器使用当前可信Kube客户端获取快照；公开请求不能直接提交这些对象。
 // UID固定来源，resourceVersion只证明真实读取，不冻结平台原地轮转token/证书。
 func dsgaStorageClientSnapshot(namespace string, p dsgaStorageProfile, service *core.Service, secret *core.Secret) (*dsgaStorageClient, error) {
+	return dsgaStorageClientSnapshotAccess(namespace, p, service, secret, true)
+}
+func dsgaStorageClientSnapshotAccess(namespace string, p dsgaStorageProfile, service *core.Service, secret *core.Secret, write bool) (*dsgaStorageClient, error) {
 	if p.validate(namespace) != nil || service == nil || service.Namespace != namespace || service.Name != p.ServiceName || string(service.UID) != p.ServiceUID || service.ResourceVersion == "" || service.DeletionTimestamp != nil ||
 		service.Spec.Type != core.ServiceTypeClusterIP || service.Spec.ExternalName != "" || len(service.Spec.ExternalIPs) != 0 || len(service.Spec.Ports) != 1 {
 		return nil, errDSGAStorageManagement
@@ -103,8 +111,12 @@ func dsgaStorageClientSnapshot(namespace string, p dsgaStorageProfile, service *
 	}
 	key, err := jwt.ParseEdPublicKeyFromPEM(keyPEM)
 	public, ok := key.(ed25519.PublicKey)
-	if err != nil || !ok || len(public) != ed25519.PublicKeySize || !validDSGAStorageToken(readToken, public, "scrubber") || !validDSGAStorageToken(writeToken, public, "pageserverapi") {
+	if err != nil || !ok || len(public) != ed25519.PublicKeySize || !validDSGAStorageToken(readToken, public, "scrubber") || (write && !validDSGAStorageToken(writeToken, public, "pageserverapi")) {
 		return nil, errDSGAStorageManagement
+	}
+	if !write {
+		// 即使平台误把额外字段放进只读Secret，也不能向Adapter提升写能力。
+		writeToken = ""
 	}
 	ca := x509.NewCertPool()
 	if !ca.AppendCertsFromPEM(bytes.Clone(caPEM)) {
