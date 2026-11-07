@@ -14,41 +14,46 @@ import (
 // The API contract is a release boundary. Use Go's parser rather than a text
 // regex, and reject either undocumented handlers or advertised missing routes.
 func TestOpenAPIRouteParity(t *testing.T) {
-	file, err := parser.ParseFile(token.NewFileSet(), "handlers.go", nil, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
 	registered := map[string]bool{}
-	ast.Inspect(file, func(node ast.Node) bool {
-		call, ok := node.(*ast.CallExpr)
-		if !ok || len(call.Args) == 0 {
-			return true
-		}
-		selector, ok := call.Fun.(*ast.SelectorExpr)
-		if !ok || (selector.Sel.Name != "Handle" && selector.Sel.Name != "HandleFunc") {
-			return true
-		}
-		receiver, ok := selector.X.(*ast.Ident)
-		if !ok || receiver.Name != "mux" {
-			return true
-		}
-		literal, ok := call.Args[0].(*ast.BasicLit)
-		if !ok || literal.Kind != token.STRING {
-			t.Error("HTTP registration must use a static method/path contract")
-			return true
-		}
-		pattern, err := strconv.Unquote(literal.Value)
+	// The API process installs these additional public management routes in
+	// withStorageGatewayRoutes before serving. Independent data-plane/private
+	// broker routes have their own contracts and are not API operations.
+	for _, filename := range []string{"handlers.go", "storage_gateway_api.go"} {
+		file, err := parser.ParseFile(token.NewFileSet(), filename, nil, 0)
 		if err != nil {
-			t.Error(err)
-			return true
+			t.Fatal(err)
 		}
-		parts := strings.SplitN(pattern, " ", 2)
-		if len(parts) != 2 || parts[1] == "/api/docs" || parts[1] == "/api/openapi.json" || parts[1] == "/api/docs/assets/" {
+		ast.Inspect(file, func(node ast.Node) bool {
+			call, ok := node.(*ast.CallExpr)
+			if !ok || len(call.Args) == 0 {
+				return true
+			}
+			selector, ok := call.Fun.(*ast.SelectorExpr)
+			if !ok || (selector.Sel.Name != "Handle" && selector.Sel.Name != "HandleFunc") {
+				return true
+			}
+			receiver, ok := selector.X.(*ast.Ident)
+			if !ok || receiver.Name != "mux" {
+				return true
+			}
+			literal, ok := call.Args[0].(*ast.BasicLit)
+			if !ok || literal.Kind != token.STRING {
+				t.Error("HTTP registration must use a static method/path contract")
+				return true
+			}
+			pattern, err := strconv.Unquote(literal.Value)
+			if err != nil {
+				t.Error(err)
+				return true
+			}
+			parts := strings.SplitN(pattern, " ", 2)
+			if len(parts) != 2 || parts[1] == "/api/docs" || parts[1] == "/api/openapi.json" || parts[1] == "/api/docs/assets/" {
+				return true
+			}
+			registered[strings.ToLower(parts[0])+" "+parts[1]] = true
 			return true
-		}
-		registered[strings.ToLower(parts[0])+" "+parts[1]] = true
-		return true
-	})
+		})
+	}
 	contract := loadOpenAPI(t)
 	paths := contract["paths"].(map[string]any)
 	documented := map[string]bool{}

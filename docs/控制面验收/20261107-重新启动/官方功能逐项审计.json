@@ -1,0 +1,2787 @@
+{
+  "scope": "继承135项完整需求并新增自有PG内存核心产品项；逐项代码映射进行中，不将文件存在当功能通过",
+  "features": [
+    {
+      "id": "NEON-CP-00-01",
+      "package": "CP-00",
+      "feature": "组织→项目→分支→服务统一层次",
+      "official_sources": [
+        "https://neon.com/docs/concepts/the-object-model"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "任何接口、Console、凭据和日志均核同一原资源归属；跨组织和分支负路径拒绝",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-00-02",
+      "package": "CP-00",
+      "feature": "HTTP管理接口及OpenAPI合同",
+      "official_sources": [
+        "https://neon.com/docs/reference/api",
+        "https://neon.com/docs/reference/api/key-concepts"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "逐一覆盖锁定193个operation的参数/响应/错误；不以返回200或路由存在代替资源生效",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-00-03",
+      "package": "CP-00",
+      "feature": "异步operations完整状态机",
+      "official_sources": [
+        "https://neon.com/docs/manage/operations"
+      ],
+      "official_operation_ids": [
+        "getProjectOperation"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "scheduling/running/finished/failed/error/cancelling/cancelled/skipped各状态可观察；完成前不能当真实供应成功",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-00-04",
+      "package": "CP-00",
+      "feature": "分页、锁冲突、限流与重试",
+      "official_sources": [
+        "https://neon.com/docs/reference/api/key-concepts",
+        "https://neon.com/docs/manage/operations"
+      ],
+      "official_operation_ids": [
+        "addNeonAuthDomainToRedirectURIWhitelist",
+        "deleteNeonAuthDomainFromRedirectURIWhitelist",
+        "listApiKeys",
+        "listBranchNeonAuthOauthProviders",
+        "listBranchNeonAuthTrustedDomains",
+        "listCredentials",
+        "listNeonAuthIntegrations",
+        "listNeonAuthOAuthClients",
+        "listNeonAuthOauthProviders",
+        "listNeonAuthRedirectURIWhitelistDomains",
+        "listOrgApiKeys",
+        "listOrganizationVPCEndpoints",
+        "listOrganizationVPCEndpointsAllRegions",
+        "listProjectBranchBucketObjects",
+        "listProjectBranchBuckets",
+        "listProjectBranchCustomDomains",
+        "listProjectBranchDatabases",
+        "listProjectBranchEndpoints",
+        "listProjectBranchFunctions",
+        "listProjectBranchLogFieldValues",
+        "listProjectBranchLogFields",
+        "listProjectBranchRoles",
+        "listProjectBranchTriggers",
+        "listProjectBranches",
+        "listProjectEndpoints",
+        "listProjectMembers",
+        "listProjectOperations",
+        "listProjectPermissions",
+        "listProjectVPCEndpoints",
+        "listProjects",
+        "listSharedProjects",
+        "listSnapshots"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "多页无丢失/重复；429/423按官方响应处理，丢回复先查原operation/资源而非盲重建",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-00-05",
+      "package": "CP-00",
+      "feature": "区域、产品和PG版本能力目录",
+      "official_sources": [
+        "https://neon.com/docs/introduction/regions",
+        "https://neon.com/docs/manage/projects"
+      ],
+      "official_operation_ids": [
+        "getActiveRegions"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "UI/API都按实际可用区域和后端版本拒绝无能力组合；不得自动把现有PG升级大版本",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-00-06",
+      "package": "CP-00",
+      "feature": "正式、beta、alpha、deprecated分层",
+      "official_sources": [
+        "https://neon.com/docs/reference/api",
+        "https://neon.com/docs/introduction/roadmap"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "官方beta限制、legacy兼容和roadmap分别标记；未查到资料不推定不需要",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-00-07",
+      "package": "CP-00",
+      "feature": "跨产品统一分支生命周期",
+      "official_sources": [
+        "https://neon.com/docs/concepts/branch-your-backend"
+      ],
+      "official_operation_ids": [
+        "createProjectBranch",
+        "createProjectBranchAnonymized",
+        "createProjectBranchBucket",
+        "createProjectBranchDataAPI",
+        "createProjectBranchDatabase",
+        "createProjectBranchFunctionDeployment",
+        "createProjectBranchRole",
+        "createProjectBranchTrigger"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "创建/删除/恢复分支核PG/Auth/Storage/Functions/AI各自复制或重建语义，不能只增删一行CP元数据",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-01-01",
+      "package": "CP-01",
+      "feature": "登录、邮箱验证与身份方式切换",
+      "official_sources": [
+        "https://neon.com/docs/manage/accounts"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "正常与错误登录、邮箱变更确认、社交身份解绑按文档验证，禁止越权接管",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-01-02",
+      "package": "CP-01",
+      "feature": "个人资料和密码管理",
+      "official_sources": [
+        "https://neon.com/docs/manage/accounts"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "资料更新与密码修改核原会话；日志/响应不泄漏秘密",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-01-03",
+      "package": "CP-01",
+      "feature": "TOTP双因素启用及延迟移除",
+      "official_sources": [
+        "https://neon.com/docs/manage/accounts"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "真实TOTP验证；移除24小时冷却与取消、通知、冷却期仍有效",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-01-04",
+      "package": "CP-01",
+      "feature": "Passkey注册、登录和延迟移除",
+      "official_sources": [
+        "https://neon.com/docs/manage/accounts"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "真实WebAuthn挑战/来源验证，设备多凭据及24小时取消窗口，不用静态开关代替",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-01-05",
+      "package": "CP-01",
+      "feature": "账号删除、30天恢复与最终清理",
+      "official_sources": [
+        "https://neon.com/docs/manage/accounts",
+        "https://neon.com/docs/manage/account-recovery"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "删除/恢复边界及资源归属正确，冷却后不可虚假恢复，邮件/身份丢失走明确支持流程",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-01-06",
+      "package": "CP-01",
+      "feature": "当前用户、组织列表与请求认证信息",
+      "official_sources": [
+        "https://neon.com/docs/reference/api"
+      ],
+      "official_operation_ids": [
+        "getAuthDetails",
+        "getCurrentUserInfo",
+        "getCurrentUserOrganizations"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "认证上下文与有效作用域正确，不能从请求体自报身份",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-02-01",
+      "package": "CP-02",
+      "feature": "组织创建、重命名、删除",
+      "official_sources": [
+        "https://neon.com/docs/manage/orgs-manage",
+        "https://neon.com/docs/manage/organizations"
+      ],
+      "official_operation_ids": [
+        "getOrganization",
+        "getOrganizationInvitations",
+        "getOrganizationMember",
+        "getOrganizationMembers",
+        "getOrganizationSpendingLimit",
+        "getOrganizationVPCEndpointDetails"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "组织隔离、删除前置与剩余资源处理完整；自有代码尚未评估",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-02-02",
+      "package": "CP-02",
+      "feature": "邀请、成员分页、排序与角色变更",
+      "official_sources": [
+        "https://neon.com/docs/manage/orgs-api",
+        "https://neon.com/docs/manage/orgs-manage"
+      ],
+      "official_operation_ids": [
+        "createOrganizationInvitations",
+        "getOrganizationInvitations",
+        "getOrganizationMember",
+        "getOrganizationMembers",
+        "removeOrganizationMember",
+        "updateOrganizationMember"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "邀请/接受/移除/排序分页真实执行，唯一Admin不可被降级，重复操作不越权",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-02-03",
+      "package": "CP-02",
+      "feature": "组织四角色及项目三角色",
+      "official_sources": [
+        "https://neon.com/docs/manage/user-permissions"
+      ],
+      "official_operation_ids": [
+        "listProjectMembers",
+        "removeProjectMemberRole",
+        "setProjectMemberRole"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "按Admin/Editor/Viewer/Collaborator与项目viewer/editor/admin做允许/拒绝矩阵，包含Viewer自建项目例外",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-02-04",
+      "package": "CP-02",
+      "feature": "继承/显式权限与旧模型迁移",
+      "official_sources": [
+        "https://neon.com/docs/manage/user-permissions"
+      ],
+      "official_operation_ids": [
+        "grantPermissionToProject",
+        "listProjectPermissions"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "权限叠加不能降低组织基线；旧member/项目sharing保留迁移，不混淆新旧Collaborator",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-02-05",
+      "package": "CP-02",
+      "feature": "项目成员、grant/revoke和权限展示",
+      "official_sources": [
+        "https://neon.com/docs/manage/project-permissions-get-started",
+        "https://neon.com/docs/manage/user-permissions"
+      ],
+      "official_operation_ids": [
+        "grantPermissionToProject",
+        "listProjectMembers",
+        "listProjectPermissions",
+        "removeProjectMemberRole",
+        "revokePermissionFromProject",
+        "setProjectMemberRole"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "撤销显式授权后组织继承仍适用；Viewer不可读取连接串/密码",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-02-06",
+      "package": "CP-02",
+      "feature": "组织强制2FA",
+      "official_sources": [
+        "https://neon.com/docs/manage/orgs-manage"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "未完成2FA或passkey的成员不能继续访问受限组织，角色变更与重新登录生效",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-02-07",
+      "package": "CP-02",
+      "feature": "按域自动入组与DNS验证",
+      "official_sources": [
+        "https://neon.com/docs/manage/orgs-add-members-by-domain"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "DNS所有权核验后才自动加入；域移除和现有成员行为按文档区分",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-02-08",
+      "package": "CP-02",
+      "feature": "个人管理API keys生命周期",
+      "official_sources": [
+        "https://neon.com/docs/manage/api-keys"
+      ],
+      "official_operation_ids": [
+        "createApiKey",
+        "listApiKeys",
+        "revokeApiKey"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "秘密仅创建时展示、不可再次获取；撤销立即且永久；替换先创建再撤销可无停顿",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-02-09",
+      "package": "CP-02",
+      "feature": "组织与单项目API keys",
+      "official_sources": [
+        "https://neon.com/docs/manage/api-keys",
+        "https://neon.com/docs/manage/orgs-api"
+      ],
+      "official_operation_ids": [
+        "createOrgApiKey",
+        "listOrgApiKeys",
+        "revokeOrgApiKey"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "仅组织Admin创建；单项目key为Editor级，不能删除项目/管理权限/新建项目/越出项目",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-02-10",
+      "package": "CP-02",
+      "feature": "个人与组织key操作差异",
+      "official_sources": [
+        "https://neon.com/docs/manage/orgs-api"
+      ],
+      "official_operation_ids": [
+        "acceptProjectTransferRequest",
+        "assignOrganizationVPCEndpoint",
+        "createOrganizationInvitations",
+        "createProjectTransferRequest",
+        "deleteOrganizationSpendingLimit",
+        "deleteOrganizationVPCEndpoint",
+        "getCurrentUserOrganizations",
+        "getOrganization",
+        "getOrganizationInvitations",
+        "getOrganizationMember",
+        "getOrganizationMembers",
+        "getOrganizationSpendingLimit",
+        "getOrganizationVPCEndpointDetails",
+        "listOrganizationVPCEndpoints",
+        "listOrganizationVPCEndpointsAllRegions",
+        "removeOrganizationMember",
+        "setOrganizationSpendingLimit",
+        "updateNeonAuthOrganizationPlugin",
+        "updateOrganizationMember"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "组织key不能替代个人Admin执行邀请、移除成员、项目转移等明确受限动作",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-02-11",
+      "package": "CP-02",
+      "feature": "组织间转移、claimable项目认领",
+      "official_sources": [
+        "https://neon.com/docs/manage/orgs-project-transfer",
+        "https://neon.com/docs/workflows/claimable-database-integration"
+      ],
+      "official_operation_ids": [
+        "acceptProjectTransferRequest",
+        "createProjectTransferRequest",
+        "transferNeonAuthProviderProject",
+        "transferProjectsFromOrgToOrg",
+        "transferProjectsFromUserToOrg"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "源/目标权限、配额、旧key失效和claim URL状态验证，丢回复不可重复转移",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-03-01",
+      "package": "CP-03",
+      "feature": "项目创建及默认数据库/角色/分支/compute",
+      "official_sources": [
+        "https://neon.com/docs/manage/projects"
+      ],
+      "official_operation_ids": [
+        "createProject",
+        "createProjectBranch",
+        "createProjectBranchAnonymized",
+        "createProjectBranchBucket",
+        "createProjectBranchDataAPI",
+        "createProjectBranchDatabase",
+        "createProjectBranchFunctionDeployment",
+        "createProjectBranchRole",
+        "createProjectBranchTrigger",
+        "createProjectEndpoint",
+        "createProjectTransferRequest"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "创建事务与异步供应均完成后才能连接，异常不得留下对外假可用资源",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-03-02",
+      "package": "CP-03",
+      "feature": "项目列表、搜索、计数和共享项目",
+      "official_sources": [
+        "https://neon.com/docs/manage/projects"
+      ],
+      "official_operation_ids": [
+        "countProjects",
+        "listProjects",
+        "listSharedProjects"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "组织过滤、分页、可恢复项目筛选和权限过滤与Console一致",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-03-03",
+      "package": "CP-03",
+      "feature": "项目名称、默认compute、历史配置",
+      "official_sources": [
+        "https://neon.com/docs/manage/projects"
+      ],
+      "official_operation_ids": [
+        "getProject",
+        "getProjectAdvisorSecurityIssues",
+        "getProjectBranch",
+        "getProjectBranchAiGateway",
+        "getProjectBranchBucketObject",
+        "getProjectBranchDataAPI",
+        "getProjectBranchDatabase",
+        "getProjectBranchFunction",
+        "getProjectBranchRealtime",
+        "getProjectBranchRealtimeSecret",
+        "getProjectBranchRole",
+        "getProjectBranchRolePassword",
+        "getProjectBranchSchema",
+        "getProjectBranchSchemaComparison",
+        "getProjectBranchStorage",
+        "getProjectBranchTrigger",
+        "getProjectEndpoint",
+        "getProjectJWKS",
+        "getProjectOperation",
+        "updateProject",
+        "updateProjectBranch",
+        "updateProjectBranchDataAPI",
+        "updateProjectBranchDatabase",
+        "updateProjectBranchFunction",
+        "updateProjectBranchTrigger",
+        "updateProjectEndpoint"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "默认配置只影响文档规定对象，不静默篡改已有实例或历史保留",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-03-04",
+      "package": "CP-03",
+      "feature": "项目消费配额与存储逻辑限额",
+      "official_sources": [
+        "https://neon.com/docs/guides/consumption-limits",
+        "https://neon.com/docs/manage/projects"
+      ],
+      "official_operation_ids": [
+        "updateProject",
+        "updateProjectBranch",
+        "updateProjectBranchDataAPI",
+        "updateProjectBranchDatabase",
+        "updateProjectBranchFunction",
+        "updateProjectBranchTrigger",
+        "updateProjectEndpoint"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "按compute/storage/transfer实际计量触发规定行为；与账单邮件阈值严格区分",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-03-05",
+      "package": "CP-03",
+      "feature": "项目维护时间窗与更新策略",
+      "official_sources": [
+        "https://neon.com/docs/manage/projects",
+        "https://neon.com/docs/manage/updates"
+      ],
+      "official_operation_ids": [
+        "updateProject",
+        "updateProjectBranch",
+        "updateProjectBranchDataAPI",
+        "updateProjectBranchDatabase",
+        "updateProjectBranchFunction",
+        "updateProjectBranchTrigger",
+        "updateProjectEndpoint"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "计划更新、待更新版本、提前应用、连接中断处理可验，不以CP配置写入代替实际更新",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-03-06",
+      "package": "CP-03",
+      "feature": "删除项目与恢复窗口",
+      "official_sources": [
+        "https://neon.com/docs/manage/projects",
+        "https://neon.com/docs/reference/api/projects/recover-project"
+      ],
+      "official_operation_ids": [
+        "deleteProject",
+        "deleteProjectBranch",
+        "deleteProjectBranchBucket",
+        "deleteProjectBranchBucketObject",
+        "deleteProjectBranchBucketObjectsByPrefix",
+        "deleteProjectBranchCustomDomain",
+        "deleteProjectBranchDataAPI",
+        "deleteProjectBranchDatabase",
+        "deleteProjectBranchFunction",
+        "deleteProjectBranchRole",
+        "deleteProjectBranchTrigger",
+        "deleteProjectEndpoint",
+        "deleteProjectJWKS",
+        "deleteProjectVPCEndpoint",
+        "recoverProject"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "按官方窗口列表→恢复→数据校验；过期/无权限/资源冲突拒绝，不能只恢复元数据",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-03-07",
+      "package": "CP-03",
+      "feature": "项目转移请求与接受",
+      "official_sources": [
+        "https://neon.com/docs/manage/orgs-project-transfer"
+      ],
+      "official_operation_ids": [
+        "acceptProjectTransferRequest",
+        "createProjectTransferRequest"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "请求、接受、权限和claim状态可靠，原组织project-scoped key语义随转移正确变化",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-04-01",
+      "package": "CP-04",
+      "feature": "分支DAG与当前/历史LSN或时间创建",
+      "official_sources": [
+        "https://neon.com/docs/manage/branches",
+        "https://neon.com/docs/introduction/branching"
+      ],
+      "official_operation_ids": [
+        "createProjectBranch",
+        "createProjectBranchAnonymized",
+        "createProjectBranchBucket",
+        "createProjectBranchDataAPI",
+        "createProjectBranchDatabase",
+        "createProjectBranchFunctionDeployment",
+        "createProjectBranchRole",
+        "createProjectBranchTrigger"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "父子数据写入隔离、历史时点一致、非法LSN/过期历史拒绝",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-04-02",
+      "package": "CP-04",
+      "feature": "root不可删除与default切换",
+      "official_sources": [
+        "https://neon.com/docs/manage/branches"
+      ],
+      "official_operation_ids": [
+        "deleteProjectBranch",
+        "deleteProjectBranchBucket",
+        "deleteProjectBranchBucketObject",
+        "deleteProjectBranchBucketObjectsByPrefix",
+        "deleteProjectBranchCustomDomain",
+        "deleteProjectBranchDataAPI",
+        "deleteProjectBranchDatabase",
+        "deleteProjectBranchFunction",
+        "deleteProjectBranchRole",
+        "deleteProjectBranchTrigger",
+        "setDefaultProjectBranch"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "区分root/default/protected；Console production与API main命名差异不造成错误对象操作",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-04-03",
+      "package": "CP-04",
+      "feature": "分支重命名、详情、计数与用量",
+      "official_sources": [
+        "https://neon.com/docs/manage/branches"
+      ],
+      "official_operation_ids": [
+        "countProjectBranches",
+        "getProjectBranch",
+        "getProjectBranchAiGateway",
+        "getProjectBranchBucketObject",
+        "getProjectBranchDataAPI",
+        "getProjectBranchDatabase",
+        "getProjectBranchFunction",
+        "getProjectBranchRealtime",
+        "getProjectBranchRealtimeSecret",
+        "getProjectBranchRole",
+        "getProjectBranchRolePassword",
+        "getProjectBranchSchema",
+        "getProjectBranchSchemaComparison",
+        "getProjectBranchStorage",
+        "getProjectBranchTrigger",
+        "updateProjectBranch",
+        "updateProjectBranchDataAPI",
+        "updateProjectBranchDatabase",
+        "updateProjectBranchFunction",
+        "updateProjectBranchTrigger"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "名称/状态/资源和实际branch一致，分页/计数权限一致",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-04-04",
+      "package": "CP-04",
+      "feature": "schema-only分支",
+      "official_sources": [
+        "https://neon.com/docs/guides/branching-schema-only"
+      ],
+      "official_operation_ids": [
+        "createProjectBranch",
+        "createProjectBranchAnonymized",
+        "createProjectBranchBucket",
+        "createProjectBranchDataAPI",
+        "createProjectBranchDatabase",
+        "createProjectBranchFunctionDeployment",
+        "createProjectBranchRole",
+        "createProjectBranchTrigger"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "真实复制schema而不暴露生产数据，依赖对象/默认角色按官方限制核验",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-04-05",
+      "package": "CP-04",
+      "feature": "分支TTL/expiration与自动删除",
+      "official_sources": [
+        "https://neon.com/docs/manage/branches"
+      ],
+      "official_operation_ids": [
+        "updateProjectBranch",
+        "updateProjectBranchDataAPI",
+        "updateProjectBranchDatabase",
+        "updateProjectBranchFunction",
+        "updateProjectBranchTrigger"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "过期、延期、取消期限及有子分支/保护状态正确；删除真正释放对应服务",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-04-06",
+      "package": "CP-04",
+      "feature": "分支archiving及再次访问",
+      "official_sources": [
+        "https://neon.com/docs/manage/branches"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "按官方自动归档/恢复语义验证，不凭UI归档标识认定存储已处理",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-04-07",
+      "package": "CP-04",
+      "feature": "protected分支及凭据隔离",
+      "official_sources": [
+        "https://neon.com/docs/guides/protected-branches"
+      ],
+      "official_operation_ids": [
+        "updateProjectBranch",
+        "updateProjectBranchDataAPI",
+        "updateProjectBranchDatabase",
+        "updateProjectBranchFunction",
+        "updateProjectBranchTrigger"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "受保护不可误删，密码/子分支保护规则和IP Allow范围按官方合同执行",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-04-08",
+      "package": "CP-04",
+      "feature": "reset到parent和跨分支历史恢复",
+      "official_sources": [
+        "https://neon.com/docs/postgres/backup-restore/branch-restore",
+        "https://neon.com/docs/manage/branches"
+      ],
+      "official_operation_ids": [
+        "restoreProjectBranch"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "恢复前备份分支、原连接语义、实际数据及依赖服务一致；失败保留可观察状态",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-04-09",
+      "package": "CP-04",
+      "feature": "Schema读取和双分支diff",
+      "official_sources": [
+        "https://neon.com/docs/guides/schema-diff"
+      ],
+      "official_operation_ids": [
+        "getProjectBranchSchema",
+        "getProjectBranchSchemaComparison"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "对比正确database/role/branch与历史点，schema较大限制透明，不能把diff当自动迁移",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-04-10",
+      "package": "CP-04",
+      "feature": "匿名化分支、mask规则和进度",
+      "official_sources": [
+        "https://neon.com/docs/workflows/data-anonymization",
+        "https://neon.com/docs/workflows/data-anonymization-api"
+      ],
+      "official_operation_ids": [
+        "createProjectBranchAnonymized",
+        "getAnonymizedBranchStatus",
+        "getMaskingRules",
+        "startAnonymization",
+        "updateMaskingRules"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "实际数据脱敏、规则读写、进度/失败与复制隔离，敏感原数据不能因创建接口成功泄漏",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-05-01",
+      "package": "CP-05",
+      "feature": "同分支一个RW和多个只读compute",
+      "official_sources": [
+        "https://neon.com/docs/manage/computes",
+        "https://neon.com/docs/guides/read-replica-guide"
+      ],
+      "official_operation_ids": [
+        "createProjectEndpoint",
+        "deleteProjectEndpoint",
+        "getProjectEndpoint",
+        "listProjectEndpoints",
+        "restartProjectEndpoint",
+        "startProjectEndpoint",
+        "suspendProjectEndpoint",
+        "updateProjectEndpoint"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "真实读写权限、连接URI、相同分支数据与复制可见性正确",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-05-02",
+      "package": "CP-05",
+      "feature": "固定compute规格及CU/RAM配置",
+      "official_sources": [
+        "https://neon.com/docs/manage/computes"
+      ],
+      "official_operation_ids": [
+        "createProjectEndpoint",
+        "updateProjectEndpoint"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "规格由准确能力来源限定，非法组合写前拒绝；实际PG/Guest/VM/Host资源回读",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-05-03",
+      "package": "CP-05",
+      "feature": "autoscaling上下界与策略启停",
+      "official_sources": [
+        "https://neon.com/docs/introduction/autoscaling",
+        "https://neon.com/docs/manage/computes"
+      ],
+      "official_operation_ids": [
+        "updateProjectEndpoint"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "实际负载下Grow/Shrink/Regrow、边界/滞回和故障恢复，PG17安全normal门槛全部保留",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-05-04",
+      "package": "CP-05",
+      "feature": "scale-to-zero/超时/自动唤醒",
+      "official_sources": [
+        "https://neon.com/docs/introduction/scale-to-zero",
+        "https://neon.com/docs/introduction/compute-lifecycle"
+      ],
+      "official_operation_ids": [
+        "restartProjectEndpoint",
+        "startProjectEndpoint",
+        "suspendProjectEndpoint"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "空闲真停止、连接真唤醒、已有会话/后台工作负载语义与计量一致",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-05-05",
+      "package": "CP-05",
+      "feature": "start/suspend/restart/delete与状态回读",
+      "official_sources": [
+        "https://neon.com/docs/manage/computes"
+      ],
+      "official_operation_ids": [
+        "deleteProjectEndpoint",
+        "restartProjectEndpoint",
+        "startProjectEndpoint",
+        "suspendProjectEndpoint"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "API async完成与真正连接/进程生命周期一致；迟到响应不能复活已删实例",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-05-06",
+      "package": "CP-05",
+      "feature": "read-replica创建、配置与删除",
+      "official_sources": [
+        "https://neon.com/docs/introduction/read-replicas",
+        "https://neon.com/docs/guides/read-replica-guide"
+      ],
+      "official_operation_ids": [
+        "createProjectEndpoint"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "replica实际拒写、数据可见性、生命周期与收费正确；不擅自假定跨区域支持",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-05-07",
+      "package": "CP-05",
+      "feature": "连接pooler配置和事务池限制",
+      "official_sources": [
+        "https://neon.com/docs/connect/connection-pooling"
+      ],
+      "official_operation_ids": [
+        "getConnectionURI",
+        "updateProjectEndpoint"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "direct/pooled URI正确，事务池不支持的会话功能给出明确限制与替代路径",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-05-08",
+      "package": "CP-05",
+      "feature": "compute release和维护更新",
+      "official_sources": [
+        "https://neon.com/docs/manage/updates",
+        "https://neon.com/docs/manage/platform-maintenance"
+      ],
+      "official_operation_ids": [
+        "getProjectEndpoint"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "版本/待更新/更新窗口/重启生效和数据持久性验证，不能以旧镜像标签冒称最新",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-05-09",
+      "package": "CP-05",
+      "feature": "断连、故障恢复与HA依赖",
+      "official_sources": [
+        "https://neon.com/docs/introduction/high-availability",
+        "https://neon.com/docs/introduction/compute-lifecycle"
+      ],
+      "official_operation_ids": [
+        "getProjectEndpoint"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "真实PG/VM/node故障恢复与会话损失边界分开记录，不能承诺未经实测的RPO/RTO",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-06-01",
+      "package": "CP-06",
+      "feature": "数据库创建、修改/改名、owner和删除",
+      "official_sources": [
+        "https://neon.com/docs/manage/databases"
+      ],
+      "official_operation_ids": [
+        "createProjectBranchDatabase",
+        "deleteProjectBranchDatabase",
+        "getProjectBranchDatabase",
+        "listProjectBranchDatabases",
+        "updateProjectBranchDatabase"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "实际Postgres目录与CP同步、reserved名和所有权约束验证，SQL旁路变化可对账",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-06-02",
+      "package": "CP-06",
+      "feature": "角色创建、删除与保留名称",
+      "official_sources": [
+        "https://neon.com/docs/manage/roles"
+      ],
+      "official_operation_ids": [
+        "createProjectBranchRole",
+        "deleteProjectBranchRole",
+        "getProjectBranchRole",
+        "getProjectBranchRolePassword",
+        "listProjectBranchRoles",
+        "resetProjectBranchRolePassword"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "neon_superuser语义不等于真实超级用户，API/SQL角色区别和NOLOGIN限制按官方执行",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-06-03",
+      "package": "CP-06",
+      "feature": "密码查看、重置与受保护分支",
+      "official_sources": [
+        "https://neon.com/docs/manage/roles",
+        "https://neon.com/docs/guides/protected-branches"
+      ],
+      "official_operation_ids": [
+        "getProjectBranchRolePassword",
+        "resetProjectBranchRolePassword"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "只有授权身份能看/改原角色秘密；重置后旧连接凭据行为和新连接生效可核",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-06-04",
+      "package": "CP-06",
+      "feature": "read-only/read-write/developer数据库授权",
+      "official_sources": [
+        "https://neon.com/docs/manage/database-access"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "GRANT/REVOKE/默认权限/Public schema和实际SQL正负访问矩阵，不能只隐藏UI入口",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-06-05",
+      "package": "CP-06",
+      "feature": "连接串生成、TLS和driver连接",
+      "official_sources": [
+        "https://neon.com/docs/connect/choose-connection",
+        "https://neon.com/docs/connect/connect-from-any-app"
+      ],
+      "official_operation_ids": [
+        "getConnectionURI"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "project/branch/db/role/compute/pooler选项准确；SNI/TLS验证与凭据避免写入日志",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-06-06",
+      "package": "CP-06",
+      "feature": "HTTP/WebSocket serverless连接",
+      "official_sources": [
+        "https://neon.com/docs/serverless/serverless-driver"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "真实查询、事务、超时及鉴权边界，CP提供的URI/角色和Proxy实际相同",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-06-07",
+      "package": "CP-06",
+      "feature": "逻辑复制开关、slot和外部迁移",
+      "official_sources": [
+        "https://neon.com/docs/guides/logical-replication-guide",
+        "https://neon.com/docs/manage/projects"
+      ],
+      "official_operation_ids": [
+        "updateProject",
+        "updateProjectBranch",
+        "updateProjectBranchDataAPI",
+        "updateProjectBranchDatabase",
+        "updateProjectBranchFunction",
+        "updateProjectBranchTrigger",
+        "updateProjectEndpoint"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "真实复制、WAL保留、restart和不支持的拓扑明示，不能把项目开关当复制已运行",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-07-01",
+      "package": "CP-07",
+      "feature": "历史保留窗及计费",
+      "official_sources": [
+        "https://neon.com/docs/postgres/backup-restore/history-window"
+      ],
+      "official_operation_ids": [
+        "updateProject",
+        "updateProjectBranch",
+        "updateProjectBranchDataAPI",
+        "updateProjectBranchDatabase",
+        "updateProjectBranchFunction",
+        "updateProjectBranchTrigger",
+        "updateProjectEndpoint"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "配置范围/plan门禁、真实可恢复LSN和过期不可恢复边界，不能用当前时间推历史存在",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-07-02",
+      "package": "CP-07",
+      "feature": "instant restore及备份分支保留",
+      "official_sources": [
+        "https://neon.com/docs/postgres/backup-restore/branch-restore"
+      ],
+      "official_operation_ids": [
+        "restoreProjectBranch"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "数据校验、原branch/连接行为、备份分支保留和失败可恢复性实测",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-07-03",
+      "package": "CP-07",
+      "feature": "Time Travel只读历史查询",
+      "official_sources": [
+        "https://neon.com/docs/postgres/backup-restore/time-travel-assist"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "只读一致性、临时endpoint寿命和费用、历史窗限制，原生产状态不被回滚",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-07-04",
+      "package": "CP-07",
+      "feature": "手动快照创建/列表/改名/删除",
+      "official_sources": [
+        "https://neon.com/docs/guides/backup-restore"
+      ],
+      "official_operation_ids": [
+        "createSnapshot",
+        "deleteSnapshot",
+        "getSnapshotSchedule",
+        "listSnapshots",
+        "restoreSnapshot",
+        "setSnapshotSchedule",
+        "updateSnapshot"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "实存快照、来源branch/时间、保留和额度验证，删除与对象存储实际生命周期闭合",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-07-05",
+      "package": "CP-07",
+      "feature": "定时快照与保留策略",
+      "official_sources": [
+        "https://neon.com/docs/guides/backup-restore"
+      ],
+      "official_operation_ids": [
+        "getSnapshotSchedule",
+        "setSnapshotSchedule"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "时区/计划/配额、重复投递及故障补偿由明确合同验证，不能仅保存cron字符串",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-07-06",
+      "package": "CP-07",
+      "feature": "快照restore与显式finalize",
+      "official_sources": [
+        "https://neon.com/docs/reference/api/snapshots/restore-snapshot",
+        "https://neon.com/docs/reference/api/branches/finalize-restore-branch"
+      ],
+      "official_operation_ids": [
+        "finalizeRestoreBranch",
+        "restoreSnapshot"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "检查未finalize分支→确认实际数据→finalize切换；失败不得假完成或丢原数据",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-07-07",
+      "package": "CP-07",
+      "feature": "pg_dump导出与pg_restore恢复",
+      "official_sources": [
+        "https://neon.com/docs/manage/backup-pg-dump",
+        "https://neon.com/docs/manage/backup-pg-dump-automate"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "真实格式/版本/角色兼容与回灌校验；用户工具/外部S3流程与内建PITR分开",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-08-01",
+      "package": "CP-08",
+      "feature": "SQL Editor执行与分支/角色选择",
+      "official_sources": [
+        "https://neon.com/docs/get-started/query-with-neon-sql-editor"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "真实SQL与结果/错误/取消，明确选中db/role/branch；不能只返回模拟表格",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-08-02",
+      "package": "CP-08",
+      "feature": "查询历史、保存及AI SQL辅助",
+      "official_sources": [
+        "https://neon.com/docs/get-started/query-with-neon-sql-editor",
+        "https://neon.com/docs/security/ai-use-in-neon"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "历史/隐私授权和生成SQL需用户确认执行，AI描述不能作为已运行结果",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-08-03",
+      "package": "CP-08",
+      "feature": "Explain/Analyze与执行分析",
+      "official_sources": [
+        "https://neon.com/docs/get-started/query-with-neon-sql-editor"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "真实计划及执行副作用提示、权限、取消和结果；不伪造成本数据",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-08-04",
+      "package": "CP-08",
+      "feature": "Tables记录增删改查、过滤与导出",
+      "official_sources": [
+        "https://neon.com/docs/guides/tables"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "真实事务与约束错误、JSON/CSV导出、跨branch隔离及授权矩阵",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-08-05",
+      "package": "CP-08",
+      "feature": "可视schema/table/view/enum和RLS",
+      "official_sources": [
+        "https://neon.com/docs/guides/tables"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "真实DDL/RLS与SQL结果一致，失败不留下UI已生效假象；ORM迁移工具不冒充内建",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-09-01",
+      "package": "CP-09",
+      "feature": "RAM/CPU/连接/pooler/缓存/WSS等仪表",
+      "official_sources": [
+        "https://neon.com/docs/introduction/monitoring-page"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "各指标单位、时间窗、retention与真实生产者关联，不能以静态数值/采样冒充预算资格",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-09-02",
+      "package": "CP-09",
+      "feature": "Active queries与query performance",
+      "official_sources": [
+        "https://neon.com/docs/introduction/monitor-active-queries",
+        "https://neon.com/docs/introduction/monitor-query-performance"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "实际查询、统计来源和访问权限核验，慢查询/停止后的行为按文档记录",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-09-03",
+      "package": "CP-09",
+      "feature": "日志scope/filter/live/download/retention",
+      "official_sources": [
+        "https://neon.com/docs/introduction/monitor-logs",
+        "https://neon.com/docs/reference/metrics-logs"
+      ],
+      "official_operation_ids": [
+        "listProjectBranchLogFieldValues",
+        "listProjectBranchLogFields",
+        "queryProjectBranchLogs"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "服务与分支范围、搜索/字段值分页、live流、下载及保留；敏感信息不泄漏",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-09-04",
+      "package": "CP-09",
+      "feature": "System operations展示和错误恢复",
+      "official_sources": [
+        "https://neon.com/docs/manage/operations"
+      ],
+      "official_operation_ids": [
+        "getProjectOperation",
+        "listProjectOperations"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "显示真实pending/error/retry状态与原operation ID，不能把丢回复当NoEffect",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-09-05",
+      "package": "CP-09",
+      "feature": "Datadog/Grafana/OTel导出",
+      "official_sources": [
+        "https://neon.com/docs/introduction/monitoring",
+        "https://neon.com/docs/reference/metrics-logs"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "真实导出、组织/项目权限、secret轮换和保留限制按集成文档验证",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-09-06",
+      "package": "CP-09",
+      "feature": "安全/性能advisor",
+      "official_sources": [
+        "https://neon.com/api_spec/release/v2.json"
+      ],
+      "official_operation_ids": [
+        "getProjectAdvisorSecurityIssues"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "真实Data API/数据库分析依赖、severity过滤及权限；alpha不冒充稳定SLA，公开spec有操作但编辑文档链接404仍须保留此需求",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-09-07",
+      "package": "CP-09",
+      "feature": "维护公告、更新状态、状态订阅及支持",
+      "official_sources": [
+        "https://neon.com/docs/manage/maintenance-updates-overview",
+        "https://neon.com/docs/introduction/status",
+        "https://neon.com/docs/introduction/support"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "故障可观察、支持入口和通知来源真实；运营承诺/工单不靠UI文案替代",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-10-01",
+      "package": "CP-10",
+      "feature": "IP Allow单IP/CIDR及保护范围",
+      "official_sources": [
+        "https://neon.com/docs/introduction/ip-allow",
+        "https://neon.com/docs/guides/protected-branches"
+      ],
+      "official_operation_ids": [
+        "updateProject",
+        "updateProjectBranch",
+        "updateProjectBranchDataAPI",
+        "updateProjectBranchDatabase",
+        "updateProjectBranchFunction",
+        "updateProjectBranchTrigger",
+        "updateProjectEndpoint"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "真实Proxy连接拒绝与已授权连接放行；不误称对Functions/Storage/AI全部生效",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-10-02",
+      "package": "CP-10",
+      "feature": "组织VPC endpoint管理与项目限制",
+      "official_sources": [
+        "https://neon.com/docs/guides/neon-private-networking"
+      ],
+      "official_operation_ids": [
+        "assignOrganizationVPCEndpoint",
+        "assignProjectVPCEndpoint",
+        "deleteOrganizationVPCEndpoint",
+        "deleteProjectVPCEndpoint",
+        "getOrganizationVPCEndpointDetails",
+        "listOrganizationVPCEndpoints",
+        "listOrganizationVPCEndpointsAllRegions",
+        "listProjectVPCEndpoints"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "Endpoint restriction/provider资源真实生效；公共/私有路径正负访问、撤销与恢复",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-10-03",
+      "package": "CP-10",
+      "feature": "TLS和静态加密/密钥管理依赖",
+      "official_sources": [
+        "https://neon.com/docs/security/security-overview",
+        "https://neon.com/security"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "真实传输/存储配置、密钥使用/轮换证据；不能把供应商认证徽标当自有系统认证",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-10-04",
+      "package": "CP-10",
+      "feature": "泄漏检测、secret扫描和凭据轮换",
+      "official_sources": [
+        "https://neon.com/docs/security/security-overview",
+        "https://neon.com/docs/manage/api-keys"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "实际撤销/替换和租户隔离，日志/错误响应不泄漏秘密",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-10-05",
+      "package": "CP-10",
+      "feature": "HIPAA组织/项目开关、BAA和审计",
+      "official_sources": [
+        "https://neon.com/docs/security/hipaa"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "按官方受限功能、Console/API审计与pgAudit范围分别验；合规认证由独立流程获得",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-10-06",
+      "package": "CP-10",
+      "feature": "公开合规/数据保留和AI数据用途",
+      "official_sources": [
+        "https://neon.com/docs/security/compliance",
+        "https://neon.com/docs/security/ai-use-in-neon",
+        "https://neon.com/docs/ai-gateway/data-retention"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "说明与真实配置/提供方合同一致；未认证不展示已获SOC/ISO/HIPAA",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-11-01",
+      "package": "CP-11",
+      "feature": "plan权益、额度及beta收费边界",
+      "official_sources": [
+        "https://neon.com/docs/introduction/plans",
+        "https://neon.com/docs/introduction/agent-plan"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "功能门禁和资源配额API/Console/执行器一致；不硬编码历史价格或旧plan额度",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-11-02",
+      "package": "CP-11",
+      "feature": "compute/storage/history/branch/egress真实计量",
+      "official_sources": [
+        "https://neon.com/docs/introduction/usage-calculations",
+        "https://neon.com/docs/manage/orgs-api-consumption"
+      ],
+      "official_operation_ids": [
+        "getConsumptionHistoryPerBranchV2",
+        "getConsumptionHistoryPerProject",
+        "getConsumptionHistoryPerProjectV2"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "单位/周期/组织项目分支归属正确，账单与原计量可对账，不能以请求参数自报用量",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-11-03",
+      "package": "CP-11",
+      "feature": "账单、支付方式、邮件、发票和欠费",
+      "official_sources": [
+        "https://neon.com/docs/introduction/manage-billing"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "真实支付提供方状态、invoice下载、失败/重试与用户通知；测试环境不能假真扣款",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-11-04",
+      "package": "CP-11",
+      "feature": "升级/降级、停费和组织关闭",
+      "official_sources": [
+        "https://neon.com/docs/introduction/manage-billing",
+        "https://neon.com/docs/manage/orgs-manage"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "plan变更兼容现有资源和额度，不能静默删数据或只更UI标签",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-11-05",
+      "package": "CP-11",
+      "feature": "花费阈值通知（并非硬停机）",
+      "official_sources": [
+        "https://neon.com/docs/introduction/spending-notifications"
+      ],
+      "official_operation_ids": [
+        "deleteOrganizationSpendingLimit",
+        "getOrganizationSpendingLimit",
+        "setOrganizationSpendingLimit"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "80%/100%邮件和Console banner、cents参数及删除幂等；当前官方只通知仍继续计费",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-11-06",
+      "package": "CP-11",
+      "feature": "每项目消费限额实际停机",
+      "official_sources": [
+        "https://neon.com/docs/guides/consumption-limits"
+      ],
+      "official_operation_ids": [
+        "updateProject",
+        "updateProjectBranch",
+        "updateProjectBranchDataAPI",
+        "updateProjectBranchDatabase",
+        "updateProjectBranchFunction",
+        "updateProjectBranchTrigger",
+        "updateProjectEndpoint"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "独立于总美元通知，准确compute/storage/transfer配额触发及恢复真实执行",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-11-07",
+      "package": "CP-11",
+      "feature": "AWS Marketplace及Agent组织转移计费",
+      "official_sources": [
+        "https://neon.com/docs/introduction/billing-aws-marketplace",
+        "https://neon.com/docs/introduction/agent-plan"
+      ],
+      "official_operation_ids": [
+        "transferProjectsFromOrgToOrg",
+        "transferProjectsFromUserToOrg"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "提供方订单/组织/项目所有权与实际账单一致，不能用普通plan UI替代市场订阅",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-12-01",
+      "package": "CP-12",
+      "feature": "Auth启用、禁用与分支隔离",
+      "official_sources": [
+        "https://neon.com/docs/auth/overview",
+        "https://neon.com/docs/auth/branching-authentication"
+      ],
+      "official_operation_ids": [
+        "createNeonAuth",
+        "createNeonAuthIntegration",
+        "createNeonAuthNewUser",
+        "createNeonAuthOAuthClient",
+        "createNeonAuthProviderSDKKeys",
+        "disableNeonAuth",
+        "getNeonAuth"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "真实neon_auth数据、独立Auth URL/session/JWKS与branch clone/delete，原分支用户不串用",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-12-02",
+      "package": "CP-12",
+      "feature": "Email/password注册登录及验证/重置",
+      "official_sources": [
+        "https://neon.com/docs/auth/guides/email-verification",
+        "https://neon.com/docs/auth/guides/password-reset"
+      ],
+      "official_operation_ids": [
+        "getNeonAuthEmailAndPasswordConfig",
+        "updateNeonAuthEmailAndPasswordConfig"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "实际验证/重置token、过期/重复使用/账号枚举边界与邮件流程",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-12-03",
+      "package": "CP-12",
+      "feature": "OAuth提供方与redirect domains",
+      "official_sources": [
+        "https://neon.com/docs/auth/guides/setup-oauth",
+        "https://neon.com/docs/auth/guides/configure-domains"
+      ],
+      "official_operation_ids": [
+        "addBranchNeonAuthOauthProvider",
+        "addBranchNeonAuthTrustedDomain",
+        "addNeonAuthOauthProvider",
+        "deleteBranchNeonAuthOauthProvider",
+        "deleteBranchNeonAuthTrustedDomain",
+        "deleteNeonAuthOauthProvider",
+        "listBranchNeonAuthOauthProviders",
+        "listBranchNeonAuthTrustedDomains",
+        "listNeonAuthOauthProviders",
+        "updateBranchNeonAuthOauthProvider",
+        "updateNeonAuthOauthProvider"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "真实OAuth callback、localhost白名单、错branch/域拒绝与secret轮换",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-12-04",
+      "package": "CP-12",
+      "feature": "Auth用户创建/删除/角色/admin plugin",
+      "official_sources": [
+        "https://neon.com/docs/auth/guides/user-management",
+        "https://neon.com/docs/auth/guides/plugins/admin"
+      ],
+      "official_operation_ids": [
+        "createBranchNeonAuthNewUser",
+        "createNeonAuthNewUser",
+        "deleteBranchNeonAuthUser",
+        "deleteNeonAuthUser",
+        "updateNeonAuthUserRole"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "真实用户目录和访问结果、管理员作用域，CP账号角色与应用Auth角色严格分开",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-12-05",
+      "package": "CP-12",
+      "feature": "JWT、email OTP、magic link插件",
+      "official_sources": [
+        "https://neon.com/docs/auth/guides/plugins",
+        "https://neon.com/docs/auth/guides/plugins/jwt",
+        "https://neon.com/docs/auth/guides/plugins/magic-link"
+      ],
+      "official_operation_ids": [
+        "getNeonAuthPluginConfigs",
+        "updateNeonAuthMagicLinkPlugin"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "真实短期JWT、claims/issuer/JWKS，OTP/链接一次性及过期行为；只用官方支持插件",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-12-06",
+      "package": "CP-12",
+      "feature": "Auth organization与phone插件",
+      "official_sources": [
+        "https://neon.com/docs/auth/guides/plugins/organization",
+        "https://neon.com/docs/auth/guides/plugins/phone-number"
+      ],
+      "official_operation_ids": [
+        "getNeonAuthPhoneNumberPlugin",
+        "updateNeonAuthOrganizationPlugin",
+        "updateNeonAuthPhoneNumberPlugin"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "租户/成员与电话验证及外部短信依赖分开，不能与Neon CP组织混为同一权限域",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-12-07",
+      "package": "CP-12",
+      "feature": "Auth OAuth provider及client生命周期",
+      "official_sources": [
+        "https://neon.com/docs/auth/guides/plugins/oauth-provider"
+      ],
+      "official_operation_ids": [
+        "createNeonAuthOAuthClient",
+        "deleteNeonAuthOAuthClient",
+        "getNeonAuthOAuthClient",
+        "getNeonAuthOAuthProviderPlugin",
+        "listNeonAuthOAuthClients",
+        "rotateNeonAuthOAuthClientSecret",
+        "updateNeonAuthOAuthClient",
+        "updateNeonAuthOAuthProviderPlugin"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "OAuth2.1 client类型、redirect/secret rotation/revoke、public/confidential和PKCE按准确合同",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-12-08",
+      "package": "CP-12",
+      "feature": "邮件提供方与测试邮件",
+      "official_sources": [
+        "https://neon.com/docs/auth/guides/customize-emails"
+      ],
+      "official_operation_ids": [
+        "getNeonAuthEmailProvider",
+        "sendNeonAuthEmailProviderTest",
+        "updateNeonAuthEmailProvider"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "真实配置校验、发送结果/失败，不把保存SMTP JSON当已发送；旧测试邮件API保留迁移",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-12-09",
+      "package": "CP-12",
+      "feature": "Auth webhook配置与安全",
+      "official_sources": [
+        "https://neon.com/docs/auth/guides/webhooks"
+      ],
+      "official_operation_ids": [
+        "getNeonAuthWebhookConfig",
+        "updateNeonAuthWebhookConfig"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "真实交付、鉴权/签名、重试与密钥处理按官方限制，不假设exactly-once",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-12-10",
+      "package": "CP-12",
+      "feature": "旧Stack Auth API/SDK迁移",
+      "official_sources": [
+        "https://neon.com/docs/auth/migrate/from-legacy-auth",
+        "https://neon.com/docs/auth/migrate/from-auth-v0.1"
+      ],
+      "official_operation_ids": [
+        "addNeonAuthDomainToRedirectURIWhitelist",
+        "addNeonAuthOauthProvider",
+        "createNeonAuthIntegration",
+        "createNeonAuthNewUser",
+        "createNeonAuthProviderSDKKeys",
+        "deleteNeonAuthDomainFromRedirectURIWhitelist",
+        "deleteNeonAuthIntegration",
+        "deleteNeonAuthOauthProvider",
+        "deleteNeonAuthUser",
+        "getNeonAuthEmailServer",
+        "listNeonAuthIntegrations",
+        "listNeonAuthOauthProviders",
+        "listNeonAuthRedirectURIWhitelistDomains",
+        "transferNeonAuthProviderProject",
+        "updateNeonAuthEmailServer",
+        "updateNeonAuthOauthProvider"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "旧provider16操作仍列在API盘点；迁移前不静默删除用户、session或旧接口",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-13-01",
+      "package": "CP-13",
+      "feature": "Data API按分支/数据库启用配置禁用",
+      "official_sources": [
+        "https://neon.com/docs/data-api/overview",
+        "https://neon.com/docs/data-api/manage"
+      ],
+      "official_operation_ids": [
+        "createProjectBranchDataAPI",
+        "deleteProjectBranchDataAPI",
+        "getProjectBranchDataAPI",
+        "updateProjectBranchDataAPI"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "真实HTTPS服务/URL与数据库绑定，配置错误不对外假可用",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-13-02",
+      "package": "CP-13",
+      "feature": "JWT/JWKS信任、角色和RLS",
+      "official_sources": [
+        "https://neon.com/docs/data-api/access-control",
+        "https://neon.com/docs/manage/projects"
+      ],
+      "official_operation_ids": [
+        "addProjectJWKS",
+        "deleteProjectJWKS",
+        "getProjectJWKS"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "真实issuer/audience/角色/GRANT/RLS正负矩阵，过期/错签名/跨分支拒绝",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-13-03",
+      "package": "CP-13",
+      "feature": "REST查询/CRUD/filter/RPC及SDK",
+      "official_sources": [
+        "https://neon.com/docs/data-api/overview"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "数据面PostgREST兼容面逐项实测，类型/错误/事务边界清楚，CP开关不能代替真实访问",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-14-01",
+      "package": "CP-14",
+      "feature": "Scoped credential创建/列出/撤销",
+      "official_sources": [
+        "https://neon.com/docs/concepts/credentials-access",
+        "https://neon.com/docs/storage/authentication"
+      ],
+      "official_operation_ids": [
+        "createCredential",
+        "listCredentials",
+        "revealCredential",
+        "revokeCredential",
+        "rotateCredential"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "API key仅管理用，runtime credential只按scopes调用服务；跨项目/分支祖先负路径",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-14-02",
+      "package": "CP-14",
+      "feature": "secret reveal/rotate和immutable scope/branch",
+      "official_sources": [
+        "https://neon.com/docs/concepts/credentials-access"
+      ],
+      "official_operation_ids": [
+        "revealCredential",
+        "rotateCredential"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "原credential作用域和anchor不随轮换改变；改scope需新建再撤销，S3/bearer形式共同失效",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-14-03",
+      "package": "CP-14",
+      "feature": "branch及后代继承的访问范围",
+      "official_sources": [
+        "https://neon.com/docs/concepts/credentials-access",
+        "https://neon.com/docs/storage/authentication"
+      ],
+      "official_operation_ids": [
+        "createCredential"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "同branch及现有/未来后代允许，父/兄弟/其他项目拒绝；默认分支credential范围广须明确展示",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-15-01",
+      "package": "CP-15",
+      "feature": "bucket创建、列出、删除与访问级别",
+      "official_sources": [
+        "https://neon.com/docs/storage/buckets"
+      ],
+      "official_operation_ids": [
+        "createProjectBranchBucket",
+        "deleteProjectBranchBucket",
+        "deleteProjectBranchBucketObject",
+        "deleteProjectBranchBucketObjectsByPrefix",
+        "getProjectBranchBucketObject",
+        "listProjectBranchBucketObjects",
+        "listProjectBranchBuckets",
+        "presignProjectBranchBucketObject"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "private/public_read真实生效；不能用不支持的S3 ACL/policy接口冒充配置",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-15-02",
+      "package": "CP-15",
+      "feature": "对象上传/下载/范围/列表/前缀删除",
+      "official_sources": [
+        "https://neon.com/docs/storage/objects"
+      ],
+      "official_operation_ids": [
+        "deleteProjectBranchBucketObject",
+        "deleteProjectBranchBucketObjectsByPrefix",
+        "getProjectBranchBucketObject",
+        "listProjectBranchBucketObjects",
+        "presignProjectBranchBucketObject"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "真实对象及元数据/分页/前缀边界、branch隔离；bulk delete失败结果可对账",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-15-03",
+      "package": "CP-15",
+      "feature": "Multipart、CORS和presigned URL",
+      "official_sources": [
+        "https://neon.com/docs/storage/s3-compatibility",
+        "https://neon.com/docs/storage/objects"
+      ],
+      "official_operation_ids": [
+        "presignProjectBranchBucketObject"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "真实分片/完成/取消、过期/签名/路径范围；不把管理API URL当S3数据接口",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-15-04",
+      "package": "CP-15",
+      "feature": "Storage CoW分支及对象生命周期",
+      "official_sources": [
+        "https://neon.com/docs/storage/buckets",
+        "https://neon.com/docs/storage/objects"
+      ],
+      "official_operation_ids": [
+        "getProjectBranchStorage"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "子分支修改/删除不污染parent，删除分支后的原对象/URL权限按实际语义回收",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-15-05",
+      "package": "CP-15",
+      "feature": "S3兼容性显式边界",
+      "official_sources": [
+        "https://neon.com/docs/storage/s3-compatibility"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "path-style与SigV4，已支持操作逐项验证；不支持的S3功能返回规定错误，不能宣称完整AWS S3等价",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-15-06",
+      "package": "CP-15",
+      "feature": "Storage日志及错误诊断",
+      "official_sources": [
+        "https://neon.com/docs/storage/logs",
+        "https://neon.com/docs/storage/troubleshooting"
+      ],
+      "official_operation_ids": [
+        "queryProjectBranchLogs"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "身份、scope、错误分支与签名错误区分；敏感密钥不记录",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-16-01",
+      "package": "CP-16",
+      "feature": "Function部署、列表、更新、删除",
+      "official_sources": [
+        "https://neon.com/docs/compute/functions/deploy"
+      ],
+      "official_operation_ids": [
+        "createProjectBranchFunctionDeployment",
+        "deleteProjectBranchFunction",
+        "getProjectBranchFunction",
+        "listProjectBranchFunctions",
+        "updateProjectBranchFunction"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "真实构建/部署状态、slug/URL、版本和删除；API成功不等于函数可调用",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-16-02",
+      "package": "CP-16",
+      "feature": "环境变量与Neon注入credentials",
+      "official_sources": [
+        "https://neon.com/docs/compute/functions/environment-variables"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "自动连接/branch参数与用户变量限制，secret隔离、分支克隆和重新部署实际生效",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-16-03",
+      "package": "CP-16",
+      "feature": "运行时、超时、并发及SIGINT",
+      "official_sources": [
+        "https://neon.com/docs/compute/functions/reference/runtime-limits"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "Node24/固定2048MiB、15分钟TTFB/heartbeat/waitUntil和5秒退出窗口按锁定合同测试，429可重试",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-16-04",
+      "package": "CP-16",
+      "feature": "Functions URL鉴权、CORS、WS/SSE",
+      "official_sources": [
+        "https://neon.com/docs/compute/functions/authentication",
+        "https://neon.com/docs/compute/functions/websockets"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "当前public URL无平台门禁，由handler真实验JWT/key；不得把functions:invoke enum当已存在平台鉴权",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-16-05",
+      "package": "CP-16",
+      "feature": "cron及object-created触发器",
+      "official_sources": [
+        "https://neon.com/docs/compute/functions/triggers/overview"
+      ],
+      "official_operation_ids": [
+        "createProjectBranchTrigger",
+        "deleteProjectBranchTrigger",
+        "getProjectBranchTrigger",
+        "listProjectBranchTriggers",
+        "updateProjectBranchTrigger"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "UTC cron、对象过滤、跨branch复制/禁用和目标function路径真实执行",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-16-06",
+      "package": "CP-16",
+      "feature": "触发投递重试、身份与幂等",
+      "official_sources": [
+        "https://neon.com/docs/compute/functions/triggers/overview"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "重复/乱序、72小时窗口、2xx完成语义、503 Retry-After与X-Neon头去伪造按合同测",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-16-07",
+      "package": "CP-16",
+      "feature": "自定义域、DNS/TLS与撤销",
+      "official_sources": [
+        "https://neon.com/docs/compute/functions/custom-domains"
+      ],
+      "official_operation_ids": [
+        "deleteProjectBranchCustomDomain",
+        "listProjectBranchCustomDomains",
+        "registerProjectBranchCustomDomain"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "真实域所有权、证书/路由、冲突/删除；缺外部DNS事实不得标可用",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-16-08",
+      "package": "CP-16",
+      "feature": "Function日志和失败排查",
+      "official_sources": [
+        "https://neon.com/docs/compute/functions/logs"
+      ],
+      "official_operation_ids": [
+        "queryProjectBranchLogs"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "部署失败和运行失败、时间/branch范围、retention及下载一致",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-17-01",
+      "package": "CP-17",
+      "feature": "Realtime enable/state/disable与secret rotate",
+      "official_sources": [
+        "https://neon.com/docs/realtime/overview"
+      ],
+      "official_operation_ids": [
+        "disableProjectBranchRealtime",
+        "enableProjectBranchRealtime",
+        "getProjectBranchRealtime",
+        "getProjectBranchRealtimeSecret",
+        "rotateProjectBranchRealtimeSecret"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "真实服务状态、secret get/rotate/revoke、子分支继承与删除回收",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-17-02",
+      "package": "CP-17",
+      "feature": "Live SQL、sealed query和订阅",
+      "official_sources": [
+        "https://neon.com/docs/realtime/guides/queries",
+        "https://neon.com/docs/realtime/overview"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "只读确定性SELECT、权限/参数封装、真实多客户端变更；不伪造实时返回",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-17-03",
+      "package": "CP-17",
+      "feature": "scale-to-zero/分支和复制依赖",
+      "official_sources": [
+        "https://neon.com/docs/realtime/overview"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "建立订阅可唤醒compute，持有订阅不阻止scale-to-zero；复制开关/region和重连实际验证",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-17-04",
+      "package": "CP-17",
+      "feature": "Realtime beta限制",
+      "official_sources": [
+        "https://neon.com/docs/realtime/overview"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "RLS尚不支持、协议未稳定和暂无性能保证明确；不能写成已支持RLS或已获SLA",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-18-01",
+      "package": "CP-18",
+      "feature": "AI Gateway分支endpoint及scope",
+      "official_sources": [
+        "https://neon.com/docs/ai-gateway/overview",
+        "https://neon.com/docs/ai-gateway/authentication"
+      ],
+      "official_operation_ids": [
+        "getProjectBranchAiGateway"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "真实分支绑定和invoke权限，错host/分支/模型不越权",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-18-02",
+      "package": "CP-18",
+      "feature": "全局模型目录和账户可用性",
+      "official_sources": [
+        "https://neon.com/docs/ai-gateway/models"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "列出可用模型/权益、region和速率限制真实，不将全局模型误做每分支可变模型配置",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-18-03",
+      "package": "CP-18",
+      "feature": "多provider协议、stream及embeddings",
+      "official_sources": [
+        "https://neon.com/docs/ai-gateway/chat-completions",
+        "https://neon.com/docs/ai-gateway/openai-responses",
+        "https://neon.com/docs/ai-gateway/anthropic-messages",
+        "https://neon.com/docs/ai-gateway/gemini",
+        "https://neon.com/docs/ai-gateway/embeddings",
+        "https://neon.com/docs/ai-gateway/decisions"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "实际转发与错误/stream取消/token usage；数据面依赖真实可用模型，不以假回答回归",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-18-04",
+      "package": "CP-18",
+      "feature": "AI预付credits、余额、auto-top-up与限额",
+      "official_sources": [
+        "https://neon.com/docs/ai-gateway/prepaid-credits"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "Admin权限、扣费/失败/重复支付/负余额边界，不能以UI余额替代账本或触发真实扣款测试",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-18-05",
+      "package": "CP-18",
+      "feature": "模型提供方数据保留与隐私",
+      "official_sources": [
+        "https://neon.com/docs/ai-gateway/data-retention"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "明确各提供方数据路径和保留，不能沿用PG网络隔离宣传覆盖AI出站调用",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-19-01",
+      "package": "CP-19",
+      "feature": "vector/text/tokenizer搜索扩展",
+      "official_sources": [
+        "https://neon.com/docs/ai/lakebase-search"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "准确PG版本扩展安装及真实索引/查询/分词功能；CP开关不等于数据面扩展已构建",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-19-02",
+      "package": "CP-19",
+      "feature": "现有扩展兼容、配置与弃用迁移",
+      "official_sources": [
+        "https://neon.com/docs/extensions/lakebase-vector",
+        "https://neon.com/docs/extensions/lakebase-text",
+        "https://neon.com/docs/extensions/lakebase-tokenizer"
+      ],
+      "official_operation_ids": [
+        "getAvailablePreloadLibraries"
+      ],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "白名单/预加载/major版本适配，pg_search/pgrag等弃用迁移记录，不随意删既有功能",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-20-01",
+      "package": "CP-20",
+      "feature": "公共CLI、Management SDK和OpenAPI",
+      "official_sources": [
+        "https://neon.com/docs/cli",
+        "https://neon.com/docs/reference/api"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "身份/项目上下文和退出码正确；完整193 route与版本锁对照，不仅能调用自有私有接口",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-20-02",
+      "package": "CP-20",
+      "feature": "neon.ts plan/deploy与配置漂移",
+      "official_sources": [
+        "https://neon.com/docs/reference/neon-ts"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "声明资源、差异预览、失败/重试/secret注入和branch一致，不能把配置文件保存当已部署",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-20-03",
+      "package": "CP-20",
+      "feature": "Neon MCP及agent权限",
+      "official_sources": [
+        "https://neon.com/docs/ai/neon-mcp-server"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "真实OAuth/key、作用域和工具操作结果；破坏性/数据访问遵守明确授权，不能只返回tool名称",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-20-04",
+      "package": "CP-20",
+      "feature": "GitHub/Vercel preview集成",
+      "official_sources": [
+        "https://neon.com/docs/manage/integrations",
+        "https://neon.com/docs/guides/vercel-managed-integration",
+        "https://neon.com/docs/guides/vercel-overview"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "外部OAuth、repo/preview分支和环境变量/Auth URL真实联动，PR关闭清理与重试幂等",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "NEON-CP-20-05",
+      "package": "CP-20",
+      "feature": "集成目录与各提供方差异",
+      "official_sources": [
+        "https://neon.com/docs/manage/integrations"
+      ],
+      "official_operation_ids": [],
+      "code_review_status": "PENDING_INDIVIDUAL_MAPPING",
+      "historical_evidence": [],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "从官方catalog展开每个提供方，区分Console安装和手工driver指南；未展开者保留NOT_ASSESSED而非删除",
+        "API/Console权限正负路径及真实数据/资源结果均验证；未执行不标PASS。"
+      ]
+    },
+    {
+      "id": "SELF-PG-MEM-01",
+      "package": "CP-05",
+      "feature": "动态PG共享缓冲区和真实normal安全在线降限的控制面创建、策略、观察及恢复",
+      "official_sources": [],
+      "code_review_status": "CONFIRMED_INTEGRATION_GAPS",
+      "code_evidence": [
+        "api/internal/control/worker.go",
+        "api/internal/control/dsga_project_handler.go",
+        "api/internal/control/dsga_creation_plan.go",
+        "api/internal/control/bounds.go"
+      ],
+      "historical_evidence": [
+        "PG17/PG18数据面各4/4，详见既有Linux验收；不是控制面验收"
+      ],
+      "current_e2e": "NOT_RUN",
+      "acceptance": [
+        "公开API/UI创建PG17并通过SQL",
+        "公开策略触发Grow/Shrink/Regrow/自动策略且真实读回",
+        "同连接应用数据及WAL一致",
+        "PG18复用同一上层合同独立回归"
+      ]
+    }
+  ]
+}

@@ -1,4 +1,5 @@
 import { FunctionRequestLogs } from './FunctionRequestLogs';
+import { FunctionUsage } from './FunctionUsage';
 import { ScheduleTriggers } from './ScheduleTriggers';
 import { FunctionOutput } from './FunctionOutput';
 import { FunctionBranchCopy } from './FunctionBranchCopy';
@@ -518,6 +519,11 @@ export function Functions({
                   disabled={busy}
                 />
                 <FunctionRequestLogs path={`${path}/${current.slug}`} />
+                <FunctionUsage
+                  key={`usage/${path}/${current.id}`}
+                  path={`${path}/${current.slug}`}
+                  functionId={current.id}
+                />
                 <FunctionOutput
                   key={`output/${current.id}`}
                   path={`${path}/${current.slug}`}

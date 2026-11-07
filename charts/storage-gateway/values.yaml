@@ -1,0 +1,49 @@
+image:
+  reference: ""
+  pullPolicy: IfNotPresent
+replicaCount: 1
+metadataSecret: ""
+blobSecret: ""
+backendKeysSecret: ""
+capabilitySecret: ""
+# Explicit existing cp-<endpoint>-credentials Secrets; never wildcard Secret get.
+endpointCredentialSecrets: []
+publicOrigin: ""
+region: us-east-2
+proxy:
+  host: ""
+  port: 30432
+  tlsMode: verify-full
+  caSecret: ""
+capacity:
+  objectBytes: 67108864
+  branchBytes: 268435456
+  bufferBytes: 268435456
+  transferSeconds: 150
+events:
+  secret: ""
+  keyVersion: ""
+service:
+  type: ClusterIP
+  nodePort: 0
+ingress:
+  enabled: true
+  className: ""
+  host: ""
+  tlsSecret: ""
+  # Optional Console hostname: routes only /storage/v1/ to this gateway.
+  restHost: ""
+  restTLSSecret: ""
+laboratory:
+  allowHTTP: false
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+    ephemeral-storage: 256Mi
+  limits:
+    cpu: "1"
+    memory: 512Mi
+    ephemeral-storage: 512Mi
+nodeSelector: {}
+tolerations: []

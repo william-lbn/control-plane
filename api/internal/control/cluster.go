@@ -336,6 +336,8 @@ type createPayload struct {
 	RestoreSource             string `json:"restore_source,omitempty"`
 	CatalogPolicy             string `json:"catalog_policy,omitempty"`
 	CatalogInitializePlatform bool   `json:"-"`
+	ResetInspectionOperation  string `json:"-"`
+	ResetInspectionLSN        string `json:"-"`
 	CatalogSpec               string `json:"-"` // Runtime projection from branch intent; never persisted in Operation.
 	MinCPU                    int    `json:"min_cpu_milli"`
 	MaxCPU                    int    `json:"max_cpu_milli"`
@@ -355,6 +357,10 @@ func (e vmWaitError) Error() string {
 func (e vmWaitError) Unwrap() error { return e.cause }
 
 func (k *kubeClient) createCompute(ctx context.Context, p createPayload) (map[string]any, error) {
+	if err := validateBranchResetInspectionPayload(p); err != nil {
+		return nil, err
+	}
+	// 恢复检查沿用同一创建边界；主线恢复功能不能绕过受管内存实例的身份保护。
 	if err := k.legacyComputePreflight(ctx, p); err != nil {
 		return nil, err
 	}
@@ -475,8 +481,32 @@ func (k *kubeClient) createCompute(ctx context.Context, p createPayload) (map[st
 		config = string(encoded)
 	}
 	labels := credentialLabels(p.ProjectID, p.EndpointID)
+	annotations := map[string]string{}
+	if p.ResetInspectionOperation != "" {
+		var initial map[string]any
+		if json.Unmarshal([]byte(config), &initial) != nil {
+			return nil, errBranchResetProbe
+		}
+		var isolated map[string]any
+		var err error
+		if p.ResetInspectionLSN != "" {
+			isolated, err = resetBackupInspectionConfig(initial, p.ResetInspectionLSN)
+		} else {
+			isolated, err = resetInspectionConfig(initial)
+		}
+		if err != nil {
+			return nil, err
+		}
+		encoded, err := json.Marshal(isolated)
+		if err != nil {
+			return nil, err
+		}
+		config = string(encoded)
+		labels["neon-control/reset-operation"] = p.ResetInspectionOperation
+		annotations[resetInspectionAnnotation] = p.ResetInspectionOperation
+	}
 	configSecret, err := k.createOwned(ctx, "secret", map[string]any{"apiVersion": "v1", "kind": "Secret", "type": "Opaque",
-		"metadata": map[string]any{"name": name + "-config", "labels": labels},
+		"metadata": map[string]any{"name": name + "-config", "labels": labels, "annotations": annotations},
 		"data": map[string]string{"config.json": base64.StdEncoding.EncodeToString([]byte(config)),
 			"probePassword": base64.StdEncoding.EncodeToString([]byte(probePassword)), "control.crt": tlsIdentity["controlCert"], "control.key": tlsIdentity["controlTLSKey"]}}, p.ProjectID, p.EndpointID)
 	if err != nil {
@@ -496,7 +526,10 @@ func (k *kubeClient) createCompute(ctx context.Context, p createPayload) (map[st
 	if stringVal(nested(persisted, "spec", "cluster", "cluster_id")) != p.ProjectID {
 		return nil, errors.New("compute config project mismatch")
 	}
-	if p.EndpointType == "read_only" && nested(persisted, "spec", "mode") != "Replica" {
+	if err = validatePersistedBranchResetInspection(p, persisted); err != nil {
+		return nil, err
+	}
+	if p.EndpointType == "read_only" && p.ResetInspectionLSN == "" && nested(persisted, "spec", "mode") != "Replica" {
 		return nil, errors.New("compute config replica mode mismatch")
 	}
 	roles := map[string]string{}
@@ -516,8 +549,16 @@ func (k *kubeClient) createCompute(ctx context.Context, p createPayload) (map[st
 	if _, err := k.createOwned(ctx, "service", service, p.ProjectID, p.EndpointID); err != nil {
 		return nil, err
 	}
+	guestAutoscaling := "1"
+	if p.ResetInspectionOperation != "" {
+		guestAutoscaling = "0"
+	}
 	vmLabels := credentialLabels(p.ProjectID, p.EndpointID)
 	vmLabels["autoscaling.neon.tech/enabled"] = "true"
+	if p.ResetInspectionOperation != "" {
+		vmLabels["autoscaling.neon.tech/enabled"] = "false"
+		vmLabels["neon-control/reset-operation"] = p.ResetInspectionOperation
+	}
 	bounds, _ := json.Marshal(map[string]any{"min": map[string]string{"cpu": cpuQuantityText(p.MinCPU), "mem": fmt.Sprintf("%dGi", p.MinMem/1024)},
 		"max": map[string]string{"cpu": cpuQuantityText(p.MaxCPU), "mem": fmt.Sprintf("%dGi", p.MaxMem/1024)}})
 	vm := map[string]any{"apiVersion": "vm.neon.tech/v1", "kind": "VirtualMachine",
@@ -532,7 +573,7 @@ func (k *kubeClient) createCompute(ctx context.Context, p createPayload) (map[st
 					"--filecache-connstr", "host=localhost port=55433 dbname=postgres user=cloud_admin sslmode=disable application_name=vm-monitor", "--dev"},
 				"env": []any{map[string]string{"name": "PG_VERSION", "value": "16"}, map[string]string{"name": "TENANT_ID", "value": p.TenantID},
 					map[string]string{"name": "TIMELINE_ID", "value": p.TimelineID}, map[string]string{"name": "ALLOW_LAB_AUTOBOOTSTRAP", "value": "NO"},
-					map[string]string{"name": "AUTOSCALING", "value": "1"}},
+					map[string]string{"name": "AUTOSCALING", "value": guestAutoscaling}},
 				"ports": []any{map[string]any{"name": "postgres", "port": 55433}, map[string]any{"name": "metrics", "port": 9100},
 					map[string]any{"name": "monitor", "port": 10301}, map[string]any{"name": "compute-control", "port": 3080}}},
 			"extraNetwork": map[string]bool{"enable": true},

@@ -1,0 +1,82 @@
+{
+  "recorded_at_utc": "2026-11-07T10:04:09.560114+00:00",
+  "official_sources": [
+    {
+      "key": "openapi",
+      "url": "https://neon.com/api_spec/release/v2.json",
+      "canonical": "https://neon.com/api_spec/release/v2.json",
+      "sha256": "bcc73bd5e55a57a5349791a6367e62b39763cc512e49346b27a4436bb79ebafa",
+      "bytes": 924227,
+      "time": "2026-11-07T09:58:19.287960+00:00"
+    },
+    {
+      "key": "index",
+      "url": "https://neon.com/docs/llms.txt",
+      "canonical": "https://neon.com/docs/llms.txt",
+      "sha256": "295f6fa242a9a0b80f60ca95607b8cc536225e128b02deb2d60c5851f5384f27",
+      "bytes": 29240,
+      "time": "2026-11-07T09:58:16.394956+00:00"
+    },
+    {
+      "key": "objects",
+      "url": "https://neon.com/docs/concepts/the-object-model.md",
+      "canonical": "https://neon.com/docs/concepts/the-object-model.md",
+      "sha256": "289a46dde89a7c6eb37631cc3890b4c065135ccff480fb613cc84411b00d43fb",
+      "bytes": 9681,
+      "time": "2026-11-07T09:58:15.381192+00:00"
+    },
+    {
+      "key": "branching",
+      "url": "https://neon.com/docs/concepts/branch-your-backend.md",
+      "canonical": "https://neon.com/docs/concepts/branch-your-backend.md",
+      "sha256": "6ef6ee11a98c809dab630c4980ecc70570a3751bbc91ef8f683c1583e6cc8432",
+      "bytes": 9734,
+      "time": "2026-11-07T09:58:16.719637+00:00"
+    },
+    {
+      "key": "roadmap",
+      "url": "https://neon.com/docs/introduction/roadmap.md",
+      "canonical": "https://neon.com/docs/introduction/roadmap.md",
+      "sha256": "b245409c18d50ff05af58cda5960ccbc25fee6c22999061b812ee12dddf3f331",
+      "bytes": 46512,
+      "time": "2026-11-07T09:58:20.646802+00:00"
+    },
+    {
+      "key": "realtime",
+      "url": "https://neon.com/docs/realtime/overview.md",
+      "canonical": "https://neon.com/docs/realtime/overview.md",
+      "sha256": "e56e7f2dd442d341e16fc7753dcebc0d2f12945f0dd86af2120b3c8baba7e01b",
+      "bytes": 18833,
+      "time": "2026-11-07T09:58:18.070422+00:00"
+    },
+    {
+      "key": "search",
+      "url": "https://neon.com/docs/ai/lakebase-search.md",
+      "canonical": "https://neon.com/docs/ai/lakebase-search.md",
+      "sha256": "f2169defe775f18ba9dc111aa6b35fb605dbe9696e4703e1a9940a5ca322338f",
+      "bytes": 6547,
+      "time": "2026-11-07T09:58:19.190706+00:00"
+    },
+    {
+      "key": "autoscaling",
+      "url": "https://neon.com/docs/introduction/autoscaling.md",
+      "canonical": "https://neon.com/docs/introduction/autoscaling.md",
+      "sha256": "fa0ca900f0108cdcb258abeeda615f3c7cb7d5587faf4d4d14dc7f0decbc73a7",
+      "bytes": 4378,
+      "time": "2026-11-07T09:58:23.294667+00:00"
+    }
+  ],
+  "official_operations_count": 194,
+  "official_operations_added_since_20261031": [
+    "updateNeonAuthLogsExport"
+  ],
+  "official_operations_removed_since_20261031": [],
+  "own_main": "e15e6c79f4c5b80eb004050eeafea866ffd30c0e",
+  "own_memory_branch_base": "1bcb81b2ca4eb8748d8ca77fe51c91c0a6f0d550",
+  "branch": "codex/dsga-control-plane-v3-20261020",
+  "integration_method": "reviewed non-rewriting cherry-pick of five main-only business commits, pending tests",
+  "own_operation_count": 312,
+  "parity_verified": false,
+  "new_e2e_passes": 0,
+  "openapi_wire_compatibility_claimed": false
+}

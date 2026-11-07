@@ -89,7 +89,7 @@ func TestFunctionArtifactConditionalWireRecoveryAndIntegrity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b := &storageBlobs{client, "neon-product-ci"}
+	b := &storageBlobs{client: client, bucket: "neon-product-ci"}
 	ref, err := b.reserveFunctionArtifact(context.Background(), "prj_0123456789abcdef", "br_0123456789abcdef", archive)
 	if err != nil {
 		t.Fatal("conditional creation failed", err)

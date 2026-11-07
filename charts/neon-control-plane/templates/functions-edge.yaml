@@ -1,0 +1,109 @@
+{{- if (dig "edge" "enabled" false .Values.functions) -}}
+{{- if not (and .Values.functions.enabled .Values.functions.publicHTTP.enabled .Values.worker.enabled) -}}
+{{- fail "Functions edge requires Functions, publicHTTP and separate Worker" -}}
+{{- end -}}
+{{- if ne (int .Values.functions.edge.replicaCount) 1 -}}
+{{- fail "Functions edge preview requires one replica until external fencing/HA acceptance" -}}
+{{- end -}}
+{{- $name := include "neonControl.name" . -}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}-function-edge
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}-function-edge
+  labels:
+    {{- include "neonControl.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: function-edge}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: function-edge
+        {{- include "neonControl.labels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ $name }}-function-edge
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      terminationGracePeriodSeconds: 35
+      securityContext: {runAsNonRoot: true, runAsUser: 65532, runAsGroup: 65532, fsGroup: 65532, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: function-edge
+          image: {{ required "api.image.reference is required" .Values.api.image.reference | quote }}
+          imagePullPolicy: {{ .Values.api.image.pullPolicy }}
+          command: [/opt/neon-control/control-function-edge]
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+          ports: [{name: functions-http, containerPort: 8792}]
+          resources: {{ toYaml .Values.functions.edge.resources | nindent 12 }}
+          env:
+            - {name: NEON_FUNCTIONS_PUBLIC_BIND, value: ':8792'}
+            - {name: NEON_FUNCTIONS_PUBLIC_ORIGIN, value: {{ .Values.functions.publicHTTP.origin | quote }}}
+            - {name: NEON_FUNCTIONS_PUBLIC_LAB_HTTP, value: {{ .Values.functions.publicHTTP.labHTTP | quote }}}
+            - {name: NEON_FUNCTIONS_EDGE_BROKER_ORIGIN, value: {{ printf "https://%s-function-edge-broker.%s.svc:8795" $name .Release.Namespace | quote }}}
+            - {name: NEON_FUNCTIONS_EDGE_CLIENT_CERT_FILE, value: /run/function-edge/tls.crt}
+            - {name: NEON_FUNCTIONS_EDGE_CLIENT_KEY_FILE, value: /run/function-edge/tls.key}
+            - {name: NEON_FUNCTIONS_EDGE_BROKER_CA_FILE, value: /run/function-edge/broker-ca.crt}
+            - {name: NEON_FUNCTIONS_EDGE_GUEST_CA_FILE, value: /run/function-guest-ca/guest-ca.crt}
+          volumeMounts:
+            - {name: edge-identity, mountPath: /run/function-edge, readOnly: true}
+            - {name: guest-ca, mountPath: /run/function-guest-ca, readOnly: true}
+          readinessProbe: {tcpSocket: {port: functions-http}, initialDelaySeconds: 2, periodSeconds: 5}
+          livenessProbe: {tcpSocket: {port: functions-http}, initialDelaySeconds: 10, periodSeconds: 10}
+      volumes:
+        - name: edge-identity
+          secret:
+            secretName: {{ required "functions.edge.existingClientSecret is required" .Values.functions.edge.existingClientSecret }}
+            defaultMode: 288
+            items: [{key: tls.crt, path: tls.crt}, {key: tls.key, path: tls.key}, {key: broker-ca.crt, path: broker-ca.crt}]
+        - name: guest-ca
+          secret:
+            secretName: {{ required "functions.existingConfigSecret is required" .Values.functions.existingConfigSecret }}
+            defaultMode: 288
+            items: [{key: guest-ca.crt, path: guest-ca.crt}]
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}-function-edge-broker
+spec:
+  type: ClusterIP
+  selector: {app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: api}
+  ports: [{name: edge-broker, port: 8795, targetPort: 8795}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ $name }}-function-edge-egress
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: function-edge}
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/instance: {{ .Release.Name }}, app.kubernetes.io/component: api}
+      ports: [{protocol: TCP, port: 8795}]
+    - to:
+        - podSelector:
+            matchExpressions: [{key: vm.neon.tech/name, operator: Exists}]
+      ports: [{protocol: TCP, port: 9090}]
+    - to:
+        - namespaceSelector: {matchLabels: {kubernetes.io/metadata.name: kube-system}}
+      ports: [{protocol: UDP, port: 53}, {protocol: TCP, port: 53}]
+{{- end }}

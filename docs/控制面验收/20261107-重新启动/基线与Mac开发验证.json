@@ -1,0 +1,72 @@
+{
+  "recorded_at_utc": "2026-11-07T10:18:53.817579+00:00",
+  "scope": "最新版控制面代码整合及Mac可信传输；不是完整产品端到端",
+  "base_commit": "1bcb81b2ca4eb8748d8ca77fe51c91c0a6f0d550",
+  "passed_root_tests": 89,
+  "passed_subtests": 327,
+  "skipped_tests": [],
+  "initial_failures": {
+    "dependency_fetch": [
+      "goproxy.cn did not contain exact fork version",
+      "proxy.golang.org network timeout"
+    ],
+    "toolchain": "inherited GOROOT pointed at Go1.25; corrected per-process GOROOT to verified Go1.27",
+    "first_test_run": "missing explicit disposable schema; guard rejected before affected tests executed",
+    "baseline_test_failure": {
+      "name": "TestDSGAProjectReservationForwardMigrationPreservesLegacyKey",
+      "cause": "fixture removed reservation schema but retained dependent migration067 marker",
+      "fix": "rollback fixture also removes067 marker; production migration unchanged",
+      "focused_rerun_exit": 0
+    }
+  },
+  "go_race": true,
+  "go_vet_exit": 0,
+  "web_test_passed": 50,
+  "web_test_skipped": 0,
+  "web_build_exit": 0,
+  "real_proxy_sql": {
+    "time": "2026-11-07T10:11:54.525860+00:00",
+    "endpoint": "ep_24c41e23bb104ead",
+    "credential_uid": "a7f31b74-1deb-417e-8113-87fe2e50e331",
+    "via": "Mac localhost -> SSH worker-118 -> Neon Proxy -> existing PG18",
+    "tls": "verify-full",
+    "read_only": true,
+    "exit_code": 0,
+    "rows": "BEGIN\n180002|postgres|f\nCOMMIT",
+    "error_present": false
+  },
+  "mac_startup": {
+    "timestamp": "2026-11-07T10:18:11.143852+00:00",
+    "scope": "Mac development startup and real local metadata authentication; not cluster product E2E",
+    "checks": [
+      {
+        "path": "/",
+        "status": 200
+      },
+      {
+        "path": "/healthz",
+        "status": 200
+      },
+      {
+        "path": "/auth/login",
+        "status": 200
+      },
+      {
+        "path": "/api/v1/capabilities",
+        "status": 200,
+        "project_create_enabled": false,
+        "services": {
+          "ai_gateway": false,
+          "auth": false,
+          "data_api": false,
+          "functions": false,
+          "object_storage": false,
+          "postgres": true
+        }
+      }
+    ]
+  },
+  "production_acceptance": false,
+  "raw_evidence_local": "/Users/williamlee/github/control-plane-pg-memory/.local/dev-20261107",
+  "raw_evidence_archive": "/data/neon-control-plane/runs/20261107-控制面重新启动/validation"
+}

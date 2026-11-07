@@ -1,0 +1,25 @@
+{
+ "$schema": "https://json-schema.org/draft-07/schema#",
+ "type": "object",
+ "required": ["image", "metadataSecret", "blobSecret", "backendKeysSecret", "capabilitySecret", "endpointCredentialSecrets", "publicOrigin", "proxy", "capacity", "service", "ingress", "laboratory", "events"],
+ "properties": {
+  "image": {"type":"object","required":["reference"],"properties":{"reference":{"type":"string","pattern":"^[a-z0-9./_-]+@sha256:[a-f0-9]{64}$"},"pullPolicy":{"enum":["IfNotPresent","Always","Never"]}}},
+  "replicaCount": {"type":"integer","const":1},
+  "metadataSecret": {"type":"string","minLength":1},
+  "blobSecret": {"type":"string","minLength":1},
+  "backendKeysSecret": {"type":"string","minLength":1},
+  "capabilitySecret": {"type":"string","minLength":1},
+  "endpointCredentialSecrets": {"type":"array","minItems":1,"uniqueItems":true,"items":{"type":"string","pattern":"^cp-[a-f0-9]{16}-credentials$"}},
+  "publicOrigin": {"type":"string","pattern":"^https?://[^/?#@]+$"},
+  "region": {"type":"string","pattern":"^[a-z0-9-]{1,32}$"},
+  "proxy": {"type":"object","required":["host","port","tlsMode"],"properties":{"host":{"type":"string","minLength":1},"port":{"type":"integer","minimum":1,"maximum":65535},"tlsMode":{"enum":["verify-full","require"]},"caSecret":{"type":"string"}}},
+  "capacity": {"type":"object","required":["objectBytes","branchBytes","bufferBytes","transferSeconds"],"properties":{"objectBytes":{"type":"integer","minimum":8388608,"maximum":5368709120},"branchBytes":{"type":"integer","minimum":8388608,"maximum":21474836480},"bufferBytes":{"type":"integer","minimum":16777216,"maximum":12884901888},"transferSeconds":{"type":"integer","minimum":150,"maximum":3600}}},
+  "events": {"type":"object","required":["secret","keyVersion"],"properties":{"secret":{"type":"string"},"keyVersion":{"type":"string"}}},
+  "service": {"type":"object","required":["type"],"properties":{"type":{"enum":["ClusterIP","NodePort"]},"nodePort":{"type":"integer","minimum":0,"maximum":32767}}},
+  "ingress": {"type":"object","required":["enabled","host","tlsSecret"],"properties":{"enabled":{"type":"boolean"},"className":{"type":"string"},"host":{"type":"string"},"tlsSecret":{"type":"string"},"restHost":{"type":"string"},"restTLSSecret":{"type":"string"}}},
+  "laboratory": {"type":"object","required":["allowHTTP"],"properties":{"allowHTTP":{"type":"boolean"}}},
+  "resources": {"type":"object"},
+  "nodeSelector": {"type":"object"},
+  "tolerations": {"type":"array"}
+ }
+}

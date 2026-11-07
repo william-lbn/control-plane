@@ -251,6 +251,13 @@ func (s *server) storeComputeCatalogBootstrap(ctx context.Context, operation, wo
 }
 
 func (s *server) publishComputeCatalogBootstrap(ctx context.Context, v computeCatalogBootstrap) error {
+	restored := v.Witness == branchResetBootstrapWitness
+	if restored {
+		current, err := readBranchResetBootstrap(ctx, s.db, v.payload())
+		if err != nil || current != v {
+			return errBranchResetConfig
+		}
+	}
 	for attempt := 0; attempt < 6; attempt++ {
 		secret, document, current, err := s.kube.readComputeCatalogBootstrap(ctx, v.payload())
 		if err != nil {
@@ -261,6 +268,9 @@ func (s *server) publishComputeCatalogBootstrap(ctx context.Context, v computeCa
 		}
 		spec := document["spec"].(map[string]any)
 		if spec["skip_pg_catalog_updates"] == true {
+			if restored {
+				return nil
+			}
 			_, err = s.db.Exec(ctx, `INSERT INTO compute_catalog_bootstrap_publications(endpoint_id) VALUES($1) ON CONFLICT DO NOTHING`, v.Endpoint)
 			return err
 		}
@@ -292,17 +302,12 @@ func (s *server) sealComputeCatalogBootstrap(ctx context.Context, operation, wor
 // A retried create must reuse its first successful bootstrap receipt before it
 // can recreate a VM. It cannot silently fall back to replaying catalog DDL.
 func (s *server) resumeComputeCatalogBootstrap(ctx context.Context, p createPayload) error {
-	var raw []byte
-	err := s.db.QueryRow(ctx, `SELECT proof FROM compute_catalog_bootstrap_receipts WHERE endpoint_id=$1`, p.EndpointID).Scan(&raw)
+	v, err := currentComputeBootstrap(ctx, s.db, p)
 	if isNoRows(err) {
 		return nil
 	}
 	if err != nil {
 		return err
-	}
-	var v computeCatalogBootstrap
-	if json.Unmarshal(raw, &v) != nil || !sameBootstrapScope(v.payload(), p) {
-		return errors.New("bootstrap resume scope changed")
 	}
 	return s.publishComputeCatalogBootstrap(ctx, v)
 }

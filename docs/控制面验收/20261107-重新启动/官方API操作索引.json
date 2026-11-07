@@ -1,0 +1,1555 @@
+[
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/advisors",
+    "id": "getProjectAdvisorSecurityIssues",
+    "tags": [
+      "Project"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/api_keys",
+    "id": "listApiKeys",
+    "tags": [
+      "API Key"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/api_keys",
+    "id": "createApiKey",
+    "tags": [
+      "API Key"
+    ]
+  },
+  {
+    "method": "delete",
+    "path": "/api_keys/{key_id}",
+    "id": "revokeApiKey",
+    "tags": [
+      "API Key"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/operations/{operation_id}",
+    "id": "getProjectOperation",
+    "tags": [
+      "Operation"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects",
+    "id": "listProjects",
+    "tags": [
+      "Project"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects",
+    "id": "createProject",
+    "tags": [
+      "Project"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/count",
+    "id": "countProjects",
+    "tags": [
+      "Project"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/shared",
+    "id": "listSharedProjects",
+    "tags": [
+      "Project"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}",
+    "id": "getProject",
+    "tags": [
+      "Project"
+    ]
+  },
+  {
+    "method": "patch",
+    "path": "/projects/{project_id}",
+    "id": "updateProject",
+    "tags": [
+      "Project"
+    ]
+  },
+  {
+    "method": "delete",
+    "path": "/projects/{project_id}",
+    "id": "deleteProject",
+    "tags": [
+      "Project"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/recover",
+    "id": "recoverProject",
+    "tags": [
+      "Project"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/operations",
+    "id": "listProjectOperations",
+    "tags": [
+      "Operation"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/permissions",
+    "id": "listProjectPermissions",
+    "tags": [
+      "Project"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/permissions",
+    "id": "grantPermissionToProject",
+    "tags": [
+      "Project"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/members",
+    "id": "listProjectMembers",
+    "tags": [
+      "Project"
+    ]
+  },
+  {
+    "method": "put",
+    "path": "/projects/{project_id}/members/{member_id}/role",
+    "id": "setProjectMemberRole",
+    "tags": [
+      "Project"
+    ]
+  },
+  {
+    "method": "delete",
+    "path": "/projects/{project_id}/members/{member_id}/role",
+    "id": "removeProjectMemberRole",
+    "tags": [
+      "Project"
+    ]
+  },
+  {
+    "method": "delete",
+    "path": "/projects/{project_id}/permissions/{permission_id}",
+    "id": "revokePermissionFromProject",
+    "tags": [
+      "Project"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/available_preload_libraries",
+    "id": "getAvailablePreloadLibraries",
+    "tags": [
+      "Project"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/transfer_requests",
+    "id": "createProjectTransferRequest",
+    "tags": [
+      "Project"
+    ]
+  },
+  {
+    "method": "put",
+    "path": "/projects/{project_id}/transfer_requests/{request_id}",
+    "id": "acceptProjectTransferRequest",
+    "tags": [
+      "Project"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/jwks",
+    "id": "getProjectJWKS",
+    "tags": [
+      "Project"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/jwks",
+    "id": "addProjectJWKS",
+    "tags": [
+      "Project"
+    ]
+  },
+  {
+    "method": "delete",
+    "path": "/projects/{project_id}/jwks/{jwks_id}",
+    "id": "deleteProjectJWKS",
+    "tags": [
+      "Project"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/branches/{branch_id}/data-api/{database_name}",
+    "id": "createProjectBranchDataAPI",
+    "tags": [
+      "DataAPI"
+    ]
+  },
+  {
+    "method": "patch",
+    "path": "/projects/{project_id}/branches/{branch_id}/data-api/{database_name}",
+    "id": "updateProjectBranchDataAPI",
+    "tags": [
+      "DataAPI"
+    ]
+  },
+  {
+    "method": "delete",
+    "path": "/projects/{project_id}/branches/{branch_id}/data-api/{database_name}",
+    "id": "deleteProjectBranchDataAPI",
+    "tags": [
+      "DataAPI"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/data-api/{database_name}",
+    "id": "getProjectBranchDataAPI",
+    "tags": [
+      "DataAPI"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/auth/create",
+    "id": "createNeonAuthIntegration",
+    "tags": [
+      "Auth (legacy)"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/auth",
+    "id": "getNeonAuth",
+    "tags": [
+      "Auth"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/branches/{branch_id}/auth",
+    "id": "createNeonAuth",
+    "tags": [
+      "Auth"
+    ]
+  },
+  {
+    "method": "delete",
+    "path": "/projects/{project_id}/branches/{branch_id}/auth",
+    "id": "disableNeonAuth",
+    "tags": [
+      "Auth"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/auth/domains",
+    "id": "listNeonAuthRedirectURIWhitelistDomains",
+    "tags": [
+      "Auth (legacy)"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/auth/domains",
+    "id": "addNeonAuthDomainToRedirectURIWhitelist",
+    "tags": [
+      "Auth (legacy)"
+    ]
+  },
+  {
+    "method": "delete",
+    "path": "/projects/{project_id}/auth/domains",
+    "id": "deleteNeonAuthDomainFromRedirectURIWhitelist",
+    "tags": [
+      "Auth (legacy)"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/auth/domains",
+    "id": "listBranchNeonAuthTrustedDomains",
+    "tags": [
+      "Auth"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/branches/{branch_id}/auth/domains",
+    "id": "addBranchNeonAuthTrustedDomain",
+    "tags": [
+      "Auth"
+    ]
+  },
+  {
+    "method": "delete",
+    "path": "/projects/{project_id}/branches/{branch_id}/auth/domains",
+    "id": "deleteBranchNeonAuthTrustedDomain",
+    "tags": [
+      "Auth"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/auth/keys",
+    "id": "createNeonAuthProviderSDKKeys",
+    "tags": [
+      "Auth (legacy)"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/auth/user",
+    "id": "createNeonAuthNewUser",
+    "tags": [
+      "Auth (legacy)"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/branches/{branch_id}/auth/users",
+    "id": "createBranchNeonAuthNewUser",
+    "tags": [
+      "Auth"
+    ]
+  },
+  {
+    "method": "delete",
+    "path": "/projects/{project_id}/branches/{branch_id}/auth/users/{auth_user_id}",
+    "id": "deleteBranchNeonAuthUser",
+    "tags": [
+      "Auth"
+    ]
+  },
+  {
+    "method": "put",
+    "path": "/projects/{project_id}/branches/{branch_id}/auth/users/{auth_user_id}/role",
+    "id": "updateNeonAuthUserRole",
+    "tags": [
+      "Auth"
+    ]
+  },
+  {
+    "method": "delete",
+    "path": "/projects/{project_id}/auth/users/{auth_user_id}",
+    "id": "deleteNeonAuthUser",
+    "tags": [
+      "Auth (legacy)"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/auth/transfer_ownership",
+    "id": "transferNeonAuthProviderProject",
+    "tags": [
+      "Auth (legacy)"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/auth/integrations",
+    "id": "listNeonAuthIntegrations",
+    "tags": [
+      "Auth (legacy)"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/auth/oauth_providers",
+    "id": "listNeonAuthOauthProviders",
+    "tags": [
+      "Auth (legacy)"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/auth/oauth_providers",
+    "id": "addNeonAuthOauthProvider",
+    "tags": [
+      "Auth (legacy)"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/auth/oauth_providers",
+    "id": "listBranchNeonAuthOauthProviders",
+    "tags": [
+      "Auth"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/branches/{branch_id}/auth/oauth_providers",
+    "id": "addBranchNeonAuthOauthProvider",
+    "tags": [
+      "Auth"
+    ]
+  },
+  {
+    "method": "patch",
+    "path": "/projects/{project_id}/auth/oauth_providers/{oauth_provider_id}",
+    "id": "updateNeonAuthOauthProvider",
+    "tags": [
+      "Auth (legacy)"
+    ]
+  },
+  {
+    "method": "delete",
+    "path": "/projects/{project_id}/auth/oauth_providers/{oauth_provider_id}",
+    "id": "deleteNeonAuthOauthProvider",
+    "tags": [
+      "Auth (legacy)"
+    ]
+  },
+  {
+    "method": "patch",
+    "path": "/projects/{project_id}/branches/{branch_id}/auth/oauth_providers/{oauth_provider_id}",
+    "id": "updateBranchNeonAuthOauthProvider",
+    "tags": [
+      "Auth"
+    ]
+  },
+  {
+    "method": "delete",
+    "path": "/projects/{project_id}/branches/{branch_id}/auth/oauth_providers/{oauth_provider_id}",
+    "id": "deleteBranchNeonAuthOauthProvider",
+    "tags": [
+      "Auth"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/auth/email_server",
+    "id": "getNeonAuthEmailServer",
+    "tags": [
+      "Auth (legacy)"
+    ]
+  },
+  {
+    "method": "patch",
+    "path": "/projects/{project_id}/auth/email_server",
+    "id": "updateNeonAuthEmailServer",
+    "tags": [
+      "Auth (legacy)"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/branches/{branch_id}/auth/send_test_email",
+    "id": "sendNeonAuthTestEmail",
+    "tags": [
+      "Auth"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/branches/{branch_id}/auth/email_provider/test",
+    "id": "sendNeonAuthEmailProviderTest",
+    "tags": [
+      "Auth"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/auth/email_and_password",
+    "id": "getNeonAuthEmailAndPasswordConfig",
+    "tags": [
+      "Auth"
+    ]
+  },
+  {
+    "method": "patch",
+    "path": "/projects/{project_id}/branches/{branch_id}/auth/email_and_password",
+    "id": "updateNeonAuthEmailAndPasswordConfig",
+    "tags": [
+      "Auth"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/auth/email_provider",
+    "id": "getNeonAuthEmailProvider",
+    "tags": [
+      "Auth"
+    ]
+  },
+  {
+    "method": "patch",
+    "path": "/projects/{project_id}/branches/{branch_id}/auth/email_provider",
+    "id": "updateNeonAuthEmailProvider",
+    "tags": [
+      "Auth"
+    ]
+  },
+  {
+    "method": "delete",
+    "path": "/projects/{project_id}/auth/integration/{auth_provider}",
+    "id": "deleteNeonAuthIntegration",
+    "tags": [
+      "Auth (legacy)"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/connection_uri",
+    "id": "getConnectionURI",
+    "tags": [
+      "Project"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/auth/allow_localhost",
+    "id": "getNeonAuthAllowLocalhost",
+    "tags": [
+      "Auth"
+    ]
+  },
+  {
+    "method": "patch",
+    "path": "/projects/{project_id}/branches/{branch_id}/auth/allow_localhost",
+    "id": "updateNeonAuthAllowLocalhost",
+    "tags": [
+      "Auth"
+    ]
+  },
+  {
+    "method": "patch",
+    "path": "/projects/{project_id}/branches/{branch_id}/auth/logs_export",
+    "id": "updateNeonAuthLogsExport",
+    "tags": [
+      "Auth"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/auth/plugins",
+    "id": "getNeonAuthPluginConfigs",
+    "tags": [
+      "Auth"
+    ]
+  },
+  {
+    "method": "patch",
+    "path": "/projects/{project_id}/branches/{branch_id}/auth/plugins/organization",
+    "id": "updateNeonAuthOrganizationPlugin",
+    "tags": [
+      "Auth"
+    ]
+  },
+  {
+    "method": "patch",
+    "path": "/projects/{project_id}/branches/{branch_id}/auth/config",
+    "id": "updateNeonAuthConfig",
+    "tags": [
+      "Auth"
+    ]
+  },
+  {
+    "method": "patch",
+    "path": "/projects/{project_id}/branches/{branch_id}/auth/plugins/magic-link",
+    "id": "updateNeonAuthMagicLinkPlugin",
+    "tags": [
+      "Auth"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/auth/plugins/phone-number",
+    "id": "getNeonAuthPhoneNumberPlugin",
+    "tags": [
+      "Auth"
+    ]
+  },
+  {
+    "method": "patch",
+    "path": "/projects/{project_id}/branches/{branch_id}/auth/plugins/phone-number",
+    "id": "updateNeonAuthPhoneNumberPlugin",
+    "tags": [
+      "Auth"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/auth/plugins/oauth-provider",
+    "id": "getNeonAuthOAuthProviderPlugin",
+    "tags": [
+      "Auth"
+    ]
+  },
+  {
+    "method": "patch",
+    "path": "/projects/{project_id}/branches/{branch_id}/auth/plugins/oauth-provider",
+    "id": "updateNeonAuthOAuthProviderPlugin",
+    "tags": [
+      "Auth"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/auth/oauth-provider/clients",
+    "id": "listNeonAuthOAuthClients",
+    "tags": [
+      "Auth"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/branches/{branch_id}/auth/oauth-provider/clients",
+    "id": "createNeonAuthOAuthClient",
+    "tags": [
+      "Auth"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/auth/oauth-provider/clients/{client_id}",
+    "id": "getNeonAuthOAuthClient",
+    "tags": [
+      "Auth"
+    ]
+  },
+  {
+    "method": "patch",
+    "path": "/projects/{project_id}/branches/{branch_id}/auth/oauth-provider/clients/{client_id}",
+    "id": "updateNeonAuthOAuthClient",
+    "tags": [
+      "Auth"
+    ]
+  },
+  {
+    "method": "delete",
+    "path": "/projects/{project_id}/branches/{branch_id}/auth/oauth-provider/clients/{client_id}",
+    "id": "deleteNeonAuthOAuthClient",
+    "tags": [
+      "Auth"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/branches/{branch_id}/auth/oauth-provider/clients/{client_id}/rotate_secret",
+    "id": "rotateNeonAuthOAuthClientSecret",
+    "tags": [
+      "Auth"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/auth/webhooks",
+    "id": "getNeonAuthWebhookConfig",
+    "tags": [
+      "Auth"
+    ]
+  },
+  {
+    "method": "put",
+    "path": "/projects/{project_id}/branches/{branch_id}/auth/webhooks",
+    "id": "updateNeonAuthWebhookConfig",
+    "tags": [
+      "Auth"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/branches",
+    "id": "createProjectBranch",
+    "tags": [
+      "Branch"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches",
+    "id": "listProjectBranches",
+    "tags": [
+      "Branch"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/branch_anonymized",
+    "id": "createProjectBranchAnonymized",
+    "tags": [
+      "Branch"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/count",
+    "id": "countProjectBranches",
+    "tags": [
+      "Branch"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}",
+    "id": "getProjectBranch",
+    "tags": [
+      "Branch"
+    ]
+  },
+  {
+    "method": "delete",
+    "path": "/projects/{project_id}/branches/{branch_id}",
+    "id": "deleteProjectBranch",
+    "tags": [
+      "Branch"
+    ]
+  },
+  {
+    "method": "patch",
+    "path": "/projects/{project_id}/branches/{branch_id}",
+    "id": "updateProjectBranch",
+    "tags": [
+      "Branch"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/branches/{branch_id}/restore",
+    "id": "restoreProjectBranch",
+    "tags": [
+      "Branch"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/schema",
+    "id": "getProjectBranchSchema",
+    "tags": [
+      "Branch"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/compare_schema",
+    "id": "getProjectBranchSchemaComparison",
+    "tags": [
+      "Branch"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/masking_rules",
+    "id": "getMaskingRules",
+    "tags": [
+      "Branch"
+    ]
+  },
+  {
+    "method": "patch",
+    "path": "/projects/{project_id}/branches/{branch_id}/masking_rules",
+    "id": "updateMaskingRules",
+    "tags": [
+      "Branch"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/anonymized_status",
+    "id": "getAnonymizedBranchStatus",
+    "tags": [
+      "Branch"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/branches/{branch_id}/anonymize",
+    "id": "startAnonymization",
+    "tags": [
+      "Branch"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/branches/{branch_id}/set_as_default",
+    "id": "setDefaultProjectBranch",
+    "tags": [
+      "Branch"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/branches/{branch_id}/finalize_restore",
+    "id": "finalizeRestoreBranch",
+    "tags": [
+      "Branch"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/endpoints",
+    "id": "listProjectBranchEndpoints",
+    "tags": [
+      "Branch"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/databases",
+    "id": "listProjectBranchDatabases",
+    "tags": [
+      "Branch"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/branches/{branch_id}/databases",
+    "id": "createProjectBranchDatabase",
+    "tags": [
+      "Branch"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/databases/{database_name}",
+    "id": "getProjectBranchDatabase",
+    "tags": [
+      "Branch"
+    ]
+  },
+  {
+    "method": "patch",
+    "path": "/projects/{project_id}/branches/{branch_id}/databases/{database_name}",
+    "id": "updateProjectBranchDatabase",
+    "tags": [
+      "Branch"
+    ]
+  },
+  {
+    "method": "delete",
+    "path": "/projects/{project_id}/branches/{branch_id}/databases/{database_name}",
+    "id": "deleteProjectBranchDatabase",
+    "tags": [
+      "Branch"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/roles",
+    "id": "listProjectBranchRoles",
+    "tags": [
+      "Branch"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/branches/{branch_id}/roles",
+    "id": "createProjectBranchRole",
+    "tags": [
+      "Branch"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/roles/{role_name}",
+    "id": "getProjectBranchRole",
+    "tags": [
+      "Branch"
+    ]
+  },
+  {
+    "method": "delete",
+    "path": "/projects/{project_id}/branches/{branch_id}/roles/{role_name}",
+    "id": "deleteProjectBranchRole",
+    "tags": [
+      "Branch"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/roles/{role_name}/reveal_password",
+    "id": "getProjectBranchRolePassword",
+    "tags": [
+      "Branch"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/realtime",
+    "id": "getProjectBranchRealtime",
+    "tags": [
+      "Realtime"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/branches/{branch_id}/realtime",
+    "id": "enableProjectBranchRealtime",
+    "tags": [
+      "Realtime"
+    ]
+  },
+  {
+    "method": "delete",
+    "path": "/projects/{project_id}/branches/{branch_id}/realtime",
+    "id": "disableProjectBranchRealtime",
+    "tags": [
+      "Realtime"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/realtime/secret",
+    "id": "getProjectBranchRealtimeSecret",
+    "tags": [
+      "Realtime"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/branches/{branch_id}/realtime/rotate_secret",
+    "id": "rotateProjectBranchRealtimeSecret",
+    "tags": [
+      "Realtime"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/branches/{branch_id}/roles/{role_name}/reset_password",
+    "id": "resetProjectBranchRolePassword",
+    "tags": [
+      "Branch"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/vpc_endpoints",
+    "id": "listProjectVPCEndpoints",
+    "tags": [
+      "Project"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/vpc_endpoints/{vpc_endpoint_id}",
+    "id": "assignProjectVPCEndpoint",
+    "tags": [
+      "Project"
+    ]
+  },
+  {
+    "method": "delete",
+    "path": "/projects/{project_id}/vpc_endpoints/{vpc_endpoint_id}",
+    "id": "deleteProjectVPCEndpoint",
+    "tags": [
+      "Project"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/endpoints",
+    "id": "createProjectEndpoint",
+    "tags": [
+      "Endpoint"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/endpoints",
+    "id": "listProjectEndpoints",
+    "tags": [
+      "Endpoint"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/endpoints/{endpoint_id}",
+    "id": "getProjectEndpoint",
+    "tags": [
+      "Endpoint"
+    ]
+  },
+  {
+    "method": "delete",
+    "path": "/projects/{project_id}/endpoints/{endpoint_id}",
+    "id": "deleteProjectEndpoint",
+    "tags": [
+      "Endpoint"
+    ]
+  },
+  {
+    "method": "patch",
+    "path": "/projects/{project_id}/endpoints/{endpoint_id}",
+    "id": "updateProjectEndpoint",
+    "tags": [
+      "Endpoint"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/endpoints/{endpoint_id}/start",
+    "id": "startProjectEndpoint",
+    "tags": [
+      "Endpoint"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/endpoints/{endpoint_id}/suspend",
+    "id": "suspendProjectEndpoint",
+    "tags": [
+      "Endpoint"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/endpoints/{endpoint_id}/restart",
+    "id": "restartProjectEndpoint",
+    "tags": [
+      "Endpoint"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/consumption_history/projects",
+    "id": "getConsumptionHistoryPerProject",
+    "tags": [
+      "Consumption"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/consumption_history/v2/projects",
+    "id": "getConsumptionHistoryPerProjectV2",
+    "tags": [
+      "Consumption"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/consumption_history/v2/branches",
+    "id": "getConsumptionHistoryPerBranchV2",
+    "tags": [
+      "Consumption"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/organizations/{org_id}",
+    "id": "getOrganization",
+    "tags": [
+      "Organizations"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/organizations/{org_id}/api_keys",
+    "id": "listOrgApiKeys",
+    "tags": [
+      "Organizations"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/organizations/{org_id}/api_keys",
+    "id": "createOrgApiKey",
+    "tags": [
+      "Organizations"
+    ]
+  },
+  {
+    "method": "delete",
+    "path": "/organizations/{org_id}/api_keys/{key_id}",
+    "id": "revokeOrgApiKey",
+    "tags": [
+      "Organizations"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/organizations/{org_id}/billing/spending_limit",
+    "id": "getOrganizationSpendingLimit",
+    "tags": [
+      "Organizations"
+    ]
+  },
+  {
+    "method": "put",
+    "path": "/organizations/{org_id}/billing/spending_limit",
+    "id": "setOrganizationSpendingLimit",
+    "tags": [
+      "Organizations"
+    ]
+  },
+  {
+    "method": "delete",
+    "path": "/organizations/{org_id}/billing/spending_limit",
+    "id": "deleteOrganizationSpendingLimit",
+    "tags": [
+      "Organizations"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/organizations/{org_id}/members",
+    "id": "getOrganizationMembers",
+    "tags": [
+      "Organizations"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/organizations/{org_id}/members/{member_id}",
+    "id": "getOrganizationMember",
+    "tags": [
+      "Organizations"
+    ]
+  },
+  {
+    "method": "patch",
+    "path": "/organizations/{org_id}/members/{member_id}",
+    "id": "updateOrganizationMember",
+    "tags": [
+      "Organizations"
+    ]
+  },
+  {
+    "method": "delete",
+    "path": "/organizations/{org_id}/members/{member_id}",
+    "id": "removeOrganizationMember",
+    "tags": [
+      "Organizations"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/organizations/{org_id}/invitations",
+    "id": "getOrganizationInvitations",
+    "tags": [
+      "Organizations"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/organizations/{org_id}/invitations",
+    "id": "createOrganizationInvitations",
+    "tags": [
+      "Organizations"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/organizations/{source_org_id}/projects/transfer",
+    "id": "transferProjectsFromOrgToOrg",
+    "tags": [
+      "Organizations"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/organizations/{org_id}/vpc/vpc_endpoints",
+    "id": "listOrganizationVPCEndpointsAllRegions",
+    "tags": [
+      "Organizations"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/organizations/{org_id}/vpc/region/{region_id}/vpc_endpoints",
+    "id": "listOrganizationVPCEndpoints",
+    "tags": [
+      "Organizations"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/organizations/{org_id}/vpc/region/{region_id}/vpc_endpoints/{vpc_endpoint_id}",
+    "id": "getOrganizationVPCEndpointDetails",
+    "tags": [
+      "Organizations"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/organizations/{org_id}/vpc/region/{region_id}/vpc_endpoints/{vpc_endpoint_id}",
+    "id": "assignOrganizationVPCEndpoint",
+    "tags": [
+      "Organizations"
+    ]
+  },
+  {
+    "method": "delete",
+    "path": "/organizations/{org_id}/vpc/region/{region_id}/vpc_endpoints/{vpc_endpoint_id}",
+    "id": "deleteOrganizationVPCEndpoint",
+    "tags": [
+      "Organizations"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/regions",
+    "id": "getActiveRegions",
+    "tags": [
+      "Region"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/users/me",
+    "id": "getCurrentUserInfo",
+    "tags": [
+      "Users"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/users/me/organizations",
+    "id": "getCurrentUserOrganizations",
+    "tags": [
+      "Users",
+      "Organizations"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/users/me/projects/transfer",
+    "id": "transferProjectsFromUserToOrg",
+    "tags": [
+      "Users"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/auth",
+    "id": "getAuthDetails",
+    "tags": [
+      "Users"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/branches/{branch_id}/snapshot",
+    "id": "createSnapshot",
+    "tags": [
+      "Snapshot"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/snapshots",
+    "id": "listSnapshots",
+    "tags": [
+      "Snapshot"
+    ]
+  },
+  {
+    "method": "delete",
+    "path": "/projects/{project_id}/snapshots/{snapshot_id}",
+    "id": "deleteSnapshot",
+    "tags": [
+      "Snapshot"
+    ]
+  },
+  {
+    "method": "patch",
+    "path": "/projects/{project_id}/snapshots/{snapshot_id}",
+    "id": "updateSnapshot",
+    "tags": [
+      "Snapshot"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/snapshots/{snapshot_id}/restore",
+    "id": "restoreSnapshot",
+    "tags": [
+      "Snapshot"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/backup_schedule",
+    "id": "getSnapshotSchedule",
+    "tags": [
+      "Snapshot"
+    ]
+  },
+  {
+    "method": "put",
+    "path": "/projects/{project_id}/branches/{branch_id}/backup_schedule",
+    "id": "setSnapshotSchedule",
+    "tags": [
+      "Snapshot"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/branches/{branch_id}/buckets",
+    "id": "createProjectBranchBucket",
+    "tags": [
+      "Buckets"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/buckets",
+    "id": "listProjectBranchBuckets",
+    "tags": [
+      "Buckets"
+    ]
+  },
+  {
+    "method": "delete",
+    "path": "/projects/{project_id}/branches/{branch_id}/buckets/{bucket_name}",
+    "id": "deleteProjectBranchBucket",
+    "tags": [
+      "Buckets"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/storage",
+    "id": "getProjectBranchStorage",
+    "tags": [
+      "Storage"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/ai_gateway",
+    "id": "getProjectBranchAiGateway",
+    "tags": [
+      "AI Gateway"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/branches/{branch_id}/logs/query",
+    "id": "queryProjectBranchLogs",
+    "tags": [
+      "Logs"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/logs/fields",
+    "id": "listProjectBranchLogFields",
+    "tags": [
+      "Logs"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/logs/fields/{field_name}/values",
+    "id": "listProjectBranchLogFieldValues",
+    "tags": [
+      "Logs"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/buckets/{bucket_name}/objects",
+    "id": "listProjectBranchBucketObjects",
+    "tags": [
+      "Buckets"
+    ]
+  },
+  {
+    "method": "delete",
+    "path": "/projects/{project_id}/branches/{branch_id}/buckets/{bucket_name}/objects/{object_key}",
+    "id": "deleteProjectBranchBucketObject",
+    "tags": [
+      "Buckets"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/buckets/{bucket_name}/objects/{object_key}/download",
+    "id": "getProjectBranchBucketObject",
+    "tags": [
+      "Buckets"
+    ]
+  },
+  {
+    "method": "delete",
+    "path": "/projects/{project_id}/branches/{branch_id}/buckets/{bucket_name}/objects-by-prefix",
+    "id": "deleteProjectBranchBucketObjectsByPrefix",
+    "tags": [
+      "Buckets"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/branches/{branch_id}/buckets/{bucket_name}/objects/{object_key}/presign",
+    "id": "presignProjectBranchBucketObject",
+    "tags": [
+      "Buckets"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/branches/{branch_id}/credentials",
+    "id": "createCredential",
+    "tags": [
+      "Credentials"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/credentials",
+    "id": "listCredentials",
+    "tags": [
+      "Credentials"
+    ]
+  },
+  {
+    "method": "delete",
+    "path": "/projects/{project_id}/branches/{branch_id}/credentials/{token_id}",
+    "id": "revokeCredential",
+    "tags": [
+      "Credentials"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/branches/{branch_id}/credentials/{token_id}/reveal",
+    "id": "revealCredential",
+    "tags": [
+      "Credentials"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/branches/{branch_id}/credentials/{token_id}/rotate",
+    "id": "rotateCredential",
+    "tags": [
+      "Credentials"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/functions",
+    "id": "listProjectBranchFunctions",
+    "tags": [
+      "Functions"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/functions/{slug}",
+    "id": "getProjectBranchFunction",
+    "tags": [
+      "Functions"
+    ]
+  },
+  {
+    "method": "patch",
+    "path": "/projects/{project_id}/branches/{branch_id}/functions/{slug}",
+    "id": "updateProjectBranchFunction",
+    "tags": [
+      "Functions"
+    ]
+  },
+  {
+    "method": "delete",
+    "path": "/projects/{project_id}/branches/{branch_id}/functions/{slug}",
+    "id": "deleteProjectBranchFunction",
+    "tags": [
+      "Functions"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/branches/{branch_id}/functions/{slug}/deployments",
+    "id": "createProjectBranchFunctionDeployment",
+    "tags": [
+      "Functions"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/triggers",
+    "id": "listProjectBranchTriggers",
+    "tags": [
+      "Functions"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/branches/{branch_id}/triggers",
+    "id": "createProjectBranchTrigger",
+    "tags": [
+      "Functions"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/triggers/{trigger_id}",
+    "id": "getProjectBranchTrigger",
+    "tags": [
+      "Functions"
+    ]
+  },
+  {
+    "method": "patch",
+    "path": "/projects/{project_id}/branches/{branch_id}/triggers/{trigger_id}",
+    "id": "updateProjectBranchTrigger",
+    "tags": [
+      "Functions"
+    ]
+  },
+  {
+    "method": "delete",
+    "path": "/projects/{project_id}/branches/{branch_id}/triggers/{trigger_id}",
+    "id": "deleteProjectBranchTrigger",
+    "tags": [
+      "Functions"
+    ]
+  },
+  {
+    "method": "post",
+    "path": "/projects/{project_id}/branches/{branch_id}/custom-domains",
+    "id": "registerProjectBranchCustomDomain",
+    "tags": [
+      "Functions"
+    ]
+  },
+  {
+    "method": "get",
+    "path": "/projects/{project_id}/branches/{branch_id}/custom-domains",
+    "id": "listProjectBranchCustomDomains",
+    "tags": [
+      "Functions"
+    ]
+  },
+  {
+    "method": "delete",
+    "path": "/projects/{project_id}/branches/{branch_id}/custom-domains/{domain}",
+    "id": "deleteProjectBranchCustomDomain",
+    "tags": [
+      "Functions"
+    ]
+  }
+]

@@ -94,8 +94,22 @@ func readCatalogNativeSnapshot(ctx context.Context, conn *pgx.Conn, scope catalo
 	if _, err = tx.Exec(ctx, `SET LOCAL statement_timeout='10s'; SET LOCAL lock_timeout='2s'; SET LOCAL TIME ZONE 'UTC'`, pgx.QueryExecModeSimpleProtocol); err != nil {
 		return result, err
 	}
+	result, err = readCatalogNativeSnapshotTx(ctx, tx, scope)
+	if err != nil {
+		return result, err
+	}
+	return result, tx.Commit(ctx)
+}
+
+// The restore Worker observes and changes only its isolated target timeline in
+// one SQL transaction. This reader never selects password/verifier columns.
+func readCatalogNativeSnapshotTx(ctx context.Context, tx pgx.Tx, scope catalogNativeScope) (catalogNativeSnapshot, error) {
+	result := catalogNativeSnapshot{Scope: scope, Roles: []catalogNativeRole{}, Databases: []catalogNativeDatabase{}}
+	if !scope.valid() {
+		return result, errCatalogInventoryScope
+	}
 	var actual catalogNativeScope
-	err = tx.QueryRow(ctx, `SELECT current_setting('neon.tenant_id',true),current_setting('neon.timeline_id',true)`).Scan(&actual.TenantID, &actual.TimelineID)
+	err := tx.QueryRow(ctx, `SELECT current_setting('neon.tenant_id',true),current_setting('neon.timeline_id',true)`).Scan(&actual.TenantID, &actual.TimelineID)
 	if err != nil || actual != scope {
 		return result, errCatalogInventoryScope
 	}
@@ -148,7 +162,7 @@ func readCatalogNativeSnapshot(ctx context.Context, conn *pgx.Conn, scope catalo
 	if err = validateCatalogNativeSnapshot(result); err != nil {
 		return result, err
 	}
-	return result, tx.Commit(ctx)
+	return result, nil
 }
 
 func validateCatalogNativeSnapshot(s catalogNativeSnapshot) error {

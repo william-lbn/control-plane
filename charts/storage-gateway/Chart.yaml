@@ -1,0 +1,7 @@
+apiVersion: v2
+name: neon-storage-gateway
+description: Independent native Storage data path with durable server-observed usage
+type: application
+version: 0.1.0
+appVersion: 0.1.0-functional
+home: https://github.com/william-lbn/control-plane

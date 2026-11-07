@@ -333,6 +333,7 @@ func (s *server) reconcileFunctionStop(ctx context.Context, op, worker string, p
 						}
 						client, e := functions.NewInstanceClient(c.instance.Scope, netip.MustParseAddrPort(verified.ClusterIP+":9090"), key, s.functions.guestCA)
 						if e == nil {
+							s.sampleFunctionResources(ctx, publishedFunctionRuntime{target: plan.Target, instance: c.instance, bootID: *c.bootID}, client)
 							if !s.shutdownFunctionWithOutput(ctx, plan.Target, c.instance.Scope.InstanceID, *c.bootID, client) {
 								_ = client.Shutdown(ctx, *c.bootID)
 							}
