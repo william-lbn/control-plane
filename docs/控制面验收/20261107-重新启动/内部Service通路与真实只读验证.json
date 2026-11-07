@@ -1,0 +1,128 @@
+{
+  "核对时间": "2026-11-07T12:02:18.528870+00:00",
+  "分支": "codex/dsga-control-plane-v3-20261020",
+  "代码基线": "375bd271b3f957d8f8b9dc400b40e65a9b81e4a3 加本提交内部Service传输修改",
+  "范围": "复用原Service验证、TLS/JWT和初始化合同；增加Mac SSH内部Service TCP通路。不新增Gateway或放宽Unknown。",
+  "本地定向测试": {
+    "root_pass": 32,
+    "subtest_pass": 131,
+    "failed": 0,
+    "skipped": 0
+  },
+  "真实PG18只读测试": {
+    "authentication_policy_verified": true,
+    "bootstrap_protocol": 3,
+    "config_uid": "fa9ff8c4-a20f-494a-9018-84cad1d35c66",
+    "low_buffers": 256,
+    "maximum_buffers": 8192,
+    "mutations": false,
+    "native_protocol": 1,
+    "ordinary_roles_verified": true,
+    "result": "PASS",
+    "scope": "Mac SSH118 original PG native initialization read-only; not project-creation E2E",
+    "service_uid": "85787e76-9cde-48ac-a453-d11c29c6bfb2",
+    "vm_uid": "02679a05-092f-4a50-b4f2-391fae7ac63e"
+  },
+  "真实用例统计": {
+    "root_pass": 1,
+    "subtest_pass": 0,
+    "failed": 0,
+    "skipped": 0
+  },
+  "静态检查及编译": {
+    "vet_exit": 0,
+    "build_exit": 0
+  },
+  "原实例请求后身份": [
+    {
+      "kind": "virtualmachines",
+      "name": "cp-24c41e23bb104ead",
+      "uid": "02679a05-092f-4a50-b4f2-391fae7ac63e",
+      "resource_version": "3140785",
+      "phase": "Running"
+    },
+    {
+      "kind": "services",
+      "name": "cp-24c41e23bb104ead-management",
+      "uid": "85787e76-9cde-48ac-a453-d11c29c6bfb2",
+      "resource_version": "3127371",
+      "phase": null
+    },
+    {
+      "kind": "secrets",
+      "name": "cp-24c41e23bb104ead-config",
+      "uid": "fa9ff8c4-a20f-494a-9018-84cad1d35c66",
+      "resource_version": "3127369",
+      "phase": null
+    }
+  ],
+  "前阶段Linux同SHA构建": {
+    "source": "375bd271b3f957d8f8b9dc400b40e65a9b81e4a3",
+    "start": "2026-11-07T11:43:45.109382+00:00",
+    "finished": "2026-11-07T11:44:56.962193+00:00",
+    "exit": 0,
+    "command": [
+      "/data/neon-build/toolchains/go1.27.1-63d339f0da5a/go/bin/go",
+      "build",
+      "-p=4",
+      "-trimpath",
+      "-o",
+      "/data/neon-control-plane/runs/20261107-控制面重新启动/linux-build-375bd27/control-api",
+      "./cmd/control-api"
+    ],
+    "claim": "Linux build only, not deployment or E2E",
+    "binary_sha256": "b4ab612023bdfb438397b5fd663e89a33d4fbfeec475cf23d81e4ba6aec2b99d"
+  },
+  "Linux有界任务": {
+    "source": "375bd271b3f957d8f8b9dc400b40e65a9b81e4a3",
+    "unit": "neon-cp-build-375bd27-20261107t1145",
+    "cpu_quota": "200%",
+    "memory_max": "4G",
+    "runtime_max_seconds": 600,
+    "scope": "Incremental Linux control-api build from GitHub source",
+    "launched_at": "2026-11-07T11:43:45.043113+00:00"
+  },
+  "日志": {
+    "internal-tunnel-first.jsonl": {
+      "sha256": "aab9a7c1a07b3886501e450308f3cbc7c9b434a817b1536d29a52b29e60d36d9",
+      "bytes": 174387
+    },
+    "internal-tunnel-first.exit": {
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bytes": 2
+    },
+    "internal-tunnel-live.jsonl": {
+      "sha256": "def96b0d9bf2256a94e5d33058ad526bfbc1a5cca74a5f1d7626ddea730181cc",
+      "bytes": 2324
+    },
+    "internal-tunnel-live.exit": {
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bytes": 2
+    },
+    "internal-tunnel-vet.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "internal-tunnel-vet.exit": {
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bytes": 2
+    },
+    "internal-tunnel-build.log": {
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0
+    },
+    "internal-tunnel-build.exit": {
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa",
+      "bytes": 2
+    }
+  },
+  "集群变更": false,
+  "完整控制面新项目端到端": "NOT_RUN",
+  "PG17和PG18既有核心四项验收": "各4/4，证据沿用原归档，未被本测试替代",
+  "下一阻塞": [
+    "原storage-controller仅HTTP且--dev；原生TLS/JWT已有实现，须联动调用方配置",
+    "新VM模板须与已验收Guest正式启动入口核对；现场尚无ClusterIssuer",
+    "每个新VM的资格采集/签发和自动策略仍未动态接入原Agent Owner",
+    "PG18镜像继承早期PG17标签，须以实际构建与digest重建发行身份，不能改标签冒称完成"
+  ]
+}

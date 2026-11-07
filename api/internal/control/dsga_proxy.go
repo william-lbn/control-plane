@@ -38,7 +38,7 @@ func newDSGAProxy(broker *dsgaCredentialBroker) *dsgaProxy {
 		return &http.Client{Timeout: timeout, Transport: &http.Transport{Proxy: nil,
 			MaxConnsPerHost: 16, MaxIdleConns: 64, MaxIdleConnsPerHost: 16,
 			IdleConnTimeout: 30 * time.Second, DisableCompression: true,
-			DialContext: (&net.Dialer{Timeout: 5 * time.Second}).DialContext},
+			DialContext: dialInternalService},
 			CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	}
 	// 执行与观察各自拥有有限连接池，长执行不会占满观察/取消通道。

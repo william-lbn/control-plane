@@ -17,6 +17,7 @@ SSH 只在 Mac 的 127.0.0.1 监听，通过118转发至已核对的内部服务
 - `NEON_PROXY_HOST`：原 Proxy 证书中的服务名称；`NEON_PROXY_PORT` 为本地转发端口。
 - `NEON_PG_HOSTADDR=127.0.0.1`：只覆盖 TCP 地址，TLS SNI、证书验证和 endpoint selector 仍保持原身份。
 - `NEON_PG_TLS_MODE=verify-full`、`NEON_PG_CA_FILE`：保留真实 CA 校验。
+- `NEON_INTERNAL_SOCKS5_ADDR=127.0.0.1:18080`：可选、显式的SSH动态端口，仅接受字面loopback地址。用于Worker访问从原Service读取的内部ClusterIP；不依赖公共HTTP_PROXY，不改变TLS身份和JWT，连接失败不回落其他路径。未配置时集群部署仍直连。通过既有SSH control socket增加 `-D 127.0.0.1:18080` 即可；不把SOCKS暴露给LAN或浏览器。
 - 管理 HTTPS 的既有 Gateway URL 可设为其隧道地址；原 per-compute SNI/CA 校验继续由现有客户端执行。
 
 不要把 kube-admin 证书或 token 加入源码、日志、`.env.example` 或命令行。Mac 断线只影响开发控制进程，已经安全运行的 SQL 不因开发链路断开而关闭；未知写结果先对账。
@@ -31,3 +32,5 @@ SSH 只在 Mac 的 127.0.0.1 监听，通过118转发至已核对的内部服务
 6. 每批测试记录源码SHA、请求/Operation、实际资源/数据读回及退出状态；本地通过后将相同提交构建成Linux镜像并通过自有Helm回归。
 
 2026-11-07首次建立的开发实例及回执见 `docs/控制面验收/20261107-重新启动/`。原始证据同步到118 `/data/neon-control-plane/`；服务重启、隧道重连和令牌续期均需核对原进程/对象身份，不能靠旧PID文件冒称运行。
+
+内部传输的 `TestInternalServiceTunnelLiveNativeReadOnly` 仅在显式提供 `NEON_INTERNAL_NATIVE_READONLY_FIXTURE` 的0600文件时执行。文件由运维读取原VM/Service/immutable配置并核UID后生成；签名seed不得写入命令行或提交。用例仅GET原生初始化，执行后删除临时秘密文件，只归档脱敏回执。它验证连接和身份，不能替代Worker公开创建项目端到端。

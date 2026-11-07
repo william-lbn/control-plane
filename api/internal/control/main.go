@@ -138,6 +138,9 @@ func RunWorker(ctx context.Context) error {
 }
 
 func runProcess(ctx context.Context, role processRole) error {
+	if _, err := internalServiceSOCKS5(); err != nil {
+		return err
+	}
 	if err := validateS3Config(); err != nil {
 		return err
 	}

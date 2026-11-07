@@ -111,7 +111,7 @@ func dsgaStorageClientSnapshot(namespace string, p dsgaStorageProfile, service *
 		return nil, errDSGAStorageManagement
 	}
 	transport := &http.Transport{Proxy: nil, MaxConnsPerHost: 8, MaxIdleConns: 8, MaxIdleConnsPerHost: 8, IdleConnTimeout: 30 * time.Second,
-		DisableCompression: true, DialContext: (&net.Dialer{Timeout: 5 * time.Second}).DialContext, TLSHandshakeTimeout: 5 * time.Second, ResponseHeaderTimeout: 10 * time.Second, MaxResponseHeaderBytes: 64 << 10,
+		DisableCompression: true, DialContext: dialInternalService, TLSHandshakeTimeout: 5 * time.Second, ResponseHeaderTimeout: 10 * time.Second, MaxResponseHeaderBytes: 64 << 10,
 		TLSClientConfig: &tls.Config{RootCAs: ca, ServerName: p.ServiceName + "." + namespace + ".svc", MinVersion: tls.VersionTLS12}}
 	client := &http.Client{Timeout: 15 * time.Second, Transport: transport, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	return &dsgaStorageClient{profile: p, namespace: namespace, base: "https://" + net.JoinHostPort(service.Spec.ClusterIP, strconv.Itoa(int(p.Port))), readToken: readToken, writeToken: writeToken, publicKey: bytes.Clone(public), http: client}, nil
