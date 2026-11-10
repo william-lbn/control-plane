@@ -158,3 +158,33 @@ func TestNotificationFailsClosedOnAuthoritativeAndWriteErrors(t *testing.T) {
 		})
 	}
 }
+
+func TestNativeStoragePlacementReaderNeverFallsBack(t *testing.T) {
+	for _, fail := range []bool{false, true} {
+		s, f, _ := fixture(t)
+		calls := 0
+		s.config.ReadTenant = func(_ context.Context, tenant string) (map[string]any, error) {
+			calls++
+			if tenant != testTenant {
+				t.Fatal("tenant changed")
+			}
+			if fail {
+				return nil, errors.New("authenticated read unavailable")
+			}
+			return map[string]any{"shards": []any{map[string]any{"node_attached": json.Number("2")}}}, nil
+		}
+		w := request(s, "PUT", "/notify-attach", "hook-test-credential", attachPayload(2))
+		want := 200
+		if fail {
+			want = 503
+		}
+		if w.Code != want || calls != 1 {
+			t.Fatal("native read not honored")
+		}
+		for path, count := range f.calls {
+			if strings.Contains(path, "/services/") && count != 0 {
+				t.Fatal("fell back to unauthenticated proxy")
+			}
+		}
+	}
+}

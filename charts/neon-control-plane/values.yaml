@@ -133,6 +133,13 @@ dataAPI:
   labHTTP: false
   gatewayImage: ''
   postgrestImage: ''
+# PG17/PG18 DSGA 发行目录由平台运维侧以独立 Secret 预先审核并管理。
+# 禁止在公开 API 请求或 Helm values 中直接提交镜像选择和预算原始 JSON。
+# 默认关闭新建；只配置目录但不开启创建时，可以安全展示只读版本选项。
+dsga:
+  createEnabled: false
+  runtimeCatalogSecret: ''
+
 worker:
   # Upgrade from combined mode requires the documented stop/drain procedure.
   enabled: true

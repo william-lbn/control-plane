@@ -168,6 +168,14 @@ func connectSQL(ctx context.Context, host, port, role, password, database, selec
 	if err != nil {
 		return nil, sqlExecutionError{"configuration", err}
 	}
+	// 对应libpq的hostaddr：SSH只改变TCP目标，原host仍用于TLS名称校验。
+	// 配置属于运营者，不从HTTP请求读取；保留连接预算、Proxy selector和认证。
+	if address := os.Getenv("NEON_PG_HOSTADDR"); address != "" {
+		if net.ParseIP(address) == nil {
+			return nil, sqlExecutionError{"configuration", errors.New("NEON_PG_HOSTADDR must be an IP address")}
+		}
+		config.LookupFunc = func(context.Context, string) ([]string, error) { return []string{address}, nil }
+	}
 	connectCtx, cancelConnect := context.WithTimeout(ctx, connectTimeout)
 	conn, err := pgx.ConnectConfig(connectCtx, config)
 	cancelConnect()

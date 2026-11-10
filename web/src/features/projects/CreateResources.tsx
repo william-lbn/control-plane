@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { api, projectPath } from '../../api';
-import type { Branch, Operation } from '../../api';
+import type { Branch, Operation, Capabilities, PostgresRuntime } from '../../api';
 import { newRequestKey } from '../../shared/requestKey';
 import { followOperation } from '../../shared/followOperation';
 
@@ -167,6 +167,35 @@ export function CreateResource({
   );
   const [password, setPassword] = useState('');
   const [bounds, setBounds] = useState<Bounds>(initialBounds);
+  const [runtimes, setRuntimes] = useState<PostgresRuntime[]>([]);
+  const [runtimeKey, setRuntimeKey] = useState('');
+  const [runtimeError, setRuntimeError] = useState('');
+  const runtimeIdentity = (value: PostgresRuntime) =>
+    `${value.postgres_version}:${value.region_id}`;
+  const selectedRuntime = runtimes.find(
+    (value) => runtimeIdentity(value) === runtimeKey && value.create_enabled,
+  );
+  useEffect(() => {
+    if (kind !== 'project') return;
+    const controller = new AbortController();
+    api<Capabilities>('/api/v1/capabilities', { signal: controller.signal })
+      .then((capabilities) => {
+        if (controller.signal.aborted) return;
+        const choices = capabilities.postgres_runtimes || [];
+        setRuntimes(choices);
+        const first = choices.find((value) => value.create_enabled);
+        if (first) {
+          setRuntimeKey(runtimeIdentity(first));
+          setBounds(first.bounds);
+        } else setRuntimeError('当前没有可创建的 PostgreSQL 版本，请稍后重试。');
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setRuntimeError('无法获取可用版本，请重新打开创建窗口。');
+      });
+    return () => controller.abort();
+  }, [kind]);
+  const resourceLimits = kind === 'project' ? selectedRuntime?.bounds : undefined;
+
   const [busy, setBusy] = useState(false);
   const [operation, setOperation] = useState<Operation | null>(null);
   const [resourceId, setResourceId] = useState('');
@@ -227,7 +256,7 @@ export function CreateResource({
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (busy || operation) return;
+    if (busy || operation || (kind === 'project' && !selectedRuntime)) return;
     if (
       kind === 'branch' &&
       (!parentFunctions ||
@@ -251,8 +280,8 @@ export function CreateResource({
         ? {
             name,
             default_branch_name: defaultBranch,
-            region_id: 'rke2-lab',
-            postgres_version: 16,
+            region_id: selectedRuntime!.region_id,
+            postgres_version: selectedRuntime!.postgres_version,
             password,
             autoscaling: bounds,
           }
@@ -377,6 +406,38 @@ export function CreateResource({
             : '请求会生成持久 Operation，依次调谐 Storage Controller、NeonVM 和 Proxy，并在 SQL 探针成功后标记就绪。'}
         </p>
         <form onSubmit={submit}>
+          {kind === 'project' && (
+            <label className="create-field">
+              PostgreSQL 版本与地域
+              <select
+                aria-label="PostgreSQL 版本与地域"
+                value={runtimeKey}
+                disabled={busy || !!operation}
+                onChange={(event) => {
+                  const value = runtimes.find(
+                    (item) => runtimeIdentity(item) === event.target.value,
+                  );
+                  if (!value?.create_enabled) return;
+                  setRuntimeKey(runtimeIdentity(value));
+                  setBounds(value.bounds);
+                  resetKey();
+                }}
+              >
+                {!selectedRuntime && <option value="">请选择可用版本</option>}
+                {runtimes.map((value) => (
+                  <option
+                    key={runtimeIdentity(value)}
+                    value={runtimeIdentity(value)}
+                    disabled={!value.create_enabled}
+                  >
+                    PostgreSQL {value.postgres_version} · {value.region_id}
+                    {value.memory_scaling === 'vm_and_postgres' ? ' · PG 内存自动伸缩' : ''}
+                  </option>
+                ))}
+              </select>
+              {runtimeError && <span role="alert">{runtimeError}</span>}
+            </label>
+          )}
           {kind !== 'endpoint' && (
             <label className="create-field">
               {kind === 'project' ? '项目名称' : '分支名称'}
@@ -621,90 +682,94 @@ export function CreateResource({
             )}
           {(kind !== 'branch' || withEndpoint) && (
             <div className="form-grid create-bounds">
+              {kind !== 'project' && (
+                <>
+                  <label>
+                    资源预设
+                    <select
+                      aria-label="计算资源预设"
+                      value=""
+                      onChange={(e) => {
+                        if (e.target.value === 'fractional') {
+                          setBounds({
+                            min_cpu_milli: 250,
+                            max_cpu_milli: 500,
+                            min_memory_mib: 1024,
+                            max_memory_mib: 2048,
+                          });
+                          resetKey();
+                        } else if (e.target.value === 'integer') {
+                          setBounds(initialBounds);
+                          resetKey();
+                        }
+                      }}
+                    >
+                      <option value="">选择配置</option>
+                      <option value="fractional">0.25–0.5 vCPU / 1–2 GiB</option>
+                      <option value="integer">整数 CPU 兼容配置</option>
+                    </select>
+                  </label>
+                  <p className="subtle-note">
+                    小数 CPU 使用 agent 的 250m / 1Gi 比例；新 Endpoint 可设 250m。已有 VM
+                    不可越过创建时的硬件下限。逻辑 CPU 预算与 QEMU overcommit 硬配额不同。
+                  </p>
+                </>
+              )}
               <label>
-                资源预设
-                <select
-                  aria-label="计算资源预设"
-                  value=""
-                  onChange={(e) => {
-                    if (e.target.value === 'fractional') {
-                      setBounds({
-                        min_cpu_milli: 250,
-                        max_cpu_milli: 500,
-                        min_memory_mib: 1024,
-                        max_memory_mib: 2048,
-                      });
-                      resetKey();
-                    } else if (e.target.value === 'integer') {
-                      setBounds(initialBounds);
-                      resetKey();
-                    }
-                  }}
-                >
-                  <option value="">选择配置</option>
-                  <option value="fractional">0.25–0.5 vCPU / 1–2 GiB</option>
-                  <option value="integer">整数 CPU 兼容配置</option>
-                </select>
-              </label>
-              <p className="subtle-note">
-                小数 CPU 使用 agent 的 250m / 1Gi 比例；新 Endpoint 可设 250m。已有 VM
-                不可越过创建时的硬件下限。逻辑 CPU 预算与 QEMU overcommit 硬配额不同。
-              </p>
-              <label>
-                最小 CPU
-                <select
+                最小 CPU（mCPU）
+                <input
+                  type="number"
+                  required
                   aria-label="最小 CPU"
                   value={bounds.min_cpu_milli}
-                  onChange={(e) => setBound('min_cpu_milli', Number(e.target.value))}
-                >
-                  <option value={250}>250m · 0.25 vCPU</option>
-                  <option value={500}>500m · 0.5 vCPU</option>
-                  <option value={750}>750m · 0.75 vCPU</option>
-                  <option value={1000}>1000m</option>
-                  <option value={2000}>2000m</option>
-                </select>
+                  min={resourceLimits?.min_cpu_milli || 250}
+                  max={resourceLimits?.max_cpu_milli || 2000}
+                  step={250}
+                  disabled={busy || !!operation}
+                  onChange={(event) => setBound('min_cpu_milli', Number(event.target.value))}
+                />
               </label>
               <label>
-                最大 CPU
-                <select
+                最大 CPU（mCPU）
+                <input
+                  type="number"
+                  required
                   aria-label="最大 CPU"
                   value={bounds.max_cpu_milli}
-                  onChange={(e) => setBound('max_cpu_milli', Number(e.target.value))}
-                >
-                  <option value={250}>250m · 0.25 vCPU</option>
-                  <option value={500}>500m · 0.5 vCPU</option>
-                  <option value={750}>750m · 0.75 vCPU</option>
-                  <option value={1000}>1000m</option>
-                  <option value={2000}>2000m</option>
-                </select>
+                  min={resourceLimits?.min_cpu_milli || 250}
+                  max={resourceLimits?.max_cpu_milli || 2000}
+                  step={250}
+                  disabled={busy || !!operation}
+                  onChange={(event) => setBound('max_cpu_milli', Number(event.target.value))}
+                />
               </label>
               <label>
-                最小内存
-                <select
+                最小内存（MiB）
+                <input
+                  type="number"
+                  required
                   aria-label="最小内存"
                   value={bounds.min_memory_mib}
-                  onChange={(e) => setBound('min_memory_mib', Number(e.target.value))}
-                >
-                  {[1024, 2048, 3072].map((n) => (
-                    <option key={n} value={n}>
-                      {n} MiB
-                    </option>
-                  ))}
-                </select>
+                  min={resourceLimits?.min_memory_mib || 1024}
+                  max={resourceLimits?.max_memory_mib || 3072}
+                  step={selectedRuntime?.memory_slot_mib || 1024}
+                  disabled={busy || !!operation}
+                  onChange={(event) => setBound('min_memory_mib', Number(event.target.value))}
+                />
               </label>
               <label>
-                最大内存
-                <select
+                最大内存（MiB）
+                <input
+                  type="number"
+                  required
                   aria-label="最大内存"
                   value={bounds.max_memory_mib}
-                  onChange={(e) => setBound('max_memory_mib', Number(e.target.value))}
-                >
-                  {[1024, 2048, 3072].map((n) => (
-                    <option key={n} value={n}>
-                      {n} MiB
-                    </option>
-                  ))}
-                </select>
+                  min={resourceLimits?.min_memory_mib || 1024}
+                  max={resourceLimits?.max_memory_mib || 3072}
+                  step={selectedRuntime?.memory_slot_mib || 1024}
+                  disabled={busy || !!operation}
+                  onChange={(event) => setBound('max_memory_mib', Number(event.target.value))}
+                />
               </label>
             </div>
           )}
@@ -717,6 +782,7 @@ export function CreateResource({
               disabled={
                 busy ||
                 !!operation ||
+                (kind === 'project' && !selectedRuntime) ||
                 (kind === 'branch' &&
                   (!parentFunctions ||
                     !!functionPolicyError ||

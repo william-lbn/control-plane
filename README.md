@@ -1,3 +1,5 @@
+> 产品集成与安全验收：[DSGA 控制面](docs/DSGA-CONTROL-PLANE-INTEGRATION.md) · [Neon 官方功能对标](docs/NEON-OFFICIAL-FEATURE-PARITY.md)
+
 # Neon 自托管控制面
 
 Go + PostgreSQL 控制 API、React + TypeScript 控制台、Go Proxy/Storage 适配器、Compute 管理网关及 Helm Chart。

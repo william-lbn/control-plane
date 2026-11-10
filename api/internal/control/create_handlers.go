@@ -160,7 +160,13 @@ func addCreateOperation(ctx context.Context, tx pgx.Tx, action, resourceType, re
 	if err != nil {
 		return err
 	}
-	_, err = tx.Exec(ctx, `INSERT INTO operations(id,project_id,resource_type,resource_id,action,state,actor_id,request_id,payload)
+	return addCreateOperationJSON(ctx, tx, action, resourceType, resourceID, projectID, operationID, actor, requestID, b, key, hash, steps)
+}
+
+// 原PG16与版本化DSGA生产者共享写入/步骤/idempotency事务；只接受各自已经
+// 校验并编码的完整payload，不在此解释模式或把未知字段解码成float64后重写。
+func addCreateOperationJSON(ctx context.Context, tx pgx.Tx, action, resourceType, resourceID, projectID, operationID, actor, requestID string, b []byte, key, hash string, steps []string) error {
+	_, err := tx.Exec(ctx, `INSERT INTO operations(id,project_id,resource_type,resource_id,action,state,actor_id,request_id,payload)
 		VALUES($1,$2,$3,$4,$5,'queued',$6,$7,$8)`, operationID, projectID, resourceType, resourceID, action, actor, requestID, b)
 	if err != nil {
 		return err
@@ -223,19 +229,21 @@ func creationPayload(projectID, branchID, endpointID, tenantID, timelineID strin
 		TenantID: tenantID, TimelineID: timelineID, MinCPU: b.MinCPU, MaxCPU: b.MaxCPU, MinMem: b.MinMem, MaxMem: b.MaxMem}
 }
 
+type projectCreateRequest struct {
+	Name              string        `json:"name"`
+	Password          string        `json:"password"`
+	DefaultBranchName string        `json:"default_branch_name"`
+	RegionID          string        `json:"region_id"`
+	PostgresVersion   int           `json:"postgres_version"`
+	Autoscaling       *createBounds `json:"autoscaling"`
+}
+
 func (s *server) createProject(w http.ResponseWriter, r *http.Request) {
 	if !creationEnabled() {
 		fail(w, r, 503, "creation_disabled", "Creation driver is not enabled")
 		return
 	}
-	var body struct {
-		Name              string        `json:"name"`
-		Password          string        `json:"password"`
-		DefaultBranchName string        `json:"default_branch_name"`
-		RegionID          string        `json:"region_id"`
-		PostgresVersion   int           `json:"postgres_version"`
-		Autoscaling       *createBounds `json:"autoscaling"`
-	}
+	var body projectCreateRequest
 	if err := readJSON(r, &body); err != nil {
 		fail(w, r, 422, "invalid_request", "Invalid project request")
 		return
@@ -243,11 +251,17 @@ func (s *server) createProject(w http.ResponseWriter, r *http.Request) {
 	if body.DefaultBranchName == "" {
 		body.DefaultBranchName = "main"
 	}
-	if body.RegionID == "" {
-		body.RegionID = "rke2-lab"
-	}
 	if body.PostgresVersion == 0 {
 		body.PostgresVersion = 16
+	}
+	// 已适配PG大版本共用同一DSGA生产者，发行差异在可信计划中冻结。
+	// 原Region默认只在legacy分支应用，新路径先读原保留计划。
+	if body.PostgresVersion > 0 && uint64(body.PostgresVersion) <= uint64(^uint32(0)) && dsgaSupportedPostgresVersion(uint32(body.PostgresVersion)) {
+		s.createDSGAProject(w, r, body)
+		return
+	}
+	if body.RegionID == "" {
+		body.RegionID = "rke2-lab"
 	}
 	bounds := defaults(body.Autoscaling)
 	if !validName(body.Name, 64) || !validName(body.DefaultBranchName, 63) || body.RegionID != "rke2-lab" ||

@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	dsgapi "github.com/neondatabase/autoscaling/pkg/api/dsga"
 	"github.com/william-lbn/control-plane/api/internal/adapter"
 )
 
@@ -75,6 +76,20 @@ func RunProxyAdapter(ctx context.Context) error {
 	config := adapter.Config{Namespace: kube.namespace, RoutesSecret: env("ROUTES_SECRET", routesSecret), NotificationsConfigMap: env("NOTIFICATIONS_CONFIGMAP", "neon-control-notifications"),
 		ProxyToken: adapter.Credential{File: os.Getenv("PROXY_API_TOKEN_FILE"), Value: os.Getenv("PROXY_API_TOKEN")}, HookToken: adapter.Credential{File: os.Getenv("CONTROLLER_HOOK_TOKEN_FILE"), Value: os.Getenv("CONTROLLER_HOOK_TOKEN")},
 		WakeTimeout: timeout, PollInterval: 2 * time.Second, MaxConcurrentWakes: wakes, PageserverNodeID: node}
+	if raw := os.Getenv("NEON_ADAPTER_STORAGE_PROFILE"); raw != "" {
+		profile, err := adapterStorageProfile(raw, kube.namespace)
+		if err != nil {
+			return err
+		}
+		config.ReadTenant = func(ctx context.Context, tenant string) (map[string]any, error) {
+			storage, err := newDSGAStorageClientAccess(ctx, kube, profile, false)
+			if err != nil {
+				return nil, err
+			}
+			defer storage.CloseIdleConnections()
+			return storage.request(ctx, http.MethodGet, "control/v1/tenant/"+tenant, nil)
+		}
+	}
 	service, err := adapter.New(config, adapterKubernetes{kube}, slog.New(slog.NewJSONHandler(os.Stdout, nil)))
 	if err != nil {
 		return err
@@ -98,4 +113,13 @@ func RunProxyAdapter(ctx context.Context) error {
 		return nil
 	}
 	return err
+}
+
+// 环境变量只携带Service/Secret引用，实际CA/JWT每次从固定UID对象读取，支持轮转。
+func adapterStorageProfile(raw, namespace string) (dsgaStorageProfile, error) {
+	var p dsgaStorageProfile
+	if len(raw) > 4096 || dsgapi.ValidateJSON([]byte(raw), 4096, 64) != nil || dsgapi.UnmarshalObject([]byte(raw), &p) != nil || p.validate(namespace) != nil {
+		return dsgaStorageProfile{}, errDSGAStorageManagement
+	}
+	return p, nil
 }

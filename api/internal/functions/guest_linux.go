@@ -6,7 +6,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net/netip"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -66,24 +65,6 @@ func HideGuestBlockDevices() error {
 		}
 		return nil
 	})
-}
-
-// GuestBoundary applies inside one dedicated NeonVM. It must never run on a
-// Kubernetes host: paths and network policy belong to the guest namespace.
-// The exact own-fork kernel has IPv4 owner matching but no IPv6 filter table;
-// IPv6 is therefore disabled in the guest before untrusted execution.
-type GuestBoundary struct {
-	ProxyIP          netip.Addr
-	ProxyPort        uint16
-	DNSIP            netip.Addr
-	AllowPublicHTTPS bool
-}
-
-func (b GuestBoundary) Validate() error {
-	if !b.ProxyIP.Is4() || !b.DNSIP.Is4() || b.ProxyIP.IsLoopback() || b.DNSIP.IsLoopback() || b.ProxyIP.IsUnspecified() || b.DNSIP.IsUnspecified() || b.ProxyPort == 0 {
-		return errors.New("guest requires explicit IPv4 SQL proxy and DNS destinations")
-	}
-	return nil
 }
 
 // guestRules are argument arrays, never interpolated shell text. The terminal

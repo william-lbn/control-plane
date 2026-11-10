@@ -78,9 +78,7 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 			case <-runCtx.Done():
 				return
 			case <-ticker.C:
-				tag, leaseErr := s.db.Exec(runCtx, `UPDATE operations SET lease_expires_at=now()+interval '45 seconds'
-					WHERE id=$1 AND lease_owner=$2 AND state='running'`, id, workerID)
-				if leaseErr != nil || tag.RowsAffected() != 1 {
+				if leaseErr := s.renewOperationLease(runCtx, id, workerID); leaseErr != nil {
 					cancel()
 					return
 				}
@@ -193,6 +191,15 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 			} else {
 				stepErr = s.reconcileCatalog(runCtx, id, workerID, action, p)
 			}
+		case "create_project_dsga_v1":
+			// 复用原Worker租约和步骤；只从不可变Operation重载计划，
+			// 不把版本化创建送入legacy VM/凭据/固定PG版本路径。
+			var binding *dsgaCreationBinding
+			binding, stepErr = s.loadDSGACreationBinding(runCtx, id, workerID)
+			if stepErr == nil {
+				createP = binding.intent.createPayload
+				stepErr = s.reconcileDSGAProject(runCtx, binding)
+			}
 		case "create_project", "create_branch", "create_endpoint":
 			if err := json.Unmarshal(payload, &createP); err != nil {
 				stepErr = err
@@ -225,7 +232,7 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 					stepErr = s.setCreateStep(runCtx, id, workerID, 0, "running", "")
 				}
 				if stepErr == nil {
-					stepErr = s.kube.reconcileVMBounds(runCtx, p)
+					stepErr = s.reconcileEndpointBounds(runCtx, id, workerID, p)
 				}
 				if stepErr == nil {
 					stepErr = s.setCreateStep(runCtx, id, workerID, 0, "succeeded", "")
@@ -319,6 +326,11 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 		return err
 	}
 	defer finishTx.Rollback(ctx)
+	if state == "failed" && action == "create_project_dsga_v1" && createP.ProjectID != "" {
+		if err = lockDSGAProjectParents(ctx, finishTx, createP); err != nil {
+			return err
+		}
+	}
 	if err = assertCreateLeaseTx(ctx, finishTx, id, workerID); err != nil {
 		return err
 	}
@@ -356,19 +368,25 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 			WHERE operation_id=$1 AND state='running'`, id); err != nil {
 			return err
 		}
-		if action == "create_project" {
+		createAction := action
+		if base := dsgaCreationBaseAction(action); base != "" {
+			createAction = base
+		}
+		// 失败只更新用户可见状态，不清理原租户、Timeline、凭据或VM；
+		// 原Operation重试仍由持久绑定恢复，不能因超时再分配一套资源。
+		if createAction == "create_project" {
 			if _, err = finishTx.Exec(ctx, `UPDATE projects SET state='error',updated_at=now()
 				WHERE id=$1 AND state<>'ready'`, createP.ProjectID); err != nil {
 				return err
 			}
 		}
-		if action == "create_project" || action == "create_branch" {
+		if createAction == "create_project" || createAction == "create_branch" {
 			if _, err = finishTx.Exec(ctx, `UPDATE branches SET state='error'
 				WHERE id=$1 AND state<>'ready'`, createP.BranchID); err != nil {
 				return err
 			}
 		}
-		if (action == "create_project" || action == "create_branch" || action == "create_endpoint") && createP.EndpointID != "" {
+		if (createAction == "create_project" || createAction == "create_branch" || createAction == "create_endpoint") && createP.EndpointID != "" {
 			if _, err = finishTx.Exec(ctx, `UPDATE endpoints SET state='error',updated_at=now()
 				WHERE id=$1 AND state<>'active'`, createP.EndpointID); err != nil {
 				return err
@@ -377,7 +395,7 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 	}
 	tag, err := finishTx.Exec(ctx, `UPDATE operations SET state=$2,error_code=NULLIF($3,''),error_message=NULLIF($4,''),
         retryable=$5,finished_at=now(),lease_owner=NULL,lease_expires_at=NULL
-		WHERE id=$1 AND lease_owner=$6 AND lease_expires_at>now() AND state='running'`,
+		WHERE id=$1 AND lease_owner=$6 AND lease_expires_at>clock_timestamp() AND state='running'`,
 		id, state, code, message, retryable, workerID)
 	if err != nil {
 		return err
@@ -405,4 +423,21 @@ func (s *server) retryFailed(ctx context.Context, id, project string) error {
 		return pgx.ErrNoRows
 	}
 	return nil
+}
+
+// 复用原Operation租约，只约束管理执行器，绝不控制普通SQL生存。
+// 等锁期间过期后不能续约自我复活；接管必须回到原workOnce认领流程。
+func (s *server) renewOperationLease(ctx context.Context, operationID, workerID string) error {
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if err := assertCreateLeaseTx(ctx, tx, operationID, workerID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `UPDATE operations SET lease_expires_at=clock_timestamp()+interval '45 seconds' WHERE id=$1`, operationID); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }

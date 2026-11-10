@@ -93,8 +93,16 @@ func TestConsoleMFAReplayRecoveryIsolationAndLegacyGuard(t *testing.T) {
 		t.Fatal("Factor leaked across accounts")
 	}
 	call("alice", "POST", base+"/confirm", proof("invalid", false), 401)
-	prior, _ := totp.GenerateCode(secret, time.Now().Add(-30*time.Second))
-	confirmed := call("alice", "POST", base+"/confirm", proof(prior, false), 200)
+	// 这里验证真实路由、加密持久化及一次性消费；±1窗口边界由下方固定时间的
+	// TestConsoleMFACounterWindowAndReplay验证。集成请求还执行真实密码校验，
+	// 若在窗口末尾预先生成“上一窗口”的码，校验跨窗后应当被生产逻辑正确拒绝。
+	// 使用当前窗口完成注册，随后登录使用下一窗口的未消费码；两次仍走原生产
+	// 验证窗口，不重试认证POST、不放宽有效期，也不跳过密码/重放检查。
+	enrollCode, err := totp.GenerateCode(secret, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	confirmed := call("alice", "POST", base+"/confirm", proof(enrollCode, false), 200)
 	values := confirmed["recovery_codes"].([]any)
 	if len(values) != 10 {
 		t.Fatal("Recovery code count")
@@ -105,7 +113,7 @@ func TestConsoleMFAReplayRecoveryIsolationAndLegacyGuard(t *testing.T) {
 	}
 	call("alice-old", "GET", "/api/v1/session", nil, 401)
 	call("alice", "GET", "/api/v1/session", nil, 200)
-	call("alice", "POST", base+"/confirm", proof(prior, false), 409)
+	call("alice", "POST", base+"/confirm", proof(enrollCode, false), 409)
 	if _, err = db.Exec(ctx, `INSERT INTO sessions(token_hash,user_id,csrf_hash,expires_at) VALUES('legacy','alice','legacy',now()+interval '1 hour')`); err == nil {
 		t.Fatal("Legacy password-only session accepted")
 	}
@@ -120,14 +128,17 @@ func TestConsoleMFAReplayRecoveryIsolationAndLegacyGuard(t *testing.T) {
 	if w := login("", false); w.Code != 401 || len(w.Result().Cookies()) != 0 || !strings.Contains(w.Body.String(), "mfa_required") {
 		t.Fatal("Password bypassed factor")
 	}
-	if w := login(prior, false); w.Code != 401 {
+	if w := login(enrollCode, false); w.Code != 401 {
 		t.Fatal("Enrollment code replay accepted")
 	}
-	current, _ := totp.GenerateCode(secret, time.Now())
-	if w := login(current, false); w.Code != 200 {
+	freshCode, err := totp.GenerateCode(secret, time.Now().Add(30*time.Second))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if w := login(freshCode, false); w.Code != 200 {
 		t.Fatal("Valid authenticator rejected", w.Code, w.Body.String())
 	}
-	if w := login(current, false); w.Code != 401 {
+	if w := login(freshCode, false); w.Code != 401 {
 		t.Fatal("TOTP replay accepted")
 	}
 	var wg sync.WaitGroup

@@ -1,0 +1,55 @@
+package control
+
+import (
+	"encoding/base64"
+	"encoding/json"
+
+	"github.com/neondatabase/autoscaling/pkg/dsga/resourceguard"
+)
+
+// 与config.json同一次原Render生成，随后由既有typed创建器整体存入同一immutable
+// Secret并固定其UID。只有原计划/真实VM UID/原凭据公钥参与，重试不取当前env、
+// 不生成新预算引用/epoch、不补写历史配置；没有私钥、verifier或角色口令输出。
+// 数字只证明完整可表示且适合原最低Guest，实际Root/Host约束仍由生产执行器落实。
+// 原计划可显式携带冻结pids上限，整份Limits原样传递；缺省仍是旧未约束来源，
+// 不在Renderer补默认，也不将任务数换算成已经认证的私有字节或VM许可。
+// 系统计费域只从原Limits显式开启，额度包含于Outside；其余系统/旧charge仍需
+// 完整外部预算，Renderer不能凭一个cgroup额度声明已经覆盖全部SystemOutsidePG。
+func renderDSGAResourceBootstrap(p createPayload, plan dsgaCreationPlan, vmUID string, credentials dsgaRenderCredentials) ([]byte, error) {
+	if _, err := plan.nativeBootstrap(p, vmUID); err != nil {
+		return nil, err
+	}
+	if plan.VM.validateResourceBudget(plan.Budget) != nil {
+		return nil, errDSGARender
+	}
+	s := resourceguard.SourceConfig{ProtocolVersion: 1, Config: resourceguard.Config{VMUID: vmUID, ComputeInstanceID: plan.ComputeInstanceID, StateDir: resourceguard.FixedStateDir, SystemCgroup: plan.VM.ResourceLimits.SystemMemoryMaxBytes != 0}, IssuerEpoch: 1, BudgetCommitmentID: "bootstrap-" + plan.OperationUUID, Limits: *plan.VM.ResourceLimits, ControlPublicKey: base64.RawURLEncoding.EncodeToString(credentials.ControlPublicKey)}
+	if plan.VM.generic() {
+		s.Config.ExecutionModel = resourceguard.TrustedControllerExecutionModel
+	}
+	if s.Validate() != nil {
+		return nil, errDSGARender
+	}
+	raw, err := json.Marshal(s)
+	if err != nil || len(raw) > 16*1024 {
+		return nil, errDSGARender
+	}
+	return raw, nil
+}
+
+// 两份文件只有同时成功才交创建器，不返回可被调用者误写的半份配置。
+func renderDSGABootstrapFiles(p createPayload, plan dsgaCreationPlan, vmUID string, c dsgaRenderCredentials) (map[string][]byte, error) {
+	native, err := renderDSGAComputeBootstrap(p, plan, vmUID, c)
+	if err != nil {
+		return nil, err
+	}
+	resource, err := renderDSGAResourceBootstrap(p, plan, vmUID, c)
+	if err != nil {
+		return nil, err
+	}
+	files := map[string][]byte{"config.json": native, "resource.json": resource}
+	if plan.VM.generic() {
+		files[resourceguard.PolicyTemplatesSecretKey] = append([]byte(nil), plan.VM.GenericGuest.PolicyTemplates...)
+		files[resourceguard.ComputeStartupSecretKey] = genericStartupSelection()
+	}
+	return files, nil
+}

@@ -172,3 +172,66 @@ func TestGatewayComputeIdentityFailsClosedOnMalformedSpec(t *testing.T) {
 		t.Fatal("missing stored identity accepted")
 	}
 }
+
+// 正式render使用顶层三身份字段，不要求同时复制到legacy GUC。
+func TestGatewayNativeTopLevelIdentityKeepsLegacyFallback(t *testing.T) {
+	fixture := func() map[string]any {
+		return map[string]any{"compute_ctl_config": map[string]any{}, "spec": map[string]any{
+			"tenant_id": "native-tenant", "timeline_id": "native-timeline", "pageserver_connstring": "native-pageserver:6400",
+			"cluster": map[string]any{"cluster_id": "cp-0123456789abcdef", "settings": []any{map[string]any{"name": "shared_buffers", "value": "2MB"}}}}}
+	}
+	clone := func(v map[string]any) map[string]any {
+		raw, _ := json.Marshal(v)
+		var out map[string]any
+		_ = json.Unmarshal(raw, &out)
+		return out
+	}
+	for _, mode := range []string{"top-level", "omitted-settings", "null-settings", "mixed-legacy", "shadowed-legacy", "null-top-level-fallback"} {
+		t.Run(mode, func(t *testing.T) {
+			v := fixture()
+			spec := v["spec"].(map[string]any)
+			cluster := spec["cluster"].(map[string]any)
+			switch mode {
+			case "omitted-settings":
+				delete(cluster, "settings")
+			case "null-settings":
+				cluster["settings"] = nil
+			case "mixed-legacy", "null-top-level-fallback":
+				if mode == "mixed-legacy" {
+					delete(spec, "tenant_id")
+				} else {
+					spec["tenant_id"] = nil
+				}
+				cluster["settings"] = []any{map[string]any{"name": "neon.tenant_id", "value": "native-tenant"}}
+			case "shadowed-legacy":
+				cluster["settings"] = []any{map[string]any{"name": "neon.tenant_id", "value": "ignored-old-tenant"}}
+			}
+			if !sameComputeIdentity(v, clone(v)) {
+				t.Fatal("unchanged native identity rejected")
+			}
+		})
+	}
+	for _, field := range []string{"tenant_id", "timeline_id", "pageserver_connstring", "future_topology_override"} {
+		t.Run("changed-"+field, func(t *testing.T) {
+			stored := fixture()
+			changed := clone(stored)
+			changed["spec"].(map[string]any)[field] = "foreign"
+			if sameComputeIdentity(stored, changed) {
+				t.Fatal("changed non-catalog native identity accepted")
+			}
+		})
+	}
+	for _, invalid := range []any{"", float64(1), map[string]any{"value": "native-tenant"}} {
+		v := fixture()
+		v["spec"].(map[string]any)["tenant_id"] = invalid
+		if sameComputeIdentity(v, clone(v)) {
+			t.Fatal("malformed native identity accepted")
+		}
+	}
+	v := fixture()
+	c := v["spec"].(map[string]any)["cluster"].(map[string]any)
+	c["settings"] = []any{map[string]any{"name": "neon.tenant_id", "value": "old"}, map[string]any{"name": "neon.tenant_id", "value": "other"}}
+	if sameComputeIdentity(v, clone(v)) {
+		t.Fatal("duplicate legacy identity accepted despite top-level field")
+	}
+}

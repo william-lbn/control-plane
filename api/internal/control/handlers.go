@@ -363,6 +363,7 @@ func (s *server) routes() *http.ServeMux {
 	mux.Handle("GET /api/v1/projects/{project}/endpoints/{endpoint}", s.auth(http.HandlerFunc(s.endpoint), false))
 	mux.Handle("DELETE /api/v1/projects/{project}/endpoints/{endpoint}", s.auth(http.HandlerFunc(s.deleteEndpoint), true))
 	mux.Handle("GET /api/v1/projects/{project}/endpoints/{endpoint}/connection-info", s.auth(http.HandlerFunc(s.connectionInfo), false))
+	mux.Handle("GET /api/v1/projects/{project}/endpoints/{endpoint}/autoscaling", s.auth(http.HandlerFunc(s.endpointMemoryPolicy), false))
 	mux.Handle("GET /api/v1/projects/{project}/endpoints/{endpoint}/metrics", s.auth(http.HandlerFunc(s.metrics), false))
 	mux.Handle("GET /api/v1/projects/{project}/operations", s.auth(http.HandlerFunc(s.operations), false))
 	mux.Handle("GET /api/v1/projects/{project}/operations/{operation}", s.auth(http.HandlerFunc(s.operation), false))
@@ -390,7 +391,8 @@ func (s *server) capabilities(w http.ResponseWriter, r *http.Request) {
 	}
 	jsonResponse(w, 200, map[string]any{
 		"cluster_id": "rke2-lab", "observed_at": time.Now().UTC(),
-		"runtime": s.runtimeStatus(r.Context()),
+		"runtime":           s.runtimeStatus(r.Context()),
+		"postgres_runtimes": s.postgresRuntimeOptions(),
 		"features": map[string]any{
 			"console_invitations":  map[string]any{"enabled": true, "reason": "account_bound_invitation_registration"},
 			"tenant_authorization": map[string]any{"enabled": true, "reason": "organization_and_additive_project_policy"},
@@ -700,7 +702,8 @@ func (s *server) updateEndpoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a := body.Autoscaling
-	if !(createBounds{a.MinCPU, a.MaxCPU, a.MinMem, a.MaxMem}).valid() {
+	managed, boundsErr := s.validateDSGAEndpointBounds(r.Context(), r.PathValue("project"), r.PathValue("endpoint"), createBounds{a.MinCPU, a.MaxCPU, a.MinMem, a.MaxMem})
+	if boundsErr != nil || !managed && !(createBounds{a.MinCPU, a.MaxCPU, a.MinMem, a.MaxMem}).valid() {
 		fail(w, r, 422, "invalid_scaling_bounds", "Bounds must fit VM capacity and memory slots")
 		return
 	}

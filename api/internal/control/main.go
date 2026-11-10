@@ -81,6 +81,16 @@ func migrate(ctx context.Context, db *pgxpool.Pool) error {
 	if err != nil {
 		return err
 	}
+	// 先校验完整登记表，不能先执行一半DDL再发现另一个同号文件被跳过。
+	var migrationNames []string
+	for _, entry := range entries {
+		if !entry.IsDir() && filepath.Ext(entry.Name()) == ".sql" {
+			migrationNames = append(migrationNames, entry.Name())
+		}
+	}
+	if err := validateMigrationRegistry(migrationNames); err != nil {
+		return err
+	}
 	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
 	for _, entry := range entries {
 		if entry.IsDir() || filepath.Ext(entry.Name()) != ".sql" {
@@ -128,6 +138,9 @@ func RunWorker(ctx context.Context) error {
 }
 
 func runProcess(ctx context.Context, role processRole) error {
+	if _, err := internalServiceSOCKS5(); err != nil {
+		return err
+	}
 	if err := validateS3Config(); err != nil {
 		return err
 	}

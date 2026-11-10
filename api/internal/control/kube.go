@@ -33,7 +33,7 @@ func newKubeClient() (*kubeClient, error) {
 	api := os.Getenv("NEON_KUBE_API")
 	caFile, certFile, keyFile := os.Getenv("NEON_KUBE_CA"), os.Getenv("NEON_KUBE_CERT"), os.Getenv("NEON_KUBE_KEY")
 	token := ""
-	tokenFile := ""
+	tokenFile := os.Getenv("NEON_KUBE_TOKEN_FILE")
 	if api == "" {
 		host := os.Getenv("KUBERNETES_SERVICE_HOST")
 		if host == "" {
@@ -48,6 +48,13 @@ func newKubeClient() (*kubeClient, error) {
 		}
 		token = strings.TrimSpace(string(b))
 	}
+	target, err := url.Parse(api)
+	if err != nil || target.Scheme != "https" || target.Host == "" || target.User != nil || target.RawQuery != "" || target.Fragment != "" {
+		return nil, errors.New("Kubernetes API requires a fixed HTTPS endpoint without URL credentials")
+	}
+	if (certFile == "") != (keyFile == "") {
+		return nil, errors.New("Kubernetes client certificate and key must be configured together")
+	}
 	ca, err := os.ReadFile(caFile)
 	if err != nil {
 		return nil, err
@@ -56,7 +63,12 @@ func newKubeClient() (*kubeClient, error) {
 	if !pool.AppendCertsFromPEM(ca) {
 		return nil, errors.New("invalid Kubernetes CA")
 	}
-	tlsConfig := &tls.Config{MinVersion: tls.VersionTLS12, RootCAs: pool}
+	// Mac/集群外开发通过SSH隧道连接时，拨号地址与服务证书身份不同。
+	// 只覆盖受信任配置的校验名称，仍验证原CA和证书，绝不关闭TLS校验。
+	tlsConfig := &tls.Config{MinVersion: tls.VersionTLS12, RootCAs: pool, ServerName: os.Getenv("NEON_KUBE_TLS_SERVER_NAME")}
+	if tokenFile != "" && certFile != "" {
+		return nil, errors.New("configure either Kubernetes token file or client certificate")
+	}
 	if certFile != "" && keyFile != "" {
 		cert, err := tls.LoadX509KeyPair(certFile, keyFile)
 		if err != nil {

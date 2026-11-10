@@ -23,18 +23,31 @@ jobs:
       - run: node --check tools/audit-node-cni.mjs
       - run: node tools/check-live-suites.mjs
       - run: node tools/generate-api-docs.mjs --check
+      - run: node --test tools/select-go-test-shard.test.mjs
       - run: node --test tools/functions-edge-probe/fixture.test.mjs
       - run: node --test tools/storage-gateway/workflow-contract.test.mjs
   go:
-    name: Go + real PostgreSQL
+    name: Go + real PostgreSQL / shard ${{ matrix.shard }}
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5]
+    env:
+      NEON_GO_SHARD_COUNT: '6'
+      NEON_GO_SHARD_INDEX: ${{ matrix.shard }}
     services:
       postgres:
         image: postgres@sha256:a3b7f434b2dc57ce85a67e171163eb8ab1a1ebcb39d27484661f26b1dfbe30d6
         env: {POSTGRES_USER: ci, POSTGRES_PASSWORD: ci-disposable, POSTGRES_DB: control_ci, POSTGRES_INITDB_ARGS: '--auth-host=scram-sha-256'}
         ports: ['5432:5432']
+        # PostgreSQL 真实 RLS、迁移、并发/并行测试会使用 POSIX 动态共享内存。
+        # Docker 默认 /dev/shm=64MiB，测试期间已观察到 ENOSPC，随后 PG 后端崩溃
+        # 并进入 WAL 恢复；这不是数据库数据盘耗尽。CI 独立 service 提高到 1GiB，
+        # 不修改生产数据库的共享内存或放宽权限/一致性断言。
         options: >-
+          --shm-size=1g
           --health-cmd "pg_isready -U ci -d control_ci"
           --health-interval 5s --health-timeout 5s --health-retries 12
     steps:
@@ -50,12 +63,15 @@ jobs:
       - name: Format, vet, race, integration and contract gates (zero skips)
         env:
           NEON_V2_TEST_DATABASE_URL: postgres://ci:ci-disposable@127.0.0.1:5432/control_ci?sslmode=disable
-          NEON_CI_ATTEMPT: run_${{ github.run_id }}_${{ github.run_attempt }}
+          NEON_CI_ATTEMPT: run_${{ github.run_id }}_${{ github.run_attempt }}_s${{ matrix.shard }}
           NEON_DATA_API_TEST_POSTGREST: ${{ runner.temp }}/neon-postgrest/postgrest
         run: bash tools/ci-go.sh
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
-        with: {name: go-evidence, path: artifacts/go-*, retention-days: 30}
+        with:
+          name: go-evidence-s${{ matrix.shard }}
+          path: artifacts/go-*
+          retention-days: 30
   web:
     name: TypeScript console
     runs-on: ubuntu-24.04

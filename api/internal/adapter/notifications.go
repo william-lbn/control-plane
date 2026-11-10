@@ -141,8 +141,15 @@ func (s *Server) verifyPlacement(ctx context.Context, payload map[string]any) er
 	if node != s.config.PageserverNodeID || number != 0 {
 		return pendingReconfiguration{}
 	}
-	path := "/api/v1/namespaces/" + url.PathEscape(s.config.Namespace) + "/services/http:storage-controller:1234/proxy/control/v1/tenant/" + payload["tenant_id"].(string)
-	state, err := s.kube.Request(ctx, http.MethodGet, path, nil)
+	var state map[string]any
+	var err error
+	if s.config.ReadTenant != nil {
+		state, err = s.config.ReadTenant(ctx, payload["tenant_id"].(string))
+	} else {
+		// 保持未选择原生认证配置的历史部署；原生读取失败不进入此分支。
+		path := "/api/v1/namespaces/" + url.PathEscape(s.config.Namespace) + "/services/http:storage-controller:1234/proxy/control/v1/tenant/" + payload["tenant_id"].(string)
+		state, err = s.kube.Request(ctx, http.MethodGet, path, nil)
+	}
 	if err != nil {
 		return err
 	}

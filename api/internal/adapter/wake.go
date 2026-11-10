@@ -61,7 +61,7 @@ func (s *Server) sameRoute(ctx context.Context, key string, expected route) erro
 		return err
 	}
 	identity := func(item route) [32]byte {
-		value, _ := json.Marshal([]any{item.ProjectID, item.BranchID, item.TenantID, item.Kind, item.Workload, item.Address, item.Template})
+		value, _ := json.Marshal([]any{item.ProjectID, item.BranchID, item.TenantID, item.Kind, item.Workload, item.Address, item.Template, item.ManagedBinding})
 		return sha256.Sum256(value)
 	}
 	if identity(current) != identity(expected) {
@@ -80,6 +80,9 @@ func (s *Server) ownsVM(key string, item route, vm map[string]any) bool {
 	return nested(vm, "metadata", "labels", "neon-control/project-id") == item.ProjectID && nested(vm, "metadata", "labels", "neon-control/endpoint-id") == "ep_"+strings.TrimPrefix(key, "ep-")
 }
 func (s *Server) wakeWorkload(ctx context.Context, key string, item route) (bool, error) {
+	if len(item.ManagedBinding) != 0 {
+		return false, s.wakeManagedSQLRoute(ctx, key, item)
+	}
 	if err := s.sameRoute(ctx, key, item); err != nil {
 		return false, err
 	}

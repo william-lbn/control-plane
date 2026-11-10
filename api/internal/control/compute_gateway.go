@@ -26,16 +26,27 @@ type computeGateway struct {
 }
 
 // RunComputeGateway protects the pinned native plain HTTP API with verified
-// TLS and an exact-endpoint JWT. Only configure is exposed. The native JWT
-// check remains enabled. This service never accepts caller-provided targets.
+// TLS and an exact-endpoint JWT. Configure is exposed by default. The native
+// JWT check remains enabled. This service never accepts caller-provided targets.
+// 显式配置允许的Agent主体后，另提供DSGA专用凭据路由；不改变general JWT权限。
 func RunComputeGateway(ctx context.Context) error {
 	kube, err := newKubeClient()
 	if err != nil {
 		return err
 	}
 	gateway := &computeGateway{kube: kube, http: &http.Client{Timeout: 30 * time.Second, Transport: &http.Transport{Proxy: nil}, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}
-	mux := http.NewServeMux()
-	mux.HandleFunc("POST /computes/{compute}/configure", gateway.configure)
+	// 原configure继续使用原per-Compute身份；凭据只在控制面独占身份的
+	// 独立监听器开放。任何DSGA半配置在打开任一监听器前失败关闭。
+	mux, err := gateway.routes("", "")
+	if err != nil {
+		return err
+	}
+	dsga, err := gateway.dsgaServer(dsgaListenerConfig{Bind: env("NEON_DSGA_GATEWAY_BIND", ":8444"),
+		AgentNamespace: env("NEON_DSGA_AGENT_NAMESPACE", ""), AgentAccount: env("NEON_DSGA_AGENT_SERVICE_ACCOUNT", ""),
+		CertFile: env("NEON_DSGA_GATEWAY_CERT_FILE", ""), KeyFile: env("NEON_DSGA_GATEWAY_KEY_FILE", "")})
+	if err != nil {
+		return err
+	}
 	server := &http.Server{Addr: env("NEON_COMPUTE_GATEWAY_BIND", ":8443"), Handler: mux, ReadHeaderTimeout: 10 * time.Second, ReadTimeout: 30 * time.Second, WriteTimeout: 40 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 16384,
 		TLSConfig: &tls.Config{MinVersion: tls.VersionTLS12, GetCertificate: gateway.certificate}}
 	healthMux := http.NewServeMux()
@@ -50,9 +61,12 @@ func RunComputeGateway(ctx context.Context) error {
 		jsonResponse(w, 200, record{"status": "ready"})
 	})
 	health := &http.Server{Addr: env("NEON_COMPUTE_GATEWAY_HEALTH_BIND", ":8081"), Handler: healthMux, ReadHeaderTimeout: 5 * time.Second}
-	failures := make(chan error, 2)
+	failures := make(chan error, 3)
 	go func() { failures <- server.ListenAndServeTLS("", "") }()
 	go func() { failures <- health.ListenAndServe() }()
+	if dsga != nil {
+		go func() { failures <- dsga.ListenAndServeTLS("", "") }()
+	}
 	select {
 	case <-ctx.Done():
 	case err = <-failures:
@@ -61,10 +75,37 @@ func RunComputeGateway(ctx context.Context) error {
 	defer cancel()
 	server.Shutdown(shutdown)
 	health.Shutdown(shutdown)
+	if dsga != nil {
+		dsga.Shutdown(shutdown)
+	}
 	if errors.Is(err, http.ErrServerClosed) {
 		return nil
 	}
 	return err
+}
+
+// routes同时用于真实启动与TLS业务测试，防止测试另造mux而漏掉生产接线。
+// 构造失败就阻止整个网关启动，不把不完整主体配置当成默认关闭而继续服务。
+func (gateway *computeGateway) routes(agentNamespace, agentAccount string) (*http.ServeMux, error) {
+	mux := http.NewServeMux()
+	if agentNamespace == "" && agentAccount == "" {
+		mux.HandleFunc("POST /computes/{compute}/configure", gateway.configure)
+		return mux, nil
+	}
+	// DSGA默认不开放。显式允许的Agent主体配置不完整时启动失败，不能静默
+	// 退回general/admin凭据；独立路由仅签短期专用令牌，不暴露任何私钥。
+	if agentNamespace != "" || agentAccount != "" {
+		broker, err := newDSGACredentialBroker(gateway.kube, agentNamespace, agentAccount)
+		if err != nil {
+			return nil, err
+		}
+		mux.Handle("POST /computes/{compute}/dsga-credentials", broker)
+		mux.HandleFunc("POST /computes/{compute}/dsga-array-credentials", broker.serveArrayCredentials)
+		mux.HandleFunc("POST /computes/{compute}/configure", gateway.configure)
+		proxy := newDSGAProxy(broker)
+		mux.Handle("/dsg/v1/", proxy)
+	}
+	return mux, nil
 }
 func (g *computeGateway) config(ctx context.Context, workload string) (map[string]any, error) {
 	if !computeWorkloadPattern.MatchString(workload) {
@@ -295,7 +336,12 @@ func sameComputeIdentity(stored, requested map[string]any) bool {
 	}
 	settings := func(config map[string]any) (map[string]string, bool) {
 		values := map[string]string{}
-		items, ok := nested(config, "spec", "cluster", "settings").([]any)
+		// native 的 settings 可省略；顶层身份字段仍由下方逐项严格核验。
+		raw := nested(config, "spec", "cluster", "settings")
+		if raw == nil {
+			return values, true
+		}
+		items, ok := raw.([]any)
 		if !ok {
 			return nil, false
 		}
@@ -322,8 +368,20 @@ func sameComputeIdentity(stored, requested map[string]any) bool {
 	if !validA || !validB {
 		return false
 	}
-	for _, key := range []string{"neon.tenant_id", "neon.timeline_id", "neon.pageserver_connstring"} {
-		if a[key] == "" || a[key] != b[key] {
+	// 与 native ParsedSpec 同序：有值的顶层字段优先，null/省略才回退旧GUC。
+	// 不能要求现代配置重复提供GUC；完整非catalog原始字段仍在下方冻结比较。
+	effective := func(config map[string]any, gucs map[string]string, field string) (string, bool) {
+		if raw := nested(config, "spec", field); raw != nil {
+			value, ok := raw.(string)
+			return value, ok && value != ""
+		}
+		value := gucs["neon."+field]
+		return value, value != ""
+	}
+	for _, field := range []string{"tenant_id", "timeline_id", "pageserver_connstring"} {
+		original, validOriginal := effective(stored, a, field)
+		incoming, validIncoming := effective(requested, b, field)
+		if !validOriginal || !validIncoming || original != incoming {
 			return false
 		}
 	}
