@@ -1,4 +1,5 @@
 > 当前产品架构、开发顺序与长期维护：[平台总方案与演进规划](docs/平台总方案与演进规划.md)；[官网对标](docs/官网对标与差异审查-20261107.md)；[发行与运营](docs/平台发行与运维管理.md)。历史版本回执保留，不能替代本轮 PG17/PG18 真实控制面验收。
+> DSGA 控制面集成与安全验收：[DSGA 控制面](docs/DSGA-CONTROL-PLANE-INTEGRATION.md) · [Neon 官方功能对标](docs/NEON-OFFICIAL-FEATURE-PARITY.md)
 
 # Neon 自托管控制面
 

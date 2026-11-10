@@ -96,6 +96,7 @@ spec:
             - {name: NEON_BACKEND_CREDENTIAL_KEYS_FILE, value: /run/backend-keys/keyring.json}
             {{- end }}
             {{- include "neonControl.runtimeEnv" . | nindent 12 }}
+            {{- include "neonControl.dsgaApiEnv" . | nindent 12 }}
             {{- include "neonControl.storageCapacityEnv" . | nindent 12 }}
             - {name: NEON_S3_LISTENER_ENABLED, value: {{ .Values.objectStorage.s3.apiListenerEnabled | quote }}}
             {{- include "neonControl.functionEdgeBrokerEnv" . | nindent 12 }}

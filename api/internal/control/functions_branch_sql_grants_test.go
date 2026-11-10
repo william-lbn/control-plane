@@ -34,7 +34,12 @@ func TestFunctionBranchCopyMissingGrantOptionRollsBackBeforePublication(t *testi
 		t.Fatal(err)
 	}
 	defer conn.Close(f.ctx)
-	scope := functionsql.Scope{FunctionID: "fnc_6123456789abcdef", ProjectID: f.p.ProjectID, BranchID: snapshotChild, Database: database, Schema: "app", ProvisioningRole: creator}
+	// PostgreSQL 角色属于整个 PG 实例，而不是某个临时测试数据库。
+	// 这里必须为每次测试使用独立 FunctionID：CI 失败重跑或多个分片复用
+	// 同一个 disposable PG 时，固定 fn_ 名称会撞上上一次已提交角色的
+	// 不同 provisioning 身份标记，导致误报 ownership conflict。
+	// 不改变 ProvisionTx 的原始身份校验和「授权不足必须回滚」的断言。
+	scope := functionsql.Scope{FunctionID: "fnc_" + randomToken(8), ProjectID: f.p.ProjectID, BranchID: snapshotChild, Database: database, Schema: "app", ProvisioningRole: creator}
 	verifier, err := scramVerifier(strings.Repeat("p", 43))
 	if err != nil {
 		t.Fatal(err)
