@@ -88,7 +88,7 @@ subjects:
     name: {{ $workerAccount }}
     namespace: {{ .Release.Namespace }}
 ---
-# API 只读指定 autoscaler-agent DaemonSet、该节点 Agent Pod，并调用其只读 dump-state proxy。
+# API 读取当前策略，Worker 确认原策略已采用。两者共用指定 Agent 的只读观察权限。
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
@@ -103,6 +103,9 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: {{ $apiAccount }}
+    namespace: {{ .Release.Namespace }}
+  - kind: ServiceAccount
+    name: {{ $workerAccount }}
     namespace: {{ .Release.Namespace }}
 ---
 # Worker 只读取固定节点清单中的 Node UID；不授予 Node list/watch/update。

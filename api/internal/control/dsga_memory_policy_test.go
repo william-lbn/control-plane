@@ -3,15 +3,22 @@ package control
 import (
 	"context"
 	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"reflect"
+	"strings"
+	"testing"
+	"time"
+
+	vmv1 "github.com/neondatabase/autoscaling/neonvm/apis/neonvm/v1"
 	dsgapi "github.com/neondatabase/autoscaling/pkg/api/dsga"
 	"github.com/neondatabase/autoscaling/pkg/dsga/budget"
 	"github.com/neondatabase/autoscaling/pkg/dsga/runtimeselection"
 	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"reflect"
-	"strings"
-	"testing"
-	"time"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 func selectionFixture(t *testing.T) runtimeselection.Selection {
@@ -99,6 +106,52 @@ func TestDSGAMemoryPolicyReadbackRejectsStaleForeignAndOldGeneration(t *testing.
 				t.Fatal("unconfirmed state exposed as current")
 			}
 		})
+	}
+}
+
+func TestDSGAMemoryPolicyReadsOriginalThroughKubeProxyWithOtherRetiredRunner(t *testing.T) {
+	selected := selectionFixture(t)
+	state := runtimeselection.Status{DesiredGeneration: 1, AppliedGeneration: 1, DesiredSHA256: selected.Digest(), AppliedSHA256: selected.Digest(), State: "applied"}
+	original := map[string]any{"podName": map[string]string{"namespace": selected.Namespace, "name": "original-pod"}, "runner": map[string]any{"dsga": map[string]any{"instance": selected.Instance, "observedAt": time.Now().UTC(), "runtimeSelection": state}}}
+	retired := json.RawMessage(`{"podName":{"namespace":"neon","name":"retired-pod"},"runner":{"dsga":{"instance":{"vm_uid":"retired-vm","compute_instance_id":"","pg_boot_id":"0"}}}}`)
+	dump, _ := json.Marshal(map[string]any{"stopped": false, "pods": []any{retired, original}})
+	if observed, err := decodeDSGAOwnerPolicy(dump, selected.Namespace, "original-pod", selected, time.Now()); err != nil || observed != state {
+		t.Fatalf("retired unrelated Runner masked original policy: %v", err)
+	}
+	duplicate, _ := json.Marshal(map[string]any{"stopped": false, "pods": []any{original, original}})
+	if _, err := decodeDSGAOwnerPolicy(duplicate, selected.Namespace, "original-pod", selected, time.Now()); err == nil {
+		t.Fatal("accepted ambiguous original Runner observation")
+	}
+	api := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/apis/apps/v1/namespaces/kube-system/daemonsets/autoscaler-agent":
+			_, _ = io.WriteString(w, `{"apiVersion":"apps/v1","kind":"DaemonSet","metadata":{"uid":"original-daemonset"}}`)
+		case "/api/v1/namespaces/kube-system/pods":
+			if r.URL.Query().Get("fieldSelector") != "spec.nodeName=worker-117" {
+				t.Error("missing exact Node filter")
+			}
+			_, _ = io.WriteString(w, `{"apiVersion":"v1","kind":"PodList","items":[{"metadata":{"name":"original-agent","ownerReferences":[{"kind":"DaemonSet","uid":"original-daemonset","controller":true}]},"spec":{"serviceAccountName":"autoscaler-agent"},"status":{"phase":"Running"}}]}`)
+		case "/api/v1/namespaces/kube-system/pods/original-agent:10300/proxy/dump-state":
+			raw, _ := io.ReadAll(r.Body)
+			if r.Method != http.MethodGet || string(raw) != "{}" || r.Header.Get("Content-Type") != "application/json" {
+				t.Error("Agent observation request changed")
+			}
+			_, _ = w.Write(dump)
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer api.Close()
+	client, err := kubernetes.NewForConfig(&rest.Config{Host: api.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	vm := &vmv1.VirtualMachine{ObjectMeta: metav1.ObjectMeta{Namespace: selected.Namespace}}
+	vm.Status.Node, vm.Status.PodName = "worker-117", "original-pod"
+	profile := &dsgaSupplyProfile{AgentNamespace: "kube-system", AgentServiceAccount: "autoscaler-agent", AgentDaemonSet: "autoscaler-agent", AgentDumpPort: 10300}
+	if observed, err := readDSGAOwnerPolicy(context.Background(), client, vm, profile, selected); err != nil || observed != state {
+		t.Fatalf("original Agent proxy observation failed: %v", err)
 	}
 }
 func TestDSGAMemoryPolicyOriginalIntentNeverAdvancesOnReplay(t *testing.T) {

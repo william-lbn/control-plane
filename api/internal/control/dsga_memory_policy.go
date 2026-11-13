@@ -257,7 +257,9 @@ func readDSGAOwnerPolicy(ctx context.Context, clients kubernetes.Interface, vm *
 	if target == nil {
 		return empty, errDSGAInitializationPending
 	}
-	raw, err := clients.CoreV1().RESTClient().Get().Namespace(p.AgentNamespace).Resource("pods").Name(target.Name + ":" + strconv.Itoa(int(p.AgentDumpPort))).SubResource("proxy").Suffix("/").Body([]byte("{}")).DoRaw(ctx)
+	// client-go removes a bare trailing slash. Use a path handled by the
+	// Agent dump mux so Kubernetes forwards the GET body instead of redirecting.
+	raw, err := clients.CoreV1().RESTClient().Get().Namespace(p.AgentNamespace).Resource("pods").Name(target.Name+":"+strconv.Itoa(int(p.AgentDumpPort))).SubResource("proxy").Suffix("dump-state").SetHeader("Content-Type", "application/json").Body([]byte("{}")).DoRaw(ctx)
 	if err != nil || len(raw) > 2<<20 {
 		return empty, errDSGAInitializationPending
 	}
@@ -268,24 +270,34 @@ func decodeDSGAOwnerPolicy(raw []byte, namespace, podName string, selected runti
 	var dump struct {
 		Stopped *bool `json:"stopped"`
 		Pods    []struct {
-			PodName struct{ Namespace, Name string } `json:"podName"`
-			Runner  *struct {
-				DSGA struct {
-					Instance         dsgapi.Instance          `json:"instance"`
-					ObservedAt       time.Time                `json:"observedAt"`
-					RuntimeSelection *runtimeselection.Status `json:"runtimeSelection"`
-				} `json:"dsga"`
-			} `json:"runner"`
+			PodName struct {
+				Namespace string `json:"namespace"`
+				Name      string `json:"name"`
+			} `json:"podName"`
+			Runner json.RawMessage `json:"runner"`
 		} `json:"pods"`
 	}
 	if dsgapi.ValidateObservationJSON(raw, 2<<20, 65536) != nil || json.Unmarshal(raw, &dump) != nil || dump.Stopped == nil || *dump.Stopped {
 		return empty, errDSGAInitializationPending
 	}
+	var matched *runtimeselection.Status
 	for _, pod := range dump.Pods {
-		if pod.PodName.Namespace != namespace || pod.PodName.Name != podName || pod.Runner == nil {
+		if pod.PodName.Namespace != namespace || pod.PodName.Name != podName {
 			continue
 		}
-		d := pod.Runner.DSGA
+		// Other Runners can legitimately have no PG boot during startup or
+		// after retirement. Decode the strict instance only for the original Pod.
+		var runner struct {
+			DSGA struct {
+				Instance         dsgapi.Instance          `json:"instance"`
+				ObservedAt       time.Time                `json:"observedAt"`
+				RuntimeSelection *runtimeselection.Status `json:"runtimeSelection"`
+			} `json:"dsga"`
+		}
+		if matched != nil || json.Unmarshal(pod.Runner, &runner) != nil {
+			return empty, errDSGAInitializationPending
+		}
+		d := runner.DSGA
 		age := now.Sub(d.ObservedAt)
 		// 此期限仅为页面/操作回执的新鲜度，绝不是数据库生存租约。
 		if d.Instance != selected.Instance || d.RuntimeSelection == nil || age < -5*time.Second || age > 2*time.Minute {
@@ -295,9 +307,12 @@ func decodeDSGAOwnerPolicy(raw []byte, namespace, podName string, selected runti
 		if state.DesiredGeneration != selected.Generation || state.DesiredSHA256 != selected.Digest() {
 			return empty, errDSGAInitializationPending
 		}
-		return state, nil
+		matched = &state
 	}
-	return empty, errDSGAInitializationPending
+	if matched == nil {
+		return empty, errDSGAInitializationPending
+	}
+	return *matched, nil
 }
 func (s *server) validateDSGAEndpointBounds(ctx context.Context, project, endpoint string, b createBounds) (bool, error) {
 	e, err := s.dsgaEndpointRuntime(ctx, project, endpoint)
