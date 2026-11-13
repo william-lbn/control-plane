@@ -73,12 +73,6 @@ func (s *server) createDSGARetainedEndpoint(w http.ResponseWriter, r *http.Reque
 		plan := reservation.Draft.Plan
 		plan.Credentials = reservation.Credentials
 		source := reservation.Draft.CredentialSource
-		if p.EndpointType == "read_write" {
-			if err := s.kube.verifyDSGAPriorWriterAbsent(ctx, plan.Namespace, source.Endpoint); err != nil {
-				s.dsgaCreationFailure(w, r, err)
-				return
-			}
-		}
 		frozen, err := s.kube.prepareDSGACredentials(ctx, p, plan, reservation.Operation, dsgaCredentialInput{
 			SourceEndpoint: source.Endpoint, Source: source.Reference, ExistingPassword: body.Password,
 		})
@@ -167,10 +161,10 @@ func lockDSGARetainedBranch(ctx context.Context, tx pgx.Tx, project, branch stri
 	return timeline, nil
 }
 
-func readDSGARetainedWriter(ctx context.Context, tx pgx.Tx, p createPayload) (dsgaEndpointCredentialSource, error) {
+func readDSGARetainedWriter(ctx context.Context, db connectionDefaultReader, p createPayload) (dsgaEndpointCredentialSource, error) {
 	var source dsgaEndpointCredentialSource
 	var raw []byte
-	err := tx.QueryRow(ctx, `SELECT e.id,o.id,o.payload#>'{dsga_creation,credentials}'
+	err := db.QueryRow(ctx, `SELECT e.id,o.id,o.payload#>'{dsga_creation,credentials}'
  FROM endpoints e JOIN operations o ON o.project_id=e.project_id AND o.payload->>'endpoint_id'=e.id
  JOIN dsga_creation_bindings b ON b.operation_id=o.id AND b.config_uid IS NOT NULL
  WHERE e.project_id=$1 AND e.branch_id=$2 AND e.endpoint_type='read_write' AND e.id<>$3

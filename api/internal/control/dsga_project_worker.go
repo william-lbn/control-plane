@@ -116,12 +116,32 @@ func (s *server) reconcileDSGAEndpoint(ctx context.Context, binding *dsgaCreatio
 		return errDSGACreationIdentity
 	}
 	err = s.createStep(ctx, binding.operationID, binding.workerID, 0, "verify_retained_timeline", func(ctx context.Context) error {
+		p := binding.intent.createPayload
+		if p.EndpointType == "read_write" {
+			// Only the Worker may list the original Runner Pods. Re-read the accepted
+			// credential source before any replacement VM is allowed to start.
+			var raw []byte
+			var frozen dsgaEndpointCredentialSource
+			if err := s.db.QueryRow(ctx, `SELECT draft->'credential_source' FROM dsga_creation_reservations
+ WHERE operation_id=$1 AND accepted_id=$1 AND base_action='create_endpoint'`, binding.operationID).Scan(&raw); err != nil {
+				return err
+			}
+			if decodeDSGAObject(raw, &frozen) != nil || !frozen.valid(p.EndpointID) {
+				return errDSGACreationIdentity
+			}
+			original, err := readDSGARetainedWriter(ctx, s.db, p)
+			if err != nil || original != frozen {
+				return errDSGACreationIdentity
+			}
+			if err := s.kube.verifyDSGAPriorWriterAbsent(ctx, plan.Namespace, frozen.Endpoint); err != nil {
+				return err
+			}
+		}
 		storage, err := newDSGAStorageClientAccess(ctx, s.kube, plan.Storage, false)
 		if err != nil {
 			return err
 		}
 		defer storage.CloseIdleConnections()
-		p := binding.intent.createPayload
 		fact, err := storage.request(ctx, http.MethodGet, "control/v1/tenant/"+p.TenantID+"/timeline/"+p.TimelineID, nil)
 		if err != nil {
 			return err

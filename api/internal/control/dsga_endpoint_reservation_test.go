@@ -93,6 +93,19 @@ func TestDSGARetainedReplicaUsesOriginalCredentialsAndIntent(t *testing.T) {
 			if response := request("retained-writer-conflict", body); response.Code != 409 {
 				t.Fatalf("writer collision returned %d", response.Code)
 			}
+
+			// The API's credential-only Kubernetes fixture denies Pod listing, just
+			// like the standalone API service account. A retired Writer can still
+			// be accepted; the Worker checks actual VM and Runner absence before birth.
+			retirement := "op_retained_writer_retirement"
+			f.exec(`INSERT INTO operations(id,action,state,project_id,resource_type,resource_id,actor_id,request_id,payload,finished_at)
+ VALUES($1,'delete_endpoint','succeeded',$2,'endpoint',$3,'creation_admin','req_retained_writer_retirement','{}',clock_timestamp())`, retirement, p.ProjectID, p.EndpointID)
+			f.exec(`UPDATE endpoints SET state='deleted',deleted_at=clock_timestamp(),deletion_operation_id=$2 WHERE id=$1`, p.EndpointID, retirement)
+			for range 2 {
+				if response := request("retained-replace-writer", body); response.Code != 202 {
+					t.Fatal("replacement Writer was not accepted by standalone API", response.Code, response.Body.String())
+				}
+			}
 		})
 	}
 }
