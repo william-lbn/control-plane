@@ -137,22 +137,34 @@ func waitDSGAStartupPoll(ctx context.Context) error {
 	}
 }
 
+func dsgaComputeWaitError(err error, lastPhase string) error {
+	// Classify the returned cause, not ctx.Err(): a concurrent deadline must
+	// not hide an identity, lease or authorization failure. Cancellation is
+	// also distinct from exhausting the readiness deadline.
+	if errors.Is(err, context.DeadlineExceeded) {
+		return vmWaitError{phase: lastPhase, cause: err}
+	}
+	return err
+}
+
 func (binding *dsgaCreationBinding) waitOriginalCompute(ctx context.Context) error {
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
+	lastPhase := "" // No VM phase has been observed until originalCompute succeeds.
 	for {
 		_, vm, err := binding.originalCompute(ctx)
 		if err != nil {
-			return err
+			return dsgaComputeWaitError(err, lastPhase)
 		}
-		switch string(vm.Status.Phase) {
+		lastPhase = string(vm.Status.Phase)
+		switch lastPhase {
 		case "Running":
 			return nil
 		case "Failed", "Succeeded":
-			return vmWaitError{phase: string(vm.Status.Phase), cause: errors.New("original VM terminated before readiness")}
+			return vmWaitError{phase: lastPhase, cause: errors.New("original VM terminated before readiness")}
 		}
 		if err := waitDSGAStartupPoll(ctx); err != nil {
-			return vmWaitError{phase: string(vm.Status.Phase), cause: err}
+			return dsgaComputeWaitError(err, lastPhase)
 		}
 	}
 }

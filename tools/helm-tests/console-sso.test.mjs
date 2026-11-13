@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import test from 'node:test';
 import { documents } from '../check-helm-rbac.mjs';
 
-const base = ['template', 'test', 'charts/neon-control-plane', '-f', 'charts/neon-control-plane/ci/render-values.yaml'];
+const base = ['template', '--kube-version', '1.31.2', 'test', 'charts/neon-control-plane', '-f', 'charts/neon-control-plane/ci/render-values.yaml'];
 const keys = ['--set', 'backendCredentials.enabled=true', '--set', 'backendCredentials.existingSecret=retained-keys'];
 test('Console OIDC client config is API-only and disabled by default', () => {
   const disabled = documents(execFileSync('helm', base, { encoding: 'utf8' }));

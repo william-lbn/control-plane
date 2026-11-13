@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import test from 'node:test';
 import { documents } from '../check-helm-rbac.mjs';
 
-const base = ['template','test','charts/neon-control-plane','-f','charts/neon-control-plane/ci/render-values.yaml'];
+const base = ['template','--kube-version','1.31.2','test','charts/neon-control-plane','-f','charts/neon-control-plane/ci/render-values.yaml'];
 const render = (args=[]) => documents(execFileSync('helm',[...base,...args],{encoding:'utf8'}));
 test('billing remains absent by default and payment keys never enter the Worker',()=>{
   const plain=render();

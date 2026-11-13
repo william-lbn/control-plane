@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process';
 import test from 'node:test';
 import { documents } from '../check-helm-rbac.mjs';
 
-const base=['template','test','charts/neon-control-plane','-f','charts/neon-control-plane/ci/render-values.yaml'];
+const base=['template','--kube-version','1.31.2','test','charts/neon-control-plane','-f','charts/neon-control-plane/ci/render-values.yaml'];
 const approved=['--set','platformManagement.enabled=true','--set','platformManagement.operatorIds[0]=approved_operator','--set','platformManagement.allowedOrganizations[0]=org_owned'];
 const render=(args=[])=>documents(execFileSync('helm',[...base,...args],{encoding:'utf8'}));
 test('platform plan policy is absent until explicitly enabled',()=>{

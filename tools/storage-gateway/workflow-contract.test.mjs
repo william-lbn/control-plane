@@ -48,7 +48,9 @@ test('Storage runtime contains only its own command and CI distributes its match
   assert.doesNotMatch(dockerfile, /cmd\/control-api|cmd\/control-worker|\/control-api \/opt|\/control-worker \/opt|hostPath/);
   const helm = read('../ci-helm.sh');
   assert.match(helm, /helm lint charts\/storage-gateway --strict/);
-  assert.match(helm, /helm template neon-storage charts\/storage-gateway --namespace neon/);
+  // 所有Chart必须通过统一的Kubernetes版本封装渲染，不能退回Helm默认的旧Capabilities。
+  assert.match(helm, /helm_template\(\) \{ helm template "\$@" --kube-version "\$KUBE_VERSION"; \}/);
+  assert.match(helm, /helm_template neon-storage charts\/storage-gateway --namespace neon/);
   assert.ok(helm.indexOf('helm package charts/storage-gateway') < helm.indexOf('sha256sum artifacts/helm/*.tgz'));
   assert.match(workflow.slice(0, workflow.indexOf('  go:')), /node --test tools\/storage-gateway\/workflow-contract\.test\.mjs/);
 });

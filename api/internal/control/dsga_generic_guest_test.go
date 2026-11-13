@@ -29,7 +29,7 @@ func genericVMFixture(t *testing.T, version uint32) (createPayload, dsgaCreation
 	p, plan := dsgaVMFixture(t)
 	plan.PostgresVersion = version
 	plan.NativeBootstrapVersion = 3
-	plan.VM.ProtocolVersion = 4
+	plan.VM = dsgaVMProfileV5Fixture()
 	plan.VM.TLSClusterIssuer = ""
 	plan.VM.ResourceLimits.SystemMemoryMaxBytes = 64 << 20
 	plan.VM.GenericGuest = genericGuestFixture(version, plan.Budget)
@@ -79,7 +79,7 @@ func TestDSGAGenericGuestUsesCommonPlanAndOriginalPublicStartup(t *testing.T) {
 	}
 }
 func TestDSGAGenericGuestRejectsPartialOrForeignRelease(t *testing.T) {
-	for _, name := range []string{"missing", "old-profile", "issuer", "lease-contract", "no-system", "wrong-major", "buffer-drift", "duplicate-asset", "unknown-field"} {
+	for _, name := range []string{"missing", "old-profile", "missing-runner-pod-resources", "issuer", "lease-contract", "no-system", "wrong-major", "buffer-drift", "duplicate-asset", "unknown-field"} {
 		t.Run(name, func(t *testing.T) {
 			p, plan := genericVMFixture(t, 17)
 			switch name {
@@ -87,6 +87,8 @@ func TestDSGAGenericGuestRejectsPartialOrForeignRelease(t *testing.T) {
 				plan.VM.GenericGuest = nil
 			case "old-profile":
 				plan.VM.ProtocolVersion = 3
+			case "missing-runner-pod-resources":
+				plan.VM.RunnerPodResources = nil
 			case "issuer":
 				plan.VM.TLSClusterIssuer = "unused-issuer"
 			case "lease-contract":
@@ -115,7 +117,7 @@ func TestDSGAGenericProjectReservationPreservesFrozenRelease(t *testing.T) {
 			catalog := dsgaReleaseCatalogFixture(t)
 			for i := range catalog.Releases {
 				c := &catalog.Releases[i].Creation
-				c.VM.ProtocolVersion = 4
+				c.VM.ProtocolVersion = 5
 				c.VM.TLSClusterIssuer = ""
 				c.VM.ResourceLimits.SystemMemoryMaxBytes = 64 << 20
 				c.VM.GenericGuest = genericGuestFixture(c.PostgresVersion, c.Budget)
@@ -124,7 +126,7 @@ func TestDSGAGenericProjectReservationPreservesFrozenRelease(t *testing.T) {
 			f.body.PostgresVersion = int(version)
 			key := "generic-original-project"
 			if response := f.request("creation_admin", key, f.body); response.Code != 202 {
-				t.Fatal("generic project not accepted", response.Code)
+				t.Fatalf("generic project not accepted: status=%d body=%s", response.Code, response.Body.String())
 			}
 			op, before, xmin := f.reservation(key)
 			// 冻结发行后环境目录更换不能改原接受意图。

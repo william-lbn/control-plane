@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
 import test from 'node:test';
-const base=['template','history-test','charts/neon-control-plane','--namespace','neon','-f','charts/neon-control-plane/ci/render-values.yaml'];
+const base=['template','--kube-version','1.31.2','history-test','charts/neon-control-plane','--namespace','neon','-f','charts/neon-control-plane/ci/render-values.yaml'];
 function render(args=[]){return spawnSync(process.env.HELM_BIN||'helm',[...base,...args],{encoding:'utf8'});}
 test('SQL history is opt-in and cannot start without retained encryption configuration',()=>{
  const disabled=render();assert.equal(disabled.status,0);assert.match(disabled.stdout,/NEON_V2_SQL_HISTORY_ENABLED,\s*value:\s*"false"/);

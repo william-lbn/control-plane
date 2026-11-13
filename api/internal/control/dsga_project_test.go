@@ -42,7 +42,7 @@ func newDSGAProjectFixture(t *testing.T) *dsgaProjectFixture {
 		f.exec(`INSERT INTO organization_members(org_id,user_id,role) VALUES('org_creation',$1,$2)`, actor, role)
 	}
 	_, policy, _ := dsgaPlanFixture(t)
-	policy.VM = dsgaVMProfileFixture()
+	policy.VM = dsgaVMProfileV5Fixture()
 	raw, _ := json.Marshal(dsgaProjectPolicy{1, "test-region", createBounds{500, 2000, 1024, 4096}, policy})
 	t.Setenv("NEON_V2_CREATE_ENABLED", "true")
 	t.Setenv("NEON_DSGA_CREATE_ENABLED", "true")
@@ -329,7 +329,7 @@ func TestDSGAProjectReservationForwardMigrationPreservesLegacyKey(t *testing.T) 
  -- 本夹具回退到reservation表创建之前；依赖它替换守卫的前向迁移也尚不存在。
  -- 不能留下后续066/067/068已执行标记，却让重放061把新守卫换回旧v1，这不是有效的
  -- 已发布数据库快照。实际迁移DDL及标记同事务提交，不存在该半回退状态。
- DELETE FROM schema_migrations WHERE version IN (900000061,900000066,900000067,900000068)`)
+ DELETE FROM schema_migrations WHERE version IN (900000061,900000066,900000067,900000068,900000072)`)
 	if err := migrate(f.ctx, f.s.db); err != nil {
 		t.Fatal(err)
 	}
@@ -438,6 +438,9 @@ func TestDSGAProjectPendingKeyConflictsWithLegacyInBothDirections(t *testing.T) 
 				}
 			} else {
 				p, plan := dsgaVMFixture(t)
+				// 这是升级后新建Reservation的并发互斥测试，必须使用当前v5发行协议；
+				// 历史v3只允许读取/恢复，不能再作为新Reservation写入。
+				plan.VM = dsgaVMProfileV5Fixture()
 				plan.Credentials = dsgaCredentialReference{}
 				draft, _ := json.Marshal(dsgaCreationDraft{1, f.body.Name, "main", "test-region", p, plan})
 				if _, err := tx.Exec(f.ctx, `INSERT INTO dsga_creation_reservations(actor_id,key_hash,request_hash,scope,org_id,base_action,operation_id,draft)

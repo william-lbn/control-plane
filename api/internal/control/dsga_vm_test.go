@@ -14,6 +14,8 @@ import (
 	"testing"
 
 	vmv1 "github.com/neondatabase/autoscaling/neonvm/apis/neonvm/v1"
+	core "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -22,7 +24,18 @@ import (
 func dsgaVMProfileFixture() dsgaVMProfile {
 	return dsgaVMProfile{ProtocolVersion: 3, Architecture: "amd64", RunnerImage: "ghcr.io/william-lbn/neonvm-runner@sha256:" + strings.Repeat("b", 64),
 		KernelImage: "ghcr.io/william-lbn/neonvm-kernel@sha256:" + strings.Repeat("c", 64), RootDiskBytes: 8 << 30,
-		SchedulerName: "autoscale-scheduler", ServiceAccount: "neonvm-runner", TLSClusterIssuer: "neon-compute-issuer", Placement: dsgaVMPlacementFixture(), ResourceLimits: &resourceguard.Limits{MemoryMaxBytes: 512 << 20, OutsideUpperBytes: 128 << 20, HugePools: []resourceguard.HugePool{{PageSizeKB: 2048, Pages: 64}, {PageSizeKB: 1048576, Pages: 0}}}}
+		SchedulerName: "autoscale-scheduler", ServiceAccount: "neonvm-runner", TLSClusterIssuer: "neon-compute-issuer", Placement: dsgaVMPlacementFixture(),
+		ResourceLimits: &resourceguard.Limits{MemoryMaxBytes: 512 << 20, OutsideUpperBytes: 128 << 20, HugePools: []resourceguard.HugePool{{PageSizeKB: 2048, Pages: 64}, {PageSizeKB: 1048576, Pages: 0}}}}
+}
+
+func dsgaVMProfileV5Fixture() dsgaVMProfile {
+	profile := dsgaVMProfileFixture()
+	profile.ProtocolVersion = 5
+	profile.RunnerPodResources = &dsgaRunnerPodResources{
+		CPURequestMilli: 2000, CPULimitMilli: 4000,
+		MemoryRequestBytes: 7 << 30, MemoryLimitBytes: 7 << 30,
+	}
+	return profile
 }
 
 func dsgaVMFixture(t *testing.T) (createPayload, dsgaCreationPlan) {
@@ -34,8 +47,41 @@ func dsgaVMFixture(t *testing.T) (createPayload, dsgaCreationPlan) {
 	return p, plan
 }
 
+func TestDSGAVMProfileCloneOwnsRunnerPodResources(t *testing.T) {
+	original := dsgaVMProfileV5Fixture()
+	cloned := original.clone()
+	original.RunnerPodResources.MemoryLimitBytes = 6 << 30
+	if cloned.RunnerPodResources == nil || cloned.RunnerPodResources.MemoryLimitBytes != 7<<30 {
+		t.Fatal("cloned creation profile aliases the mutable Runner Pod resource budget")
+	}
+}
+
+func TestDSGAVMSmallComputeResourceBudget(t *testing.T) {
+	p, plan := dsgaVMFixture(t)
+	plan.VM = dsgaVMProfileV5Fixture()
+	p.MinCPU, p.MaxCPU = 500, 1000
+	p.MinMem, p.MaxMem = 1024, 2048
+	plan.VM.RunnerPodResources = &dsgaRunnerPodResources{
+		CPURequestMilli: 1000, CPULimitMilli: 2000,
+		MemoryRequestBytes: 5 << 30, MemoryLimitBytes: 5 << 30,
+	}
+	vm, err := renderDSGAVM(p, plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if vm.Spec.Guest.CPUs.Min != 500 || vm.Spec.Guest.CPUs.Use != 500 || vm.Spec.Guest.CPUs.Max != 1000 ||
+		vm.Spec.Guest.MemorySlots != (vmv1.MemorySlots{Min: 1, Use: 1, Max: 2}) {
+		t.Fatal("small Guest CPU/virtio-mem bounds were not preserved")
+	}
+	if vm.Spec.PodResources.Requests.Cpu().MilliValue() != 1000 || vm.Spec.PodResources.Limits.Cpu().MilliValue() != 2000 ||
+		vm.Spec.PodResources.Requests.Memory().Value() != 5<<30 || vm.Spec.PodResources.Limits.Memory().Value() != 5<<30 {
+		t.Fatal("small Runner Pod resource request/limit was not preserved")
+	}
+}
+
 func TestDSGAVMTemplateFreezesOfficialRuntimeAndTLS(t *testing.T) {
 	p, plan := dsgaVMFixture(t)
+	plan.VM = dsgaVMProfileV5Fixture()
 	vm, err := renderDSGAVM(p, plan)
 	if err != nil {
 		t.Fatal(err)
@@ -48,6 +94,10 @@ func TestDSGAVMTemplateFreezesOfficialRuntimeAndTLS(t *testing.T) {
 	}
 	if vm.Spec.Guest.CPUs.Min != 500 || vm.Spec.Guest.CPUs.Use != 500 || vm.Spec.Guest.CPUs.Max != 2000 || vm.Spec.Guest.MemorySlotSize.Value() != 1<<30 || vm.Spec.Guest.MemorySlots != (vmv1.MemorySlots{Min: 1, Use: 1, Max: 4}) {
 		t.Fatal("CPU/byte/slot conversion changed requested resources")
+	}
+	if vm.Spec.PodResources.Requests.Cpu().MilliValue() != 2000 || vm.Spec.PodResources.Limits.Cpu().MilliValue() != 4000 ||
+		vm.Spec.PodResources.Requests.Memory().Value() != 7<<30 || vm.Spec.PodResources.Limits.Memory().Value() != 7<<30 {
+		t.Fatal("Runner Pod hard budget does not cover Guest max plus the frozen 3Gi host reserve")
 	}
 	if vm.Spec.TLS == nil || vm.Spec.TLS.CertificateIssuer != plan.VM.TLSClusterIssuer || vm.Spec.TLS.MountPath != dsgaTLSMount || vm.Spec.TLS.ServerName != vm.Name+"-management.neon.svc" {
 		t.Fatal("official TLS provisioning not connected")
@@ -94,8 +144,14 @@ func TestDSGAVMTemplateFreezesOfficialRuntimeAndTLS(t *testing.T) {
 
 func TestDSGAVMTemplateRejectsUnfrozenAndCRDIncompatibleInputs(t *testing.T) {
 	for name, mutate := range map[string]func(*createPayload, *dsgaCreationPlan){
-		"missing_profile":     func(_ *createPayload, v *dsgaCreationPlan) { v.VM = dsgaVMProfile{} },
-		"missing_credentials": func(_ *createPayload, v *dsgaCreationPlan) { v.Credentials = dsgaCredentialReference{} },
+		"missing_profile":                 func(_ *createPayload, v *dsgaCreationPlan) { v.VM = dsgaVMProfile{} },
+		"missing_credentials":             func(_ *createPayload, v *dsgaCreationPlan) { v.Credentials = dsgaCredentialReference{} },
+		"missing_runner_pod_resources":    func(_ *createPayload, v *dsgaCreationPlan) { v.VM.RunnerPodResources = nil },
+		"runner_pod_cpu_underprovisioned": func(_ *createPayload, v *dsgaCreationPlan) { v.VM.RunnerPodResources.CPURequestMilli = 1000 },
+		"runner_pod_memory_underprovisioned": func(_ *createPayload, v *dsgaCreationPlan) {
+			v.VM.RunnerPodResources.MemoryRequestBytes = 6 << 30
+			v.VM.RunnerPodResources.MemoryLimitBytes = 6 << 30
+		},
 		"runner_tag":          func(_ *createPayload, v *dsgaCreationPlan) { v.VM.RunnerImage = "runner:latest" },
 		"kernel_tag":          func(_ *createPayload, v *dsgaCreationPlan) { v.VM.KernelImage = "kernel:latest" },
 		"architecture":        func(_ *createPayload, v *dsgaCreationPlan) { v.VM.Architecture = "unknown" },
@@ -109,6 +165,7 @@ func TestDSGAVMTemplateRejectsUnfrozenAndCRDIncompatibleInputs(t *testing.T) {
 	} {
 		t.Run(name, func(t *testing.T) {
 			p, plan := dsgaVMFixture(t)
+			plan.VM = dsgaVMProfileV5Fixture()
 			mutate(&p, &plan)
 			vm, err := renderDSGAVM(p, plan)
 			if !errors.Is(err, errDSGACreationPlan) || vm != nil {
@@ -117,7 +174,13 @@ func TestDSGAVMTemplateRejectsUnfrozenAndCRDIncompatibleInputs(t *testing.T) {
 		})
 	}
 	p, plan := dsgaVMFixture(t)
+	plan.VM = dsgaVMProfileV5Fixture()
 	p.MaxMem = 512 * 1024
+	// 此断言只验证CRD的512 slots可表示上限；同步扩大可信Runner预算，
+	// 不允许测试通过隐式放宽生产资源硬限制。
+	maxPodMemory := int64(p.MaxMem)*(1<<20) + dsgaRunnerPodMemoryOverheadBytes
+	plan.VM.RunnerPodResources.MemoryRequestBytes = maxPodMemory
+	plan.VM.RunnerPodResources.MemoryLimitBytes = maxPodMemory
 	if vm, err := renderDSGAVM(p, plan); err != nil || vm.Spec.Guest.MemorySlots.Max != 512 {
 		t.Fatal("real CRD upper bound rejected")
 	}
@@ -125,6 +188,7 @@ func TestDSGAVMTemplateRejectsUnfrozenAndCRDIncompatibleInputs(t *testing.T) {
 
 func TestDSGAVMRecoveryRejectsStartupDriftAndAllowsOnlyRuntimeUse(t *testing.T) {
 	p, plan := dsgaVMFixture(t)
+	plan.VM = dsgaVMProfileV5Fixture()
 	wanted, err := renderDSGAVM(p, plan)
 	if err != nil {
 		t.Fatal(err)
@@ -149,6 +213,9 @@ func TestDSGAVMRecoveryRejectsStartupDriftAndAllowsOnlyRuntimeUse(t *testing.T) 
 		"memory_use":    func(v *vmv1.VirtualMachine) { v.Spec.Guest.MemorySlots.Use = 5 },
 		"cpu_use":       func(v *vmv1.VirtualMachine) { v.Spec.Guest.CPUs.Use = 2001 },
 		"bootstrap":     func(v *vmv1.VirtualMachine) { v.Spec.DSGABootstrap.ComputeInstanceID = "other-compute" },
+		"pod_resources": func(v *vmv1.VirtualMachine) {
+			v.Spec.PodResources.Limits[core.ResourceMemory] = resource.MustParse("6Gi")
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			copy := actual.DeepCopy()

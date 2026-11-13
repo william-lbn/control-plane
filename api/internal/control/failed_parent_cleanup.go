@@ -24,8 +24,8 @@ func verifyFailedParentCreation(ctx context.Context, reader failedEndpointCreati
 	var terminal bool
 	var count int
 	err := reader.QueryRow(ctx, `SELECT payload,state='failed' AND finished_at IS NOT NULL AND lease_owner IS NULL AND lease_expires_at IS NULL,
- (SELECT count(*) FROM operations WHERE project_id=$2 AND resource_type=$3 AND resource_id=$4 AND action='create_'||$3)
- FROM operations WHERE id=$1 AND project_id=$2 AND resource_type=$3 AND resource_id=$4 AND action='create_'||$3`, p.FailedCreateOperationID, p.ProjectID, kind, resource).Scan(&raw, &terminal, &count)
+ (SELECT count(*) FROM operations WHERE project_id=$2 AND resource_type=$3 AND resource_id=$4 AND action IN ('create_'||$3, 'create_'||$3||'_dsga_v1'))
+ FROM operations WHERE id=$1 AND project_id=$2 AND resource_type=$3 AND resource_id=$4 AND action IN ('create_'||$3, 'create_'||$3||'_dsga_v1')`, p.FailedCreateOperationID, p.ProjectID, kind, resource).Scan(&raw, &terminal, &count)
 	var original createPayload
 	if err != nil || !terminal || count != 1 || json.Unmarshal(raw, &original) != nil || original.ProjectID != p.ProjectID || original.BranchID != p.BranchIDs[0] || original.TenantID == "" || original.TimelineID == "" {
 		return errors.New("unique terminal original parent creation required")
@@ -89,7 +89,7 @@ func (s *server) admitFailedParentCleanupTx(w http.ResponseWriter, r *http.Reque
 		return true
 	}
 	p := deletionPayload{ProjectID: r.PathValue("project"), BranchIDs: []string{branchID}, EndpointIDs: []string{}}
-	rows, err := tx.Query(r.Context(), `SELECT id,payload FROM operations WHERE project_id=$1 AND resource_type=$2 AND resource_id=$3 AND action='create_'||$2`, p.ProjectID, kind, id)
+	rows, err := tx.Query(r.Context(), `SELECT id,payload FROM operations WHERE project_id=$1 AND resource_type=$2 AND resource_id=$3 AND action IN ('create_'||$2, 'create_'||$2||'_dsga_v1')`, p.ProjectID, kind, id)
 	if err != nil {
 		fail(w, r, 503, "metadata_unavailable", "Could not read original creation")
 		return true

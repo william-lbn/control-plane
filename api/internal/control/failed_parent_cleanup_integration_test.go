@@ -137,7 +137,8 @@ func TestFailedParentCleanupIntegration(t *testing.T) {
 	for _, item := range []struct {
 		kind, suffix string
 		compute      bool
-	}{{"project", "parentproject", true}, {"branch", "parentbranch", true}, {"branch", "parentempty", false}} {
+		dsga         bool
+	}{{"project", "parentproject", true, false}, {"project", "parentprojectdsga", true, true}, {"branch", "parentbranch", true, false}, {"branch", "parentempty", false, false}} {
 		t.Run(item.suffix, func(t *testing.T) {
 			project, branch, endpoint, origin := "prj_"+item.suffix, "br_"+item.suffix, "ep_"+item.suffix, "op_"+item.suffix
 			ps := "ready"
@@ -146,7 +147,11 @@ func TestFailedParentCleanupIntegration(t *testing.T) {
 			}
 			tenantID := stableHex(item.suffix, "tenant")
 			projectName := "Failed " + item.suffix
-			exec(`INSERT INTO projects(id,org_id,name,tenant_id,region_id,postgres_version,state,source,created_at,updated_at) VALUES($1,'org_parent_cleanup',$4,$3,'rke2-lab',16,$2,'managed',now(),now())`, project, ps, tenantID, projectName)
+			pgVersion := 16
+			if item.dsga {
+				pgVersion = 17
+			}
+			exec(`INSERT INTO projects(id,org_id,name,tenant_id,region_id,postgres_version,state,source,created_at,updated_at) VALUES($1,'org_parent_cleanup',$4,$3,'rke2-lab',$5,$2,'managed',now(),now())`, project, ps, tenantID, projectName, pgVersion)
 			var parent any
 			if item.kind == "branch" {
 				parent = "br_root_" + item.suffix
@@ -164,12 +169,24 @@ func TestFailedParentCleanupIntegration(t *testing.T) {
 				exec(`INSERT INTO endpoints(id,project_id,branch_id,selector,workload_kind,workload_name,service_name,state,role_name,database_name,endpoint_type,created_at,updated_at) VALUES($1,$2,$3,$4,'neonvm',$5,$5,'provisioning','cloud_admin','postgres','read_write',now(),now())`, endpoint, project, branch, selector(endpoint), kubeName(endpoint))
 				services[kubeName(endpoint)] = "original-service-" + item.suffix
 			}
-			raw, _ := json.Marshal(p)
+			var raw []byte
+			if item.dsga {
+				raw, _ = json.Marshal(struct {
+					createPayload
+					DSGACreation record `json:"dsga_creation"`
+				}{p, record{"protocol_version": 1, "postgres_version": 17}})
+			} else {
+				raw, _ = json.Marshal(p)
+			}
 			resource := branch
 			if item.kind == "project" {
 				resource = project
 			}
-			exec(`INSERT INTO operations(id,project_id,resource_type,resource_id,action,state,actor_id,request_id,payload,finished_at,retryable) VALUES($1,$2,$3,$4,$5,'failed','admin_parent','original-failure',$6,now(),true)`, origin, project, item.kind, resource, "create_"+item.kind, raw)
+			action := "create_" + item.kind
+			if item.dsga {
+				action += "_dsga_v1"
+			}
+			exec(`INSERT INTO operations(id,project_id,resource_type,resource_id,action,state,actor_id,request_id,payload,finished_at,retryable) VALUES($1,$2,$3,$4,$5,'failed','admin_parent','original-failure',$6,now(),true)`, origin, project, item.kind, resource, action, raw)
 			exec(`UPDATE branches SET state='error' WHERE id=$1`, branch)
 			if item.kind == "project" {
 				exec(`UPDATE projects SET state='error' WHERE id=$1`, project)
@@ -198,8 +215,22 @@ func TestFailedParentCleanupIntegration(t *testing.T) {
 			}
 			request("admin_parent", "DELETE", path, body, key, `"99"`, 412)
 			request("admin_parent", "DELETE", path, `{"confirm_name":"wrong"}`, key, `"1"`, 422)
-			exec(`UPDATE operations SET payload=jsonb_set(payload,'{timeline_id}','"wrong"') WHERE id=$1`, origin)
-			request("admin_parent", "DELETE", path, body, key, `"1"`, 409)
+			if item.dsga {
+				// DSGA intents are immutable: the database must reject the
+				// forged identity before cleanup admission can observe it.
+				_, mutationErr := db.Exec(ctx, `UPDATE operations SET payload=jsonb_set(payload,'{timeline_id}','"wrong"') WHERE id=$1`, origin)
+				var denied *pgconn.PgError
+				if !errors.As(mutationErr, &denied) || denied.Code != "23514" {
+					t.Fatal("DSGA creation intent mutation was not rejected", mutationErr)
+				}
+				var unchanged bool
+				if readErr := db.QueryRow(ctx, `SELECT payload=$2::jsonb FROM operations WHERE id=$1`, origin, raw).Scan(&unchanged); readErr != nil || !unchanged {
+					t.Fatal("rejected mutation changed original DSGA creation payload", readErr)
+				}
+			} else {
+				exec(`UPDATE operations SET payload=jsonb_set(payload,'{timeline_id}','"wrong"') WHERE id=$1`, origin)
+				request("admin_parent", "DELETE", path, body, key, `"1"`, 409)
+			}
 			exec(`UPDATE operations SET payload=$2,state='succeeded' WHERE id=$1`, origin, raw)
 			request("admin_parent", "DELETE", path, body, key, `"1"`, 409)
 			exec(`UPDATE operations SET state='failed' WHERE id=$1`, origin)

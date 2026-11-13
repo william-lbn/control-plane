@@ -8,7 +8,8 @@ import (
 	"github.com/neondatabase/autoscaling/pkg/dsga/resourceguard"
 )
 
-// v4只冻结通用Guest的公开构建策略。它是发行意图，不是资格报告或运行时证明；
+// v4冻结通用Guest的公开构建策略；v5在该Guest合同上增加Runner Pod硬预算。
+// 它是发行意图，不是资格报告或运行时证明；
 // 真实原SecretUID/Runtime摘要仍由原Controller/Runner填写和核验。
 type dsgaGenericGuestProfile struct {
 	ProtocolVersion uint32             `json:"protocol_version"`
@@ -73,7 +74,9 @@ func (p *dsgaGenericGuestProfile) clone() *dsgaGenericGuestProfile {
 	out.Supply = p.Supply.clone()
 	return &out
 }
-func (v dsgaVMProfile) generic() bool { return v.ProtocolVersion == 4 }
+func (v dsgaVMProfile) generic() bool {
+	return v.ProtocolVersion == 4 || (v.ProtocolVersion == 5 && v.GenericGuest != nil)
+}
 func genericStartupSelection() []byte {
 	raw, _ := json.Marshal(resourceguard.ComputeStartupSelection{ProtocolVersion: 1, IdentitySource: resourceguard.RuntimeComputeIdentitySource})
 	return raw

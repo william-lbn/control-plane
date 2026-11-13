@@ -1,0 +1,15 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import { parseAllDocuments } from 'yaml';
+const file = process.argv[2];
+assert.ok(file, 'rendered API-hosted web manifest required');
+const docs = parseAllDocuments(fs.readFileSync(file, 'utf8'), { uniqueKeys: true }).map(d => { assert.equal(d.errors.length, 0); return d.toJSON(); }).filter(Boolean);
+const by = (kind, name) => docs.find(x => x.kind === kind && x.metadata?.name === name);
+assert.ok(by('Deployment', 'neon-control-api'), 'API deployment must remain');
+assert.ok(by('Service', 'neon-control-api'), 'API service must remain');
+assert.equal(by('Deployment', 'neon-control-web'), undefined, 'standalone Web deployment must be omitted');
+assert.equal(by('Service', 'neon-control-web'), undefined, 'standalone Web service must be omitted');
+const ingress = by('Ingress', 'neon-control');
+assert.ok(ingress, 'Ingress should remain available');
+assert.equal(ingress.spec.rules[0].http.paths[0].backend.service.name, 'neon-control-api');
+console.log('API-hosted Console: SPA profile, no nginx workload, API-backed ingress passed');

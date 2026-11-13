@@ -39,7 +39,7 @@ func dsgaServicesSourceFixture(t *testing.T, mode string, action ...string) (con
 	if len(action) > 0 {
 		kind = action[0]
 	}
-	ctx, _, _, f, _, binding, source := credentialSourceFixtureForAction(t, dsgaVMProfileFixture(), kind)
+	ctx, _, _, f, _, binding, source := credentialSourceFixtureForAction(t, dsgaVMProfileV5Fixture(), kind)
 	if _, err := binding.prepareVM(ctx); err != nil {
 		t.Fatal(err)
 	}

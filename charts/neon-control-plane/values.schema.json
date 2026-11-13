@@ -131,6 +131,9 @@
         "resources": {
           "type": "object",
           "additionalProperties": true
+        },
+        "enabled": {
+          "type": "boolean"
         }
       },
       "additionalProperties": false
@@ -480,8 +483,14 @@
             "enabled": {
               "type": "boolean"
             },
-            "apiListenerEnabled": { "type": "boolean" },
-            "gatewayService": { "type": "string", "maxLength": 253, "pattern": "^$|^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?([.][a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?)*$" },
+            "apiListenerEnabled": {
+              "type": "boolean"
+            },
+            "gatewayService": {
+              "type": "string",
+              "maxLength": 253,
+              "pattern": "^$|^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?([.][a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?)*$"
+            },
             "origin": {
               "type": "string",
               "maxLength": 255

@@ -98,6 +98,7 @@ func TestDSGAVM3SnapshotOwnsPlacementAndHistoricalVersionsStayFrozen(t *testing.
 	old.VM = plan.VM.clone()
 	old.VM.ProtocolVersion = 2
 	old.VM.Placement = nil
+	old.VM.RunnerPodResources = nil // 历史v2不包含v3新增的Runner资源合同
 	old.Credentials = dsgaCredentialReference{1, "original-credentials", strings.Repeat("d", 64)}
 	t.Setenv("NEON_DSGA_CREATION_POLICY", string(before))
 	vm, err := renderDSGAVM(p, old)
@@ -106,6 +107,7 @@ func TestDSGAVM3SnapshotOwnsPlacementAndHistoricalVersionsStayFrozen(t *testing.
 	}
 	old.VM.ProtocolVersion = 1
 	old.VM.ResourceLimits = nil
+	old.VM.RunnerPodResources = nil // 历史v1只按原字段解码
 	if old.VM.validate() != nil {
 		t.Fatal("historical v1 read compatibility lost")
 	}
@@ -117,20 +119,33 @@ func TestDSGAVM3SnapshotOwnsPlacementAndHistoricalVersionsStayFrozen(t *testing.
 
 func TestDSGAVM3RejectsIncompletePlacementBeforeProducingTemplate(t *testing.T) {
 	for name, mutate := range map[string]func(*dsgaVMProfile){
-		"missing":             func(v *dsgaVMProfile) { v.Placement = nil },
-		"missing_selector":    func(v *dsgaVMProfile) { v.Placement.NodeSelector = nil },
-		"missing_pool":        func(v *dsgaVMProfile) { delete(v.Placement.NodeSelector, dsgaMemoryPoolLabel) },
-		"wrong_os":            func(v *dsgaVMProfile) { v.Placement.NodeSelector[core.LabelOSStable] = "windows" },
-		"wrong_arch":          func(v *dsgaVMProfile) { v.Placement.NodeSelector[core.LabelArchStable] = "arm64" },
-		"bad_label":           func(v *dsgaVMProfile) { v.Placement.NodeSelector["invalid key"] = "value" },
-		"bad_value":           func(v *dsgaVMProfile) { v.Placement.NodeSelector[dsgaMemoryPoolLabel] = "bad value" },
-		"no_hosts":            func(v *dsgaVMProfile) { v.Placement.AllowedNodeNames = nil },
-		"two_hosts":           func(v *dsgaVMProfile) { v.Placement.AllowedNodeNames = v.Placement.AllowedNodeNames[:2] },
-		"four_hosts":          func(v *dsgaVMProfile) { v.Placement.AllowedNodeNames = append(v.Placement.AllowedNodeNames, "ubuntu") },
-		"duplicate":           func(v *dsgaVMProfile) { v.Placement.AllowedNodeNames[0] = v.Placement.AllowedNodeNames[1] },
-		"invalid_host":        func(v *dsgaVMProfile) { v.Placement.AllowedNodeNames[0] = "bad/host" },
-		"v2_hidden_placement": func(v *dsgaVMProfile) { v.ProtocolVersion = 2 },
-		"unknown_version":     func(v *dsgaVMProfile) { v.ProtocolVersion = 4 },
+		"missing":          func(v *dsgaVMProfile) { v.Placement = nil },
+		"missing_selector": func(v *dsgaVMProfile) { v.Placement.NodeSelector = nil },
+		"missing_pool":     func(v *dsgaVMProfile) { delete(v.Placement.NodeSelector, dsgaMemoryPoolLabel) },
+		"wrong_os":         func(v *dsgaVMProfile) { v.Placement.NodeSelector[core.LabelOSStable] = "windows" },
+		"wrong_arch":       func(v *dsgaVMProfile) { v.Placement.NodeSelector[core.LabelArchStable] = "arm64" },
+		"bad_label":        func(v *dsgaVMProfile) { v.Placement.NodeSelector["invalid key"] = "value" },
+		"bad_value":        func(v *dsgaVMProfile) { v.Placement.NodeSelector[dsgaMemoryPoolLabel] = "bad value" },
+		"no_hosts":         func(v *dsgaVMProfile) { v.Placement.AllowedNodeNames = nil },
+		"two_hosts":        func(v *dsgaVMProfile) { v.Placement.AllowedNodeNames = v.Placement.AllowedNodeNames[:2] },
+		"four_hosts":       func(v *dsgaVMProfile) { v.Placement.AllowedNodeNames = append(v.Placement.AllowedNodeNames, "ubuntu") },
+		"duplicate":        func(v *dsgaVMProfile) { v.Placement.AllowedNodeNames[0] = v.Placement.AllowedNodeNames[1] },
+		"invalid_host":     func(v *dsgaVMProfile) { v.Placement.AllowedNodeNames[0] = "bad/host" },
+		"v2_hidden_placement": func(v *dsgaVMProfile) {
+			v.ProtocolVersion = 2
+			v.RunnerPodResources = nil // 只测试v2隐藏placement时的拒绝原因
+		},
+		"v2_runner_pod_resources": func(v *dsgaVMProfile) {
+			v.ProtocolVersion = 2
+			v.Placement = nil
+			// 注入完整且有效的v5 Runner预算，确保该负例真正覆盖
+			// v2协议携带新字段时必须拒绝，而不是只测试一个空字段。
+			v.RunnerPodResources = &dsgaRunnerPodResources{
+				CPURequestMilli: 2000, CPULimitMilli: 4000,
+				MemoryRequestBytes: 7 << 30, MemoryLimitBytes: 7 << 30,
+			}
+		},
+		"unknown_version": func(v *dsgaVMProfile) { v.ProtocolVersion = 4 },
 	} {
 		t.Run(name, func(t *testing.T) {
 			p, plan := dsgaVMFixture(t)
@@ -147,6 +162,7 @@ func TestDSGAVM2UnboundRecoveryNeverPostsAndBoundRecoveryNeverAdoptsPlacement(t 
 	old := dsgaVMProfileFixture()
 	old.ProtocolVersion = 2
 	old.Placement = nil
+	old.RunnerPodResources = nil
 	ctx, _, _, f, input, binding, _ := credentialSourceFixtureWithVM(t, old)
 	f.mu.Lock()
 	before := append([]string(nil), f.trace...)

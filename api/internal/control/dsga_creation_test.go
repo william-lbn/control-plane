@@ -36,6 +36,7 @@ type creationTestAPI struct {
 	trace         []string
 	lost          string
 	beforePatch   func()
+	afterCreate   func()
 	afterRender   func()
 	bindErr       error
 	bindConfigErr error
@@ -85,7 +86,12 @@ func (f *creationTestAPI) serve(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		vm.UID, vm.ResourceVersion = "vm-uid", f.next()
-		f.vm, phase, object = vm, "create", vm
+		f.vm, phase, object = vm, "create", vm.DeepCopy()
+		if f.afterCreate != nil {
+			hook := f.afterCreate
+			f.afterCreate = nil
+			hook()
+		}
 	case r.Method == http.MethodPatch && r.URL.Path == f.kube.path("vm", brokerTestWorkload):
 		if f.beforePatch != nil {
 			hook := f.beforePatch

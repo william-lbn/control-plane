@@ -32,13 +32,13 @@ func (s *server) captureCatalogInheritanceTx(ctx context.Context, tx pgx.Tx, ope
  EXISTS(SELECT 1 FROM endpoints WHERE project_id=$1 AND branch_id=$2 AND endpoint_type='read_write' AND id<>$3),
  EXISTS(SELECT 1 FROM endpoints e WHERE e.project_id=$1 AND e.branch_id=$2 AND e.endpoint_type='read_write' AND e.id<>$3 AND
  (EXISTS(SELECT 1 FROM compute_catalog_bootstrap_receipts r JOIN compute_catalog_bootstrap_publications pub ON pub.endpoint_id=r.endpoint_id WHERE r.endpoint_id=e.id)
- OR EXISTS(SELECT 1 FROM operations o WHERE o.project_id=$1 AND o.action IN ('create_project','create_branch','create_endpoint') AND o.state='succeeded' AND o.payload->>'endpoint_id'=e.id AND o.payload->>'branch_id'=$2 AND o.payload->>'tenant_id'=$4 AND o.payload->>'timeline_id'=$5
- AND (SELECT count(*) FROM operations other WHERE other.project_id=$1 AND other.action IN ('create_project','create_branch','create_endpoint') AND other.payload->>'endpoint_id'=e.id)=1
+ OR EXISTS(SELECT 1 FROM operations o WHERE o.project_id=$1 AND o.action IN ('create_project','create_branch','create_endpoint','create_project_dsga_v1','create_branch_dsga_v1','create_endpoint_dsga_v1') AND o.state='succeeded' AND o.payload->>'endpoint_id'=e.id AND o.payload->>'branch_id'=$2 AND o.payload->>'tenant_id'=$4 AND o.payload->>'timeline_id'=$5
+ AND (SELECT count(*) FROM operations other WHERE other.project_id=$1 AND other.action IN ('create_project','create_branch','create_endpoint','create_project_dsga_v1','create_branch_dsga_v1','create_endpoint_dsga_v1') AND other.payload->>'endpoint_id'=e.id)=1
  AND EXISTS(SELECT 1 FROM operation_steps st WHERE st.operation_id=o.id AND st.name='sql_probe_via_proxy' AND st.state='succeeded')))),
  NOT EXISTS(SELECT 1 FROM endpoints e WHERE e.project_id=$1 AND e.branch_id=$2 AND e.endpoint_type='read_write' AND e.id<>$3 AND NOT EXISTS(
  SELECT 1 FROM operations cleanup JOIN operations original ON original.id=cleanup.payload->>'failed_create_operation_id'
  WHERE cleanup.id=e.deletion_operation_id AND e.state='deleted' AND e.deleted_at IS NOT NULL AND cleanup.action='cleanup_failed_endpoint' AND cleanup.state='succeeded'
- AND original.project_id=$1 AND original.resource_id=e.id AND original.action='create_endpoint' AND original.state='failed' AND original.lease_owner IS NULL
+ AND original.project_id=$1 AND original.resource_id=e.id AND original.action IN ('create_endpoint','create_endpoint_dsga_v1') AND original.state='failed' AND original.lease_owner IS NULL
  AND original.payload->>'branch_id'=$2 AND original.payload->>'tenant_id'=$4 AND original.payload->>'timeline_id'=$5))`, p.ProjectID, p.BranchID, p.EndpointID, p.TenantID, p.TimelineID).Scan(&previousWriter, &initialized, &retiredFailed); err != nil {
 		return err
 	}

@@ -92,7 +92,7 @@ func TestDSGAProjectWorkerWaitUsesOriginalUIDAndTerminalState(t *testing.T) {
 	f.mu.Unlock()
 	short, cancel := context.WithTimeout(ctx, 75*time.Millisecond)
 	defer cancel()
-	if err := binding.waitOriginalCompute(short); !errors.As(err, &wait) {
+	if err := binding.waitOriginalCompute(short); !errors.As(err, &wait) || !errors.Is(err, context.DeadlineExceeded) || wait.phase != "" {
 		t.Fatal("pending startup did not remain bounded", err)
 	}
 	f.mu.Lock()
@@ -103,6 +103,43 @@ func TestDSGAProjectWorkerWaitUsesOriginalUIDAndTerminalState(t *testing.T) {
 	}
 	if err := binding.waitOriginalCompute(ctx); !errors.Is(err, errLeaseLost) {
 		t.Fatal("stale worker continued readiness", err)
+	}
+}
+
+func TestDSGAProjectWorkerWaitClassifiesOnlyDeadlineAndPreservesCause(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+		wait bool
+	}{
+		{name: "nil"},
+		{name: "deadline", err: context.DeadlineExceeded, wait: true},
+		{name: "wrapped_database_deadline", err: fmt.Errorf("database read: %w", context.DeadlineExceeded), wait: true},
+		{name: "canceled", err: context.Canceled},
+		{name: "wrapped_canceled", err: fmt.Errorf("database read: %w", context.Canceled)},
+		{name: "lease", err: errLeaseLost},
+		{name: "wrapped_lease", err: fmt.Errorf("binding: %w", errLeaseLost)},
+		{name: "identity", err: errDSGACreationIdentity},
+		{name: "forbidden", err: kubeError{Status: http.StatusForbidden}},
+		{name: "ordinary", err: errors.New("database unavailable")},
+		{name: "timeout_text_without_deadline_cause", err: errors.New("context deadline exceeded")},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, phase := range []string{"", "Pending"} {
+				err := dsgaComputeWaitError(tc.err, phase)
+				var wait vmWaitError
+				if errors.As(err, &wait) != tc.wait {
+					t.Fatalf("unexpected readiness classification: %v", err)
+				}
+				if tc.wait {
+					if wait.phase != phase || wait.cause != tc.err || !errors.Is(err, context.DeadlineExceeded) {
+						t.Fatalf("deadline lost its original cause or observed phase: %#v", wait)
+					}
+				} else if err != tc.err {
+					t.Fatalf("non-deadline error was replaced: got %v, want %v", err, tc.err)
+				}
+			}
+		})
 	}
 }
 

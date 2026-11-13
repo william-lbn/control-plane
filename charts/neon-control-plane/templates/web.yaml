@@ -1,3 +1,4 @@
+{{- if .Values.web.enabled -}}
 {{- $name := include "neonControl.name" . -}}
 {{- $config := .Files.Get "files/nginx.conf" -}}
 {{- $gateway := include "neonControl.storageGatewayService" . -}}
@@ -94,3 +95,5 @@ spec:
       {{- if eq .Values.service.type "NodePort" }}
       nodePort: {{ .Values.service.nodePort }}
       {{- end }}
+
+{{- end -}}

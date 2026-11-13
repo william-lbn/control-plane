@@ -14,8 +14,10 @@ import (
 func TestManagedAuthFactorRebindAtomicNativeAndPublication(t *testing.T) {
 	ctx, s, exec := catalogBindingFixture(t)
 	s.idempotencyKey = []byte(strings.Repeat("synthetic-factor-root-key", 3))
-	parent := "br_0123456789abcdef"
-	child := "br_fedcba9876543210"
+	// PostgreSQL角色是cluster-global而非schema-local；每次测试使用唯一分支ID，
+	// 避免不同CI分片/重试在共享测试PostgreSQL中争用同一个native login role。
+	parent := "br_0123456789abcdef" // catalogBindingFixture creates this source branch
+	child := newID("br_")[:19]      // valid 16-hex branch ID; login roles are cluster-global
 	exec(`INSERT INTO branches(id,project_id,parent_branch_id,name,timeline_id,state,created_at) VALUES($1,'prj_0123456789abcdef',$2,'factor-child',$3,'ready',now())`, child, parent, strings.Repeat("c", 32))
 	p := managedAuthPayload{ProjectID: "prj_0123456789abcdef", BranchID: child, EndpointID: "ep_0123456789abcdef", Generation: 1, FactorSourceBranchID: parent, FactorOperationID: "op_synthetic_factor_child", Spec: ManagedAuthSpec{Database: "control_ci", AllowedOrigins: []string{}, TwoFactorEnabled: true, InheritTwoFactor: true}}
 	source := p

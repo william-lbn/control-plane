@@ -5,7 +5,7 @@ import test from 'node:test';
 import { documents } from '../check-helm-rbac.mjs';
 
 const origin = 'https://functions.example.test';
-const base = ['template', 'test', 'charts/neon-control-plane', '--namespace', 'neon',
+const base = ['template', '--kube-version', '1.31.2', 'test', 'charts/neon-control-plane', '--namespace', 'neon',
   '-f', 'charts/neon-control-plane/ci/render-values.yaml',
   '--set', 'functions.enabled=true', '--set', 'functions.existingConfigSecret=functions-common',
   '--set', 'functions.existingIssuerSecret=functions-issuer', '--set', 'functions.proxyCASecret=proxy-public-ca',

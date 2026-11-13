@@ -175,6 +175,9 @@ func (plan dsgaCreationPlan) validate(p createPayload) error {
 		p.MinMem <= 0 || p.MaxMem < p.MinMem || p.MaxMem > 1<<31-1 {
 		return errDSGACreationPlan
 	}
+	if plan.VM.validatePodResourcesForBounds(p.MaxCPU, p.MaxMem) != nil {
+		return errDSGACreationPlan
+	}
 	minGuest, maxGuest := uint64(p.MinMem)*(1<<20), uint64(p.MaxMem)*(1<<20)
 	// 当前NeonVM virtio-mem块为8MiB；CRD的slots上限为512。禁止按MiB整数除法截断，
 	// 否则数据库意图与实际Guest内存不一致。未来最低合法Guest也必须落在槽边界。

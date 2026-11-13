@@ -16,9 +16,62 @@ import (
 	"k8s.io/apimachinery/pkg/util/validation"
 )
 
+// DSGA Runner Pod必须有可调度的硬资源预算。内存预留沿用已验证的
+// PG17/PG18生产模板：Guest最大内存之外额外保留3Gi，覆盖QEMU/Runner及
+// 镜像初始化阶段；CPU request至少覆盖Guest最大CPU，limit由平台发行目录冻结。
+const dsgaRunnerPodMemoryOverheadBytes int64 = 3 << 30
+
+// dsgaRunnerPodResources是可信发行目录中的Kubernetes Runner Pod资源合同。
+// 不接受租户提交的Pod资源；这些值随创建计划冻结，恢复时不重新估算。
+type dsgaRunnerPodResources struct {
+	CPURequestMilli    int64 "json:\"cpu_request_milli\""
+	CPULimitMilli      int64 "json:\"cpu_limit_milli\""
+	MemoryRequestBytes int64 "json:\"memory_request_bytes\""
+	MemoryLimitBytes   int64 "json:\"memory_limit_bytes\""
+}
+
+func (p *dsgaRunnerPodResources) validate() error {
+	if p == nil || p.CPURequestMilli <= 0 || p.CPULimitMilli < p.CPURequestMilli ||
+		p.MemoryRequestBytes <= 0 || p.MemoryLimitBytes != p.MemoryRequestBytes {
+		return errDSGACreationPlan
+	}
+	return nil
+}
+
+// validateForBounds保证平台硬预算覆盖租户可请求的最大Guest规格。
+// 内存request必须等于limit，避免Kubernetes只预留较小request而实际Runner
+// 在初始化或Guest运行时使用更高内存；3Gi预留与既有11Gi/8Gi Guest模板一致。
+func (p *dsgaRunnerPodResources) validateForBounds(maxCPU, maxMemMiB int) error {
+	if p.validate() != nil || maxCPU <= 0 || maxMemMiB <= 0 {
+		return errDSGACreationPlan
+	}
+	requiredMemory := int64(maxMemMiB)*(1<<20) + dsgaRunnerPodMemoryOverheadBytes
+	if p.CPURequestMilli < int64(maxCPU) || p.CPULimitMilli > int64(maxCPU)*4 ||
+		p.MemoryRequestBytes < requiredMemory {
+		return errDSGACreationPlan
+	}
+	return nil
+}
+
+func (p *dsgaRunnerPodResources) requirements() core.ResourceRequirements {
+	if p == nil {
+		return core.ResourceRequirements{}
+	}
+	return core.ResourceRequirements{
+		Requests: core.ResourceList{
+			core.ResourceCPU:    *resource.NewMilliQuantity(p.CPURequestMilli, resource.DecimalSI),
+			core.ResourceMemory: *resource.NewQuantity(p.MemoryRequestBytes, resource.BinarySI),
+		},
+		Limits: core.ResourceList{
+			core.ResourceCPU:    *resource.NewMilliQuantity(p.CPULimitMilli, resource.DecimalSI),
+			core.ResourceMemory: *resource.NewQuantity(p.MemoryLimitBytes, resource.BinarySI),
+		},
+	}
+}
+
 // 使用官方NeonVM字段，不生成部署/镜像。镜像必须由可信发行配置提供digest，
-// 不从租户请求或恢复时env选择。旧profile保留NeonVM证书供给合同；v4沿
-// 当前固定Guest+原生JWT启动，外部TLS在Proxy/Gateway，不声明Guest证书挂载。
+// 不从租户请求或恢复时env选择。v3冻结节点放置，v4冻结通用Guest启动，v5
+// 在原有启动合同上增加不可变Runner Pod硬资源预算；旧版本保持原始投影。
 type dsgaVMProfile struct {
 	ProtocolVersion  uint32 `json:"protocol_version"`
 	Architecture     string `json:"architecture"`
@@ -31,6 +84,9 @@ type dsgaVMProfile struct {
 	// v2显式冻结整个Guest初始聚合额度，不从RSS或固定比例猜预算。v1仅供历史
 	// 只读解码；新生产显式v3/v4。历史v2仅按已绑定同UID核对，不能从env补计划。
 	ResourceLimits *resourceguard.Limits `json:"resource_limits,omitempty"`
+	// v5显式冻结Runner Pod的request/limit；历史v3/v4不回填该字段，
+	// 避免恢复时悄悄改变原VM规格。
+	RunnerPodResources *dsgaRunnerPodResources `json:"runner_pod_resources,omitempty"`
 	// v3把节点授权作为原创建事实冻结；指针子结构保持profile可比较零值。
 	// 旧v1/v2不得从当前env/节点快照补入放置，也不因此取得新VM创建权限。
 	Placement    *dsgaVMPlacement         `json:"placement,omitempty"`
@@ -38,7 +94,7 @@ type dsgaVMProfile struct {
 }
 
 func (v dsgaVMProfile) validate() error {
-	if (v.ProtocolVersion != 1 && v.ProtocolVersion != 2 && v.ProtocolVersion != 3 && v.ProtocolVersion != 4) || (v.Architecture != "amd64" && v.Architecture != "arm64") ||
+	if (v.ProtocolVersion != 1 && v.ProtocolVersion != 2 && v.ProtocolVersion != 3 && v.ProtocolVersion != 4 && v.ProtocolVersion != 5) || (v.Architecture != "amd64" && v.Architecture != "arm64") ||
 		!dsgaPinnedImage.MatchString(v.RunnerImage) || !dsgaPinnedImage.MatchString(v.KernelImage) ||
 		v.RootDiskBytes < 1<<30 || v.RootDiskBytes > 1<<63-1 || v.RootDiskBytes%(1<<20) != 0 {
 		return errDSGACreationPlan
@@ -63,7 +119,7 @@ func (v dsgaVMProfile) validate() error {
 		}
 	}
 	if v.ProtocolVersion == 1 {
-		if v.ResourceLimits != nil || v.Placement != nil {
+		if v.ResourceLimits != nil || v.RunnerPodResources != nil || v.Placement != nil {
 			return errDSGACreationPlan
 		}
 		return nil
@@ -72,16 +128,45 @@ func (v dsgaVMProfile) validate() error {
 		return errDSGACreationPlan
 	}
 	if v.ProtocolVersion == 2 {
-		if v.Placement != nil {
+		// v2是已发布的历史协议：不能把v3引入的Runner Pod资源合同
+		// 回填到旧计划，否则旧计划的重放/恢复会悄悄改变原始Pod规格。
+		if v.Placement != nil || v.RunnerPodResources != nil {
 			return errDSGACreationPlan
 		}
 		return nil
 	}
+	switch v.ProtocolVersion {
+	case 3:
+		// v3只冻结Placement，不含Runner Pod资源字段。
+		if v.generic() || v.RunnerPodResources != nil {
+			return errDSGACreationPlan
+		}
+	case 4:
+		// v4是已发布的通用Guest协议；历史计划必须继续按原始Pod规格投影。
+		if !v.generic() || v.RunnerPodResources != nil {
+			return errDSGACreationPlan
+		}
+	case 5:
+		if v.RunnerPodResources == nil || v.RunnerPodResources.validate() != nil {
+			return errDSGACreationPlan
+		}
+	default:
+		return errDSGACreationPlan
+	}
 	return v.Placement.validate(v.Architecture)
 }
 
+// validatePodResourcesForBounds只校验v5新增的Runner Pod硬预算。v3/v4是已
+// 发布的不可变历史协议，缺少该字段是其原始语义，不得在恢复时静默回填。
+func (v dsgaVMProfile) validatePodResourcesForBounds(maxCPU, maxMemMiB int) error {
+	if v.ProtocolVersion != 5 {
+		return nil
+	}
+	return v.RunnerPodResources.validateForBounds(maxCPU, maxMemMiB)
+}
+
 func (v dsgaVMProfile) validateResourceBudget(b dsgaBootstrapBudget) error {
-	if v.validate() != nil || (v.ProtocolVersion != 2 && v.ProtocolVersion != 3 && v.ProtocolVersion != 4) || v.ResourceLimits == nil || b.validate() != nil {
+	if v.validate() != nil || (v.ProtocolVersion != 2 && v.ProtocolVersion != 3 && v.ProtocolVersion != 4 && v.ProtocolVersion != 5) || v.ResourceLimits == nil || b.validate() != nil {
 		return errDSGACreationPlan
 	}
 	upper, err := v.ResourceLimits.TotalUpperBytes()
@@ -96,6 +181,10 @@ func (v dsgaVMProfile) clone() dsgaVMProfile {
 		copy := *v.ResourceLimits
 		copy.HugePools = append([]resourceguard.HugePool(nil), copy.HugePools...)
 		v.ResourceLimits = &copy
+	}
+	if v.RunnerPodResources != nil {
+		copy := *v.RunnerPodResources
+		v.RunnerPodResources = &copy
 	}
 	v.Placement = v.Placement.clone()
 	v.GenericGuest = v.GenericGuest.clone()
@@ -123,7 +212,7 @@ func renderDSGAVM(p createPayload, plan dsgaCreationPlan) (*vmv1.VirtualMachine,
 	architecture := vmv1.CPUArchitecture(v.Architecture)
 	// v2原投影保持QMP供同UID历史核对；v3生产固定Sysfs，不能由env切换。
 	scaling := vmv1.CpuScalingModeQMP
-	if v.ProtocolVersion == 3 || v.generic() {
+	if v.ProtocolVersion >= 3 {
 		scaling = vmv1.CpuScalingModeSysfs
 	}
 	grace := int64(5)
@@ -145,6 +234,7 @@ func renderDSGAVM(p createPayload, plan dsgaCreationPlan) (*vmv1.VirtualMachine,
 			DSGABootstrap: &vmv1.DSGABootstrap{ProtocolVersion: 1, Incarnation: plan.Incarnation, ComputeInstanceID: plan.ComputeInstanceID},
 			QMP:           20183, QMPManual: 20184, RunnerPort: 25183, TerminationGracePeriodSeconds: &grace,
 			SchedulerName: v.SchedulerName, ServiceAccountName: v.ServiceAccount, RestartPolicy: vmv1.RestartPolicyAlways,
+			PodResources:       v.RunnerPodResources.requirements(),
 			TargetArchitecture: &architecture, EnableAcceleration: boolean(true), EnableSSH: boolean(false), ServiceLinks: boolean(false), EnableNetworkMonitoring: boolean(false),
 			RunnerImage: &v.RunnerImage, CpuScalingMode: &scaling,
 			Guest: vmv1.Guest{
@@ -166,7 +256,7 @@ func renderDSGAVM(p createPayload, plan dsgaCreationPlan) (*vmv1.VirtualMachine,
 			Disks: []vmv1.Disk{{Name: "compute-config", MountPath: dsgaConfigMount, ReadOnly: boolean(true), Watch: boolean(false),
 				DiskSource: vmv1.DiskSource{Secret: &core.SecretVolumeSource{SecretName: name + "-config", Items: []core.KeyToPath{{Key: "config.json", Path: "config.json"}}}}}},
 		}}
-	if v.ProtocolVersion == 3 || v.generic() {
+	if v.ProtocolVersion >= 3 {
 		v.Placement.apply(vm)
 	}
 	if v.generic() {
@@ -223,11 +313,6 @@ func (binding *dsgaCreationBinding) prepareVM(ctx context.Context) (*vmv1.Virtua
 	if err != nil {
 		return nil, err
 	}
-	// 历史v2只允许已绑定同UID的原对象恢复核对；未绑定不能借兼容路径
-	// 新POST一个没有冻结节点授权的VM。检查先于任何Kube请求，不补env。
-	if plan.VM.ProtocolVersion != 3 && !plan.VM.generic() && current.vmUID == "" {
-		return nil, errDSGACreationPlan
-	}
 	wanted, err := renderDSGAVM(current.intent.createPayload, plan)
 	if err != nil {
 		return nil, err
@@ -239,7 +324,11 @@ func (binding *dsgaCreationBinding) prepareVM(ctx context.Context) (*vmv1.Virtua
 		return nil
 	}
 	vm, err := current.server.kube.prepareDSGACreation(ctx, dsgaCreationInput{Payload: current.intent.createPayload, VM: wanted,
-		ExpectedVMUID: types.UID(current.vmUID), ExpectedConfigUID: types.UID(current.configUID),
+		// 只有v5冻结了Runner Pod硬预算，允许从未绑定状态创建新VM。
+		// v1-v4仍可GET并核对原UID，未知写入的原对象可以恢复；若对象不存在，
+		// 必须拒绝POST，不能用新资源预算改写历史Operation。
+		RequireExisting: plan.VM.ProtocolVersion != 5,
+		ExpectedVMUID:   types.UID(current.vmUID), ExpectedConfigUID: types.UID(current.configUID),
 		Bind: func(ctx context.Context, vm *vmv1.VirtualMachine) error {
 			if err := check(vm); err != nil {
 				return err

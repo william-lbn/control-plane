@@ -28,8 +28,8 @@ func verifyFailedEndpointCreation(ctx context.Context, reader failedEndpointCrea
 	var raw []byte
 	var terminal bool
 	err := reader.QueryRow(ctx, `SELECT payload,state='failed' AND finished_at IS NOT NULL AND lease_owner IS NULL AND lease_expires_at IS NULL
- AND (SELECT count(*) FROM operations WHERE project_id=$2 AND resource_type='endpoint' AND resource_id=$3 AND action='create_endpoint')=1
- FROM operations WHERE id=$1 AND project_id=$2 AND resource_type='endpoint' AND resource_id=$3 AND action='create_endpoint'`, p.FailedCreateOperationID, p.ProjectID, p.EndpointID).Scan(&raw, &terminal)
+ AND (SELECT count(*) FROM operations WHERE project_id=$2 AND resource_type='endpoint' AND resource_id=$3 AND action IN ('create_endpoint','create_endpoint_dsga_v1'))=1
+ FROM operations WHERE id=$1 AND project_id=$2 AND resource_type='endpoint' AND resource_id=$3 AND action IN ('create_endpoint','create_endpoint_dsga_v1')`, p.FailedCreateOperationID, p.ProjectID, p.EndpointID).Scan(&raw, &terminal)
 	var original createPayload
 	if err != nil || !terminal || json.Unmarshal(raw, &original) != nil || original.ProjectID != p.ProjectID || original.BranchID != p.BranchID || original.EndpointID != p.EndpointID {
 		return errors.New("original failed endpoint creation identity or terminal receipt mismatch")
@@ -115,7 +115,7 @@ func (s *server) deleteEndpoint(w http.ResponseWriter, r *http.Request) {
 		// Parent/endpoint locks serialize this read with retry admission. Do not
 		// lock the original Operation here: retry already owns its row before
 		// acquiring these parent locks, which would invert the lock order.
-		rows, e := tx.Query(r.Context(), `SELECT id,payload FROM operations WHERE project_id=$1 AND resource_type='endpoint' AND resource_id=$2 AND action='create_endpoint'`, p.ProjectID, p.EndpointID)
+		rows, e := tx.Query(r.Context(), `SELECT id,payload FROM operations WHERE project_id=$1 AND resource_type='endpoint' AND resource_id=$2 AND action IN ('create_endpoint','create_endpoint_dsga_v1')`, p.ProjectID, p.EndpointID)
 		if e != nil {
 			fail(w, r, 503, "metadata_unavailable", "Could not verify original creation")
 			return

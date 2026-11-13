@@ -3,7 +3,7 @@ import {execFileSync} from 'node:child_process';
 import test from 'node:test';
 import {documents} from '../check-helm-rbac.mjs';
 
-const base=['template','test','charts/neon-control-plane','-f','charts/neon-control-plane/ci/render-values.yaml'];
+const base=['template','--kube-version','1.31.2','test','charts/neon-control-plane','-f','charts/neon-control-plane/ci/render-values.yaml'];
 const enabled=['--set','aiGateway.enabled=true','--set','aiGateway.labHTTP=true','--set','backendCredentials.enabled=true','--set','backendCredentials.existingSecret=backend-keys','--set','aiGateway.existingConfigSecret=ai-routes','--set','aiGateway.existingDatabaseSecret=ai-db','--set','aiGateway.image=example.invalid/control-ai@sha256:'+ 'a'.repeat(64)];
 test('AI gateway is independent and keeps provider secrets out of the API',()=>{
  const objects=documents(execFileSync('helm',[...base,...enabled],{encoding:'utf8'}));

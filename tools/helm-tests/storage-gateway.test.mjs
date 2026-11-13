@@ -4,7 +4,7 @@ import test from 'node:test';
 import { documents } from '../check-helm-rbac.mjs';
 
 const origin = 'http://192.168.146.100:30893';
-const base = ['template', 'test', 'charts/neon-control-plane', '-f', 'charts/neon-control-plane/ci/render-values.yaml',
+const base = ['template', '--kube-version', '1.31.2', 'test', 'charts/neon-control-plane', '-f', 'charts/neon-control-plane/ci/render-values.yaml',
   '--set', 'objectStorage.enabled=true', '--set', 'objectStorage.existingSecret=owned-storage',
   '--set', 'objectStorage.s3.enabled=true', '--set', `objectStorage.s3.origin=${origin}`, '--set', 'objectStorage.s3.labHTTP=true',
   '--set', 'objectStorage.s3.serviceType=NodePort', '--set', 'objectStorage.s3.nodePort=30893',
@@ -69,7 +69,7 @@ test('incomplete mixed and injected Storage takeover configuration is rejected',
 });
 
 test('standalone chart owns the released NodePort with exact endpoint Secret GET permissions', () => {
-  const objects = documents(execFileSync('helm', ['template', 'dedicated', 'charts/storage-gateway', '-n', 'neon',
+  const objects = documents(execFileSync('helm', ['template', '--kube-version', '1.31.2', 'dedicated', 'charts/storage-gateway', '-n', 'neon',
     '-f', 'charts/storage-gateway/ci/render-values.yaml', '--set', 'laboratory.allowHTTP=true', '--set', 'ingress.enabled=false',
     '--set', `publicOrigin=${origin}`, '--set', 'service.type=NodePort', '--set', 'service.nodePort=30893'], { encoding: 'utf8' }));
   const service = objects.find(v => v.kind === 'Service');

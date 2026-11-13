@@ -36,11 +36,24 @@ type dsgaStorageProfile struct {
 	Port                 uint16 `json:"port"`
 	CredentialSecretName string `json:"credential_secret_name"`
 	CredentialSecretUID  string `json:"credential_secret_uid"`
+	// Storage Service and its management credential are independently owned
+	// platform objects and may live in different namespaces. Empty is retained
+	// only for decoding already-persisted same-namespace historical plans.
+	CredentialNamespace string `json:"credential_namespace,omitempty"`
+}
+
+func (p dsgaStorageProfile) credentialNamespace(serviceNamespace string) string {
+	if p.CredentialNamespace != "" {
+		return p.CredentialNamespace
+	}
+	return serviceNamespace
 }
 
 func (p dsgaStorageProfile) validate(namespace string) error {
+	credentialNamespace := p.credentialNamespace(namespace)
 	if p.ProtocolVersion != 1 || p.Port == 0 || len(namespace) > 63 || !dsgaPlanNamespace.MatchString(namespace) ||
 		len(validation.IsDNS1035Label(p.ServiceName)) != 0 || len(validation.IsDNS1123Subdomain(p.CredentialSecretName)) != 0 ||
+		len(validation.IsDNS1123Label(credentialNamespace)) != 0 ||
 		dsgapi.ValidateID(p.ServiceUID, "storage Service") != nil || dsgapi.ValidateID(p.CredentialSecretUID, "storage credential Secret") != nil {
 		return errDSGAStorageManagement
 	}
@@ -78,7 +91,8 @@ func newDSGAStorageClientAccess(ctx context.Context, k *kubeClient, p dsgaStorag
 	if err != nil {
 		return nil, errDSGAStorageManagement
 	}
-	secret, err := clients.CoreV1().Secrets(k.namespace).Get(ctx, p.CredentialSecretName, metav1.GetOptions{})
+	credentialNamespace := p.credentialNamespace(k.namespace)
+	secret, err := clients.CoreV1().Secrets(credentialNamespace).Get(ctx, p.CredentialSecretName, metav1.GetOptions{})
 	if err != nil {
 		return nil, errDSGAStorageManagement
 	}
@@ -101,7 +115,7 @@ func dsgaStorageClientSnapshotAccess(namespace string, p dsgaStorageProfile, ser
 	if ip == nil || !ip.IsGlobalUnicast() || ip.IsLoopback() || port.Protocol != core.ProtocolTCP || port.Port != int32(p.Port) || port.NodePort != 0 {
 		return nil, errDSGAStorageManagement
 	}
-	if secret == nil || secret.Namespace != namespace || secret.Name != p.CredentialSecretName || string(secret.UID) != p.CredentialSecretUID || secret.ResourceVersion == "" || secret.DeletionTimestamp != nil || secret.Type != core.SecretTypeOpaque {
+	if secret == nil || secret.Namespace != p.credentialNamespace(namespace) || secret.Name != p.CredentialSecretName || string(secret.UID) != p.CredentialSecretUID || secret.ResourceVersion == "" || secret.DeletionTimestamp != nil || secret.Type != core.SecretTypeOpaque {
 		return nil, errDSGAStorageManagement
 	}
 	readToken, writeToken := string(secret.Data["observe_token"]), string(secret.Data["create_token"])

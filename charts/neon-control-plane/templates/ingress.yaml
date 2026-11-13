@@ -1,5 +1,7 @@
 {{- if .Values.ingress.enabled -}}
 {{- $name := include "neonControl.name" . -}}
+{{- $webService := printf "%s-web" $name -}}
+{{- if not .Values.web.enabled -}}{{- $webService = printf "%s-api" $name -}}{{- end -}}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -19,5 +21,5 @@ spec:
           - path: /
             pathType: Prefix
             backend:
-              service: {name: {{ $name }}-web, port: {name: http}}
+              service: {name: {{ $webService }}, port: {name: http}}
 {{- end }}

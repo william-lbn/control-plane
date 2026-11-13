@@ -4,6 +4,8 @@ import test from "node:test";
 import { documents } from "../check-helm-rbac.mjs";
 const base = [
   "template",
+  "--kube-version",
+  "1.31.2",
   "test",
   "charts/neon-control-plane",
   "--namespace",

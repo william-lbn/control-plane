@@ -43,3 +43,20 @@ func TestMigration058JoinPreservesBothOriginalScripts(t *testing.T) {
 		}
 	}
 }
+
+func TestMigration069FailedCreateCleanupRecognizesDSGAV1(t *testing.T) {
+	raw, err := migrations.ReadFile("migrations/900000073_dsga_failed_create_cleanup_actions.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, fragment := range []string{
+		"action IN ('create_'||rk,'create_'||rk||'_dsga_v1')",
+		"action IN ('create_endpoint','create_endpoint_dsga_v1')",
+		"lease_owner IS NULL",
+		"lease_expires_at IS NULL",
+	} {
+		if !bytes.Contains(raw, []byte(fragment)) {
+			t.Fatal("DSGA failed-create cleanup migration lost required guard", fragment)
+		}
+	}
+}

@@ -26,7 +26,10 @@ import (
 )
 
 func dsgaStorageProfileFixture() dsgaStorageProfile {
-	return dsgaStorageProfile{1, "storage-controller", "storage-service-uid", 1234, "storage-management", "storage-secret-uid"}
+	return dsgaStorageProfile{
+		ProtocolVersion: 1, ServiceName: "storage-controller-management", ServiceUID: "storage-service-uid", Port: 1235,
+		CredentialSecretName: "neon-storage-management-client", CredentialSecretUID: "storage-secret-uid", CredentialNamespace: "neon",
+	}
 }
 
 // 仅为本地协议测试签发临时EdDSA token/证书，不把测试密钥用于平台供给。
@@ -39,7 +42,7 @@ func dsgaStorageTestObjects(t *testing.T) (*core.Service, *core.Secret, tls.Cert
 		t.Fatal(err)
 	}
 	now := time.Now()
-	template := &x509.Certificate{SerialNumber: big.NewInt(1), DNSNames: []string{"storage-controller.neon.svc"}, NotBefore: now.Add(-time.Minute), NotAfter: now.Add(time.Hour), KeyUsage: x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}, IsCA: true, BasicConstraintsValid: true}
+	template := &x509.Certificate{SerialNumber: big.NewInt(1), DNSNames: []string{"storage-controller-management.neon.svc"}, NotBefore: now.Add(-time.Minute), NotAfter: now.Add(time.Hour), KeyUsage: x509.KeyUsageDigitalSignature | x509.KeyUsageCertSign, ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth}, IsCA: true, BasicConstraintsValid: true}
 	der, err := x509.CreateCertificate(rand.Reader, template, template, public, private)
 	if err != nil {
 		t.Fatal(err)
@@ -58,7 +61,7 @@ func dsgaStorageTestObjects(t *testing.T) (*core.Service, *core.Secret, tls.Cert
 	}
 	p := dsgaStorageProfileFixture()
 	service := &core.Service{ObjectMeta: metav1.ObjectMeta{Namespace: "neon", Name: p.ServiceName, UID: types.UID(p.ServiceUID), ResourceVersion: "17"}, Spec: core.ServiceSpec{Type: core.ServiceTypeClusterIP, ClusterIP: "10.66.0.7", Ports: []core.ServicePort{{Port: int32(p.Port), Protocol: core.ProtocolTCP}}}}
-	secret := &core.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: "neon", Name: p.CredentialSecretName, UID: types.UID(p.CredentialSecretUID), ResourceVersion: "18"}, Type: core.SecretTypeOpaque, Data: map[string][]byte{"observe_token": []byte(read), "create_token": []byte(write), "public_key": pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: keyDER}), "ca.crt": pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})}}
+	secret := &core.Secret{ObjectMeta: metav1.ObjectMeta{Namespace: p.credentialNamespace("neon"), Name: p.CredentialSecretName, UID: types.UID(p.CredentialSecretUID), ResourceVersion: "18"}, Type: core.SecretTypeOpaque, Data: map[string][]byte{"observe_token": []byte(read), "create_token": []byte(write), "public_key": pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: keyDER}), "ca.crt": pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: der})}}
 	return service, secret, tls.Certificate{Certificate: [][]byte{der}, PrivateKey: private}
 }
 
@@ -76,7 +79,7 @@ func dsgaStorageTestClient(t *testing.T, handler http.Handler) *dsgaStorageClien
 	t.Cleanup(s.Close)
 	transport := c.http.Transport.(*http.Transport)
 	transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
-		if addr != "10.66.0.7:1234" {
+		if addr != "10.66.0.7:1235" {
 			return nil, errors.New("unexpected pinned address")
 		}
 		return (&net.Dialer{}).DialContext(ctx, network, s.Listener.Addr().String())
@@ -134,6 +137,27 @@ func TestDSGAStorageNativeScopesStrictClaimsAndSignature(t *testing.T) {
 	}
 }
 
+func TestDSGAStorageProfilePinsLiveManagementServiceAndCredentialNamespace(t *testing.T) {
+	service, secret, _ := dsgaStorageTestObjects(t)
+	p := dsgaStorageProfileFixture()
+	if service.Namespace != "neon" || secret.Namespace != "neon" || p.credentialNamespace("neon") != "neon" {
+		t.Fatal("test fixture does not model the live Storage management endpoint")
+	}
+	if _, err := dsgaStorageClientSnapshot("neon", p, service, secret); err != nil {
+		t.Fatalf("pinned Storage management references rejected: %v", err)
+	}
+	legacy := p
+	legacy.CredentialNamespace = ""
+	if legacy.credentialNamespace("neon") != "neon" || legacy.validate("neon") != nil {
+		t.Fatal("historical same-namespace Storage profile lost read compatibility")
+	}
+	bad := p
+	bad.CredentialNamespace = "invalid/namespace"
+	if bad.validate("neon") == nil {
+		t.Fatal("invalid credential namespace accepted")
+	}
+}
+
 func TestDSGAStorageSnapshotRejectsRebindingAndCopiesCredentials(t *testing.T) {
 	service, secret, _ := dsgaStorageTestObjects(t)
 	p := dsgaStorageProfileFixture()
@@ -143,12 +167,13 @@ func TestDSGAStorageSnapshotRejectsRebindingAndCopiesCredentials(t *testing.T) {
 	}
 	defer c.CloseIdleConnections()
 	for name, change := range map[string]func(*core.Service, *core.Secret){
-		"service_uid":    func(s *core.Service, _ *core.Secret) { s.UID = "replacement-service" },
-		"secret_uid":     func(_ *core.Service, s *core.Secret) { s.UID = "replacement-secret" },
-		"public_service": func(s *core.Service, _ *core.Secret) { s.Spec.Type = core.ServiceTypeLoadBalancer },
-		"headless":       func(s *core.Service, _ *core.Secret) { s.Spec.ClusterIP = core.ClusterIPNone },
-		"scope_swap":     func(_ *core.Service, s *core.Secret) { s.Data["create_token"] = s.Data["observe_token"] },
-		"untrusted_ca":   func(_ *core.Service, s *core.Secret) { s.Data["ca.crt"] = []byte("invalid") },
+		"service_uid":      func(s *core.Service, _ *core.Secret) { s.UID = "replacement-service" },
+		"secret_uid":       func(_ *core.Service, s *core.Secret) { s.UID = "replacement-secret" },
+		"secret_namespace": func(_ *core.Service, s *core.Secret) { s.Namespace = "neon-control-runtime" },
+		"public_service":   func(s *core.Service, _ *core.Secret) { s.Spec.Type = core.ServiceTypeLoadBalancer },
+		"headless":         func(s *core.Service, _ *core.Secret) { s.Spec.ClusterIP = core.ClusterIPNone },
+		"scope_swap":       func(_ *core.Service, s *core.Secret) { s.Data["create_token"] = s.Data["observe_token"] },
+		"untrusted_ca":     func(_ *core.Service, s *core.Secret) { s.Data["ca.crt"] = []byte("invalid") },
 	} {
 		t.Run(name, func(t *testing.T) {
 			a, b := service.DeepCopy(), secret.DeepCopy()
@@ -174,7 +199,7 @@ func TestDSGAStorageRequestUsesTLSNativeScopeAndNeverReplaysPOST(t *testing.T) {
 	c = dsgaStorageTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		scope, ok := storageRequestScope(r.Method, strings.TrimPrefix(r.URL.Path, "/"))
-		if !ok || !validDSGAStorageToken(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "), c.publicKey, scope) || r.TLS == nil || r.TLS.ServerName != "storage-controller.neon.svc" || r.Host != "10.66.0.7:1234" {
+		if !ok || !validDSGAStorageToken(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "), c.publicKey, scope) || r.TLS == nil || r.TLS.ServerName != "storage-controller-management.neon.svc" || r.Host != "10.66.0.7:1235" {
 			t.Error("request escaped pinned TLS/native scope")
 			w.WriteHeader(403)
 			return
@@ -289,7 +314,7 @@ func TestAdapterStorageProfileRejectsAmbiguousOrUnpinnedSource(t *testing.T) {
 	if got, err := adapterStorageProfile(string(raw), "neon"); err != nil || got != p {
 		t.Fatal("valid profile rejected")
 	}
-	for _, value := range []string{"{}", string(raw) + "{}", strings.Replace(string(raw), `"protocol_version":1`, `"protocol_version":1,"protocol_version":1`, 1), strings.Replace(string(raw), `"port":1234`, `"port":0`, 1), strings.Replace(string(raw), `"protocol_version":1`, `"unexpected":true,"protocol_version":1`, 1)} {
+	for _, value := range []string{"{}", string(raw) + "{}", strings.Replace(string(raw), `"protocol_version":1`, `"protocol_version":1,"protocol_version":1`, 1), strings.Replace(string(raw), `"port":1235`, `"port":0`, 1), strings.Replace(string(raw), `"protocol_version":1`, `"unexpected":true,"protocol_version":1`, 1)} {
 		if _, err := adapterStorageProfile(value, "neon"); err == nil {
 			t.Fatal("invalid profile accepted")
 		}

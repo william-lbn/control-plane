@@ -29,7 +29,9 @@ type dsgaCreationInput struct {
 	// 已绑定的原UID必须随恢复传入，404或同名重建均拒绝。第一次为空时，
 	// Bind也必须使用原Operation/worker lease做一次CAS；不能实现成无条件覆盖。
 	ExpectedVMUID types.UID
-	Bind          func(context.Context, *vmv1.VirtualMachine) error
+	// RequireExisting允许历史协议只GET并核对原对象；404时拒绝创建新VM。
+	RequireExisting bool
+	Bind            func(context.Context, *vmv1.VirtualMachine) error
 	// 配置也在释放前由原Operation固定实际UID；恢复不能借同名新Secret换身份。
 	ExpectedConfigUID types.UID
 	BindConfig        func(context.Context, *core.Secret) error
@@ -136,6 +138,9 @@ func (k *kubeClient) prepareDSGACreation(ctx context.Context, input dsgaCreation
 		if input.ExpectedVMUID != "" {
 			return nil, errDSGACreationIdentity
 		}
+		if input.RequireExisting {
+			return nil, errDSGACreationPlan
+		}
 		// 有旧配置却没有VM时不重建新UID，避免从孤儿配置/旧实例恢复出新身份。
 		_, secretErr := secretAPI.Get(ctx, input.VM.Name+"-config", metav1.GetOptions{})
 		if !apierrors.IsNotFound(secretErr) {
@@ -161,15 +166,71 @@ func (k *kubeClient) prepareDSGACreation(ctx context.Context, input dsgaCreation
 		return nil, err
 	}
 	var snapshot *journal.Snapshot
-	if !dsgapi.Managed(vm.Annotations) {
-		// 只对从CREATE即held、无执行历史且尚无任一日志标记的实例显式初始化。
-		// 一旦存在任一标记，走下面Load；失败绝不能当空日志重新Initialize。
-		snapshot, err = store.Initialize(ctx, vm.ResourceVersion, "bootstrap-"+vm.Spec.DSGABootstrap.Incarnation)
-	} else {
+	if dsgapi.Managed(vm.Annotations) {
+		// 已有任一journal标记时只读原日志；损坏/缺失不能退回Initialize。
 		snapshot, err = store.Load(ctx)
+	} else {
+		// NeonVM Controller会在CREATE后异步添加Finalizer并推进resourceVersion。
+		// 不能用CREATE响应中的旧RV初始化journal：先重新GET同一UID，再核对
+		// 完整不可变VM Spec、原incarnation、held与undispatched状态。仅允许
+		// Finalizer/metadata等不改变Spec的RV推进；每次Initialize仍由Store用
+		// 最新RV执行JSON Patch CAS。若CAS窗口内又有安全metadata更新，则重读
+		// 并重新验证，最多三次；未知写入若已留下journal则只Load确认，绝不覆盖。
+		const maxJournalInitializeAttempts = 3
+		for attempt := 0; attempt < maxJournalInitializeAttempts; attempt++ {
+			latest, readErr := vmAPI.Get(ctx, input.VM.Name, metav1.GetOptions{})
+			if readErr != nil {
+				return nil, readErr
+			}
+			if latest.UID != vm.UID || latest.DeletionTimestamp != nil || !sameDSGAVM(latest, input.VM) {
+				return nil, errDSGACreationIdentity
+			}
+			if dsgapi.Managed(latest.Annotations) {
+				snapshot, err = store.Load(ctx)
+				if err == nil && !journal.PristineBootstrap(snapshot.State()) {
+					return nil, errDSGACreationIdentity
+				}
+				break
+			}
+			held, holdErr := latest.DSGABootstrapHeld()
+			if holdErr != nil || !held || latest.Spec.DSGABootstrap == nil ||
+				latest.Spec.DSGABootstrap.Ready || !latest.DSGAUndispatched() {
+				return nil, errDSGACreationIdentity
+			}
+			bootstrapVersion := latest.ResourceVersion
+			snapshot, err = store.Initialize(ctx, bootstrapVersion, "bootstrap-"+latest.Spec.DSGABootstrap.Incarnation)
+			if err == nil {
+				break
+			}
+
+			// Initialize返回错误后先确认是否为未知写入。若原journal已持久化，
+			// 只接受同UID且PristineBootstrap的原日志；不再次写入或重置。
+			after, readErr := vmAPI.Get(ctx, input.VM.Name, metav1.GetOptions{})
+			if readErr != nil {
+				return nil, err
+			}
+			if after.UID != vm.UID || after.DeletionTimestamp != nil ||
+				!sameDSGAVM(after, input.VM) || !after.DSGAUndispatched() {
+				return nil, errDSGACreationIdentity
+			}
+			if dsgapi.Managed(after.Annotations) {
+				// PATCH响应未知时不在同一次调用内把读回事实冒充成功；将确认交给
+				// 下一次原Operation恢复入口，保持UnconfirmedWrite的既有语义。
+				return nil, err
+			}
+			// 没有journal且RV未变化时，错误不是Finalizer竞态，原样失败。
+			// RV已变化时，下一轮会以新GET再次核对完整Spec和held屏障。
+			if after.ResourceVersion == bootstrapVersion || attempt == maxJournalInitializeAttempts-1 {
+				return nil, err
+			}
+			vm = after
+		}
 	}
 	if err != nil {
 		return nil, err
+	}
+	if snapshot == nil {
+		return nil, errDSGACreationIdentity
 	}
 	vm = snapshot.VirtualMachine()
 	if !vm.Spec.DSGABootstrap.Ready && !journal.PristineBootstrap(snapshot.State()) {

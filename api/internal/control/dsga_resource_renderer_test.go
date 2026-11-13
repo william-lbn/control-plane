@@ -70,6 +70,7 @@ func TestDSGAResourceRendererRejectsPartialAndHistoricalBudget(t *testing.T) {
 				plan.VM.ProtocolVersion = 1
 				plan.VM.ResourceLimits = nil
 				plan.VM.Placement = nil
+				plan.VM.RunnerPodResources = nil
 				if plan.VM.validate() != nil {
 					t.Fatal("historical read compatibility lost")
 				}
@@ -108,9 +109,9 @@ func TestDSGAResourcePolicySnapshotOwnsLimitsAndPools(t *testing.T) {
 	}
 }
 
-func TestDSGAResourcePublicPolicyRequiresV3PlacementBeforeReservation(t *testing.T) {
+func TestDSGAResourcePublicPolicyRequiresV5RunnerBudgetAndPlacementBeforeReservation(t *testing.T) {
 	_, base, _ := dsgaPlanFixture(t)
-	base.VM = dsgaVMProfileFixture()
+	base.VM = dsgaVMProfileV5Fixture()
 	policy := dsgaProjectPolicy{1, "test-region", createBounds{500, 2000, 1024, 4096}, base}
 	raw, _ := json.Marshal(policy)
 	t.Setenv("NEON_DSGA_CREATION_POLICY", string(raw))
@@ -119,13 +120,30 @@ func TestDSGAResourcePublicPolicyRequiresV3PlacementBeforeReservation(t *testing
 	}
 
 	for name, mutate := range map[string]func(*dsgaVMProfile){
-		"historical_v1":                 func(v *dsgaVMProfile) { v.ProtocolVersion = 1; v.ResourceLimits = nil; v.Placement = nil },
-		"complete_v2_without_placement": func(v *dsgaVMProfile) { v.ProtocolVersion = 2; v.Placement = nil },
-		"v3_missing_placement":          func(v *dsgaVMProfile) { v.Placement = nil },
+		"historical_v1": func(v *dsgaVMProfile) {
+			v.ProtocolVersion = 1
+			v.ResourceLimits = nil
+			v.Placement = nil
+			v.RunnerPodResources = nil
+		},
+		"complete_v2_without_placement": func(v *dsgaVMProfile) {
+			v.ProtocolVersion = 2
+			v.Placement = nil
+			v.RunnerPodResources = nil
+		},
+		"legacy_v3_missing_placement": func(v *dsgaVMProfile) {
+			v.ProtocolVersion = 3
+			v.RunnerPodResources = nil
+			v.Placement = nil
+		},
+		"legacy_v3_complete_but_not_new_creation": func(v *dsgaVMProfile) {
+			v.ProtocolVersion = 3
+			v.RunnerPodResources = nil
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			candidate := policy
-			candidate.Creation.VM = dsgaVMProfileFixture()
+			candidate.Creation.VM = dsgaVMProfileV5Fixture()
 			mutate(&candidate.Creation.VM)
 			if name == "complete_v2_without_placement" && candidate.Creation.VM.validateResourceBudget(candidate.Creation.Budget) != nil {
 				t.Fatal("legacy v2 fixture lost its valid original budget")
@@ -133,7 +151,7 @@ func TestDSGAResourcePublicPolicyRequiresV3PlacementBeforeReservation(t *testing
 			raw, _ := json.Marshal(candidate)
 			t.Setenv("NEON_DSGA_CREATION_POLICY", string(raw))
 			if _, err := readDSGAProjectPolicy("neon"); err == nil {
-				t.Fatal("new public reservation accepted missing frozen v3 placement")
+				t.Fatal("new public reservation accepted a historical profile instead of the v5 creation contract")
 			}
 		})
 	}

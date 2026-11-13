@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import test from 'node:test';
 import { documents } from '../check-helm-rbac.mjs';
-// 固定为Chart支持的最低API版本：本地Helm默认值不能改变容量测试的失败原因。
+// 固定为当前Kubernetes验收基线：本地Helm默认值不能改变容量测试的失败原因。
 // 只在内存中渲染，不连接集群或准备部署交付。
-const base=['template','test','charts/neon-control-plane','--kube-version','1.30.0','-f','charts/neon-control-plane/ci/render-values.yaml','--set','objectStorage.enabled=true','--set','objectStorage.existingSecret=owned-storage'];
+const base=['template','--kube-version','1.31.2','test','charts/neon-control-plane','-f','charts/neon-control-plane/ci/render-values.yaml','--set','objectStorage.enabled=true','--set','objectStorage.existingSecret=owned-storage'];
 const render=(extra=[])=>documents(execFileSync('helm',[...base,...extra],{encoding:'utf8'}));
 test('storage defaults retain 64 MiB admission and 256 MiB disk',()=>{
   const objects=render(),api=objects.find(v=>v.kind==='Deployment'&&v.metadata.name.endsWith('-api')).spec.template.spec;

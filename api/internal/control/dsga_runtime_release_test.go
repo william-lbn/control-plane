@@ -14,7 +14,7 @@ import (
 func dsgaReleaseCatalogFixture(t *testing.T) dsgaRuntimeCatalog {
 	t.Helper()
 	_, policy, _ := dsgaPlanFixture(t)
-	policy.VM = dsgaVMProfileFixture()
+	policy.VM = dsgaVMProfileV5Fixture()
 	policy.NativeBootstrapVersion = 3
 	catalog := dsgaRuntimeCatalog{ProtocolVersion: 1}
 	for _, version := range []uint32{17, 18} {
@@ -46,6 +46,16 @@ func TestDSGARuntimeCatalogRejectsAmbiguousOrUnsafeConfiguration(t *testing.T) {
 		"mutable_image":    func(c *dsgaRuntimeCatalog) { c.Releases[1].Creation.Image = "registry.test/pg18:latest" },
 		"wrong_namespace":  func(c *dsgaRuntimeCatalog) { c.Releases[1].Creation.Namespace = "other" },
 		"bad_budget":       func(c *dsgaRuntimeCatalog) { c.Releases[1].Creation.Budget.MinimumGuestMemoryBytes = 1 },
+		"pod_cpu_under_guest_max": func(c *dsgaRuntimeCatalog) {
+			c.Releases[1].Creation.VM.RunnerPodResources.CPURequestMilli = 1000
+		},
+		"pod_memory_under_guest_max": func(c *dsgaRuntimeCatalog) {
+			c.Releases[1].Creation.VM.RunnerPodResources.MemoryRequestBytes = 6 << 30
+			c.Releases[1].Creation.VM.RunnerPodResources.MemoryLimitBytes = 6 << 30
+		},
+		"pod_memory_request_limit_mismatch": func(c *dsgaRuntimeCatalog) {
+			c.Releases[1].Creation.VM.RunnerPodResources.MemoryLimitBytes = 8 << 30
+		},
 	} {
 		t.Run(name, func(t *testing.T) {
 			catalog := dsgaReleaseCatalogFixture(t)

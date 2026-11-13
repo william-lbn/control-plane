@@ -1,0 +1,140 @@
+{{- /* DSGA 运行时跨命名空间权限只在显式打开新 Compute 创建时授予。 */ -}}
+{{- if .Values.dsga.createEnabled -}}
+{{- $name := include "neonControl.name" . -}}
+{{- $apiAccount := printf "%s-api" $name -}}
+{{- /* 兼容单进程模式：API 同时承担 Worker 时必须继承同一组受限权限。 */ -}}
+{{- $workerAccount := ternary (printf "%s-worker" $name) $apiAccount .Values.worker.enabled -}}
+{{- if ne .Release.Namespace "neon" -}}
+{{- fail "DSGA creation RBAC is pinned to the neon namespace" -}}
+{{- end -}}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ printf "%s-dsga-neon-api" $name | trunc 63 | trimSuffix "-" }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "neonControl.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: neon-control-runtime-neon-runtime-access-api
+subjects:
+  - kind: ServiceAccount
+    name: {{ $apiAccount }}
+    namespace: {{ .Release.Namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ printf "%s-dsga-neon-worker" $name | trunc 63 | trimSuffix "-" }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "neonControl.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: neon-control-runtime-neon-runtime-access-worker
+subjects:
+  - kind: ServiceAccount
+    name: {{ $workerAccount }}
+    namespace: {{ .Release.Namespace }}
+---
+# API 只更新由原 Compute/VMUID 命名的 Runtime Selection ConfigMap。
+# 初始 ConfigMap 与 Qualification Job 的创建由 Worker 的平台角色完成。
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ printf "%s-dsga-platform-policy" $name | trunc 63 | trimSuffix "-" }}
+  namespace: neon-control-runtime
+  labels:
+    {{- include "neonControl.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: [configmaps]
+    verbs: [get, update]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ printf "%s-dsga-platform-policy" $name | trunc 63 | trimSuffix "-" }}
+  namespace: neon-control-runtime
+  labels:
+    {{- include "neonControl.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ printf "%s-dsga-platform-policy" $name | trunc 63 | trimSuffix "-" }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ $apiAccount }}
+    namespace: {{ .Release.Namespace }}
+---
+# Worker 负责发布本次 VM 身份绑定的 Collector ConfigMap、Qualification Job，
+# 并读取 Job Pod 状态与日志；权限复用平台 Runtime Access 的窄命名空间角色。
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ printf "%s-dsga-platform-worker" $name | trunc 63 | trimSuffix "-" }}
+  namespace: neon-control-runtime
+  labels:
+    {{- include "neonControl.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: neon-control-runtime-neon-runtime-access-platform-worker
+subjects:
+  - kind: ServiceAccount
+    name: {{ $workerAccount }}
+    namespace: {{ .Release.Namespace }}
+---
+# API 只读指定 autoscaler-agent DaemonSet、该节点 Agent Pod，并调用其只读 dump-state proxy。
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ printf "%s-dsga-agent-observation" $name | trunc 63 | trimSuffix "-" }}
+  namespace: kube-system
+  labels:
+    {{- include "neonControl.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: neon-control-runtime-neon-runtime-access-agent-observation
+subjects:
+  - kind: ServiceAccount
+    name: {{ $apiAccount }}
+    namespace: {{ .Release.Namespace }}
+---
+# Worker 只读取固定节点清单中的 Node UID；不授予 Node list/watch/update。
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ printf "%s-dsga-node-read" $name | trunc 63 | trimSuffix "-" }}
+  labels:
+    {{- include "neonControl.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: neon-control-runtime-worker-nodes
+subjects:
+  - kind: ServiceAccount
+    name: {{ $workerAccount }}
+    namespace: {{ .Release.Namespace }}
+---
+# Worker 只能创建其已有权限范围内的 Runner ClusterRoleBinding；Runner 最终绑定的
+# ClusterRole 仍由 dsgaSupplyAccess 固定为发行目录中的 node-read 角色。
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ printf "%s-dsga-runner-delegation" $name | trunc 63 | trimSuffix "-" }}
+  labels:
+    {{- include "neonControl.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: neon-control-runtime-neon-runtime-access-runner-delegation
+subjects:
+  - kind: ServiceAccount
+    name: {{ $workerAccount }}
+    namespace: {{ .Release.Namespace }}
+{{- end -}}

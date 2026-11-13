@@ -379,7 +379,7 @@ func (s *server) routes() *http.ServeMux {
 	dist := env("NEON_V2_WEB_DIST", filepath.Join("..", "web", "dist"))
 	mux.Handle("GET /api/docs/assets/", http.StripPrefix("/api/docs/assets/", http.FileServer(http.Dir(filepath.Join(dist, "api", "docs", "assets")))))
 	if _, err := os.Stat(filepath.Join(dist, "index.html")); err == nil {
-		mux.Handle("/", http.FileServer(http.Dir(dist)))
+		mux.Handle("/", newWebStaticHandler(dist))
 	}
 	return mux
 }

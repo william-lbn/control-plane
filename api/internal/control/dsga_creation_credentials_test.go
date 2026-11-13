@@ -78,7 +78,7 @@ func TestDSGACredentialSourceSnapshotIsolationAndUnsafeInputs(t *testing.T) {
 // 来源，真实Bind回调固定VM/Config UID。所有敏感失败信息只报告错误类别。
 func credentialSourceFixture(t *testing.T, legacy ...bool) (context.Context, *server, string, *creationTestAPI, dsgaCreationInput, *dsgaCreationBinding, **core.Secret) {
 	t.Helper()
-	return credentialSourceFixtureWithVM(t, dsgaVMProfileFixture(), legacy...)
+	return credentialSourceFixtureWithVM(t, dsgaVMProfileV5Fixture(), legacy...)
 }
 
 func credentialSourceFixtureWithVM(t *testing.T, profile dsgaVMProfile, legacy ...bool) (context.Context, *server, string, *creationTestAPI, dsgaCreationInput, *dsgaCreationBinding, **core.Secret) {

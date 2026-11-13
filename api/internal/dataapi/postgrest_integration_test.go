@@ -133,30 +133,65 @@ server-port = %d
 		t.Fatal(err)
 	}
 	process := exec.CommandContext(ctx, binary, configPath)
-	process.Stdout, process.Stderr = io.Discard, io.Discard
+	// 保留子进程启动诊断：PostgREST启动失败不能只表现为15秒的HTTP就绪超时。
+	// 用临时文件接收子进程输出，避免race测试下主测试goroutine与exec复制
+	// goroutine并发读写同一个bytes.Buffer。
+	childLogPath := filepath.Join(temp, "postgrest.log")
+	childLog, err := os.Create(childLogPath)
+	if err != nil {
+		t.Fatal("PostgREST diagnostic log could not be created")
+	}
+	process.Stdout, process.Stderr = childLog, childLog
 	// No inherited provider keys, database configuration overrides or proxy
 	// environment may alter the pinned child process's test configuration.
 	process.Env = []string{"PATH=" + os.Getenv("PATH"), "LANG=C.UTF-8"}
 	if err := process.Start(); err != nil {
+		childLog.Close()
 		t.Fatal("Pinned PostgREST process failed to start")
 	}
-	defer func() { process.Process.Kill(); process.Wait() }()
+	processStopped := false
+	stopProcess := func() {
+		if processStopped {
+			return
+		}
+		_ = process.Process.Kill()
+		_ = process.Wait()
+		_ = childLog.Sync()
+		_ = childLog.Close()
+		processStopped = true
+	}
+	defer stopProcess()
 	client := &http.Client{Timeout: 3 * time.Second, Transport: &http.Transport{Proxy: nil}}
 	ready := false
-	for attempt := 0; attempt < 60; attempt++ {
-		response, err := client.Get(f.config.Routes[0].Upstream + "/")
-		if err == nil {
-			io.Copy(io.Discard, response.Body)
+	lastStatus, lastBody, lastTransportError := 0, "", ""
+	// 大型CI数据库首次构建schema cache可能超过15秒；测试上下文有90秒预算，
+	// 这里给60秒就绪窗口，避免刚启动完成就被测试本身杀掉。
+	for attempt := 0; attempt < 240; attempt++ {
+		response, requestErr := client.Get(f.config.Routes[0].Upstream + "/")
+		if requestErr == nil {
+			data, readErr := io.ReadAll(io.LimitReader(response.Body, 4096))
 			response.Body.Close()
+			lastStatus, lastBody = response.StatusCode, string(data)
+			if readErr != nil {
+				lastBody += " [body read error: " + readErr.Error() + "]"
+			}
 			if response.StatusCode == 401 {
 				ready = true
 				break
 			}
+		} else {
+			lastTransportError = requestErr.Error()
+		}
+		if process.ProcessState != nil {
+			break
 		}
 		time.Sleep(250 * time.Millisecond)
 	}
 	if !ready {
-		t.Fatal("PostgREST did not become ready with anonymous access disabled")
+		stopProcess()
+		childOutput, _ := os.ReadFile(childLogPath)
+		t.Fatalf("PostgREST did not become ready with anonymous access disabled: status=%d body=%q transport=%q child_output=%q",
+			lastStatus, lastBody, lastTransportError, string(childOutput))
 	}
 	app := httptest.NewServer(g)
 	defer app.Close()
