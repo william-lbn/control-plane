@@ -279,8 +279,23 @@ func (k *kubeClient) prepareDSGACreation(ctx context.Context, input dsgaCreation
 		}
 	}
 	if !vm.Spec.DSGABootstrap.Ready {
-		// 只用同原绑定当前完整快照CAS；普通finalizer/RV更新可安全造成冲突，
-		// 下一次原Operation重读处理，不能去掉RV或反复PATCH直到“看似成功”。
+		// Config和访问对象准备期间，Controller可推进原held VM的RV。
+		// 释放前重读并复核完整原来源，再以最新RV执行一次CAS。
+		latestSecret, err := secretAPI.Get(ctx, desired.Name, metav1.GetOptions{})
+		if err != nil {
+			return nil, err
+		}
+		snapshot, err = store.Load(ctx)
+		if err != nil {
+			return nil, err
+		}
+		latest := snapshot.VirtualMachine()
+		if input.creationVM(latest) != nil || !sameDSGAVM(latest, input.VM) ||
+			latestSecret.UID != configUID || input.confirmConfig(latest, latestSecret, desired) != nil ||
+			!latest.Spec.DSGABootstrap.Ready && !journal.PristineBootstrap(snapshot.State()) {
+			return nil, errDSGACreationIdentity
+		}
+		// CAS未确认时由原Operation恢复，保留原UID及不可变配置。
 		snapshot, err = store.ReleaseBootstrap(ctx, snapshot.ResourceVersion(), secret.UID)
 		if err != nil {
 			return nil, err
