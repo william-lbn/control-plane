@@ -130,6 +130,46 @@ func TestDSGASupplyCommonReleaseIsFrozenAndIdentitySpecific(t *testing.T) {
 		}
 	}
 }
+
+func TestDSGASupplyAdapterReadsOnlyOriginalConfigAndSQLService(t *testing.T) {
+	for _, major := range []uint32{17, 18} {
+		p, plan := supplyFixture(t, major)
+		vm, err := renderDSGAVM(p, plan)
+		if err != nil {
+			t.Fatal(err)
+		}
+		vm.UID = "original-vm"
+		prior := dsgaSupplyAccess(vm, plan)
+		plan.VM.GenericGuest.Supply.AdapterServiceAccount = "neon-control-adapter"
+		if err := plan.VM.supply().validate(); err != nil {
+			t.Fatal(err)
+		}
+		access := dsgaSupplyAccess(vm, plan)
+		if len(access) != len(prior)+2 || !reflect.DeepEqual(access[:len(prior)], prior) {
+			t.Fatal("original access objects changed")
+		}
+		role := access[len(prior)].(*rbac.Role)
+		binding := access[len(prior)+1].(*rbac.RoleBinding)
+		wantRules := []rbac.PolicyRule{
+			{APIGroups: []string{""}, Resources: []string{"secrets"}, ResourceNames: []string{vm.Name + "-config"}, Verbs: []string{"get"}},
+			{APIGroups: []string{""}, Resources: []string{"services"}, ResourceNames: []string{vm.Name}, Verbs: []string{"get"}},
+		}
+		if !reflect.DeepEqual(role.Rules, wantRules) || binding.RoleRef.Name != role.Name || binding.RoleRef.Kind != "Role" ||
+			!reflect.DeepEqual(binding.Subjects, []rbac.Subject{{Kind: "ServiceAccount", Name: "neon-control-adapter", Namespace: vm.Namespace}}) {
+			t.Fatal("Adapter access is not scoped to the original SQL sources")
+		}
+		for _, meta := range []metav1.ObjectMeta{role.ObjectMeta, binding.ObjectMeta} {
+			if meta.Namespace != vm.Namespace || meta.Labels[dsgaSupplyVMLabel] != string(vm.UID) || len(meta.OwnerReferences) != 1 || meta.OwnerReferences[0].UID != vm.UID {
+				t.Fatal("Adapter grant does not follow the original VM lifecycle")
+			}
+		}
+		plan.VM.GenericGuest.Supply.AdapterServiceAccount = "foreign-adapter"
+		if err := plan.VM.supply().validate(); err == nil {
+			t.Fatal("foreign Adapter identity accepted")
+		}
+	}
+}
+
 func TestDSGASupplyRejectsIncompleteAndOutOfClassRelease(t *testing.T) {
 	for _, kind := range []string{"namespace", "image", "host", "targets", "policy", "slot", "maxbuffers", "class", "version"} {
 		t.Run(kind, func(t *testing.T) {

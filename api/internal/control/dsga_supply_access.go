@@ -74,7 +74,21 @@ func dsgaSupplyAccess(vm *vmv1.VirtualMachine, p dsgaCreationPlan) []any {
 	qb.Name = qr.Name
 	qb.RoleRef.Name = qr.Name
 	qb.Subjects = []rbac.Subject{{Kind: "ServiceAccount", Namespace: s.PlatformNamespace, Name: s.QualifierServiceAccount}}
-	return append(out, qr, qb)
+	out = append(out, qr, qb)
+	if s.AdapterServiceAccount != "" {
+		// Give the Proxy adapter the same two exact reads as the manual chart.
+		// Both objects follow the original VM UID through retirement and GC.
+		name := vm.Name + "-adapter-read"
+		adapter := &rbac.Role{TypeMeta: role.TypeMeta, ObjectMeta: metadata(name, vm.Namespace), Rules: []rbac.PolicyRule{
+			{APIGroups: []string{""}, Resources: []string{"secrets"}, ResourceNames: []string{vm.Name + "-config"}, Verbs: []string{"get"}},
+			{APIGroups: []string{""}, Resources: []string{"services"}, ResourceNames: []string{vm.Name}, Verbs: []string{"get"}},
+		}}
+		read := &rbac.RoleBinding{TypeMeta: binding.TypeMeta, ObjectMeta: metadata(name, vm.Namespace),
+			RoleRef:  rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "Role", Name: name},
+			Subjects: []rbac.Subject{{Kind: "ServiceAccount", Name: s.AdapterServiceAccount, Namespace: vm.Namespace}}}
+		out = append(out, adapter, read)
+	}
+	return out
 }
 
 // 权限对象可幂等恢复，但绝不覆盖同名的外来/扩大权限对象；未知CREATE留待原操作读回。

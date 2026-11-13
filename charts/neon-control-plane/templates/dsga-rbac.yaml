@@ -101,12 +101,11 @@ roleRef:
   kind: Role
   name: neon-control-runtime-neon-runtime-access-agent-observation
 subjects:
+{{- range $account := list $apiAccount $workerAccount | uniq }}
   - kind: ServiceAccount
-    name: {{ $apiAccount }}
-    namespace: {{ .Release.Namespace }}
-  - kind: ServiceAccount
-    name: {{ $workerAccount }}
-    namespace: {{ .Release.Namespace }}
+    name: {{ $account }}
+    namespace: {{ $.Release.Namespace }}
+{{- end }}
 ---
 # Worker 只读取固定节点清单中的 Node UID；不授予 Node list/watch/update。
 apiVersion: rbac.authorization.k8s.io/v1

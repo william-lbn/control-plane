@@ -22,6 +22,7 @@ type dsgaSupplyProfile struct {
 	PlatformNamespace         string                                `json:"platform_namespace"`
 	QualifierImage            string                                `json:"qualifier_image"`
 	QualifierServiceAccount   string                                `json:"qualifier_service_account"`
+	AdapterServiceAccount     string                                `json:"adapter_service_account,omitempty"`
 	NodeReadClusterRole       string                                `json:"node_read_cluster_role"`
 	ResourceReadHostDirectory string                                `json:"resource_read_host_directory"`
 	ResourceReadSocketName    string                                `json:"resource_read_socket_name"`
@@ -37,6 +38,7 @@ type dsgaSupplyLease struct {
 func (p *dsgaSupplyProfile) validate() error {
 	if p == nil || p.ProtocolVersion != 1 || !dsgaPlanNamespace.MatchString(p.AgentNamespace) || !dsgaPlanNamespace.MatchString(p.AgentServiceAccount) || !dsgaPlanNamespace.MatchString(p.AgentDaemonSet) || p.AgentDumpPort == 0 || !strings.HasPrefix(p.PlatformNamespace, "neon-control-") || len(p.PlatformNamespace) > 63 || !dsgaPlanNamespace.MatchString(p.PlatformNamespace) ||
 		!dsgaPinnedImage.MatchString(p.QualifierImage) || !dsgaPlanNamespace.MatchString(p.QualifierServiceAccount) || len(p.QualifierServiceAccount) > 63 ||
+		(p.AdapterServiceAccount != "" && p.AdapterServiceAccount != "neon-control-adapter") ||
 		dsgapi.ValidateID(p.NodeReadClusterRole, "node read role") != nil || !filepath.IsAbs(p.ResourceReadHostDirectory) || filepath.Clean(p.ResourceReadHostDirectory) != p.ResourceReadHostDirectory ||
 		p.ResourceReadHostDirectory == "/" || len(validation.IsDNS1123Subdomain(p.ResourceReadSocketName)) != 0 || len(p.HostLeases) != 3 || len(p.Targets) < 1 || len(p.Targets) > 32 || p.Automatic.Validate() != nil {
 		return errDSGACreationPlan
