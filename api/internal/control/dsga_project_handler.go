@@ -80,6 +80,10 @@ func (s *server) dsgaCreationFailure(w http.ResponseWriter, r *http.Request, err
 		fail(w, r, 403, "creation_authority_changed", "Current organization creation permission is required")
 	case errors.Is(err, errDSGACreationConflict), errors.As(err, &pgerr) && pgerr.Code == "23505":
 		fail(w, r, 409, "idempotency_or_name_conflict", "Original creation key or resource name conflicts")
+	case errors.Is(err, errDSGAEndpointWriterExists):
+		fail(w, r, 409, "writer_exists", "A writer already exists on the branch")
+	case errors.Is(err, errDSGACredentialWriterRetained):
+		fail(w, r, 409, "writer_retirement_unconfirmed", "The previous writer retirement is not yet confirmed")
 	case errors.Is(err, errOrganizationQuota):
 		fail(w, r, 429, "organization_quota_exceeded", "Organization resources and pending creations exceed quota")
 	case errors.Is(err, errDSGARuntimeUnavailable):

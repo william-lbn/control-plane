@@ -50,6 +50,10 @@ func dsgaAuthorityReadError(err error) error {
 // 避免事务now()或锁等待前的clock_timestamp判断放过刚刚过期的凭据。
 // 行锁只覆盖SQL事务，不跨凭据Secret网络调用；撤销可在两个阶段间生效。
 func lockDSGARequestCredential(ctx context.Context, tx pgx.Tx, org, actor string) error {
+	return lockDSGARequestCredentialForProject(ctx, tx, org, actor, "")
+}
+
+func lockDSGARequestCredentialForProject(ctx context.Context, tx pgx.Tx, org, actor, project string) error {
 	a, ok := ctx.Value(dsgaCreationAuthKey{}).(dsgaCreationAuth)
 	if !ok || a.Actor != actor {
 		return errDSGACreationAuthority
@@ -64,7 +68,7 @@ func lockDSGARequestCredential(ctx context.Context, tx pgx.Tx, org, actor string
 		if err != nil {
 			return dsgaAuthorityReadError(err)
 		}
-		if keyOrg != a.KeyOrg || keyProject != a.KeyProject || role != a.KeyRole || roleLevel(role) < 2 || (keyOrg != "" && keyOrg != org) || keyProject != "" {
+		if keyOrg != a.KeyOrg || keyProject != a.KeyProject || role != a.KeyRole || roleLevel(role) < 2 || (keyOrg != "" && keyOrg != org) || (keyProject != "" && keyProject != project) {
 			return errDSGACreationAuthority
 		}
 	} else {

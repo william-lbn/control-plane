@@ -27,7 +27,7 @@ func TestDSGAReservationVM2ForwardMigrationPreservesOriginalAndRejectsPartial(t 
 	p, _, plan := dsgaPlanFixture(t)
 	plan.VM = dsgaVMProfileFixture()
 	plan.VM.ProtocolVersion, plan.VM.ResourceLimits, plan.VM.Placement = 1, nil, nil
-	draft := dsgaCreationDraft{1, "historical", "main", "test-region", p, plan}
+	draft := dsgaCreationDraft{ProtocolVersion: 1, ResourceName: "historical", DefaultBranch: "main", Region: "test-region", Payload: p, Plan: plan}
 	raw, err := json.Marshal(draft)
 	if err != nil {
 		t.Fatal(err)

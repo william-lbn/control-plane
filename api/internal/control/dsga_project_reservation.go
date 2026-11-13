@@ -37,16 +37,18 @@ type dsgaProjectDescription struct {
 }
 
 type dsgaCreationDraft struct {
-	ProtocolVersion uint32           `json:"protocol_version"`
-	ResourceName    string           `json:"resource_name"`
-	DefaultBranch   string           `json:"default_branch"`
-	Region          string           `json:"region"`
-	Payload         createPayload    `json:"payload"`
-	Plan            dsgaCreationPlan `json:"plan"`
+	ProtocolVersion  uint32                        `json:"protocol_version"`
+	ResourceName     string                        `json:"resource_name"`
+	DefaultBranch    string                        `json:"default_branch"`
+	Region           string                        `json:"region"`
+	Payload          createPayload                 `json:"payload"`
+	Plan             dsgaCreationPlan              `json:"plan"`
+	CredentialSource *dsgaEndpointCredentialSource `json:"credential_source,omitempty"`
 }
 
 type dsgaProjectReservation struct {
 	Actor, KeyHash, RequestHash, Scope, Org, Operation string
+	BaseAction                                         string
 	Draft                                              dsgaCreationDraft
 	Credentials                                        dsgaCredentialReference
 	Accepted                                           bool
@@ -80,6 +82,9 @@ func validateDSGAProjectPolicy(namespace string, policy dsgaProjectPolicy) (dsga
 		return policy, errDSGACreationPlan
 	}
 	if policy.Creation.VM.generic() && (policy.Creation.NativeBootstrapVersion.selected() != 3 || policy.Creation.VM.ResourceLimits.SystemMemoryMaxBytes == 0 || policy.Creation.VM.GenericGuest.validateNative(policy.Creation.postgresVersion(), policy.Creation.Budget) != nil) {
+		return policy, errDSGACreationPlan
+	}
+	if policy.Creation.RetainedCatalog && !policy.Creation.VM.generic() {
 		return policy, errDSGACreationPlan
 	}
 	if policy.Creation.VM.validatePodResourcesForBounds(policy.Bounds.MaxCPU, policy.Bounds.MaxMem) != nil {
@@ -156,15 +161,26 @@ func readDSGAReservation(ctx context.Context, tx pgx.Tx, actor, keyDigest string
 	r := dsgaProjectReservation{Actor: actor, KeyHash: keyDigest}
 	var raw, reference []byte
 	var accepted *string
-	var base string
 	err := tx.QueryRow(ctx, `SELECT request_hash,scope,org_id,base_action,operation_id,draft,credential_reference,accepted_id
  FROM dsga_creation_reservations WHERE actor_id=$1 AND key_hash=$2 FOR UPDATE`, actor, keyDigest).
-		Scan(&r.RequestHash, &r.Scope, &r.Org, &base, &r.Operation, &raw, &reference, &accepted)
+		Scan(&r.RequestHash, &r.Scope, &r.Org, &r.BaseAction, &r.Operation, &raw, &reference, &accepted)
 	if err != nil {
 		return r, err
 	}
-	if base != "create_project" || decodeDSGAObject(raw, &r.Draft) != nil || r.Draft.ProtocolVersion != 1 || r.Draft.Plan.validate(r.Draft.Payload) != nil ||
+	if decodeDSGAObject(raw, &r.Draft) != nil || r.Draft.ProtocolVersion != 1 || r.Draft.Plan.validate(r.Draft.Payload) != nil ||
 		r.Draft.Plan.VM.validateResourceBudget(r.Draft.Plan.Budget) != nil || r.Draft.Plan.Credentials != (dsgaCredentialReference{}) || dsgapi.ValidateID(r.Operation, "reserved Operation") != nil {
+		return r, errDSGACreationPlan
+	}
+	switch r.BaseAction {
+	case "create_project":
+		if r.Draft.CredentialSource != nil || r.Draft.Plan.RetainCatalog {
+			return r, errDSGACreationPlan
+		}
+	case "create_endpoint":
+		if !r.Draft.Plan.RetainCatalog || !r.Draft.CredentialSource.valid(r.Draft.Payload.EndpointID) {
+			return r, errDSGACreationPlan
+		}
+	default:
 		return r, errDSGACreationPlan
 	}
 	if len(reference) > 0 && (decodeDSGAObject(reference, &r.Credentials) != nil || r.Credentials.validate() != nil) {
@@ -179,7 +195,7 @@ func readDSGAReservation(ctx context.Context, tx pgx.Tx, actor, keyDigest string
 
 func (r dsgaProjectReservation) matches(org, scope, requestHash, namespace string, body dsgaProjectDescription) bool {
 	p := r.Draft.Payload
-	return r.Draft.Plan.PostgresVersion == body.PostgresVersion && r.Org == org && r.Scope == scope && r.RequestHash == requestHash && r.Draft.Plan.Namespace == namespace &&
+	return r.BaseAction == "create_project" && r.Draft.Plan.PostgresVersion == body.PostgresVersion && r.Org == org && r.Scope == scope && r.RequestHash == requestHash && r.Draft.Plan.Namespace == namespace &&
 		r.Draft.ResourceName == body.Name && r.Draft.DefaultBranch == body.DefaultBranch && (body.Region == "" || body.Region == r.Draft.Region) &&
 		(body.Bounds == nil || *body.Bounds == (createBounds{p.MinCPU, p.MaxCPU, p.MinMem, p.MaxMem}))
 }
@@ -271,7 +287,8 @@ func (s *server) reserveDSGAProject(ctx context.Context, actor, org, scope, key,
 	if collision {
 		return empty, errDSGACreationConflict
 	}
-	r = dsgaProjectReservation{Actor: actor, KeyHash: keyHash(key), RequestHash: requestHash, Scope: scope, Org: org, Operation: newID("op_"), Draft: dsgaCreationDraft{1, body.Name, body.DefaultBranch, region, p, plan}}
+	r = dsgaProjectReservation{Actor: actor, KeyHash: keyHash(key), RequestHash: requestHash, Scope: scope, Org: org, Operation: newID("op_"), BaseAction: "create_project",
+		Draft: dsgaCreationDraft{ProtocolVersion: 1, ResourceName: body.Name, DefaultBranch: body.DefaultBranch, Region: region, Payload: p, Plan: plan}}
 	raw, err := json.Marshal(r.Draft)
 	if err != nil {
 		return empty, err
@@ -314,7 +331,7 @@ func (s *server) pinDSGAReservationCredentials(ctx context.Context, r dsgaProjec
 	if err != nil {
 		return r, err
 	}
-	if current.Operation != r.Operation || current.RequestHash != r.RequestHash {
+	if current.BaseAction != "create_project" || current.Operation != r.Operation || current.RequestHash != r.RequestHash {
 		return r, errDSGACreationConflict
 	}
 	if current.Credentials != (dsgaCredentialReference{}) {
@@ -360,7 +377,7 @@ func (s *server) acceptDSGAProjectReservation(ctx context.Context, r dsgaProject
 	if err != nil {
 		return false, err
 	}
-	if keyHash(key) != current.KeyHash || current.Operation != r.Operation || current.RequestHash != r.RequestHash || current.Scope != r.Scope || current.Org != r.Org || current.Credentials != r.Credentials {
+	if current.BaseAction != "create_project" || keyHash(key) != current.KeyHash || current.Operation != r.Operation || current.RequestHash != r.RequestHash || current.Scope != r.Scope || current.Org != r.Org || current.Credentials != r.Credentials {
 		return false, errDSGACreationConflict
 	}
 	if current.Accepted {

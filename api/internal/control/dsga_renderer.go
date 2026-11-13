@@ -116,7 +116,7 @@ func renderDSGAComputeBootstrap(p createPayload, plan dsgaCreationPlan, vmUID st
 			"project_id": p.ProjectID, "branch_id": p.BranchID, "endpoint_id": p.EndpointID,
 			"tenant_id": p.TenantID, "timeline_id": p.TimelineID,
 			"pageserver_connstring": "host=pageserver-managed port=6400", "safekeeper_connstrings": safekeepers,
-			"skip_pg_catalog_updates": false, "disable_lfc_resizing": true,
+			"skip_pg_catalog_updates": plan.RetainCatalog, "disable_lfc_resizing": true,
 			"cluster": map[string]any{
 				"cluster_id": p.ProjectID, "name": p.ProjectID, "state": "restarted", "roles": roles,
 				"databases": []any{map[string]any{"name": dsgaApplicationDatabase, "owner": dsgaApplicationRole, "options": nil}},

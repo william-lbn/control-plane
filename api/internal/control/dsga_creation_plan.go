@@ -85,6 +85,8 @@ type dsgaCreationPlan struct {
 	// Operation。历史零值可只读解码，但真实存储执行器必须拒绝；不能恢复时
 	// 从当前env偷偷补齐旧计划，以免原操作落到另一个controller或身份域。
 	Storage dsgaStorageProfile `json:"storage,omitzero"`
+	// A successor on an existing timeline attests the retained SQL catalog before serving.
+	RetainCatalog bool `json:"retain_catalog,omitempty"`
 }
 
 type dsgaCredentialReference struct {
@@ -113,6 +115,7 @@ type dsgaCreationPolicy struct {
 	Budget                 dsgaBootstrapBudget        `json:"budget"`
 	VM                     dsgaVMProfile              `json:"vm"`
 	Storage                dsgaStorageProfile         `json:"storage"`
+	RetainedCatalog        bool                       `json:"retained_catalog,omitempty"`
 }
 
 var dsgaPinnedImage = regexp.MustCompile(`^[a-z0-9][a-z0-9./:_-]*@sha256:[0-9a-f]{64}$`)
@@ -142,6 +145,9 @@ func (b dsgaBootstrapBudget) validate() error {
 }
 
 func (plan dsgaCreationPlan) validate(p createPayload) error {
+	if plan.RetainCatalog && (!plan.VM.generic() || p.ParentTimelineID != "" || p.ParentLSN != "" || p.RestoreSource != "" || p.CatalogPolicy != "") {
+		return errDSGACreationPlan
+	}
 	if plan.Credentials != (dsgaCredentialReference{}) && plan.Credentials.validate() != nil {
 		return errDSGACreationPlan
 	}

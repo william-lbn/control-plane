@@ -31,7 +31,7 @@ func TestDSGAReservationVM5RunnerPodHardBudgetForwardMigration(t *testing.T) {
 
 	insert := func(name, operation string, payload createPayload, plan dsgaCreationPlan) error {
 		t.Helper()
-		draft := dsgaCreationDraft{1, name, "main", "test-region", payload, plan}
+		draft := dsgaCreationDraft{ProtocolVersion: 1, ResourceName: name, DefaultBranch: "main", Region: "test-region", Payload: payload, Plan: plan}
 		raw, err := json.Marshal(draft)
 		if err != nil {
 			t.Fatal(err)

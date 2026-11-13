@@ -558,6 +558,13 @@ func (s *server) createBranch(w http.ResponseWriter, r *http.Request) {
 	s.acceptCreate(w, r, p.ProjectID, p.BranchID, opID, "branch")
 }
 
+type endpointCreateRequest struct {
+	BranchID    string        `json:"branch_id"`
+	Password    string        `json:"password"`
+	Type        string        `json:"type,omitempty"`
+	Autoscaling *createBounds `json:"autoscaling"`
+}
+
 func (s *server) createEndpoint(w http.ResponseWriter, r *http.Request) {
 	if !creationEnabled() {
 		fail(w, r, 503, "creation_disabled", "Creation driver is not enabled")
@@ -571,14 +578,18 @@ func (s *server) createEndpoint(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 422, "managed_project_required", "Ready managed project required")
 		return
 	}
-	var body struct {
-		BranchID    string        `json:"branch_id"`
-		Password    string        `json:"password"`
-		Type        string        `json:"type,omitempty"`
-		Autoscaling *createBounds `json:"autoscaling"`
-	}
+	var body endpointCreateRequest
 	if err := readJSON(r, &body); err != nil {
 		fail(w, r, 422, "invalid_request", "Invalid endpoint request")
+		return
+	}
+	var dsga bool
+	if err := s.db.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM operations WHERE project_id=$1 AND action='create_project_dsga_v1')`, r.PathValue("project")).Scan(&dsga); err != nil {
+		fail(w, r, 503, "metadata_unavailable", "Could not verify original PostgreSQL runtime")
+		return
+	}
+	if dsga {
+		s.createDSGARetainedEndpoint(w, r, body)
 		return
 	}
 	bounds := defaults(body.Autoscaling)

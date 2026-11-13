@@ -26,7 +26,7 @@ func TestDSGAReservationVM3ForwardMigrationPreservesV1V2AndRequiresPlacement(t *
 	plan.VM.ResourceLimits = nil
 	plan.VM.Placement = nil
 	plan.VM.RunnerPodResources = nil
-	draft := dsgaCreationDraft{1, "historical", "main", "test-region", payload, plan}
+	draft := dsgaCreationDraft{ProtocolVersion: 1, ResourceName: "historical", DefaultBranch: "main", Region: "test-region", Payload: payload, Plan: plan}
 	marshal := func(v dsgaCreationDraft) []byte {
 		t.Helper()
 		raw, e := json.Marshal(v)

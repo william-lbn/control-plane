@@ -442,7 +442,7 @@ func TestDSGAProjectPendingKeyConflictsWithLegacyInBothDirections(t *testing.T) 
 				// 历史v3只允许读取/恢复，不能再作为新Reservation写入。
 				plan.VM = dsgaVMProfileV5Fixture()
 				plan.Credentials = dsgaCredentialReference{}
-				draft, _ := json.Marshal(dsgaCreationDraft{1, f.body.Name, "main", "test-region", p, plan})
+				draft, _ := json.Marshal(dsgaCreationDraft{ProtocolVersion: 1, ResourceName: f.body.Name, DefaultBranch: "main", Region: "test-region", Payload: p, Plan: plan})
 				if _, err := tx.Exec(f.ctx, `INSERT INTO dsga_creation_reservations(actor_id,key_hash,request_hash,scope,org_id,base_action,operation_id,draft)
  VALUES($1,$2,$3,$4,'org_creation','create_project','op_reserved_cross',$5)`, actor, keyHash(key), f.s.createRequestHash("POST:/organizations/org_creation/projects", f.body), "POST:/organizations/org_creation/projects", draft); err != nil {
 					t.Fatal(err)

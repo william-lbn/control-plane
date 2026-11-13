@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -23,8 +24,12 @@ func (s *server) reconcileDSGAProject(ctx context.Context, binding *dsgaCreation
 		p.ParentTimelineID != "" || p.RestoreSource != "" || p.CatalogPolicy != "" {
 		return errDSGACreationIdentity
 	}
-	if _, err := binding.creationPlan(ctx); err != nil {
+	plan, err := binding.creationPlan(ctx)
+	if err != nil {
 		return err
+	}
+	if plan.RetainCatalog {
+		return errDSGACreationIdentity
 	}
 	step := func(ordinal int, name string, fn func(context.Context) error) error {
 		return s.createStep(ctx, binding.operationID, binding.workerID, ordinal, name, fn)
@@ -35,7 +40,14 @@ func (s *server) reconcileDSGAProject(ctx context.Context, binding *dsgaCreation
 	if err := step(1, "create_timeline", binding.prepareTimeline); err != nil {
 		return err
 	}
-	if err := step(2, "prepare_neonvm_dsga", func(ctx context.Context) error {
+	return s.reconcileDSGACompute(ctx, binding, 2)
+}
+
+func (s *server) reconcileDSGACompute(ctx context.Context, binding *dsgaCreationBinding, first int) error {
+	step := func(offset int, name string, fn func(context.Context) error) error {
+		return s.createStep(ctx, binding.operationID, binding.workerID, first+offset, name, fn)
+	}
+	if err := step(0, "prepare_neonvm_dsga", func(ctx context.Context) error {
 		if _, err := binding.prepareVM(ctx); err != nil {
 			return err
 		}
@@ -43,11 +55,11 @@ func (s *server) reconcileDSGAProject(ctx context.Context, binding *dsgaCreation
 	}); err != nil {
 		return err
 	}
-	if err := step(3, "wait_neonvm_running", binding.waitOriginalCompute); err != nil {
+	if err := step(1, "wait_neonvm_running", binding.waitOriginalCompute); err != nil {
 		return err
 	}
 	var initialization dsgaInitializationResponse
-	if err := step(4, "confirm_native_initialization", func(ctx context.Context) error {
+	if err := step(2, "confirm_native_initialization", func(ctx context.Context) error {
 		if err := binding.configureGenericCompute(ctx); err != nil {
 			return err
 		}
@@ -74,16 +86,16 @@ func (s *server) reconcileDSGAProject(ctx context.Context, binding *dsgaCreation
 	}); err != nil {
 		return err
 	}
-	if err := step(5, "publish_proxy_route", func(ctx context.Context) error {
+	if err := step(3, "publish_proxy_route", func(ctx context.Context) error {
 		// 使用本次刚读回的原生事实；不以历史观察行代替当前初始化。
 		return binding.publishInitializedSQLRoute(ctx, initialization)
 	}); err != nil {
 		return err
 	}
-	if err := step(6, "sql_probe_via_proxy", binding.probeOriginalSQL); err != nil {
+	if err := step(4, "sql_probe_via_proxy", binding.probeOriginalSQL); err != nil {
 		return err
 	}
-	return step(7, "persist_ready_state", func(ctx context.Context) error {
+	return step(5, "persist_ready_state", func(ctx context.Context) error {
 		fresh, err := binding.observeInitialization(ctx)
 		if err != nil {
 			return err
@@ -91,8 +103,35 @@ func (s *server) reconcileDSGAProject(ctx context.Context, binding *dsgaCreation
 		if fresh.Observed.Instance != initialization.Observed.Instance {
 			return errDSGACreationIdentity
 		}
-		return binding.persistProjectReady(ctx, fresh)
+		return binding.persistComputeReady(ctx, fresh, first+5)
 	})
+}
+
+func (s *server) reconcileDSGAEndpoint(ctx context.Context, binding *dsgaCreationBinding) error {
+	plan, err := binding.creationPlan(ctx)
+	if err != nil {
+		return err
+	}
+	if binding.action != "create_endpoint_dsga_v1" || !plan.RetainCatalog {
+		return errDSGACreationIdentity
+	}
+	err = s.createStep(ctx, binding.operationID, binding.workerID, 0, "verify_retained_timeline", func(ctx context.Context) error {
+		storage, err := newDSGAStorageClientAccess(ctx, s.kube, plan.Storage, false)
+		if err != nil {
+			return err
+		}
+		defer storage.CloseIdleConnections()
+		p := binding.intent.createPayload
+		fact, err := storage.request(ctx, http.MethodGet, "control/v1/tenant/"+p.TenantID+"/timeline/"+p.TimelineID, nil)
+		if err != nil {
+			return err
+		}
+		return validateDSGATimelineAggregate(fact, p.TenantID, p.TimelineID, plan.PostgresVersion, "", "", false)
+	})
+	if err != nil {
+		return err
+	}
+	return s.reconcileDSGACompute(ctx, binding, 1)
 }
 
 // 不用legacy waitCompute：该入口明确拒绝DSGA。这里每轮重读lease和固定VM UID，
@@ -227,7 +266,7 @@ func (binding *dsgaCreationBinding) probeOriginalSQL(ctx context.Context) error 
 			"SELECT current_setting('server_version_num')::integer, pg_is_in_recovery(), current_database(), current_user")
 		cancelAttempt()
 		if err == nil {
-			if !validDSGAProjectSQL(result, plan.PostgresVersion) {
+			if !validDSGAComputeSQL(result, plan.PostgresVersion, p.EndpointType == "read_only") {
 				return errDSGACreationIdentity
 			}
 			latest, latestVM, err := current.originalCompute(ctx)
@@ -247,18 +286,26 @@ func (binding *dsgaCreationBinding) probeOriginalSQL(ctx context.Context) error 
 }
 
 func validDSGAProjectSQL(result sqlResult, version uint32) bool {
+	return validDSGAComputeSQL(result, version, false)
+}
+
+func validDSGAComputeSQL(result sqlResult, version uint32, replica bool) bool {
 	if !dsgaSupportedPostgresVersion(version) || result.Truncated || len(result.Rows) != 1 || len(result.Rows[0]) != 4 {
 		return false
 	}
 	row := result.Rows[0]
 	actual, ok := row[0].(int32)
-	return ok && actual/10000 == int32(version) && row[1] == false &&
+	return ok && actual/10000 == int32(version) && row[1] == replica &&
 		row[2] == dsgaApplicationDatabase && row[3] == "control_probe"
 }
 
 // 原Operation lease与初始化来源均在事务内重核。失败/COMMIT丢回复可按原意图
 // 恢复；不会因再次确认Ready递增版本，也不会改写初始化首次观察、凭据或计划。
 func (binding *dsgaCreationBinding) persistProjectReady(ctx context.Context, fact dsgaInitializationResponse) error {
+	return binding.persistComputeReady(ctx, fact, 7)
+}
+
+func (binding *dsgaCreationBinding) persistComputeReady(ctx context.Context, fact dsgaInitializationResponse, previousSteps int) error {
 	plan, err := binding.creationPlan(ctx)
 	if err != nil {
 		return err
@@ -281,23 +328,31 @@ func (binding *dsgaCreationBinding) persistProjectReady(ctx context.Context, fac
 	var original bool
 	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM dsga_creation_initialization_observations
  WHERE operation_id=$1 AND pg_boot_id=$2 AND vm_uid=$3 AND config_uid=$4 AND credentials_uid=$5)
- AND (SELECT count(*) FROM operation_steps WHERE operation_id=$1 AND ordinal BETWEEN 0 AND 6 AND state='succeeded')=7`,
-		binding.operationID, fmt.Sprint(uint64(fact.Observed.Instance.PGBootID)), vm, config, plan.Credentials.UID).Scan(&original); err != nil {
+ AND (SELECT count(*) FROM operation_steps WHERE operation_id=$1 AND ordinal>=0 AND ordinal<$6 AND state='succeeded')=$6`,
+		binding.operationID, fmt.Sprint(uint64(fact.Observed.Instance.PGBootID)), vm, config, plan.Credentials.UID, previousSteps).Scan(&original); err != nil {
 		return err
 	}
-	if !original || binding.action != "create_project_dsga_v1" {
+	project := binding.action == "create_project_dsga_v1" && previousSteps == 7 && !plan.RetainCatalog
+	endpoint := binding.action == "create_endpoint_dsga_v1" && previousSteps == 6 && plan.RetainCatalog
+	if !original || (!project && !endpoint) {
 		return errDSGACreationIdentity
 	}
 	p := binding.intent.createPayload
-	for _, query := range []struct {
+	type update struct {
 		sql  string
 		args []any
-	}{
-		{`UPDATE projects SET state='ready',updated_at=clock_timestamp(),version=version+CASE WHEN state='ready' THEN 0 ELSE 1 END WHERE id=$1 AND deleted_at IS NULL`, []any{p.ProjectID}},
-		{`UPDATE branches SET state='ready',version=version+CASE WHEN state='ready' THEN 0 ELSE 1 END WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL`, []any{p.BranchID, p.ProjectID}},
-		{`UPDATE endpoints SET state='active',updated_at=clock_timestamp(),version=version+CASE WHEN state='active' THEN 0 ELSE 1 END WHERE id=$1 AND project_id=$2 AND branch_id=$3 AND deleted_at IS NULL`, []any{p.EndpointID, p.ProjectID, p.BranchID}},
-		{`UPDATE branch_service_instances SET desired_state='active',observed_state='active',last_observed_at=clock_timestamp(),version=version+CASE WHEN observed_state='active' THEN 0 ELSE 1 END WHERE branch_id=$1 AND service_kind='postgres'`, []any{p.BranchID}},
-	} {
+	}
+	updates := []update{}
+	if project {
+		updates = append(updates,
+			update{`UPDATE projects SET state='ready',updated_at=clock_timestamp(),version=version+CASE WHEN state='ready' THEN 0 ELSE 1 END WHERE id=$1 AND deleted_at IS NULL`, []any{p.ProjectID}},
+			update{`UPDATE branches SET state='ready',version=version+CASE WHEN state='ready' THEN 0 ELSE 1 END WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL`, []any{p.BranchID, p.ProjectID}})
+	}
+	updates = append(updates,
+		update{`UPDATE endpoints SET state='active',updated_at=clock_timestamp(),version=version+CASE WHEN state='active' THEN 0 ELSE 1 END WHERE id=$1 AND project_id=$2 AND branch_id=$3 AND deleted_at IS NULL`, []any{p.EndpointID, p.ProjectID, p.BranchID}},
+		update{`UPDATE branch_service_instances SET desired_state='active',observed_state='active',last_observed_at=clock_timestamp(),version=version+CASE WHEN observed_state='active' THEN 0 ELSE 1 END WHERE branch_id=$1 AND service_kind='postgres' AND driver_version='dsga-v1'`, []any{p.BranchID}},
+	)
+	for _, query := range updates {
 		tag, err := tx.Exec(ctx, query.sql, query.args...)
 		if err != nil {
 			return err
@@ -332,5 +387,13 @@ func lockDSGAProjectParents(ctx context.Context, tx pgx.Tx, p createPayload) err
 }
 
 func dsgaProjectCreateSteps() []string {
-	return []string{"create_managed_tenant", "create_timeline", "prepare_neonvm_dsga", "wait_neonvm_running", "confirm_native_initialization", "publish_proxy_route", "sql_probe_via_proxy", "persist_ready_state"}
+	return append([]string{"create_managed_tenant", "create_timeline"}, dsgaComputeCreateSteps()...)
+}
+
+func dsgaComputeCreateSteps() []string {
+	return []string{"prepare_neonvm_dsga", "wait_neonvm_running", "confirm_native_initialization", "publish_proxy_route", "sql_probe_via_proxy", "persist_ready_state"}
+}
+
+func dsgaEndpointCreateSteps() []string {
+	return append([]string{"verify_retained_timeline"}, dsgaComputeCreateSteps()...)
 }

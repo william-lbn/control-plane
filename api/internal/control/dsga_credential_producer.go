@@ -33,9 +33,10 @@ const (
 // 由原catalog选择来源endpoint和已冻结的UID/摘要，再实际GET该来源；不能仅凭
 // 同项目标签、任意Secret指针或租户密码重造物理副本的pg_authid内容。
 type dsgaCredentialInput struct {
-	Password       string
-	SourceEndpoint string
-	Source         dsgaCredentialReference
+	Password         string
+	SourceEndpoint   string
+	Source           dsgaCredentialReference
+	ExistingPassword string
 }
 
 func dsgaCredentialProvenance(secret *core.Secret, operation string, plan dsgaCreationPlan) bool {
@@ -57,6 +58,9 @@ func (k *kubeClient) prepareDSGACredentials(ctx context.Context, p createPayload
 		return empty, errDSGACredentialSource
 	}
 	inherit := input.Source != (dsgaCredentialReference{})
+	if plan.RetainCatalog && !inherit {
+		return empty, errDSGACredentialSource
+	}
 	if inherit {
 		if input.Password != "" || input.Source.validate() != nil || input.SourceEndpoint == p.EndpointID || dsgapi.ValidateID(input.SourceEndpoint, "source endpoint") != nil {
 			return empty, errDSGACredentialSource
@@ -82,6 +86,9 @@ func (k *kubeClient) prepareDSGACredentials(ctx context.Context, p createPayload
 		snapshot, err := snapshotDSGACredentials(source, plan.Namespace, sourceName, p.ProjectID, input.SourceEndpoint)
 		if err != nil || snapshot.reference() != input.Source || len(snapshot.probeSeed) != 32 {
 			return empty, errDSGACredentialSource
+		}
+		if plan.RetainCatalog && p.EndpointType == "read_write" && !dsgaPasswordMatches(input.ExistingPassword, snapshot.credentials.ApplicationVerifier) {
+			return empty, errBranchPasswordMismatch
 		}
 		inherited = snapshot
 	}
