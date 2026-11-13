@@ -108,6 +108,39 @@ func TestDSGAInitializationHistoryDatabaseGuardsAndForwardReplay(t *testing.T) {
 	}
 }
 
+func TestDSGAInitializationHistoryFrozenNativeV3(t *testing.T) {
+	ctx, binding, _, _, _, client, _, original := initializationBindingFixtureWithNativeVersion(t, 3, "create_project")
+	if original.Startup.ProtocolVersion != 3 {
+		t.Fatal("fixture did not freeze native bootstrap v3")
+	}
+	if _, err := binding.observeAndRecordInitializationWithHTTP(ctx, client); err != nil {
+		t.Fatalf("frozen native v3 receipt rejected: %v", err)
+	}
+	before, xmin := initializationHistoryFact(t, ctx, binding, "17")
+	if err := migrate(ctx, binding.server.db); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := binding.observeAndRecordInitializationWithHTTP(ctx, client); err != nil {
+		t.Fatal(err)
+	}
+	after, afterXmin := initializationHistoryFact(t, ctx, binding, "17")
+	if before != after || xmin != afterXmin {
+		t.Fatal("replay rewrote the original native v3 receipt")
+	}
+	for _, version := range []string{`2`, `4`, `"3"`, `null`} {
+		t.Run(version, func(t *testing.T) {
+			_, err := binding.server.db.Exec(ctx, `INSERT INTO dsga_creation_initialization_observations(operation_id,pg_boot_id,vm_uid,config_uid,credentials_uid,management_service_uid,receipt)
+ SELECT operation_id,'18',vm_uid,config_uid,credentials_uid,management_service_uid,
+ jsonb_set(jsonb_set(receipt,'{observed,instance,pg_boot_id}','"18"'::jsonb),'{startup,protocol_version}',$2::jsonb)
+ FROM dsga_creation_initialization_observations WHERE operation_id=$1 AND pg_boot_id='17'`, binding.operationID, version)
+			var pgerr *pgconn.PgError
+			if !errors.As(err, &pgerr) || pgerr.Code != "23514" || pgerr.Message != "DSGA initialization observation differs from original creation bindings" {
+				t.Fatalf("database did not reject mismatched native version %s: %v", version, err)
+			}
+		})
+	}
+}
+
 func TestDSGAInitializationHistoryUnsignedBootAndFailedCommitRecovery(t *testing.T) {
 	ctx, binding, _, _, _, client, state, original := initializationBindingFixture(t)
 	original.Observed.Instance.PGBootID = 18446744073709551615

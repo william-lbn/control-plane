@@ -88,11 +88,17 @@ func credentialSourceFixtureWithVM(t *testing.T, profile dsgaVMProfile, legacy .
 
 func credentialSourceFixtureForAction(t *testing.T, profile dsgaVMProfile, action string, legacy ...bool) (context.Context, *server, string, *creationTestAPI, dsgaCreationInput, *dsgaCreationBinding, **core.Secret) {
 	t.Helper()
+	return credentialSourceFixtureWithNativeVersion(t, profile, action, 0, len(legacy) > 0 && legacy[0])
+}
+
+func credentialSourceFixtureWithNativeVersion(t *testing.T, profile dsgaVMProfile, action string, version dsgaNativeBootstrapVersion, legacy bool) (context.Context, *server, string, *creationTestAPI, dsgaCreationInput, *dsgaCreationBinding, **core.Secret) {
+	t.Helper()
 	ctx, s, old, f, input := dsgaBindingFixture(t)
 	p, policy, _ := dsgaPlanFixture(t)
 	p.ProjectID, p.BranchID, p.EndpointID, p.TenantID, p.TimelineID = input.Payload.ProjectID, input.Payload.BranchID, input.Payload.EndpointID, input.Payload.TenantID, input.Payload.TimelineID
 	policy.Namespace = f.kube.namespace
 	policy.VM = profile.clone()
+	policy.NativeBootstrapVersion = version
 	plan, err := newDSGACreationPlan(p, policy, time.Now())
 	if err != nil {
 		t.Fatal(err)
@@ -162,7 +168,7 @@ func credentialSourceFixtureForAction(t *testing.T, profile dsgaVMProfile, actio
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(legacy) > 0 && legacy[0] {
+	if legacy {
 		plan.Credentials = dsgaCredentialReference{}
 	}
 	tx, err := s.db.Begin(ctx)

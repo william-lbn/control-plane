@@ -35,11 +35,16 @@ func dsgaServicesFixture(t *testing.T, mode string) (context.Context, *dsgaCreat
 
 func dsgaServicesSourceFixture(t *testing.T, mode string, action ...string) (context.Context, *dsgaCreationBinding, *dsgaServicesTestAPI, *creationTestAPI, **core.Secret) {
 	t.Helper()
+	return dsgaServicesSourceFixtureWithNativeVersion(t, mode, 0, action...)
+}
+
+func dsgaServicesSourceFixtureWithNativeVersion(t *testing.T, mode string, version dsgaNativeBootstrapVersion, action ...string) (context.Context, *dsgaCreationBinding, *dsgaServicesTestAPI, *creationTestAPI, **core.Secret) {
+	t.Helper()
 	kind := "create_endpoint"
 	if len(action) > 0 {
 		kind = action[0]
 	}
-	ctx, _, _, f, _, binding, source := credentialSourceFixtureForAction(t, dsgaVMProfileV5Fixture(), kind)
+	ctx, _, _, f, _, binding, source := credentialSourceFixtureWithNativeVersion(t, dsgaVMProfileV5Fixture(), kind, version, false)
 	if _, err := binding.prepareVM(ctx); err != nil {
 		t.Fatal(err)
 	}

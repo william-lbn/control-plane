@@ -56,7 +56,12 @@ type initializationTestState struct {
 
 func initializationBindingFixture(t *testing.T, action ...string) (context.Context, *dsgaCreationBinding, *creationTestAPI, **core.Secret, *core.Service, *http.Client, *initializationTestState, dsgaInitializationResponse) {
 	t.Helper()
-	ctx, binding, services, f, source := dsgaServicesSourceFixture(t, "success", action...)
+	return initializationBindingFixtureWithNativeVersion(t, 0, action...)
+}
+
+func initializationBindingFixtureWithNativeVersion(t *testing.T, version dsgaNativeBootstrapVersion, action ...string) (context.Context, *dsgaCreationBinding, *creationTestAPI, **core.Secret, *core.Service, *http.Client, *initializationTestState, dsgaInitializationResponse) {
+	t.Helper()
+	ctx, binding, services, f, source := dsgaServicesSourceFixtureWithNativeVersion(t, "success", version, action...)
 	if err := binding.prepareServices(ctx); err != nil {
 		t.Fatal(err)
 	}
