@@ -252,6 +252,9 @@ func (s *server) retireFailedEndpointCompute(ctx context.Context, operation, wor
 			return errors.New("failed creation VM identity or ownership mismatch")
 		}
 	}
+	if err := s.verifyFailedDSGAResourceIdentity(ctx, p, "vm", uid); err != nil {
+		return err
+	}
 	expected, err := s.bindFailedEndpointResource(ctx, operation, worker, p, "vm", uid)
 	if err != nil {
 		return err
@@ -262,6 +265,49 @@ func (s *server) retireFailedEndpointCompute(ctx context.Context, operation, wor
 		return err
 	}
 	return s.retireDeletedComputeBound(ctx, scope, map[string]string{p.EndpointID: expected})
+}
+
+// DSGA清理必须沿原创建的不可变UID，不得将首次观察到的同名/同标签替身
+// 当成原对象。原创建已失败，不能复用要求其运行lease的创建写入helper；
+// 这里只读原事实，清理绑定的写入仍由当前清理Operation的lease保护。
+func (s *server) verifyFailedDSGAResourceIdentity(ctx context.Context, p endpointDeletionPayload, kind, uid string) error {
+	if uid == "" {
+		return nil // 已确认404允许记录不存在，不据此重新创建或采纳后来出现的对象。
+	}
+	var action string
+	err := s.db.QueryRow(ctx, `SELECT action FROM operations WHERE id=$1 AND project_id=$2
+ AND payload->>'project_id'=$2 AND payload->>'branch_id'=$3 AND payload->>'endpoint_id'=$4`,
+		p.FailedCreateOperationID, p.ProjectID, p.BranchID, p.EndpointID).Scan(&action)
+	if err != nil {
+		return err
+	}
+	switch action {
+	case "create_project", "create_branch", "create_endpoint":
+		return nil // legacy保留原有首次观察绑定合同。
+	case "create_project_dsga_v1", "create_branch_dsga_v1", "create_endpoint_dsga_v1":
+	default:
+		return errDSGACreationIdentity
+	}
+	var expected string
+	switch kind {
+	case "vm":
+		err = s.db.QueryRow(ctx, `SELECT vm_uid FROM dsga_creation_bindings
+ WHERE operation_id=$1 AND namespace=$2 AND vm_name=$3`,
+			p.FailedCreateOperationID, s.kube.namespace, kubeName(p.EndpointID)).Scan(&expected)
+	case "service":
+		err = s.db.QueryRow(ctx, `SELECT s.service_uid FROM dsga_creation_services s
+ JOIN dsga_creation_bindings b ON b.operation_id=s.operation_id AND b.vm_uid=s.vm_uid AND b.namespace=s.namespace
+ WHERE s.operation_id=$1 AND s.service_kind='postgres' AND s.namespace=$2
+ AND s.service_name=$3 AND b.vm_name=$3 AND b.config_uid IS NOT NULL`,
+			p.FailedCreateOperationID, s.kube.namespace, kubeName(p.EndpointID)).Scan(&expected)
+	default:
+		return errDSGACreationIdentity
+	}
+	if errors.Is(err, pgx.ErrNoRows) || err == nil && (expected == "" || expected != uid) {
+		// 对象存在但原绑定缺失也可能是创建提交未知；保留现场，不能猜测归属后删除。
+		return errDSGACreationIdentity
+	}
+	return err
 }
 
 func (s *server) bindFailedEndpointResource(ctx context.Context, operation, worker string, p endpointDeletionPayload, kind, uid string) (string, error) {
@@ -306,6 +352,9 @@ func (s *server) observeFailedEndpointService(ctx context.Context, operation, wo
 			return "", errors.New("failed creation Service ownership or selector mismatch")
 		}
 		uid = stringVal(nested(service, "metadata", "uid"))
+	}
+	if err := s.verifyFailedDSGAResourceIdentity(ctx, p, "service", uid); err != nil {
+		return "", err
 	}
 	expected, err := s.bindFailedEndpointResource(ctx, operation, worker, p, "service", uid)
 	if err != nil {

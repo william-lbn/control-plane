@@ -167,7 +167,9 @@ func TestFailedParentCleanupIntegration(t *testing.T) {
 			if item.compute {
 				p.EndpointID = endpoint
 				exec(`INSERT INTO endpoints(id,project_id,branch_id,selector,workload_kind,workload_name,service_name,state,role_name,database_name,endpoint_type,created_at,updated_at) VALUES($1,$2,$3,$4,'neonvm',$5,$5,'provisioning','cloud_admin','postgres','read_write',now(),now())`, endpoint, project, branch, selector(endpoint), kubeName(endpoint))
-				services[kubeName(endpoint)] = "original-service-" + item.suffix
+				if !item.dsga {
+					services[kubeName(endpoint)] = "original-service-" + item.suffix
+				}
 			}
 			var raw []byte
 			if item.dsga {
@@ -248,11 +250,13 @@ func TestFailedParentCleanupIntegration(t *testing.T) {
 				t.Fatal("different replay intent")
 			}
 			request("admin_parent", "POST", base+"/operations/"+origin+"/retry", "", "", "", 409)
-			unknownDelete = item.compute
+			// DSGA此例验证创建尚未留下VM/Service时的清理；真实原绑定与
+			// 替身拒绝由TestFailedDSGACleanupRequiresOriginalCreationResourceUIDs覆盖。
+			unknownDelete = item.compute && !item.dsga
 			if err = s.workOnce(ctx, "parent-cleanup-worker"); err != nil {
 				t.Fatal(err)
 			}
-			if item.compute {
+			if item.compute && !item.dsga {
 				failed := request("admin_parent", "GET", base+"/operations/"+op, "", "", "", 200)
 				if failed["state"] != "failed" || deletes != beforeDeletes+1 {
 					t.Fatal("unknown Service delete not held")
