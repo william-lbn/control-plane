@@ -214,7 +214,8 @@ func (proxy *dsgaProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		"/dsg/v1/admission", "/dsg/v1/admission/status",
 		"/dsg/v1/admission/lease", "/dsg/v1/admission/lease/rearm/status",
 		"/dsg/v1/admission/close-original", "/dsg/v1/admission/close-original/status",
-		"/dsg/v1/admission/continue-close", "/dsg/v1/admission/continue-close/status":
+		"/dsg/v1/admission/continue-close", "/dsg/v1/admission/continue-close/status",
+		"/dsg/v1/suspension/drain":
 		// 准入写入也走独立观察连接池：关闭必须能在resize阻塞时到达PG。
 		// 这里只扩展固定路由名单，仍逐次核验原VM/Service/current owner；
 		// 原生Rust按完整请求再核对执行epoch，网关不代造预算或执行回执。
@@ -312,6 +313,10 @@ func (proxy *dsgaProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		deny(http.StatusForbidden)
 		return
 	}
+	if r.URL.Path == "/dsg/v1/suspension/drain" && !validDSGASuspensionDrain(body, snapshot.State()) {
+		deny(http.StatusForbidden)
+		return
+	}
 	stop()
 	request, err := http.NewRequestWithContext(ctx, r.Method, "http://"+net.JoinHostPort(service.Spec.ClusterIP, "3080")+r.URL.Path, bytes.NewReader(body))
 	if err != nil {
@@ -351,4 +356,26 @@ func (proxy *dsgaProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(response.StatusCode)
 	_, _ = w.Write(result)
+}
+
+func validDSGASuspensionDrain(body []byte, state journal.Model) bool {
+	closure := state.ServiceClosure
+	if closure == nil || closure.SuspensionOperation == "" || closure.Pending() || state.Active != nil || state.PGInstance == nil {
+		return false
+	}
+	var request dsgapi.AdmissionRequest
+	// Match the Rust wire parser exactly. Go's JSON decoder otherwise accepts
+	// case-insensitive field aliases and an omitted open field as false.
+	if dsgaTokenObject(body, &request) != nil || request.Validate() != nil {
+		return false
+	}
+	object, err := dsgaArrayExactObject(body, "protocol_version", "instance", "issuer_epoch", "revision", "expected_capacity_generation", "open", "budget_commitment_id")
+	if err != nil {
+		return false
+	}
+	if _, err := dsgaArrayExactObject(object["instance"], "vm_uid", "compute_instance_id", "pg_boot_id"); err != nil {
+		return false
+	}
+	_, _, selected, _ := closure.Selection()
+	return !request.Open && request == selected && request.Instance == *state.PGInstance && request.IssuerEpoch <= state.Owner.Epoch
 }

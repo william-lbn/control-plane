@@ -184,6 +184,57 @@ func TestDSGAProxyExplicitRoutesPreserveOriginalBytesAndCredential(t *testing.T)
 	}
 }
 
+func TestDSGAProxySuspensionDrainRequiresSettledExactClose(t *testing.T) {
+	instance := dsgapi.Instance{VMUID: "vm", ComputeInstanceID: "compute", PGBootID: 91}
+	close := dsgapi.AdmissionRequest{
+		ProtocolVersion: 1, Instance: instance, IssuerEpoch: 3, Revision: 4,
+		ExpectedCapacityGeneration: 5, BudgetCommitmentID: "budget",
+	}
+	state := journal.Model{Owner: journal.Owner{Epoch: 4}, PGInstance: &instance}
+	body, err := json.Marshal(close)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if validDSGASuspensionDrain(body, state) {
+		t.Fatal("missing closure accepted")
+	}
+	state.ServiceClosure = &journal.ServiceClosure{Request: close, Phase: journal.Settled}
+	if validDSGASuspensionDrain(body, state) {
+		t.Fatal("non-suspension closure accepted")
+	}
+	state.ServiceClosure.SuspensionOperation = "op_suspension"
+	state.ServiceClosure.Phase = journal.Unconfirmed
+	if validDSGASuspensionDrain(body, state) {
+		t.Fatal("unconfirmed closure accepted")
+	}
+	state.ServiceClosure.Phase = journal.Settled
+	if !validDSGASuspensionDrain(body, state) {
+		t.Fatal("settled close from predecessor rejected")
+	}
+	for _, changed := range []string{
+		strings.Replace(string(body), `"revision":"4"`, `"revision":"5"`, 1),
+		strings.Replace(string(body), `"pg_boot_id":"91"`, `"pg_boot_id":"92"`, 1),
+		strings.Replace(string(body), `"open":false,`, "", 1),
+		strings.Replace(string(body), `"open":false`, `"Open":false`, 1),
+		strings.Replace(string(body), `"open":false`, `"open":true`, 1),
+		strings.Replace(string(body), `"open":false`, `"open":false,"open":false`, 1),
+	} {
+		if changed == string(body) || validDSGASuspensionDrain([]byte(changed), state) {
+			t.Fatal("invalid close accepted")
+		}
+	}
+	state.ServiceClosure.Continuation = &journal.ServiceClosureContinuation{Phase: journal.Settled}
+	state.ServiceClosure.Continuation.Request.Close = close
+	state.ServiceClosure.Continuation.Request.Close.Revision++
+	if validDSGASuspensionDrain(body, state) {
+		t.Fatal("superseded close accepted")
+	}
+	body, err = json.Marshal(state.ServiceClosure.Continuation.Request.Close)
+	if err != nil || !validDSGASuspensionDrain(body, state) {
+		t.Fatal("settled successor close rejected")
+	}
+}
+
 func TestDSGAProxyRejectsStaleOwnerAndUnsafeServiceBeforeNative(t *testing.T) {
 	for _, scenario := range []string{"owner_epoch", "lease_expired", "vm_recreated", "unmanaged", "service_project", "service_selector", "service_external", "service_port", "bad_journal", "bootstrap_config", "config_owner"} {
 		t.Run(scenario, func(t *testing.T) {
