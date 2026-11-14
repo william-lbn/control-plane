@@ -105,6 +105,57 @@ func TestDataAPINativeSQLIntegration(t *testing.T) {
 			t.Fatal("owned service idle timeout not applied on replay")
 		}
 	})
+	t.Run("native_grant_with_unprivileged_database_provisioner", func(t *testing.T) {
+		provisioner := "native_setup_" + hex.EncodeToString(suffix[:])
+		for _, command := range []string{
+			"CREATE ROLE " + pgQuote(provisioner) + " NOCREATEROLE NOBYPASSRLS",
+			"GRANT CREATE ON DATABASE control_ci TO " + pgQuote(provisioner),
+			"GRANT CONNECT ON DATABASE control_ci TO " + pgQuote(provisioner) + " WITH GRANT OPTION",
+			"GRANT USAGE ON SCHEMA " + pgQuote(p.Spec.Schema) + " TO " + pgQuote(provisioner) + " WITH GRANT OPTION",
+			"GRANT SELECT,INSERT,UPDATE,DELETE ON ALL TABLES IN SCHEMA " + pgQuote(p.Spec.Schema) + " TO " + pgQuote(provisioner) + " WITH GRANT OPTION",
+		} {
+			if _, err := conn.Exec(ctx, command); err != nil {
+				t.Fatal(err)
+			}
+		}
+		tx, err := conn.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer tx.Rollback(ctx)
+		// Mimic a distinct native role owner keeping all role DDL, and let
+		// only the application owner delegate its schema to the provisioner.
+		p := p
+		other := suffix
+		other[7] ^= 1
+		p.BranchID = "br_" + hex.EncodeToString(other[:])
+		if _, err := tx.Exec(ctx, "SET LOCAL ROLE "+pgQuote(provisioner)); err != nil {
+			t.Fatal(err)
+		}
+		if err := applyDataAPIInstallationTx(ctx, tx, p, verifier, true); err == nil || !strings.Contains(err.Error(), "native role is unavailable") {
+			t.Fatalf("missing native role did not fail closed: %v", err)
+		}
+		if _, err := tx.Exec(ctx, "RESET ROLE"); err != nil {
+			t.Fatal(err)
+		}
+		stem := "neon-control:data-api:" + p.ProjectID + ":" + p.BranchID
+		login, app := pgQuote(dataAPILogin(p.BranchID)), pgQuote(dataAPIRole(p.BranchID))
+		for _, command := range []string{
+			"CREATE ROLE " + login + " LOGIN NOINHERIT PASSWORD " + pgLiteral(verifier),
+			"CREATE ROLE " + app + " NOLOGIN NOINHERIT",
+			"COMMENT ON ROLE " + login + " IS " + pgLiteral(stem),
+			"COMMENT ON ROLE " + app + " IS " + pgLiteral(stem),
+			"GRANT " + app + " TO " + login + " WITH INHERIT FALSE, SET TRUE, ADMIN FALSE",
+			"SET LOCAL ROLE " + pgQuote(provisioner),
+		} {
+			if _, err := tx.Exec(ctx, command); err != nil {
+				t.Fatal(err)
+			}
+		}
+		if err := applyDataAPIInstallationTx(ctx, tx, p, verifier, true); err != nil {
+			t.Fatal(err)
+		}
+	})
 	t.Run("actual_request_role_rls_read_and_write", func(t *testing.T) {
 		tx, e := conn.Begin(ctx)
 		if e != nil {

@@ -193,6 +193,13 @@ func (s *server) dataAPIMutate(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 412, "version_conflict", "Data API generation changed; refresh before retrying")
 		return
 	}
+	if action == "enable_data_api" && previous > 0 {
+		var original DataAPISpec
+		if json.Unmarshal(raw, &original) != nil || original.Database != p.Spec.Database {
+			fail(w, r, 409, "data_api_database_immutable", "Data API database changes require a separate identity migration; re-enable the original database")
+			return
+		}
+	}
 	var pending bool
 	err = tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM operations WHERE project_id=$1 AND state IN ('queued','running','retry_wait') AND (resource_id=$2 OR payload->>'branch_id'=$2))`, p.ProjectID, p.BranchID).Scan(&pending)
 	if err != nil || pending {
@@ -295,12 +302,32 @@ func (s *server) reconcileDataAPI(ctx context.Context, id, worker, action string
 	if !dataAPIEnabled() || validateDataAPI(p) != nil {
 		return errors.New("Data API Driver configuration unavailable")
 	}
-	var branch string
-	var generation int64
-	if err := s.db.QueryRow(ctx, `SELECT branch_id,generation FROM data_api_instances WHERE branch_id=$1 AND project_id=$2 AND endpoint_id=$3 AND secret_ref=$4`, p.BranchID, p.ProjectID, p.EndpointID, p.SecretRef).Scan(&branch, &generation); err != nil || generation != p.Generation {
-		return errors.New("Data API intent generation mismatch")
-	}
 	disabling := action == "disable_data_api"
+	authorize := func(ctx context.Context) error {
+		tx, err := s.db.Begin(ctx)
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback(ctx)
+		if err = assertCreateLeaseTx(ctx, tx, id, worker); err != nil {
+			return err
+		}
+		var intent bool
+		raw, err := json.Marshal(p.Spec)
+		if err != nil {
+			return err
+		}
+		err = tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM data_api_instances
+            WHERE branch_id=$1 AND project_id=$2 AND endpoint_id=$3 AND secret_ref=$4 AND generation=$5 AND spec=$6::jsonb)`,
+			p.BranchID, p.ProjectID, p.EndpointID, p.SecretRef, p.Generation, raw).Scan(&intent)
+		if err != nil || !intent {
+			return errLeaseLost
+		}
+		return tx.Commit(ctx)
+	}
+	if err := authorize(ctx); err != nil {
+		return err
+	}
 	steps := []func(context.Context) error{
 		func(ctx context.Context) error {
 			if disabling {
@@ -311,11 +338,16 @@ func (s *server) reconcileDataAPI(ctx context.Context, id, worker, action string
 		},
 		func(ctx context.Context) error {
 			if disabling {
-				return nil
+				return s.revokeDSGADataAPILogin(ctx, p, authorize)
 			}
-			return s.applyDataAPISQL(ctx, p)
+			return s.applyDataAPISQL(ctx, p, authorize)
 		},
-		func(ctx context.Context) error { return s.publishDataAPIIdentity(ctx, p, !disabling) },
+		func(ctx context.Context) error {
+			if err := authorize(ctx); err != nil {
+				return err
+			}
+			return s.publishDataAPIIdentity(ctx, p, !disabling)
+		},
 		func(ctx context.Context) error { return s.reconcileDataAPIWorkload(ctx, p, !disabling) },
 		func(ctx context.Context) error {
 			if !disabling {

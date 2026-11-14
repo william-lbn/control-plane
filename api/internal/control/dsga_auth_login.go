@@ -17,9 +17,11 @@ import (
 )
 
 const dsgaAuthLoginPath = "/dsg/v1/catalog/service-login"
+const dsgaDataAPIServiceLogin = "data_api"
 
 type dsgaAuthLoginRequest struct {
 	ProtocolVersion uint32        `json:"protocol_version"`
+	Service         string        `json:"service,omitempty"`
 	ProjectID       string        `json:"project_id"`
 	BranchID        string        `json:"branch_id"`
 	EndpointID      string        `json:"endpoint_id"`
@@ -31,6 +33,7 @@ type dsgaAuthLoginRequest struct {
 
 type dsgaAuthLoginReceipt struct {
 	ProtocolVersion uint32        `json:"protocol_version"`
+	Service         string        `json:"service,omitempty"`
 	BranchID        string        `json:"branch_id"`
 	PGBootID        dsgapi.Uint64 `json:"pg_boot_id"`
 	Generation      dsgapi.Uint64 `json:"generation"`
@@ -54,11 +57,25 @@ func dsgaAuthLoginJWT(key ed25519.PrivateKey, runtime *dsgaEndpointRuntime, raw 
 // authorizing one exact request. No credential or authorization is persisted
 // in the public operation result.
 func (s *server) reconcileDSGAAuthLogin(ctx context.Context, runtime *dsgaEndpointRuntime, p managedAuthPayload, verifier *string, authorize func(context.Context) error) error {
+	return s.reconcileDSGAServiceLogin(ctx, runtime, authLoginRequest(p, verifier), authorize)
+}
+
+func authLoginRequest(p managedAuthPayload, verifier *string) dsgaAuthLoginRequest {
+	return dsgaAuthLoginRequest{ProtocolVersion: 1, ProjectID: p.ProjectID, BranchID: p.BranchID,
+		EndpointID: p.EndpointID, Database: p.Spec.Database, Generation: dsgapi.Uint64(p.Generation), Verifier: verifier}
+}
+
+func dataAPILoginRequest(p dataAPIPayload, verifier *string) dsgaAuthLoginRequest {
+	return dsgaAuthLoginRequest{ProtocolVersion: 1, Service: dsgaDataAPIServiceLogin, ProjectID: p.ProjectID, BranchID: p.BranchID,
+		EndpointID: p.EndpointID, Database: p.Spec.Database, Generation: dsgapi.Uint64(p.Generation), Verifier: verifier}
+}
+
+func (s *server) reconcileDSGAServiceLogin(ctx context.Context, runtime *dsgaEndpointRuntime, input dsgaAuthLoginRequest, authorize func(context.Context) error) error {
 	if authorize == nil {
 		return errDSGACreationIdentity
 	}
-	return s.applyDSGAAuthLogin(ctx, runtime, p, verifier, 0, func(ctx context.Context) error {
-		latest, err := s.dsgaEndpointRuntime(ctx, p.ProjectID, p.EndpointID)
+	return s.applyDSGAServiceLogin(ctx, runtime, input, func(ctx context.Context) error {
+		latest, err := s.dsgaEndpointRuntime(ctx, input.ProjectID, input.EndpointID)
 		if err != nil || latest == nil || latest.Operation != runtime.Operation || latest.VMUID != runtime.VMUID {
 			return errDSGACreationIdentity
 		}
@@ -66,17 +83,29 @@ func (s *server) reconcileDSGAAuthLogin(ctx context.Context, runtime *dsgaEndpoi
 	})
 }
 
-// The caller proves which operation owns this generation. A resume can use
-// its bound, initialized Writer before that Writer becomes the active endpoint.
 func (s *server) applyDSGAAuthLogin(ctx context.Context, runtime *dsgaEndpointRuntime, p managedAuthPayload, verifier *string, boot dsgapi.Uint64, authorize func(context.Context) error) error {
+	input := authLoginRequest(p, verifier)
+	input.PGBootID = boot
+	return s.applyDSGAServiceLogin(ctx, runtime, input, authorize)
+}
+
+// A resume may use its own bound, initialized Writer before it becomes active.
+func (s *server) applyDSGAServiceLogin(ctx context.Context, runtime *dsgaEndpointRuntime, input dsgaAuthLoginRequest, authorize func(context.Context) error) error {
 	refusal := dataAPIPrerequisiteError{"auth_writer_service_login_unconfirmed", "Original DSGA Writer service login is unconfirmed"}
-	if runtime == nil || runtime.Payload.ProjectID != p.ProjectID || runtime.Payload.BranchID != p.BranchID ||
-		runtime.Payload.EndpointID != p.EndpointID || runtime.Payload.EndpointType != "read_write" ||
-		p.Generation < 1 || authorize == nil {
+	switch input.Service {
+	case dsgaDataAPIServiceLogin:
+		refusal = dataAPIPrerequisiteError{"data_api_writer_service_login_unconfirmed", "Original DSGA Writer Data API login is unconfirmed"}
+	case "":
+	default:
+		return errDSGACreationIdentity
+	}
+	if runtime == nil || runtime.Payload.ProjectID != input.ProjectID || runtime.Payload.BranchID != input.BranchID ||
+		runtime.Payload.EndpointID != input.EndpointID || runtime.Payload.EndpointType != "read_write" ||
+		input.Generation < 1 || uint64(input.Generation) > uint64(1<<63-1) || !validPGIdentifier(input.Database) || authorize == nil {
 		return refusal
 	}
 	_, vm, _, selected, err := s.readDSGABoundSelection(ctx, runtime)
-	if err != nil || boot != 0 && selected.Instance.PGBootID != boot {
+	if err != nil || input.PGBootID != 0 && selected.Instance.PGBootID != input.PGBootID {
 		return refusal
 	}
 	var uid string
@@ -95,15 +124,14 @@ func (s *server) applyDSGAAuthLogin(ctx context.Context, runtime *dsgaEndpointRu
 	if managedSQLRead(s.kube, ctx, "secret", name, &credential) != nil {
 		return refusal
 	}
-	source, err := snapshotDSGACredentials(&credential, runtime.Plan.Namespace, name, p.ProjectID, p.EndpointID)
+	source, err := snapshotDSGACredentials(&credential, runtime.Plan.Namespace, name, input.ProjectID, input.EndpointID)
 	if err != nil || source.reference() != runtime.Plan.Credentials {
 		return refusal
 	}
 	if err := authorize(ctx); err != nil {
 		return refusal
 	}
-	input := dsgaAuthLoginRequest{1, p.ProjectID, p.BranchID, p.EndpointID, selected.Instance.PGBootID,
-		p.Spec.Database, dsgapi.Uint64(p.Generation), verifier}
+	input.PGBootID = selected.Instance.PGBootID
 	key := ed25519.NewKeyFromSeed(credential.Data["controlSigningSeed"])
 	client := newDSGAProxy(nil).execution
 	client.Timeout = 35 * time.Second
@@ -136,7 +164,7 @@ func requestDSGAAuthLogin(ctx context.Context, client *http.Client, target strin
 	if err != nil || len(body) > 4096 || resp.StatusCode != http.StatusOK ||
 		resp.Header.Get("Content-Type") != "application/json" || resp.Header.Get("Cache-Control") != "no-store" ||
 		dsgapi.UnmarshalObject(body, &receipt) != nil ||
-		receipt != (dsgaAuthLoginReceipt{1, input.BranchID, input.PGBootID, input.Generation, input.Verifier != nil}) {
+		receipt != (dsgaAuthLoginReceipt{1, input.Service, input.BranchID, input.PGBootID, input.Generation, input.Verifier != nil}) {
 		return errors.New("service login receipt differs")
 	}
 	return nil

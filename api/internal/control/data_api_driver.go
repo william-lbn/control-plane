@@ -87,7 +87,7 @@ func (s *server) dsgaBackendConnection(ctx context.Context, runtime *dsgaEndpoin
 	return conn, nil
 }
 
-func (s *server) applyDataAPISQL(ctx context.Context, p dataAPIPayload) error {
+func (s *server) applyDataAPISQL(ctx context.Context, p dataAPIPayload, authorize func(context.Context) error) error {
 	release, err := s.acquireProbeGate(ctx, p.EndpointID, true)
 	if err != nil {
 		return err
@@ -101,17 +101,32 @@ func (s *server) applyDataAPISQL(ctx context.Context, p dataAPIPayload) error {
 	if err != nil {
 		return err
 	}
+	runtime, err := s.dsgaEndpointRuntime(ctx, p.ProjectID, p.EndpointID)
+	if err != nil {
+		return err
+	}
 	conn, err := s.dataAPIConnection(ctx, p)
 	if err != nil {
 		return err
 	}
 	defer conn.Close(context.Background())
+	if runtime != nil {
+		if err := verifyDataAPIDelegation(ctx, conn); err != nil {
+			return err
+		}
+		if err := s.reconcileDSGAServiceLogin(ctx, runtime, dataAPILoginRequest(p, &verifier), authorize); err != nil {
+			return err
+		}
+	}
 	tx, err := conn.Begin(ctx)
 	if err != nil {
 		return sqlExecutionError{"query", err}
 	}
 	defer tx.Rollback(ctx)
-	if err = applyDataAPISQLTx(ctx, tx, p, verifier); err != nil {
+	if err = applyDataAPIInstallationTx(ctx, tx, p, verifier, runtime != nil); err != nil {
+		return err
+	}
+	if err = authorize(ctx); err != nil {
 		return err
 	}
 	if err = tx.Commit(ctx); err != nil {
@@ -120,23 +135,32 @@ func (s *server) applyDataAPISQL(ctx context.Context, p dataAPIPayload) error {
 	return nil
 }
 
-// The same transaction implementation is tested against a disposable real
-// PostgreSQL server. Neon acceptance additionally checks the native probe role.
+type dataAPIDelegationReader interface {
+	QueryRow(context.Context, string, ...any) pgx.Row
+}
+
+func verifyDataAPIDelegation(ctx context.Context, db dataAPIDelegationReader) error {
+	var granted bool
+	if err := db.QueryRow(ctx, `SELECT has_database_privilege(current_user,current_database(),'CREATE') AND has_database_privilege(current_user,current_database(),'CONNECT WITH GRANT OPTION')`).Scan(&granted); err != nil {
+		return sqlExecutionError{"query", err}
+	}
+	if !granted {
+		return dataAPIPrerequisiteError{"data_api_database_grant_required", "Database owner must grant CREATE and CONNECT WITH GRANT OPTION to control_probe before enabling Data API"}
+	}
+	return nil
+}
+
 func applyDataAPISQLTx(ctx context.Context, tx pgx.Tx, p dataAPIPayload, verifier string) error {
+	return applyDataAPIInstallationTx(ctx, tx, p, verifier, false)
+}
+
+func applyDataAPIInstallationTx(ctx context.Context, tx pgx.Tx, p dataAPIPayload, verifier string, nativeLogin bool) error {
 	var err error
 	if _, err = tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,922741))`, p.BranchID); err != nil {
 		return sqlExecutionError{"query", err}
 	}
-	// CREATEDB does not grant CREATE on an existing database. The Neon
-	// provisioner needs explicit owner delegation to create its private guard
-	// schema and grant CONNECT to the restricted service login. This is not a
-	// privilege change to either runtime role or an RLS bypass.
-	var databaseGranted bool
-	if err = tx.QueryRow(ctx, `SELECT has_database_privilege(current_user,current_database(),'CREATE') AND has_database_privilege(current_user,current_database(),'CONNECT WITH GRANT OPTION')`).Scan(&databaseGranted); err != nil {
-		return sqlExecutionError{"query", err}
-	}
-	if !databaseGranted {
-		return dataAPIPrerequisiteError{"data_api_database_grant_required", "Database owner must grant CREATE and CONNECT WITH GRANT OPTION to control_probe before enabling Data API"}
+	if err = verifyDataAPIDelegation(ctx, tx); err != nil {
+		return err
 	}
 	marker := "neon-control:data-api:" + p.ProjectID + ":" + p.BranchID
 	login, role := dataAPILogin(p.BranchID), dataAPIRole(p.BranchID)
@@ -150,6 +174,9 @@ func applyDataAPISQLTx(ctx context.Context, tx pgx.Tx, p dataAPIPayload, verifie
 			return errors.New("Data API role ownership conflict")
 		}
 		if isNoRows(e) {
+			if nativeLogin {
+				return errors.New("Data API native role is unavailable")
+			}
 			if _, err = tx.Exec(ctx, "CREATE ROLE "+pgQuote(name)+" NOLOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS"); err != nil {
 				return sqlExecutionError{"query", err}
 			}
@@ -158,18 +185,20 @@ func applyDataAPISQLTx(ctx context.Context, tx pgx.Tx, p dataAPIPayload, verifie
 			}
 		}
 	}
-	if _, err = tx.Exec(ctx, "ALTER ROLE "+pgQuote(login)+" LOGIN PASSWORD "+pgLiteral(verifier)+" CONNECTION LIMIT 4"); err != nil {
-		return sqlExecutionError{"query", err}
-	}
-	// The pinned pool does not guarantee prompt physical disconnect while no
-	// requests arrive. Apply a server-side timeout only to our owned service
-	// login. PostgreSQL preserves active queries and idle transactions; neither
-	// user roles nor cluster defaults change. Real pool reconnection is a CI gate.
-	if _, err = tx.Exec(ctx, "ALTER ROLE "+pgQuote(login)+" SET idle_session_timeout = '5s'"); err != nil {
-		return sqlExecutionError{"query", err}
-	}
-	if _, err = tx.Exec(ctx, "GRANT "+pgQuote(role)+" TO "+pgQuote(login)+" WITH INHERIT FALSE, SET TRUE"); err != nil {
-		return sqlExecutionError{"query", err}
+	if !nativeLogin {
+		if _, err = tx.Exec(ctx, "ALTER ROLE "+pgQuote(login)+" LOGIN PASSWORD "+pgLiteral(verifier)+" CONNECTION LIMIT 4"); err != nil {
+			return sqlExecutionError{"query", err}
+		}
+		// The pinned pool does not guarantee prompt physical disconnect while no
+		// requests arrive. Apply a server-side timeout only to our owned service
+		// login. PostgreSQL preserves active queries and idle transactions; neither
+		// user roles nor cluster defaults change. Real pool reconnection is a CI gate.
+		if _, err = tx.Exec(ctx, "ALTER ROLE "+pgQuote(login)+" SET idle_session_timeout = '5s'"); err != nil {
+			return sqlExecutionError{"query", err}
+		}
+		if _, err = tx.Exec(ctx, "GRANT "+pgQuote(role)+" TO "+pgQuote(login)+" WITH INHERIT FALSE, SET TRUE"); err != nil {
+			return sqlExecutionError{"query", err}
+		}
 	}
 	var schemaExists bool
 	var unsafe, tables, functions int
@@ -221,7 +250,9 @@ END $guard$`, pgQuote(guard), pgLiteral(p.Spec.Audience), pgLiteral(p.BranchID),
 		"GRANT EXECUTE ON FUNCTION " + pgQuote(guard) + ".check_request() TO " + pgQuote(role),
 		"GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA " + pgQuote(p.Spec.Schema) + " TO " + pgQuote(role),
 		"GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA " + pgQuote(p.Spec.Schema) + " TO " + pgQuote(role),
-		"GRANT CONNECT ON DATABASE " + pgQuote(p.Spec.Database) + " TO " + pgQuote(login),
+	}
+	if !nativeLogin {
+		statements = append(statements, "GRANT CONNECT ON DATABASE "+pgQuote(p.Spec.Database)+" TO "+pgQuote(login))
 	}
 	for _, statement := range statements {
 		if _, err = tx.Exec(ctx, statement); err != nil {
@@ -245,6 +276,19 @@ END $guard$`, pgQuote(guard), pgLiteral(p.Spec.Audience), pgLiteral(p.BranchID),
 	}
 	if unexpected {
 		return errors.New("unexpected Data API role membership")
+	}
+	if nativeLogin {
+		if err := tx.QueryRow(ctx, `SELECT EXISTS(
+            SELECT FROM pg_roles login JOIN pg_auth_members m ON m.member=login.oid
+            JOIN pg_roles app ON app.oid=m.roleid
+            WHERE login.rolname=$1 AND login.rolcanlogin AND app.rolname=$2 AND NOT app.rolcanlogin
+            AND NOT m.inherit_option AND m.set_option AND NOT m.admin_option
+            AND has_database_privilege(login.oid,current_database(),'CONNECT'))`, login, role).Scan(&valid); err != nil {
+			return sqlExecutionError{"query", err}
+		}
+		if !valid {
+			return errors.New("Data API native role membership is unconfirmed")
+		}
 	}
 	return nil
 }

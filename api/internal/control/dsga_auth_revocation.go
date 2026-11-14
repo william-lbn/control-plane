@@ -33,16 +33,15 @@ func (s *server) revokeDSGAAuthLogin(ctx context.Context, p managedAuthPayload, 
 	case "active":
 		return s.reconcileDSGAAuthLogin(ctx, runtime, p, nil, authorize)
 	case "suspended":
-		return s.deferDSGAAuthRevocation(ctx, runtime, authorize)
+		return s.confirmSuspendedDSGAServiceWriter(ctx, runtime, authorize)
 	default:
 		return errDSGACreationIdentity
 	}
 }
 
-// Confirm that there is no live Writer to revoke. The disabled metadata
-// generation remains the durable intent and is applied before publishing a
-// successor's route, even for rows disabled by older releases.
-func (s *server) deferDSGAAuthRevocation(ctx context.Context, runtime *dsgaEndpointRuntime, authorize func(context.Context) error) error {
+// Confirm that the original Writer settled and no longer has live execution
+// authority before accepting a durable service change against it.
+func (s *server) confirmSuspendedDSGAServiceWriter(ctx context.Context, runtime *dsgaEndpointRuntime, authorize func(context.Context) error) error {
 	p := runtime.Payload
 	var suspension string
 	err := s.db.QueryRow(ctx, `SELECT o.id FROM operations o JOIN dsga_suspension_retirements r ON r.operation_id=o.id

@@ -8,7 +8,14 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
-func testSuspendedDSGAAuthAdmission(t *testing.T, ctx context.Context, b *dsgaCreationBinding) {
+func testSuspendedDSGAServiceAdmission(t *testing.T, ctx context.Context, b *dsgaCreationBinding) {
+	t.Helper()
+	for _, service := range []string{"managed_auth", "data_api"} {
+		t.Run(service, func(t *testing.T) { testSuspendedDSGAService(t, ctx, b, service) })
+	}
+}
+
+func testSuspendedDSGAService(t *testing.T, ctx context.Context, b *dsgaCreationBinding, service string) {
 	t.Helper()
 	tx, err := b.server.db.Begin(ctx)
 	if err != nil {
@@ -16,30 +23,30 @@ func testSuspendedDSGAAuthAdmission(t *testing.T, ctx context.Context, b *dsgaCr
 	}
 	defer tx.Rollback(ctx)
 	p := b.intent.createPayload
-	if _, err = tx.Exec(ctx, `INSERT INTO managed_auth_instances(branch_id,project_id,endpoint_id,generation,state,spec,secret_ref)
+	if _, err = tx.Exec(ctx, `INSERT INTO `+pgQuote(service+"_instances")+`(branch_id,project_id,endpoint_id,generation,state,spec,secret_ref)
  VALUES($1,$2,$3,8,'disabling','{"database":"neondb"}','auth-previous')`, p.BranchID, p.ProjectID, p.EndpointID); err != nil {
 		t.Fatal(err)
 	}
 	const query = `INSERT INTO operations(id,project_id,resource_type,resource_id,action,state,actor_id,request_id,payload)
- VALUES($1,$2,'managed_auth',$3,$4,'queued','auth-fixture','auth-fixture',
+ VALUES($1,$2,$7,$3,$4,'queued','service-fixture','service-fixture',
  jsonb_build_object('project_id',$2::text,'branch_id',$3::text,'endpoint_id',$5::text,'generation',$6::int,
  'secret_ref','auth-previous','spec','{"database":"neondb"}'::jsonb))`
 	for _, tc := range []struct {
 		action     string
 		generation int
-	}{{"enable_managed_auth", 8}, {"disable_managed_auth", 7}} {
+	}{{"enable_" + service, 8}, {"disable_" + service, 7}} {
 		attempt, err := tx.Begin(ctx)
 		if err != nil {
 			t.Fatal(err)
 		}
-		_, err = attempt.Exec(ctx, query, "auth-negative", p.ProjectID, p.BranchID, tc.action, p.EndpointID, tc.generation)
+		_, err = attempt.Exec(ctx, query, "auth-negative", p.ProjectID, p.BranchID, tc.action, p.EndpointID, tc.generation, service)
 		_ = attempt.Rollback(ctx)
 		var denied *pgconn.PgError
 		if !errors.As(err, &denied) || denied.Code != "23514" {
 			t.Fatalf("unexpected admission for %s at generation %d: %v", tc.action, tc.generation, err)
 		}
 	}
-	if _, err = tx.Exec(ctx, query, "auth-suspended-original", p.ProjectID, p.BranchID, "disable_managed_auth", p.EndpointID, 8); err != nil {
+	if _, err = tx.Exec(ctx, query, "suspended-"+service, p.ProjectID, p.BranchID, "disable_"+service, p.EndpointID, 8, service); err != nil {
 		t.Fatal(err)
 	}
 }
