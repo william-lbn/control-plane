@@ -145,6 +145,11 @@ func (b dsgaBootstrapBudget) validate() error {
 }
 
 func (plan dsgaCreationPlan) validate(p createPayload) error {
+	storageFork := p.EndpointID == "" && p.ParentBranchID != "" && p.ParentBranchID != p.BranchID &&
+		p.ParentTimelineID != "" && p.EndpointType == "read_write" && p.CatalogPolicy == catalogPreserveInheritedSQL
+	if p.EndpointID == "" && (!storageFork || plan.Credentials != (dsgaCredentialReference{})) {
+		return errDSGACreationPlan
+	}
 	if plan.RetainCatalog && (!plan.VM.generic() || p.ParentTimelineID != "" || p.ParentLSN != "" || p.RestoreSource != "" || p.CatalogPolicy != "") {
 		return errDSGACreationPlan
 	}
@@ -169,7 +174,7 @@ func (plan dsgaCreationPlan) validate(p createPayload) error {
 	if err != nil || accepted.Unix() <= 0 || accepted.UTC().Format(time.RFC3339Nano) != plan.AcceptedAt {
 		return errDSGACreationPlan
 	}
-	if p.ProjectID == "" || p.BranchID == "" || p.EndpointID == "" || !dsgaStorageID.MatchString(p.TenantID) || !dsgaStorageID.MatchString(p.TimelineID) ||
+	if p.ProjectID == "" || p.BranchID == "" || !dsgaStorageID.MatchString(p.TenantID) || !dsgaStorageID.MatchString(p.TimelineID) ||
 		(p.EndpointType != "read_write" && p.EndpointType != "read_only") {
 		return errDSGACreationPlan
 	}
@@ -285,7 +290,7 @@ func addDSGACreateOperation(ctx context.Context, tx pgx.Tx, baseAction, resource
 	} else if baseAction == "create_endpoint" {
 		wantedType, wantedID = "endpoint", p.EndpointID
 	}
-	if resourceType != wantedType || resourceID != wantedID {
+	if resourceType != wantedType || resourceID != wantedID || (p.EndpointID == "" && baseAction != "create_branch") {
 		return errDSGACreationPlan
 	}
 	// 与现有准入一致按父项目先取锁；后面的INSERT触发生命周期/TTL守卫。这里只

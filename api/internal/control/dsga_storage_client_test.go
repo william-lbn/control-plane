@@ -88,6 +88,38 @@ func dsgaStorageTestClient(t *testing.T, handler http.Handler) *dsgaStorageClien
 	return c
 }
 
+func TestDSGAStorageTimestampUsesExactControllerRead(t *testing.T) {
+	tenant, timeline := strings.Repeat("1", 32), strings.Repeat("2", 32)
+	at := time.Date(2026, 1, 2, 3, 4, 5, 0, time.FixedZone("offset", 8*3600))
+	path := "/v1/tenant/" + tenant + "/timeline/" + timeline + "/get_lsn_by_timestamp"
+	var calls atomic.Int32
+	var c *dsgaStorageClient
+	c = dsgaStorageTestClient(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		if r.Method != http.MethodGet || r.URL.Path != path || len(r.URL.Query()) != 1 ||
+			r.URL.Query().Get("timestamp") != at.UTC().Format(time.RFC3339Nano) ||
+			!validDSGAStorageToken(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer "), c.publicKey, "pageserverapi") {
+			t.Error("timestamp lookup left its exact controller contract")
+			creationStatus(w, 400)
+			return
+		}
+		jsonResponse(w, 200, record{"kind": "present", "lsn": "0/200"})
+	}))
+	ctx := context.Background()
+	for _, id := range []string{tenant + "/timeline", tenant + "?extra=true"} {
+		if _, err := c.timestampPoint(ctx, id, timeline, at); err == nil {
+			t.Fatal("accepted malformed tenant ID")
+		}
+	}
+	if _, err := c.request(ctx, http.MethodGet, path[1:]+"?timestamp=2026-01-01", nil); err == nil {
+		t.Fatal("generic storage requests accepted query input")
+	}
+	point, err := c.timestampPoint(ctx, tenant, timeline, at)
+	if err != nil || point["lsn"] != "0/200" || calls.Load() != 1 {
+		t.Fatalf("wrong timestamp point %#v, %v, %d", point, err, calls.Load())
+	}
+}
+
 func TestDSGAStorageNativeScopesStrictClaimsAndSignature(t *testing.T) {
 	public, private, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {

@@ -331,6 +331,7 @@ type createPayload struct {
 	EndpointType              string `json:"endpoint_type,omitempty"`
 	TenantID                  string `json:"tenant_id"`
 	TimelineID                string `json:"timeline_id"`
+	ParentBranchID            string `json:"parent_branch_id,omitempty"`
 	ParentTimelineID          string `json:"parent_timeline_id"`
 	ParentLSN                 string `json:"parent_lsn"`
 	RestoreSource             string `json:"restore_source,omitempty"`

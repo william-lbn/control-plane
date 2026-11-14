@@ -100,6 +100,18 @@ func (binding *dsgaCreationBinding) lockOperationTx(ctx context.Context, tx pgx.
 		(branchState != "ready" && (base == "create_endpoint" || (branchState != "creating" && branchState != "error"))) {
 		return errDSGACreationIdentity
 	}
+	if base == "create_branch" && binding.intent.EndpointID == "" {
+		p := binding.intent.createPayload
+		var sameParent bool
+		err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM branches child JOIN branches parent ON parent.id=child.parent_branch_id
+ WHERE child.id=$1 AND child.project_id=$2 AND child.parent_lsn=$3 AND parent.id=$4 AND parent.project_id=$2
+ AND parent.timeline_id=$5 AND parent.state='ready' AND parent.deleted_at IS NULL AND parent.expires_at IS NULL)`,
+			p.BranchID, p.ProjectID, p.ParentLSN, p.ParentBranchID, p.ParentTimelineID).Scan(&sameParent)
+		if err != nil || !sameParent {
+			return errDSGACreationIdentity
+		}
+		return nil
+	}
 	var endpointBranch, endpointState string
 	err = tx.QueryRow(ctx, `SELECT branch_id,state FROM endpoints WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL`, binding.intent.EndpointID, project).
 		Scan(&endpointBranch, &endpointState)
@@ -137,7 +149,8 @@ func (s *server) loadDSGACreationBinding(ctx context.Context, operationID, worke
 	var intent dsgaCreationEnvelope
 	// 先做有限大小的身份解析，再在行锁内重读全部原始payload并核对摘要。
 	// 首次读取本身不授予创建权；两次读取间的改写、换主和父生命周期变化都要拒绝。
-	if len(payload) > 1<<20 || json.Unmarshal(payload, &intent) != nil || dsgaCreationBaseAction(action) == "" || intent.ProjectID == "" || intent.BranchID == "" || intent.EndpointID == "" ||
+	if len(payload) > 1<<20 || json.Unmarshal(payload, &intent) != nil || dsgaCreationBaseAction(action) == "" || intent.ProjectID == "" || intent.BranchID == "" ||
+		(intent.EndpointID == "" && action != "create_branch_dsga_v1") ||
 		intent.Creation.ProtocolVersion != 1 || !dsgaSupportedPostgresVersion(intent.Creation.PostgresVersion) || intent.Creation.Namespace != s.kube.namespace ||
 		dsgapi.ValidateIncarnation(intent.Creation.Incarnation) != nil || dsgapi.ValidateID(intent.Creation.ComputeInstanceID, "Compute") != nil {
 		return nil, errDSGACreationIdentity

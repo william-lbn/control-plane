@@ -155,6 +155,21 @@ func (binding *dsgaCreationBinding) prepareTimelineWithStorage(ctx context.Conte
 		if err = validateDSGATimelineAggregate(parent, p.TenantID, p.ParentTimelineID, plan.PostgresVersion, "", "", false); err != nil {
 			return err
 		}
+		if p.EndpointID == "" && current.action == "create_branch_dsga_v1" {
+			window, err := dsgaTimelineRestoreWindow(parent, p.TenantID, p.ParentTimelineID, plan.PostgresVersion)
+			if err != nil {
+				return err
+			}
+			if err := restoreLSNWithinWindow(p.ParentLSN, window); err != nil {
+				return err
+			}
+			if _, err := current.timelineIdentity(ctx, request, false); err != nil {
+				return err
+			}
+			if _, err := storage.request(ctx, http.MethodPost, "v1/tenant/"+p.TenantID+"/timeline/"+p.ParentTimelineID+"/lsn_lease", map[string]string{"lsn": p.ParentLSN}); err != nil {
+				return err
+			}
+		}
 	}
 	// 排队/祖先HTTP可跨过lease边界。此处再按原payload/lease读锁对账，仍不持锁
 	// 跨POST；无法原子覆盖网络窗口，故未知状态不能被后续清理误认为未执行。

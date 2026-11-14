@@ -23,6 +23,15 @@ type restorePointObservation struct {
 }
 
 func (k *kubeClient) observeRestorePoint(ctx context.Context, tenant, timeline, timestamp, lsn string) (restorePointObservation, error) {
+	return observeRestorePoint(timeline, timestamp, lsn, func() (restoreWindow, error) {
+		return k.timelineRestoreWindow(ctx, tenant, timeline)
+	}, func(at time.Time) (map[string]any, error) {
+		return k.serviceRequest(ctx, "pageserver-managed", 9898,
+			"v1/tenant/"+tenant+"/timeline/"+timeline+"/get_lsn_by_timestamp?timestamp="+url.QueryEscape(at.Format(time.RFC3339Nano)), http.MethodGet, nil)
+	})
+}
+
+func observeRestorePoint(timeline, timestamp, lsn string, readWindow func() (restoreWindow, error), readTimestamp func(time.Time) (map[string]any, error)) (restorePointObservation, error) {
 	value := restorePointObservation{TimelineID: timeline}
 	if timestamp == "" && lsn == "" {
 		return value, restoreError{422, "restore_point_required"}
@@ -30,7 +39,7 @@ func (k *kubeClient) observeRestorePoint(ctx context.Context, tenant, timeline, 
 	if err := validateRestoreInput(timestamp, lsn, time.Now()); err != nil {
 		return value, err
 	}
-	window, err := k.timelineRestoreWindow(ctx, tenant, timeline)
+	window, err := readWindow()
 	if err != nil {
 		return value, err
 	}
@@ -38,8 +47,7 @@ func (k *kubeClient) observeRestorePoint(ctx context.Context, tenant, timeline, 
 	if timestamp != "" {
 		t, _ := time.Parse(time.RFC3339Nano, timestamp)
 		value.Timestamp = t.UTC().Format(time.RFC3339Nano)
-		point, err := k.serviceRequest(ctx, "pageserver-managed", 9898,
-			"v1/tenant/"+tenant+"/timeline/"+timeline+"/get_lsn_by_timestamp?timestamp="+url.QueryEscape(value.Timestamp), http.MethodGet, nil)
+		point, err := readTimestamp(t.UTC())
 		if err != nil {
 			return value, err
 		}
@@ -69,6 +77,23 @@ func (k *kubeClient) observeRestorePoint(ctx context.Context, tenant, timeline, 
 	return value, nil
 }
 
+func (s *server) observeDSGARestorePoint(ctx context.Context, plan *dsgaCreationPlan, tenant, timeline, timestamp, lsn string) (restorePointObservation, error) {
+	client, err := newDSGAStorageClientAccess(ctx, s.kube, plan.Storage, timestamp != "")
+	if err != nil {
+		return restorePointObservation{}, err
+	}
+	defer client.CloseIdleConnections()
+	return observeRestorePoint(timeline, timestamp, lsn, func() (restoreWindow, error) {
+		item, err := client.request(ctx, http.MethodGet, "control/v1/tenant/"+tenant+"/timeline/"+timeline, nil)
+		if err != nil {
+			return restoreWindow{}, err
+		}
+		return dsgaTimelineRestoreWindow(item, tenant, timeline, plan.PostgresVersion)
+	}, func(at time.Time) (map[string]any, error) {
+		return client.timestampPoint(ctx, tenant, timeline, at)
+	})
+}
+
 func (s *server) previewRestorePoint(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	if !pitrEnabled() {
@@ -91,7 +116,18 @@ func (s *server) previewRestorePoint(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	value, err := s.kube.observeRestorePoint(r.Context(), stringVal(branch["tenant_id"]), stringVal(branch["timeline_id"]), query.Get("timestamp"), query.Get("lsn"))
+	tenant, timeline := stringVal(branch["tenant_id"]), stringVal(branch["timeline_id"])
+	plan, err := readDSGAProjectStoragePlan(r.Context(), s.db, r.PathValue("project"), tenant)
+	if err != nil {
+		fail(w, r, 503, "restore_point_unavailable", "Could not verify the original storage profile")
+		return
+	}
+	var value restorePointObservation
+	if plan == nil {
+		value, err = s.kube.observeRestorePoint(r.Context(), tenant, timeline, query.Get("timestamp"), query.Get("lsn"))
+	} else {
+		value, err = s.observeDSGARestorePoint(r.Context(), plan, tenant, timeline, query.Get("timestamp"), query.Get("lsn"))
+	}
 	if err != nil {
 		var point restoreError
 		if errors.As(err, &point) {

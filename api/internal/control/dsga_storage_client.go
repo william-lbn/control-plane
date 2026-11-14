@@ -13,6 +13,7 @@ import (
 	"mime"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -217,11 +218,29 @@ func storageRequestScope(method, path string) (string, bool) {
 	if method == http.MethodPost && len(parts) == 4 && parts[0] == "v1" && parts[1] == "tenant" && dsgaStorageID.MatchString(parts[2]) && parts[3] == "timeline" {
 		return "pageserverapi", true
 	}
+	if method == http.MethodPost && len(parts) == 6 && parts[0] == "v1" && parts[1] == "tenant" && dsgaStorageID.MatchString(parts[2]) &&
+		parts[3] == "timeline" && dsgaStorageID.MatchString(parts[4]) && parts[5] == "lsn_lease" {
+		return "pageserverapi", true
+	}
 	return "", false
 }
 
 func (c *dsgaStorageClient) request(ctx context.Context, method, path string, body any) (map[string]any, error) {
 	scope, allowed := storageRequestScope(method, path)
+	return c.storageRequest(ctx, method, path, body, scope, allowed)
+}
+
+func (c *dsgaStorageClient) timestampPoint(ctx context.Context, tenant, timeline string, timestamp time.Time) (map[string]any, error) {
+	if !dsgaStorageID.MatchString(tenant) || !dsgaStorageID.MatchString(timeline) || timestamp.IsZero() {
+		return nil, errDSGAStorageManagement
+	}
+	path := "v1/tenant/" + tenant + "/timeline/" + timeline + "/get_lsn_by_timestamp?timestamp=" + url.QueryEscape(timestamp.UTC().Format(time.RFC3339Nano))
+	// The existing controller forwards this exact GET to shard zero and uses
+	// its PageServerApi credential. All other query-bearing paths stay closed.
+	return c.storageRequest(ctx, http.MethodGet, path, nil, "pageserverapi", true)
+}
+
+func (c *dsgaStorageClient) storageRequest(ctx context.Context, method, path string, body any, scope string, allowed bool) (map[string]any, error) {
 	if c == nil || c.http == nil || !allowed || (method == http.MethodGet && body != nil) || (method == http.MethodPost && body == nil) {
 		return nil, errDSGAStorageManagement
 	}
@@ -240,6 +259,8 @@ func (c *dsgaStorageClient) request(ctx context.Context, method, path string, bo
 	token := c.readToken
 	if scope == "pageserverapi" {
 		token = c.writeToken
+	}
+	if method == http.MethodPost {
 		req.Header.Set("Content-Type", "application/json")
 	}
 	// 构造时验签不代替发送时检查：客户端存活期间可跨过可选exp/nbf边界。
@@ -280,6 +301,15 @@ func (c *dsgaStorageClient) request(ctx context.Context, method, path string, bo
 	}
 	data, err := io.ReadAll(io.LimitReader(response.Body, int64(limit)+1))
 	if err != nil || validate(data, limit, values) != nil {
+		return nil, errDSGAStorageManagement
+	}
+	// The controller replies with JSON null only after leasing the requested
+	// point on every current shard. The branch POST and exact ancestry readback
+	// still have to succeed while the original operation is active.
+	if method == http.MethodPost && strings.HasSuffix(path, "/lsn_lease") {
+		if bytes.Equal(bytes.TrimSpace(data), []byte("null")) {
+			return nil, nil
+		}
 		return nil, errDSGAStorageManagement
 	}
 	decoder := json.NewDecoder(bytes.NewReader(data))

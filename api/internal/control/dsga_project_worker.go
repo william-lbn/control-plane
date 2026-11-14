@@ -43,6 +43,61 @@ func (s *server) reconcileDSGAProject(ctx context.Context, binding *dsgaCreation
 	return s.reconcileDSGACompute(ctx, binding, 2)
 }
 
+func (s *server) reconcileDSGAStorageBranch(ctx context.Context, binding *dsgaCreationBinding) error {
+	p := binding.intent.createPayload
+	if binding.action != "create_branch_dsga_v1" || p.EndpointID != "" || p.ParentBranchID == "" {
+		return errDSGACreationIdentity
+	}
+	if err := s.createStep(ctx, binding.operationID, binding.workerID, 0, "create_timeline", binding.prepareTimeline); err != nil {
+		return err
+	}
+	return s.createStep(ctx, binding.operationID, binding.workerID, 1, "persist_ready_state", binding.persistStorageBranchReady)
+}
+
+func (b *dsgaCreationBinding) persistStorageBranchReady(ctx context.Context) error {
+	tx, err := b.server.db.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	p := b.intent.createPayload
+	if err = lockDSGAProjectParents(ctx, tx, p); err != nil {
+		return err
+	}
+	if err = b.lockOperationTx(ctx, tx); err != nil {
+		return err
+	}
+	var confirmed bool
+	if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM dsga_creation_timelines WHERE operation_id=$1 AND confirmed_at IS NOT NULL)
+ AND EXISTS(SELECT 1 FROM operation_steps WHERE operation_id=$1 AND ordinal=0 AND state='succeeded')`, b.operationID).Scan(&confirmed); err != nil {
+		return err
+	}
+	if !confirmed || b.action != "create_branch_dsga_v1" || p.EndpointID != "" {
+		return errDSGACreationIdentity
+	}
+	tag, err := tx.Exec(ctx, `UPDATE branches SET state='ready',version=version+CASE WHEN state='ready' THEN 0 ELSE 1 END
+ WHERE id=$1 AND project_id=$2 AND timeline_id=$3 AND deleted_at IS NULL`, p.BranchID, p.ProjectID, p.TimelineID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() != 1 {
+		return errDSGACreationIdentity
+	}
+	tag, err = tx.Exec(ctx, `UPDATE branch_service_instances SET desired_state='suspended',observed_state='suspended',
+ version=version+CASE WHEN observed_state='suspended' THEN 0 ELSE 1 END,last_observed_at=clock_timestamp()
+ WHERE branch_id=$1 AND service_kind='postgres' AND driver_version='dsga-v1'`, p.BranchID)
+	if err != nil {
+		return err
+	}
+	if tag.RowsAffected() != 1 {
+		return errDSGACreationIdentity
+	}
+	if err = b.checkLease(ctx, tx); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
 func (s *server) reconcileDSGACompute(ctx context.Context, binding *dsgaCreationBinding, first int) error {
 	step := func(offset int, name string, fn func(context.Context) error) error {
 		return s.createStep(ctx, binding.operationID, binding.workerID, first+offset, name, fn)
@@ -390,20 +445,17 @@ func (binding *dsgaCreationBinding) persistComputeReady(ctx context.Context, fac
 // 与公开父生命周期准入一致，避免Operation→Project的反向锁序。
 // 只在提交资源终态时调用；外部Kube/HTTP/SQL探针永远不在此事务内执行。
 func lockDSGAProjectParents(ctx context.Context, tx pgx.Tx, p createPayload) error {
-	for _, query := range []struct {
-		sql  string
-		args []any
-	}{
-		{`SELECT id FROM projects WHERE id=$1 AND deleted_at IS NULL FOR UPDATE`, []any{p.ProjectID}},
-		{`SELECT id FROM branches WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL FOR UPDATE`, []any{p.BranchID, p.ProjectID}},
-		{`SELECT id FROM endpoints WHERE id=$1 AND project_id=$2 AND branch_id=$3 AND deleted_at IS NULL FOR UPDATE`, []any{p.EndpointID, p.ProjectID, p.BranchID}},
-	} {
-		var id string
-		if err := tx.QueryRow(ctx, query.sql, query.args...).Scan(&id); err != nil {
-			return err
-		}
+	var id string
+	if err := tx.QueryRow(ctx, `SELECT id FROM projects WHERE id=$1 AND deleted_at IS NULL FOR UPDATE`, p.ProjectID).Scan(&id); err != nil {
+		return err
 	}
-	return nil
+	if err := tx.QueryRow(ctx, `SELECT id FROM branches WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL FOR UPDATE`, p.BranchID, p.ProjectID).Scan(&id); err != nil {
+		return err
+	}
+	if p.EndpointID == "" {
+		return nil
+	}
+	return tx.QueryRow(ctx, `SELECT id FROM endpoints WHERE id=$1 AND project_id=$2 AND branch_id=$3 AND deleted_at IS NULL FOR UPDATE`, p.EndpointID, p.ProjectID, p.BranchID).Scan(&id)
 }
 
 func dsgaProjectCreateSteps() []string {

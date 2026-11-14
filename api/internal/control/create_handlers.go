@@ -327,6 +327,20 @@ func (s *server) createProject(w http.ResponseWriter, r *http.Request) {
 	s.acceptCreate(w, r, p.ProjectID, p.ProjectID, opID, "project")
 }
 
+type branchCreateRequest struct {
+	Name                   string        `json:"name"`
+	ParentBranchID         string        `json:"parent_branch_id"`
+	CreateEndpoint         *bool         `json:"create_endpoint"`
+	Password               string        `json:"password"`
+	Autoscaling            *createBounds `json:"autoscaling"`
+	ParentTimestamp        string        `json:"parent_timestamp,omitempty"`
+	ParentLSN              string        `json:"parent_lsn,omitempty"`
+	ExpectedParentTimeline string        `json:"expected_parent_timeline_id,omitempty"`
+	FunctionCopyPolicy     string        `json:"function_copy_policy,omitempty"`
+	AcknowledgeFunctions   bool          `json:"acknowledge_function_environment_copy,omitempty"`
+	AcknowledgeCurrentCode bool          `json:"acknowledge_current_functions_for_historical_data,omitempty"`
+}
+
 func (s *server) createBranch(w http.ResponseWriter, r *http.Request) {
 	if !creationEnabled() {
 		fail(w, r, 503, "creation_disabled", "Creation driver is not enabled")
@@ -340,19 +354,7 @@ func (s *server) createBranch(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 422, "managed_project_required", "Ready managed project required")
 		return
 	}
-	var body struct {
-		Name                   string        `json:"name"`
-		ParentBranchID         string        `json:"parent_branch_id"`
-		CreateEndpoint         *bool         `json:"create_endpoint"`
-		Password               string        `json:"password"`
-		Autoscaling            *createBounds `json:"autoscaling"`
-		ParentTimestamp        string        `json:"parent_timestamp,omitempty"`
-		ParentLSN              string        `json:"parent_lsn,omitempty"`
-		ExpectedParentTimeline string        `json:"expected_parent_timeline_id,omitempty"`
-		FunctionCopyPolicy     string        `json:"function_copy_policy,omitempty"`
-		AcknowledgeFunctions   bool          `json:"acknowledge_function_environment_copy,omitempty"`
-		AcknowledgeCurrentCode bool          `json:"acknowledge_current_functions_for_historical_data,omitempty"`
-	}
+	var body branchCreateRequest
 	if err := readJSON(r, &body); err != nil {
 		fail(w, r, 422, "invalid_request", "Invalid branch request")
 		return
@@ -370,6 +372,15 @@ func (s *server) createBranch(w http.ResponseWriter, r *http.Request) {
 	}
 	if historical && !pitrEnabled() {
 		fail(w, r, 503, "pitr_disabled", "Historical branch restore is not enabled")
+		return
+	}
+	plan, err := readDSGAProjectStoragePlan(r.Context(), s.db, r.PathValue("project"), stringVal(project["tenant_id"]))
+	if err != nil {
+		s.dsgaCreationFailure(w, r, err)
+		return
+	}
+	if plan != nil {
+		s.createDSGAStorageBranch(w, r, body, plan)
 		return
 	}
 	bounds := defaults(body.Autoscaling)

@@ -191,16 +191,19 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 			} else {
 				stepErr = s.reconcileCatalog(runCtx, id, workerID, action, p)
 			}
-		case "create_project_dsga_v1", "create_endpoint_dsga_v1":
+		case "create_project_dsga_v1", "create_branch_dsga_v1", "create_endpoint_dsga_v1":
 			// 复用原Worker租约和步骤；只从不可变Operation重载计划，
 			// 不把版本化创建送入legacy VM/凭据/固定PG版本路径。
 			var binding *dsgaCreationBinding
 			binding, stepErr = s.loadDSGACreationBinding(runCtx, id, workerID)
 			if stepErr == nil {
 				createP = binding.intent.createPayload
-				if action == "create_endpoint_dsga_v1" {
+				switch action {
+				case "create_endpoint_dsga_v1":
 					stepErr = s.reconcileDSGAEndpoint(runCtx, binding)
-				} else {
+				case "create_branch_dsga_v1":
+					stepErr = s.reconcileDSGAStorageBranch(runCtx, binding)
+				default:
 					stepErr = s.reconcileDSGAProject(runCtx, binding)
 				}
 			}

@@ -118,24 +118,40 @@ func dsgaTimelineRestoreWindow(item map[string]any, tenant, timeline string, maj
 	return restoreWindow{MinimumLSN: formatRestoreLSN(minimum), LatestLSN: formatRestoreLSN(latest), ObservedAt: time.Now().UTC()}, nil
 }
 
-func (s *server) branchRestoreWindow(ctx context.Context, project, tenant, timeline string) (restoreWindow, error) {
+func readDSGAProjectStoragePlan(ctx context.Context, db connectionDefaultReader, project, tenant string) (*dsgaCreationPlan, error) {
 	// The original project operation already freezes the storage trust domain.
 	// A historical branch must keep this domain even after a catalog rollout.
 	var count int
 	var raw *string
-	err := s.db.QueryRow(ctx, `SELECT count(*),max((payload->'dsga_creation')::text)
+	err := db.QueryRow(ctx, `SELECT count(*),max((payload->'dsga_creation')::text)
  FILTER (WHERE state='succeeded' AND payload->>'tenant_id'=$2)
  FROM operations WHERE project_id=$1 AND action='create_project_dsga_v1'`, project, tenant).Scan(&count, &raw)
 	if err != nil {
-		return restoreWindow{}, err
+		return nil, err
 	}
 	if count == 0 {
-		return s.kube.timelineRestoreWindow(ctx, tenant, timeline)
+		return nil, nil
 	}
 	var plan dsgaCreationPlan
-	if count != 1 || raw == nil || decodeDSGAObject([]byte(*raw), &plan) != nil {
-		return restoreWindow{}, errDSGAStorageManagement
+	if count != 1 || raw == nil || decodeDSGAObject([]byte(*raw), &plan) != nil ||
+		plan.ProtocolVersion != 1 || !dsgaSupportedPostgresVersion(plan.PostgresVersion) || plan.Storage.validate(plan.Namespace) != nil {
+		return nil, errDSGAStorageManagement
 	}
+	return &plan, nil
+}
+
+func (s *server) branchRestoreWindow(ctx context.Context, project, tenant, timeline string) (restoreWindow, error) {
+	plan, err := readDSGAProjectStoragePlan(ctx, s.db, project, tenant)
+	if err != nil {
+		return restoreWindow{}, err
+	}
+	if plan == nil {
+		return s.kube.timelineRestoreWindow(ctx, tenant, timeline)
+	}
+	return s.dsgaRestoreWindow(ctx, plan, tenant, timeline)
+}
+
+func (s *server) dsgaRestoreWindow(ctx context.Context, plan *dsgaCreationPlan, tenant, timeline string) (restoreWindow, error) {
 	client, err := newDSGAStorageClientAccess(ctx, s.kube, plan.Storage, false)
 	if err != nil {
 		return restoreWindow{}, err
