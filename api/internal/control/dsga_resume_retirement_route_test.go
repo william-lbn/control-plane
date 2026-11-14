@@ -69,7 +69,7 @@ func TestDSGAResumeRetirementIdentifiesOriginalEvictedRunner(t *testing.T) {
 	controller := true
 	deleting := metav1.Now()
 	vm := &vmv1.VirtualMachine{ObjectMeta: metav1.ObjectMeta{Namespace: "neon", Name: "cp-original", UID: "original-vm"},
-		Spec:   vmv1.VirtualMachineSpec{RestartPolicy: vmv1.RestartPolicyNever},
+		Spec:   vmv1.VirtualMachineSpec{RestartPolicy: vmv1.RestartPolicyAlways, DSGABootstrap: &vmv1.DSGABootstrap{}},
 		Status: vmv1.VirtualMachineStatus{Phase: vmv1.VmFailed, PodName: "original-runner"}}
 	pod := &core.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "neon", Name: "original-runner", UID: "original-pod", ResourceVersion: "123", DeletionTimestamp: &deleting,
 		Finalizers:      []string{hostguard.PodProtectionFinalizer},

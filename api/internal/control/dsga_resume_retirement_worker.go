@@ -40,7 +40,15 @@ func (s *server) reconcileFailedDSGAResumeRetirement(ctx context.Context, id, wo
 	})
 }
 
-func (s *server) settleFailedDSGAResume(ctx context.Context, id, worker string, p dsgaFailedResumeRetirement) error {
+func (s *server) settleFailedDSGAResume(ctx context.Context, id, worker string, p dsgaFailedResumeRetirement) (resultErr error) {
+	boundary := "load_failed_intent"
+	defer func() {
+		if resultErr != nil {
+			s.logger.Warn("DSGA failed resume retirement boundary rejected", "operation_id", id, "boundary", boundary,
+				"invalid_identity", errors.Is(resultErr, errDSGACreationIdentity),
+				"invalid_credential_source", errors.Is(resultErr, errDSGACredentialSource))
+		}
+	}()
 	var envelope struct {
 		createPayload
 		Plan           dsgaCreationPlan `json:"dsga_creation"`
@@ -70,14 +78,17 @@ func (s *server) settleFailedDSGAResume(ctx context.Context, id, worker string, 
 		!envelope.Plan.ResumeGeneration || envelope.Plan.validate(envelope.createPayload) != nil {
 		return errDSGACreationIdentity
 	}
+	boundary = "verify_predecessor_metadata"
 	previous, err := readDSGAResumeSource(ctx, s.db, envelope.createPayload, envelope.ResumeFrom)
 	if err != nil {
 		return err
 	}
+	boundary = "verify_predecessor_route"
 	if err = s.verifyDSGAUnpublishedResumeRoute(ctx, envelope.createPayload, envelope.Plan, previous); err != nil {
 		return err
 	}
 	binding := journal.Binding{Namespace: envelope.Plan.Namespace, Name: kubeName(p.EndpointID), VMUID: types.UID(uid), Incarnation: envelope.Plan.Incarnation}
+	boundary = "acquire_clients"
 	clients, vms, err := newDSGAKubeClients(s.kube)
 	if err != nil {
 		return err
@@ -97,6 +108,7 @@ func (s *server) settleFailedDSGAResume(ctx context.Context, id, worker string, 
 		return err
 	}
 
+	boundary = "read_vm_identity"
 	vm, err := api.Get(ctx, binding.Name, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return err
@@ -113,6 +125,7 @@ func (s *server) settleFailedDSGAResume(ctx context.Context, id, worker string, 
 		if identity.validateVM(vm) != nil || vm.UID != binding.VMUID {
 			return errDSGACreationIdentity
 		}
+		boundary = "inspect_vm_journal"
 		snapshot, err := journal.Inspect(vm, binding)
 		if err != nil {
 			return err
@@ -121,6 +134,7 @@ func (s *server) settleFailedDSGAResume(ctx context.Context, id, worker string, 
 		if state.PGInstance != nil || state.Active != nil {
 			return errDSGACreationIdentity
 		}
+		boundary = "verify_original_children"
 		cfg, err := clients.CoreV1().Secrets(binding.Namespace).Get(ctx, binding.Name+"-config", metav1.GetOptions{})
 		if err != nil {
 			return err
@@ -137,6 +151,7 @@ func (s *server) settleFailedDSGAResume(ctx context.Context, id, worker string, 
 				return errDSGACreationIdentity
 			}
 		}
+		boundary = "verify_pre_birth"
 		if beforeRunning {
 			// A failed readiness step can also be a timeout with a live VM.
 			// This path requires terminal pre-birth proof, including no native
@@ -148,6 +163,7 @@ func (s *server) settleFailedDSGAResume(ctx context.Context, id, worker string, 
 				return err
 			}
 		}
+		boundary = "freeze_runner_host_placement"
 		current, err := readDSGAFailedResumeIntent(ctx, clients, vm, binding, config, beforeRunning)
 		if err != nil {
 			return err
@@ -168,6 +184,7 @@ func (s *server) settleFailedDSGAResume(ctx context.Context, id, worker string, 
 		if err = s.assertLease(ctx, id, worker); err != nil {
 			return err
 		}
+		boundary = "request_original_vm_deletion"
 		options := &metav1.DeleteOptions{Preconditions: &metav1.Preconditions{UID: &vm.UID, ResourceVersion: &vm.ResourceVersion}}
 		err = vms.NeonvmV1().RESTClient().Delete().Namespace(binding.Namespace).Resource("virtualmachines").
 			Name(binding.Name).Body(options).MaxRetries(0).Do(ctx).Error()
@@ -191,6 +208,7 @@ func (s *server) settleFailedDSGAResume(ctx context.Context, id, worker string, 
 			return err
 		}
 	}
+	boundary = "verify_original_runner_absence"
 	if err = s.observeDeletedEndpointRunners(ctx, endpointDeletionPayload{ProjectID: p.ProjectID, BranchID: p.BranchID, EndpointID: p.EndpointID}); err != nil {
 		return err
 	}
@@ -215,6 +233,7 @@ func (s *server) settleFailedDSGAResume(ctx context.Context, id, worker string, 
 			return err
 		}
 	}
+	boundary = "verify_original_children_absence"
 	if err = observeDSGAFailedResumeChildren(ctx, clients, binding, config, sqlService, managementService); err != nil {
 		return err
 	}
@@ -265,7 +284,9 @@ func unusedDSGAFailedResumeJournal(m journal.Model) bool {
 }
 
 func isDSGAFailedResumeTerminalRunner(vm *vmv1.VirtualMachine, pod *core.Pod) bool {
-	if vm.Status.Phase != vmv1.VmFailed || vm.Spec.RestartPolicy != vmv1.RestartPolicyNever ||
+	// Managed terminal VMs retain their original Runner irrespective of the
+	// legacy VM restart policy. The generated Pod itself cannot restart.
+	if vm.Status.Phase != vmv1.VmFailed || vm.Spec.DSGABootstrap == nil || pod.Spec.RestartPolicy != core.RestartPolicyNever ||
 		pod.Namespace != vm.Namespace || pod.Name != vm.Status.PodName || pod.Spec.NodeName == "" ||
 		(vm.Status.Node != "" && pod.Spec.NodeName != vm.Status.Node) || pod.UID == "" ||
 		pod.ResourceVersion == "" || len(pod.OwnerReferences) != 1 ||
