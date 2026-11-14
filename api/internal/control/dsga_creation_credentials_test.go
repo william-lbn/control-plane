@@ -298,7 +298,13 @@ func TestDSGACredentialSourceActualCreationRecoveryAndDatabaseGuards(t *testing.
 		t.Fatal("migration fixture unexpectedly contains initialization history", err)
 	}
 	if _, err := s.db.Exec(ctx, `DROP TABLE dsga_creation_initialization_observations; DROP FUNCTION guard_dsga_creation_initialization_observation();
- DROP TABLE dsga_creation_credential_sources; DROP FUNCTION guard_dsga_creation_credential_source(); DELETE FROM schema_migrations WHERE version IN (900000060,900000063)`); err != nil {
+ DROP TABLE dsga_creation_credential_sources; DROP FUNCTION guard_dsga_creation_credential_source();
+ DROP TRIGGER dsga_resume_admission ON operations; DROP TRIGGER dsga_resume_immutable ON operations;
+ DROP FUNCTION guard_dsga_resume_operation(); DROP INDEX dsga_resume_one_operation_per_suspension;
+ ALTER TABLE endpoints DROP COLUMN dsga_runtime_operation_id;
+ DROP INDEX dsga_creation_services_original_name;
+ ALTER TABLE dsga_creation_services DROP COLUMN resume_generation, ADD UNIQUE(namespace,service_name);
+ DELETE FROM schema_migrations WHERE version IN (900000060,900000063,900000074,900000078)`); err != nil {
 		t.Fatal(err)
 	}
 	if err := migrate(ctx, s.db); err != nil {
