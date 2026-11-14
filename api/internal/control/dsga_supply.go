@@ -177,31 +177,11 @@ func (b *dsgaCreationBinding) provisionDSGARuntime(ctx context.Context, fact dsg
 	if _, err = current.supplyFact(ctx, "collector_config", dsgaSupplyObject{actual.Name, string(actual.UID), managedSQLDigest([]byte(actual.Data["collector.json"]))}); err != nil {
 		return err
 	}
-	jobs := clients.BatchV1().Jobs(s.PlatformNamespace)
-	jobRaw, err := current.supplyFact(ctx, "qualification_job", nil)
+	actualJob, wantedJob, err := current.selectDSGAQualificationJob(ctx, clients, vm.Namespace, vm.UID, job)
 	if err != nil {
 		return err
 	}
-	stored = dsgaSupplyObject{}
-	if jobRaw != nil && json.Unmarshal(jobRaw, &stored) != nil {
-		return errDSGACreationIdentity
-	}
-	actualJob, err := jobs.Get(ctx, job.Name, metav1.GetOptions{})
-	if apierrors.IsNotFound(err) && jobRaw == nil {
-		actualJob = &batch.Job{}
-		err = clients.BatchV1().RESTClient().Post().Namespace(s.PlatformNamespace).Resource("jobs").Body(job).MaxRetries(0).Do(ctx).Into(actualJob)
-	}
-	if err != nil {
-		return err
-	}
-	if !sameDSGAQualificationJob(actualJob, job) || jobRaw != nil && stored.UID != string(actualJob.UID) {
-		return errDSGACreationIdentity
-	}
-	raw, _ := json.Marshal(job.Spec.Template.Spec)
-	if _, err = current.supplyFact(ctx, "qualification_job", dsgaSupplyObject{actualJob.Name, string(actualJob.UID), managedSQLDigest(raw)}); err != nil {
-		return err
-	}
-	result, err := waitDSGAQualification(ctx, clients, actualJob, job)
+	result, err := waitDSGAQualification(ctx, clients, actualJob, wantedJob)
 	if err != nil {
 		return err
 	}
@@ -251,7 +231,7 @@ func waitDSGAQualification(ctx context.Context, clients kubernetes.Interface, or
 		}
 		for _, c := range got.Status.Conditions {
 			if c.Type == batch.JobFailed && c.Status == core.ConditionTrue {
-				return zero, errors.New("original qualification job failed; preserve evidence and any unconfirmed source")
+				return zero, errDSGAQualificationJobFailed
 			}
 		}
 		if got.Status.Succeeded == 1 {

@@ -40,6 +40,36 @@ subjects:
     name: {{ $workerAccount }}
     namespace: {{ .Release.Namespace }}
 ---
+# Qualification recovery must detect already-published immutable claims for the
+# original VM. Only the Worker can list ConfigMaps in the runtime namespace.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ printf "%s-dsga-qualification-lookup" $name | trunc 63 | trimSuffix "-" }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "neonControl.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: [configmaps]
+    verbs: [list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ printf "%s-dsga-qualification-lookup" $name | trunc 63 | trimSuffix "-" }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "neonControl.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ printf "%s-dsga-qualification-lookup" $name | trunc 63 | trimSuffix "-" }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ $workerAccount }}
+    namespace: {{ .Release.Namespace }}
+---
 # API 只更新由原 Compute/VMUID 命名的 Runtime Selection ConfigMap。
 # 初始 ConfigMap 与 Qualification Job 的创建由 Worker 的平台角色完成。
 apiVersion: rbac.authorization.k8s.io/v1

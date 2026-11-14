@@ -325,6 +325,12 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 	if errors.As(stepErr, &prerequisite) {
 		code, message = prerequisite.code, prerequisite.message
 	}
+	if errors.Is(stepErr, errDSGAQualificationJobFailed) {
+		code, message = "qualification_job_failed", "Inspect the original qualification Job and its Node image before retrying this Operation"
+	}
+	if errors.Is(stepErr, errDSGAQualificationUnconfirmed) {
+		code, message = "qualification_unconfirmed", "Inspect the original Job, Pod, and qualification claim; a possible prior publication needs reconciliation"
+	}
 	if errors.Is(stepErr, errFunctionRuntimeResource) {
 		code, message = "function_runtime_identity_rejected", "Original Function VM/Service UID, complete specification or availability rejected; preserve its identity and inspect before recovery"
 	}
