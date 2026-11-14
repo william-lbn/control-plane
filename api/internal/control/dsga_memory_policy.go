@@ -54,8 +54,9 @@ func (s *server) dsgaEndpointRuntime(ctx context.Context, project, endpoint stri
 		}
 		var envelope struct {
 			createPayload
-			Plan       dsgaCreationPlan `json:"dsga_creation"`
-			ResumeFrom string           `json:"resume_from,omitempty"`
+			Plan           dsgaCreationPlan `json:"dsga_creation"`
+			ResumeReplaces string           `json:"resume_replaces,omitempty"`
+			ResumeFrom     string           `json:"resume_from,omitempty"`
 		}
 		if decodeDSGAObject(raw, &envelope) != nil || envelope.Plan.validate(envelope.createPayload) != nil || envelope.ProjectID != project || envelope.EndpointID != endpoint ||
 			envelope.Plan.ResumeGeneration != (action == dsgaResumeAction) || envelope.Plan.ResumeGeneration != (envelope.ResumeFrom != "") {

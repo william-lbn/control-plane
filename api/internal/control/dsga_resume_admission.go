@@ -48,7 +48,7 @@ func (s *server) resumeDSGAEndpoint(w http.ResponseWriter, r *http.Request) {
 		case errors.Is(err, errDSGACreationAuthority):
 			fail(w, r, 403, "permission_denied", "Current project write access required")
 		case errors.Is(err, errDSGACreationIdentity), errors.Is(err, errDSGACreationConflict), dsgaSuspensionAdmissionConflict(err):
-			fail(w, r, 409, "operation_conflict", "The Compute cannot start a new resume. Retry its original resume if one exists")
+			fail(w, r, 409, "operation_conflict", "The Compute cannot start a new resume. Check the previous resume and its retirement status")
 		case errors.Is(err, errDSGARuntimeUnavailable), errors.Is(err, errDSGACreationPlan):
 			fail(w, r, 503, "runtime_unavailable", "No compatible retained Compute release is available")
 		default:
@@ -113,6 +113,13 @@ func (s *server) queueDSGAResume(ctx context.Context, project, endpoint string, 
 		}
 		return "", err
 	}
+	var replaces string
+	if err = tx.QueryRow(ctx, `SELECT COALESCE((
+ SELECT o.id FROM operations o WHERE o.action='resume_endpoint_dsga_v1' AND o.payload->>'resume_from'=$1
+ AND NOT EXISTS(SELECT 1 FROM operations successor WHERE successor.action=o.action AND successor.payload->>'resume_replaces'=o.id)
+ ),'')`, originalSuspension).Scan(&replaces); err != nil {
+		return "", err
+	}
 	var previous createPayload
 	if json.Unmarshal(frozen, &previous) != nil || previous.EndpointType != p.EndpointType || previous.MinCPU != p.MinCPU || previous.MaxCPU != p.MaxCPU {
 		return "", errDSGACreationIdentity
@@ -140,9 +147,10 @@ func (s *server) queueDSGAResume(ctx context.Context, project, endpoint string, 
 	}
 	raw, err := json.Marshal(struct {
 		createPayload
-		Plan       dsgaCreationPlan `json:"dsga_creation"`
-		ResumeFrom string           `json:"resume_from"`
-	}{p, plan, originalSuspension})
+		Plan           dsgaCreationPlan `json:"dsga_creation"`
+		ResumeFrom     string           `json:"resume_from"`
+		ResumeReplaces string           `json:"resume_replaces,omitempty"`
+	}{p, plan, originalSuspension, replaces})
 	if err != nil {
 		return "", err
 	}

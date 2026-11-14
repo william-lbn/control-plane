@@ -13,6 +13,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jackc/pgx/v5"
 	vmv1 "github.com/neondatabase/autoscaling/neonvm/apis/neonvm/v1"
 	dsgapi "github.com/neondatabase/autoscaling/pkg/api/dsga"
 	"github.com/neondatabase/autoscaling/pkg/dsga/hostguard"
@@ -279,13 +280,88 @@ func testDSGAResumeGeneration(t *testing.T, ctx context.Context, b *dsgaCreation
 	}
 	exec(`INSERT INTO dsga_creation_services(operation_id,service_kind,namespace,service_name,vm_uid,service_uid)
  SELECT $1,service_kind,namespace,service_name,'resume-vm-uid','resume-'||service_uid FROM dsga_creation_services WHERE operation_id=$2`, id, source.Creation)
-	if _, err = next.supplyFact(ctx, "runtime_selection", dsgaSupplyObject{runtimeselection.Name("resume-vm-uid"), "resume-selection-uid", strings.Repeat("a", 64)}); err != nil {
+	// Simulate the same pre-publication failure as a Worker observes. Only
+	// the test fixture supplies the Kube retirement facts directly.
+	exec(`UPDATE operation_steps SET state='failed',attempts=1 WHERE operation_id=$1 AND ordinal=3`, id)
+	exec(`UPDATE operations SET state='failed',finished_at=clock_timestamp(),lease_owner=NULL,lease_expires_at=NULL,retryable=true WHERE id=$1`, id)
+	retirePath := "resume/" + id + "/retire"
+	if w := post("resume", `"2"`, "successor-resume-key"); w.Code != 409 {
+		t.Fatalf("unsettled failed resume allowed a successor: %d %s", w.Code, w.Body.String())
+	}
+	exec(`UPDATE operation_steps SET attempts=1 WHERE operation_id=$1 AND ordinal=4`, id)
+	if w := post(retirePath, `"2"`, "retire-failed-resume-key"); w.Code != 409 {
+		t.Fatalf("retirement accepted a possibly published resume: %d %s", w.Code, w.Body.String())
+	}
+	exec(`UPDATE operation_steps SET attempts=0 WHERE operation_id=$1 AND ordinal=4`, id)
+	if w := post(retirePath, `"1"`, "retire-failed-resume-key"); w.Code != 412 {
+		t.Fatalf("retirement accepted a stale endpoint version: %d %s", w.Code, w.Body.String())
+	}
+	w = post(retirePath, `"2"`, "retire-failed-resume-key")
+	if w.Code != 202 || json.Unmarshal(w.Body.Bytes(), &op) != nil || op.Operation.Action != dsgaRetireResumeAction {
+		t.Fatalf("failed retirement admission: %d %s", w.Code, w.Body.String())
+	}
+	retirement := op.Operation.ID
+	if w := post(retirePath, `"2"`, "retire-failed-resume-key"); w.Code != 202 || !strings.HasSuffix(w.Header().Get("Location"), "/"+retirement) {
+		t.Fatalf("retirement replay changed its Operation: %d %s", w.Code, w.Body.String())
+	}
+	if err := s.retryFailed(ctx, id, p.ProjectID); !errors.Is(err, pgx.ErrNoRows) {
+		t.Fatalf("the retired resume remained retryable: %v", err)
+	}
+	exec(`UPDATE operations SET state='running',lease_owner=$2,lease_expires_at=clock_timestamp()+interval '1 minute' WHERE id=$1`, retirement, b.workerID)
+	if _, err := s.db.Exec(ctx, `UPDATE operations SET state='succeeded',finished_at=now(),lease_owner=NULL,lease_expires_at=NULL WHERE id=$1`, retirement); err == nil {
+		t.Fatal("retirement completed before the original Host was settled")
+	}
+	exec(`INSERT INTO dsga_failed_resume_retirements(operation_id,failed_resume_operation_id,intent)
+ VALUES($1,$2,'{"vm_uid":"resume-vm-uid","config_uid":"resume-config-uid","host":{"sequence":"7"}}')`, retirement, id)
+	if _, err := s.db.Exec(ctx, `INSERT INTO dsga_failed_resume_settlements(operation_id,host_sequence) VALUES($1,7)`, retirement); err == nil {
+		t.Fatal("retirement accepted the original, unadvanced Host sequence")
+	}
+	if err := s.recordDSGAFailedResumeSettlement(ctx, retirement, b.workerID, 8); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.recordDSGAFailedResumeSettlement(ctx, retirement, b.workerID, 8); err != nil {
+		t.Fatal("settlement replay failed", err)
+	}
+	if _, err := s.db.Exec(ctx, `DELETE FROM dsga_failed_resume_settlements WHERE operation_id=$1`, retirement); err == nil {
+		t.Fatal("retirement settlement could be removed")
+	}
+	exec(`UPDATE operation_steps SET state='succeeded' WHERE operation_id=$1`, retirement)
+	exec(`UPDATE operations SET state='succeeded',finished_at=now(),lease_owner=NULL,lease_expires_at=NULL WHERE id=$1`, retirement)
+	if w := post("resume", `"2"`, "same-resume-intent"); w.Code != 202 || !strings.HasSuffix(w.Header().Get("Location"), "/"+id) {
+		t.Fatalf("old idempotency key stopped resolving to the original failure: %d %s", w.Code, w.Body.String())
+	}
+	w = post("resume", `"2"`, "successor-resume-key")
+	if w.Code != 202 || json.Unmarshal(w.Body.Bytes(), &op) != nil || op.Operation.ID == id {
+		t.Fatalf("settled retirement did not permit a new resume: %d %s", w.Code, w.Body.String())
+	}
+	failed := id
+	id = op.Operation.ID
+	exec(`UPDATE operations SET state='running',lease_owner=$2,lease_expires_at=clock_timestamp()+interval '1 minute' WHERE id=$1`, id, b.workerID)
+	next, err = s.loadDSGACreationBinding(ctx, id, b.workerID)
+	if err != nil || next.intent.ResumeReplaces != failed || next.intent.ResumeFrom != source.Operation {
+		t.Fatalf("replacement lost original history: %v", err)
+	}
+	plan, err = next.creationPlan(ctx)
+	if err != nil || plan.Credentials != previous.Credentials || plan.ComputeInstanceID != previous.ComputeInstanceID {
+		t.Fatalf("replacement changed the original logical endpoint: %v", err)
+	}
+	if err := next.bind(ctx, "successor-vm-uid", ""); err != nil {
+		t.Fatal(err)
+	}
+	exec(`INSERT INTO dsga_creation_credential_sources(operation_id,source_version,credentials_uid,content_digest)
+ SELECT $1,source_version,credentials_uid,content_digest FROM dsga_creation_credential_sources WHERE operation_id=$2`, id, source.Creation)
+	if err := next.bind(ctx, "successor-vm-uid", "successor-config-uid"); err != nil {
+		t.Fatal(err)
+	}
+	exec(`INSERT INTO dsga_creation_services(operation_id,service_kind,namespace,service_name,vm_uid,service_uid)
+ SELECT $1,service_kind,namespace,service_name,'successor-vm-uid','successor-'||service_uid FROM dsga_creation_services WHERE operation_id=$2`, id, source.Creation)
+	if _, err = next.supplyFact(ctx, "runtime_selection", dsgaSupplyObject{runtimeselection.Name("successor-vm-uid"), "resume-selection-uid", strings.Repeat("a", 64)}); err != nil {
 		t.Fatal(err)
 	}
 	// These test receipts exercise the real database guards without booting a VM.
-	fact.Observed.Instance.VMUID = "resume-vm-uid"
+	fact.Observed.Instance.VMUID = "successor-vm-uid"
 	fact.Observed.Instance.PGBootID++
-	native, err := plan.nativeBootstrap(p, "resume-vm-uid")
+	native, err := plan.nativeBootstrap(p, "successor-vm-uid")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -295,7 +371,7 @@ func testDSGAResumeGeneration(t *testing.T, ctx context.Context, b *dsgaCreation
 		t.Fatal(err)
 	}
 	exec(`INSERT INTO dsga_creation_initialization_observations(operation_id,pg_boot_id,vm_uid,config_uid,credentials_uid,management_service_uid,receipt)
- SELECT $1,$2,'resume-vm-uid','resume-config-uid',$3,service_uid,$4 FROM dsga_creation_services WHERE operation_id=$1 AND service_kind='management'`,
+ SELECT $1,$2,'successor-vm-uid','successor-config-uid',$3,service_uid,$4 FROM dsga_creation_services WHERE operation_id=$1 AND service_kind='management'`,
 		id, fmt.Sprint(uint64(fact.Observed.Instance.PGBootID)), plan.Credentials.UID, raw)
 	if e, err := s.dsgaEndpointRuntime(ctx, p.ProjectID, p.EndpointID); err != nil || e.Operation != source.Creation {
 		t.Fatalf("incomplete successor displaced original runtime: %v", err)
@@ -323,7 +399,7 @@ func testDSGAResumeGeneration(t *testing.T, ctx context.Context, b *dsgaCreation
 	if err := tx.Commit(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if e, err := s.dsgaEndpointRuntime(ctx, p.ProjectID, p.EndpointID); err != nil || e.Operation != id || e.VMUID != "resume-vm-uid" {
+	if e, err := s.dsgaEndpointRuntime(ctx, p.ProjectID, p.EndpointID); err != nil || e.Operation != id || e.VMUID != "successor-vm-uid" {
 		t.Fatalf("completed successor did not become authoritative: %v", err)
 	}
 	w = post("suspend", `"3"`, "next-suspension-key")

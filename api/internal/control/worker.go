@@ -225,6 +225,15 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 					return s.suspendCompute(ctx, p)
 				})
 			}
+		case dsgaRetireResumeAction:
+			var p dsgaFailedResumeRetirement
+			if err := decodeDSGAObject(payload, &p); err != nil {
+				stepErr = err
+			} else if p.ProjectID != projectID || p.EndpointID != resourceID {
+				stepErr = errDSGACreationIdentity
+			} else {
+				stepErr = s.reconcileFailedDSGAResumeRetirement(runCtx, id, workerID, p)
+			}
 		case dsgaSuspendAction:
 			if err := decodeDSGAObject(payload, &suspensionP); err != nil {
 				stepErr = err

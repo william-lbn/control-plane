@@ -18,8 +18,9 @@ import (
 // 不将payload转成map/float64后重写；绑定事实独立存表，原意图始终保持原样。
 type dsgaCreationEnvelope struct {
 	createPayload
-	Creation   dsgaCreationIdentity `json:"dsga_creation"`
-	ResumeFrom string               `json:"resume_from,omitempty"`
+	Creation       dsgaCreationIdentity `json:"dsga_creation"`
+	ResumeReplaces string               `json:"resume_replaces,omitempty"`
+	ResumeFrom     string               `json:"resume_from,omitempty"`
 }
 
 type dsgaCreationBinding struct {

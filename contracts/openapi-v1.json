@@ -12587,6 +12587,36 @@
         }
       }
     },
+    "/api/v1/projects/{project}/endpoints/{endpoint}/resume/{operation}/retire": {
+      "post": {
+        "operationId": "retireFailedDSGAResume",
+        "tags": ["Compute"],
+        "summary": "Retire an unpublished failed DSGA resume",
+        "description": "Settles the failed physical generation on a suspended endpoint. The operation requires proof that native initialization and SQL publication did not complete. After retirement succeeds, send a new resume with a fresh idempotency key. Existing endpoint, timeline, credentials and prior operation history are retained.",
+        "parameters": [
+          {"$ref": "#/components/parameters/project"},
+          {"$ref": "#/components/parameters/endpoint"},
+          {"$ref": "#/components/parameters/operation"},
+          {"$ref": "#/components/parameters/csrf"},
+          {"$ref": "#/components/parameters/resourceVersion"},
+          {"$ref": "#/components/parameters/idempotency"}
+        ],
+        "security": [{"sessionCookie": []}, {"bearerToken": []}],
+        "responses": {
+          "202": {
+            "description": "Retirement operation queued or replayed",
+            "content": {"application/json": {"schema": {"$ref": "#/components/schemas/Accepted"}}}
+          },
+          "403": {"$ref": "#/components/responses/Error"},
+          "404": {"$ref": "#/components/responses/Error"},
+          "409": {"$ref": "#/components/responses/Error"},
+          "412": {"$ref": "#/components/responses/Error"},
+          "422": {"$ref": "#/components/responses/Error"},
+          "428": {"$ref": "#/components/responses/Error"},
+          "503": {"$ref": "#/components/responses/Error"}
+        }
+      }
+    },
     "/api/v1/organizations": {
       "get": {
         "operationId": "listOrganizations",
