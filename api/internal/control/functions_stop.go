@@ -125,6 +125,51 @@ func (s *server) functionStop(w http.ResponseWriter, r *http.Request) {
 	s.acceptFunctionOperation(w, r, op)
 }
 
+func (s *server) revokeFunctionSQLLogin(ctx context.Context, ref functionSQLReference, authorize func(context.Context) error) error {
+	release, err := s.acquireProbeGate(ctx, ref.WriterID, true)
+	if err != nil {
+		return err
+	}
+	defer release()
+	writer, err := s.dsgaEndpointRuntime(ctx, ref.Scope.ProjectID, ref.WriterID)
+	if err != nil {
+		return err
+	}
+	if writer != nil {
+		var state string
+		if err := s.db.QueryRow(ctx, `SELECT state FROM endpoints WHERE id=$1 AND project_id=$2 AND branch_id=$3
+            AND endpoint_type='read_write' AND deleted_at IS NULL`, ref.WriterID, ref.Scope.ProjectID, ref.Scope.BranchID).Scan(&state); err != nil {
+			return err
+		}
+		switch state {
+		case "suspended":
+			return s.confirmSuspendedDSGAServiceWriter(ctx, writer, authorize)
+		case "active":
+			// A terminal generation fences delayed enable of the same immutable credential.
+			return s.reconcileDSGAServiceLogin(ctx, writer, functionServiceLoginRequest(ref, ref.Generation+1, nil), authorize)
+		default:
+			return errDSGACreationIdentity
+		}
+	}
+	conn, err := s.connectLegacyFunctionProvisioner(ctx, ref)
+	if err != nil {
+		return err
+	}
+	defer conn.Close(context.Background())
+	tx, err := conn.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if err = functionsql.DisableLoginTx(ctx, tx, ref.Scope); err != nil {
+		return err
+	}
+	if err = authorize(ctx); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
+}
+
 func (s *server) lockFunctionStop(ctx context.Context, op, worker string, p functionStopTarget) error {
 	var valid bool
 	err := s.db.QueryRow(ctx, `SELECT o.state='running' AND o.lease_owner=$2 AND o.lease_expires_at>clock_timestamp()
@@ -436,32 +481,10 @@ func (s *server) reconcileFunctionStop(ctx context.Context, op, worker string, p
 				if !ref.valid() {
 					return errFunctionSQLSecret
 				}
-				writer, err := s.kube.request(ctx, http.MethodGet, s.kube.path("secret", kubeName(ref.WriterID)+"-credentials"), nil)
-				if err != nil || !owned(writer, p.ProjectID, ref.WriterID) {
-					return errFunctionSQLSecret
-				}
-				password, err := secretText(writer, "probePassword")
-				if err != nil {
-					return errFunctionSQLSecret
-				}
-				conn, err := functionsql.ConnectProvisioner(ctx, s.functionSQLPolicy(ref), password)
-				if err != nil {
-					return errFunctionSQLSecret
-				}
-				defer conn.Close(context.Background())
-				tx, err := conn.Begin(ctx)
-				if err != nil {
-					return errFunctionSQLSecret
-				}
-				defer tx.Rollback(ctx)
-				if err = functionsql.DisableLoginTx(ctx, tx, ref.Scope); err != nil {
+				if err := s.revokeFunctionSQLLogin(ctx, ref, func(ctx context.Context) error {
+					return s.lockFunctionStop(ctx, op, worker, p)
+				}); err != nil {
 					return err
-				}
-				if err = s.lockFunctionStop(ctx, op, worker, p); err != nil {
-					return err
-				}
-				if err = tx.Commit(ctx); err != nil {
-					return errFunctionSQLSecret
 				}
 				if err = s.publishBranchServiceIdentity(ctx, p.ProjectID, p.BranchID, ref.WriterID, ref.Scope.Role(), "", false); err != nil {
 					return errFunctionSQLSecret

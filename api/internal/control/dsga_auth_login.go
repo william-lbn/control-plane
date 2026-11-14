@@ -18,6 +18,7 @@ import (
 
 const dsgaAuthLoginPath = "/dsg/v1/catalog/service-login"
 const dsgaDataAPIServiceLogin = "data_api"
+const dsgaFunctionServiceLogin = "function"
 
 type dsgaAuthLoginRequest struct {
 	ProtocolVersion uint32        `json:"protocol_version"`
@@ -27,6 +28,8 @@ type dsgaAuthLoginRequest struct {
 	EndpointID      string        `json:"endpoint_id"`
 	PGBootID        dsgapi.Uint64 `json:"pg_boot_id"`
 	Database        string        `json:"database"`
+	FunctionID      string        `json:"function_id,omitempty"`
+	Schema          string        `json:"schema,omitempty"`
 	Generation      dsgapi.Uint64 `json:"generation"`
 	Verifier        *string       `json:"verifier"`
 }
@@ -36,6 +39,8 @@ type dsgaAuthLoginReceipt struct {
 	Service         string        `json:"service,omitempty"`
 	BranchID        string        `json:"branch_id"`
 	PGBootID        dsgapi.Uint64 `json:"pg_boot_id"`
+	FunctionID      string        `json:"function_id,omitempty"`
+	Schema          string        `json:"schema,omitempty"`
 	Generation      dsgapi.Uint64 `json:"generation"`
 	Enabled         bool          `json:"enabled"`
 }
@@ -70,6 +75,12 @@ func dataAPILoginRequest(p dataAPIPayload, verifier *string) dsgaAuthLoginReques
 		EndpointID: p.EndpointID, Database: p.Spec.Database, Generation: dsgapi.Uint64(p.Generation), Verifier: verifier}
 }
 
+func functionServiceLoginRequest(ref functionSQLReference, generation int64, verifier *string) dsgaAuthLoginRequest {
+	return dsgaAuthLoginRequest{ProtocolVersion: 1, Service: dsgaFunctionServiceLogin, ProjectID: ref.Scope.ProjectID,
+		BranchID: ref.Scope.BranchID, EndpointID: ref.WriterID, Database: ref.Scope.Database,
+		FunctionID: ref.Scope.FunctionID, Schema: ref.Scope.Schema, Generation: dsgapi.Uint64(generation), Verifier: verifier}
+}
+
 func (s *server) reconcileDSGAServiceLogin(ctx context.Context, runtime *dsgaEndpointRuntime, input dsgaAuthLoginRequest, authorize func(context.Context) error) error {
 	if authorize == nil {
 		return errDSGACreationIdentity
@@ -95,6 +106,11 @@ func (s *server) applyDSGAServiceLogin(ctx context.Context, runtime *dsgaEndpoin
 	switch input.Service {
 	case dsgaDataAPIServiceLogin:
 		refusal = dataAPIPrerequisiteError{"data_api_writer_service_login_unconfirmed", "Original DSGA Writer Data API login is unconfirmed"}
+	case dsgaFunctionServiceLogin:
+		refusal = dataAPIPrerequisiteError{"function_writer_service_login_unconfirmed", "Original DSGA Writer Function login is unconfirmed"}
+		if !functionDefinitionID.MatchString(input.FunctionID) || !validPGIdentifier(input.Schema) {
+			return refusal
+		}
 	case "":
 	default:
 		return errDSGACreationIdentity
@@ -164,7 +180,8 @@ func requestDSGAAuthLogin(ctx context.Context, client *http.Client, target strin
 	if err != nil || len(body) > 4096 || resp.StatusCode != http.StatusOK ||
 		resp.Header.Get("Content-Type") != "application/json" || resp.Header.Get("Cache-Control") != "no-store" ||
 		dsgapi.UnmarshalObject(body, &receipt) != nil ||
-		receipt != (dsgaAuthLoginReceipt{1, input.Service, input.BranchID, input.PGBootID, input.Generation, input.Verifier != nil}) {
+		receipt != (dsgaAuthLoginReceipt{ProtocolVersion: 1, Service: input.Service, BranchID: input.BranchID, PGBootID: input.PGBootID,
+			FunctionID: input.FunctionID, Schema: input.Schema, Generation: input.Generation, Enabled: input.Verifier != nil}) {
 		return errors.New("service login receipt differs")
 	}
 	return nil

@@ -236,6 +236,19 @@ func ConnectRuntime(ctx context.Context, p ConnectionPolicy, password string) (*
 // ROLE, override createrole_self_grant or grant any SQL privilege. The leased
 // Driver owns the returned connection and its explicit ProvisionTx transaction.
 func ConnectProvisioner(ctx context.Context, p ConnectionPolicy, password string) (*pgx.Conn, error) {
+	return connectProvisioner(ctx, p, password, false)
+}
+
+// ConnectNativeProvisioner authenticates the frozen Writer's ordinary role
+// over the same explicit TLS/SCRAM policy used by the legacy Function driver.
+func ConnectNativeProvisioner(ctx context.Context, p ConnectionPolicy, password string) (*pgx.Conn, error) {
+	if p.Scope.ProvisioningRole != "control_probe" {
+		return nil, errRuntimeConnection
+	}
+	return connectProvisioner(ctx, p, password, true)
+}
+
+func connectProvisioner(ctx context.Context, p ConnectionPolicy, password string, native bool) (*pgx.Conn, error) {
 	if p.Scope.ProvisioningRole == "" {
 		return nil, errRuntimeConnection
 	}
@@ -253,7 +266,7 @@ func ConnectProvisioner(ctx context.Context, p ConnectionPolicy, password string
 	var trusted bool
 	err = conn.QueryRow(ctx, `SELECT current_database()=$1 AND session_user::text=$2 AND current_user::text=$2
  AND current_setting('createrole_self_grant')=''
- AND EXISTS(SELECT 1 FROM pg_roles WHERE rolname=$2 AND NOT rolsuper AND rolcreaterole)`, p.Scope.Database, p.Scope.ProvisioningRole).Scan(&trusted)
+ AND EXISTS(SELECT 1 FROM pg_roles WHERE rolname=$2 AND NOT rolsuper AND rolcreaterole=(NOT $3::boolean))`, p.Scope.Database, p.Scope.ProvisioningRole, native).Scan(&trusted)
 	if err != nil || !trusted {
 		closeCtx, cancelClose := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancelClose()

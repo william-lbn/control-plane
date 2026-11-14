@@ -145,7 +145,10 @@ func (s *server) reconcileDSGACompute(ctx context.Context, binding *dsgaCreation
 			if err := binding.revokeDisabledDSGAAuthOnResume(ctx, boot); err != nil {
 				return err
 			}
-			return binding.revokeDisabledDSGADataAPIOnResume(ctx, boot)
+			if err := binding.revokeDisabledDSGADataAPIOnResume(ctx, boot); err != nil {
+				return err
+			}
+			return binding.revokeDeletedDSGAFunctionsOnResume(ctx, boot)
 		}
 		return nil
 	}); err != nil {

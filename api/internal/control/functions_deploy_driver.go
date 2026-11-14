@@ -12,6 +12,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/william-lbn/control-plane/api/internal/functions"
 	"github.com/william-lbn/control-plane/api/internal/functionsql"
 )
@@ -64,6 +67,82 @@ func (s *server) functionSQLPolicy(ref functionSQLReference) functionsql.Connect
 	return functionsql.ConnectionPolicy{Scope: ref.Scope, WriterID: ref.WriterID, Target: s.functions.proxy, Hostname: s.functions.input.ProxyHostname, CA: s.functions.proxyCA, Timeout: 120 * time.Second}
 }
 
+func (s *server) connectLegacyFunctionProvisioner(ctx context.Context, ref functionSQLReference) (*pgx.Conn, error) {
+	secret, err := s.kube.request(ctx, "GET", s.kube.path("secret", kubeName(ref.WriterID)+"-credentials"), nil)
+	if err != nil || !owned(secret, ref.Scope.ProjectID, ref.WriterID) {
+		return nil, errFunctionSQLSecret
+	}
+	password, err := secretText(secret, "probePassword")
+	if err != nil {
+		return nil, errFunctionSQLSecret
+	}
+	return functionsql.ConnectProvisioner(ctx, s.functionSQLPolicy(ref), password)
+}
+
+func (s *server) connectDSGAFunctionProvisioner(ctx context.Context, writer *dsgaEndpointRuntime, ref functionSQLReference) (*pgx.Conn, error) {
+	if writer.Payload.BranchID != ref.Scope.BranchID || writer.Payload.EndpointType != "read_write" {
+		return nil, errDSGACreationIdentity
+	}
+	clients, vm, _, _, err := s.readDSGABoundSelection(ctx, writer)
+	if err != nil {
+		return nil, err
+	}
+	secret, err := clients.CoreV1().Secrets(vm.Namespace).Get(ctx, vm.Name+"-credentials", metav1.GetOptions{})
+	if err != nil {
+		return nil, errDSGACredentialSource
+	}
+	password, err := readDSGABoundProbePassword(secret, writer)
+	if err != nil {
+		return nil, err
+	}
+	conn, err := functionsql.ConnectNativeProvisioner(ctx, s.functionSQLPolicy(ref), password)
+	if err != nil {
+		return nil, err
+	}
+	if err := verifyFunctionWriter(ctx, conn, writer); err != nil {
+		conn.Close(context.Background())
+		return nil, err
+	}
+	_, latest, _, _, err := s.readDSGABoundSelection(ctx, writer)
+	if err != nil || latest.UID != vm.UID || latest.Status.PodName != vm.Status.PodName {
+		conn.Close(context.Background())
+		return nil, errDSGACreationIdentity
+	}
+	return conn, nil
+}
+
+func verifyFunctionWriter(ctx context.Context, conn *pgx.Conn, writer *dsgaEndpointRuntime) error {
+	var tenant, timeline string
+	var replica bool
+	if err := conn.QueryRow(ctx, `SELECT current_setting('neon.tenant_id'),current_setting('neon.timeline_id'),pg_is_in_recovery()`).Scan(&tenant, &timeline, &replica); err != nil || tenant != writer.Payload.TenantID || timeline != writer.Payload.TimelineID || replica {
+		return errDSGACreationIdentity
+	}
+	return nil
+}
+
+func (s *server) connectFunctionRuntime(ctx context.Context, ref functionSQLReference, password string) (*pgx.Conn, error) {
+	policy := s.functionSQLPolicy(ref)
+	writer, err := s.dsgaEndpointRuntime(ctx, ref.Scope.ProjectID, ref.WriterID)
+	if err != nil {
+		return nil, err
+	}
+	if writer != nil {
+		if writer.Payload.BranchID != ref.Scope.BranchID || writer.Payload.EndpointType != "read_write" {
+			return nil, errDSGACreationIdentity
+		}
+		policy.Scope.ProvisioningRole = ""
+	}
+	conn, err := functionsql.ConnectRuntime(ctx, policy, password)
+	if err != nil || writer == nil {
+		return conn, err
+	}
+	if err := verifyFunctionWriter(ctx, conn, writer); err != nil {
+		conn.Close(context.Background())
+		return nil, err
+	}
+	return conn, nil
+}
+
 func (s *server) reconcileFunctionSQL(ctx context.Context, op, worker string, p functionInstanceTarget) (functionSQLRecord, error) {
 	var empty functionSQLRecord
 	ref, persisted, err := s.functionSQLIntent(ctx, op, worker, p)
@@ -107,34 +186,52 @@ func (s *server) reconcileFunctionSQL(ctx context.Context, op, worker string, p 
 	if err = s.verifyFunctionIntent(ctx, op, worker, p); err != nil {
 		return empty, err
 	}
-	secret, err := s.kube.request(ctx, "GET", s.kube.path("secret", kubeName(ref.WriterID)+"-credentials"), nil)
-	if err != nil || !owned(secret, p.ProjectID, ref.WriterID) {
-		return empty, errFunctionSQLSecret
-	}
-	password, err := secretText(secret, "probePassword")
-	if err != nil {
-		return empty, errFunctionSQLSecret
-	}
 	release, err := s.acquireProbeGate(ctx, ref.WriterID, true)
 	if err != nil {
 		return empty, err
 	}
 	defer release()
-	conn, err := functionsql.ConnectProvisioner(ctx, s.functionSQLPolicy(ref), password)
+	writer, err := s.dsgaEndpointRuntime(ctx, p.ProjectID, ref.WriterID)
+	if err != nil {
+		return empty, err
+	}
+	var conn *pgx.Conn
+	if writer != nil {
+		conn, err = s.connectDSGAFunctionProvisioner(ctx, writer, ref)
+	} else {
+		conn, err = s.connectLegacyFunctionProvisioner(ctx, ref)
+	}
 	if err != nil {
 		return empty, dataAPIPrerequisiteError{"function_sql_prerequisite_required", "Original Writer TLS/provisioning identity unavailable; inspect the Operation and owner grants"}
 	}
 	defer conn.Close(context.Background())
-	if err = s.verifyFunctionIntent(ctx, op, worker, p); err != nil {
+	authorize := func(ctx context.Context) error { return s.verifyFunctionIntent(ctx, op, worker, p) }
+	if err = authorize(ctx); err != nil {
 		return empty, err
+	}
+	scope := ref.Scope
+	if writer != nil {
+		input := functionServiceLoginRequest(ref, ref.Generation, &record.Credential.Verifier)
+		if err := s.reconcileDSGAServiceLogin(ctx, writer, input, authorize); err != nil {
+			return empty, err
+		}
+		scope.ProvisioningRole = ""
 	}
 	tx, err := conn.Begin(ctx)
 	if err != nil {
 		return empty, errFunctionSQLSecret
 	}
 	defer tx.Rollback(ctx)
-	if err = functionsql.ProvisionTx(ctx, tx, ref.Scope, record.Credential.Verifier); err != nil {
+	if writer != nil {
+		err = functionsql.ProvisionNativeGrantsTx(ctx, tx, scope)
+	} else {
+		err = functionsql.ProvisionTx(ctx, tx, scope, record.Credential.Verifier)
+	}
+	if err != nil {
 		return empty, dataAPIPrerequisiteError{"function_database_grant_required", "Database owner must explicitly authorize CONNECT/schema/table/sequence grants and review PUBLIC TEMP/CREATE permissions before Function deployment"}
+	}
+	if err := authorize(ctx); err != nil {
+		return empty, err
 	}
 	if err = tx.Commit(ctx); err != nil {
 		return empty, errFunctionSQLSecret
@@ -145,7 +242,7 @@ func (s *server) reconcileFunctionSQL(ctx context.Context, op, worker string, p 
 	if err = s.publishBranchServiceIdentity(ctx, p.ProjectID, p.BranchID, ref.WriterID, ref.Scope.Role(), record.Credential.Verifier, true); err != nil {
 		return empty, errFunctionSQLSecret
 	}
-	runtime, err := functionsql.ConnectRuntime(ctx, s.functionSQLPolicy(ref), record.Credential.Password)
+	runtime, err := s.connectFunctionRuntime(ctx, ref, record.Credential.Password)
 	if err != nil {
 		return empty, errFunctionSQLSecret
 	}
@@ -386,7 +483,7 @@ func (s *server) reconcileFunctionDeployment(ctx context.Context, op, worker str
 				status, err := client.Status(ctx)
 				client.Close()
 				if err == nil && status.NodeReady && !status.Draining {
-					runtime, err := functionsql.ConnectRuntime(ctx, s.functionSQLPolicy(sql.Reference), sql.Credential.Password)
+					runtime, err := s.connectFunctionRuntime(ctx, sql.Reference, sql.Credential.Password)
 					if err != nil {
 						return errFunctionSQLSecret
 					}

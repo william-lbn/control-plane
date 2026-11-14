@@ -120,12 +120,36 @@ func DisableLoginTx(ctx context.Context, tx pgx.Tx, s Scope) error {
 // are installed on behalf of customer owners. All failures roll back with the
 // caller transaction, including a role unexpectedly present on another branch.
 func ProvisionTx(ctx context.Context, tx pgx.Tx, s Scope, verifier string) error {
-	if s.Validate() != nil || !ValidVerifier(verifier) {
-		return errors.New("Functions SQL scope or SCRAM verifier rejected")
+	if !ValidVerifier(verifier) {
+		return errors.New("Functions SQL SCRAM verifier rejected")
+	}
+	return provisionTx(ctx, tx, s, verifier, false)
+}
+
+// ProvisionNativeGrantsTx keeps role DDL with the signed Compute driver. A
+// normal application provisioner supplies only explicit object privileges.
+func ProvisionNativeGrantsTx(ctx context.Context, tx pgx.Tx, s Scope) error {
+	return provisionTx(ctx, tx, s, "", true)
+}
+
+func provisionTx(ctx context.Context, tx pgx.Tx, s Scope, verifier string, native bool) error {
+	if s.Validate() != nil || native && s.ProvisioningRole != "" {
+		return errors.New("Functions SQL scope rejected")
 	}
 	var database string
 	if err := tx.QueryRow(ctx, `SELECT current_database()`).Scan(&database); err != nil || database != s.Database {
 		return errors.New("Functions SQL database identity mismatch")
+	}
+	if native {
+		var trusted bool
+		err := tx.QueryRow(ctx, `SELECT session_user='control_probe' AND current_user='control_probe'
+            AND NOT pg_is_in_recovery()
+            AND current_setting('neon.project_id',true)=$1 AND current_setting('neon.branch_id',true)=$2
+            AND EXISTS (SELECT FROM pg_roles WHERE rolname=current_user AND NOT rolsuper AND NOT rolcreaterole)`,
+			s.ProjectID, s.BranchID).Scan(&trusted)
+		if err != nil || !trusted {
+			return errors.New("Functions native grants principal rejected")
+		}
 	}
 	if s.ProvisioningRole != "" {
 		var trusted bool
@@ -158,6 +182,9 @@ func ProvisionTx(ctx context.Context, tx pgx.Tx, s Scope, verifier string) error
 		return errors.New("Functions SQL role ownership conflict")
 	}
 	if errors.Is(err, pgx.ErrNoRows) {
+		if native {
+			return errors.New("Functions native SQL role is unavailable")
+		}
 		if _, err = tx.Exec(ctx, "CREATE ROLE "+quote(role)+" NOLOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS"); err != nil {
 			return err
 		}
@@ -169,14 +196,16 @@ func ProvisionTx(ctx context.Context, tx pgx.Tx, s Scope, verifier string) error
 	if err = verifyRole(ctx, tx, s); err != nil {
 		return err
 	}
-	for _, statement := range []string{
-		"GRANT CONNECT ON DATABASE " + quote(s.Database) + " TO " + quote(role),
-		"GRANT USAGE ON SCHEMA " + quote(s.Schema) + " TO " + quote(role),
-		"ALTER ROLE " + quote(role) + " LOGIN PASSWORD " + literal(verifier) + " CONNECTION LIMIT 4",
-		"ALTER ROLE " + quote(role) + " SET search_path=" + quote(s.Schema) + ",pg_catalog",
-		"ALTER ROLE " + quote(role) + " SET idle_session_timeout='5s'",
-		"ALTER ROLE " + quote(role) + " SET statement_timeout='30s'",
-	} {
+	statements := []string{"GRANT USAGE ON SCHEMA " + quote(s.Schema) + " TO " + quote(role)}
+	if !native {
+		statements = append(statements,
+			"GRANT CONNECT ON DATABASE "+quote(s.Database)+" TO "+quote(role),
+			"ALTER ROLE "+quote(role)+" LOGIN PASSWORD "+literal(verifier)+" CONNECTION LIMIT 4",
+			"ALTER ROLE "+quote(role)+" SET search_path="+quote(s.Schema)+",pg_catalog",
+			"ALTER ROLE "+quote(role)+" SET idle_session_timeout='5s'",
+			"ALTER ROLE "+quote(role)+" SET statement_timeout='30s'")
+	}
+	for _, statement := range statements {
 		if _, err = tx.Exec(ctx, statement); err != nil {
 			return err
 		}
