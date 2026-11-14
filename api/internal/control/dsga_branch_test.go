@@ -1,10 +1,12 @@
 package control
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
@@ -15,7 +17,7 @@ func TestDSGAStorageBranchLeasesAndReplaysExactAncestor(t *testing.T) {
 	for _, major := range []uint32{17, 18} {
 		t.Run(fmt.Sprint(major), func(t *testing.T) {
 			f := newDSGAProjectFixture(t)
-			setDSGACatalog(t, dsgaReleaseCatalogFixture(t))
+			setDSGACatalog(t, dsgaRetainedReleaseCatalogFixture(t))
 			f.body.PostgresVersion = int(major)
 			if got := f.request("creation_admin", "branch-parent-original", f.body); got.Code != http.StatusAccepted {
 				t.Fatal("parent create not accepted", got.Code, got.Body.String())
@@ -32,9 +34,21 @@ func TestDSGAStorageBranchLeasesAndReplaysExactAncestor(t *testing.T) {
 			if err := json.Unmarshal(raw, &root); err != nil {
 				t.Fatal(err)
 			}
+			f.exec("UPDATE operations SET state='running',lease_owner='parent-test',lease_expires_at=clock_timestamp()+interval '1 minute' WHERE id=$1", op)
+			original, err := f.s.loadDSGACreationBinding(f.ctx, op, "parent-test")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := original.bind(f.ctx, "fixture-fork-parent-vm", ""); err != nil {
+				t.Fatal(err)
+			}
+			if err := original.bind(f.ctx, "fixture-fork-parent-vm", "fixture-fork-parent-config"); err != nil {
+				t.Fatal(err)
+			}
 			f.exec("UPDATE projects SET state='ready' WHERE id=$1", root.ProjectID)
 			f.exec("UPDATE branches SET state='ready' WHERE id=$1", root.BranchID)
-			f.exec("UPDATE operations SET state='succeeded',finished_at=clock_timestamp() WHERE id=$1", op)
+			f.exec("UPDATE endpoints SET state='active' WHERE id=$1", root.EndpointID)
+			f.exec("UPDATE operations SET state='succeeded',finished_at=clock_timestamp(),lease_owner=NULL,lease_expires_at=NULL WHERE id=$1", op)
 			auth := dsgaCreationAuth{Actor: "creation_admin", SessionHash: digest("creation_admin-session"), CSRFHash: digest("creation_admin-csrf")}
 			ctx := context.WithValue(f.ctx, dsgaCreationAuthKey{}, auth)
 			body := branchCreateRequest{Name: "Retained historical branch", ParentBranchID: root.BranchID}
@@ -127,6 +141,44 @@ func TestDSGAStorageBranchLeasesAndReplaysExactAncestor(t *testing.T) {
 			f.exec("UPDATE operations SET lease_expires_at=$2 WHERE id=$1", branchOp, time.Now().Add(-time.Second))
 			if err := binding.persistStorageBranchReady(ctx); err == nil {
 				t.Fatal("expired lease settled original branch")
+			}
+			f.exec("UPDATE operations SET state='succeeded',finished_at=clock_timestamp(),lease_owner=NULL,lease_expires_at=NULL WHERE id=$1", branchOp)
+			bodyEndpoint := endpointCreateRequest{BranchID: p.BranchID, Type: "read_write", Password: f.body.Password}
+			request := func(key string, body endpointCreateRequest) *httptest.ResponseRecorder {
+				t.Helper()
+				data, _ := json.Marshal(body)
+				r := httptest.NewRequest(http.MethodPost, "/api/v1/projects/"+root.ProjectID+"/endpoints", bytes.NewReader(data))
+				r.AddCookie(&http.Cookie{Name: "neon_v2_session", Value: "creation_admin-session"})
+				r.AddCookie(&http.Cookie{Name: "neon_v2_csrf", Value: "creation_admin-csrf"})
+				r.Header.Set("X-CSRF-Token", "creation_admin-csrf")
+				r.Header.Set("Idempotency-Key", key)
+				w := httptest.NewRecorder()
+				f.s.routes().ServeHTTP(w, r)
+				return w
+			}
+			wrong := bodyEndpoint
+			wrong.Password = "Incorrect application password"
+			if resp := request("first-fork-writer-wrong", wrong); resp.Code != 422 || !strings.Contains(resp.Body.String(), "branch_password_mismatch") {
+				t.Fatal("incorrect historical password accepted", resp.Code, resp.Body.String())
+			}
+			for range 2 {
+				if resp := request("first-fork-writer-accepted", bodyEndpoint); resp.Code != 202 {
+					t.Fatal("fork writer not accepted", resp.Code, resp.Body.String())
+				}
+			}
+			var frozenRaw, credentialRaw []byte
+			if err := f.s.db.QueryRow(ctx, `SELECT r.draft->'credential_source',o.payload#>'{dsga_creation,credentials}' FROM dsga_creation_reservations r
+ JOIN operations o ON o.id=r.accepted_id AND o.action='create_endpoint_dsga_v1' WHERE r.actor_id=$1 AND r.key_hash=$2
+ AND o.payload->>'timeline_id'=$3`, auth.Actor, keyHash("first-fork-writer-accepted"), p.TimelineID).Scan(&frozenRaw, &credentialRaw); err != nil {
+				t.Fatal(err)
+			}
+			var frozen dsgaEndpointCredentialSource
+			var credential dsgaCredentialReference
+			if decodeDSGAObject(frozenRaw, &frozen) != nil || decodeDSGAObject(credentialRaw, &credential) != nil ||
+				frozen != (dsgaEndpointCredentialSource{Endpoint: root.EndpointID, Operation: op, Reference: root.Plan.Credentials,
+					Fork: dsgaRetainedFork{Operation: branchOp, ParentBranch: root.BranchID, ParentTimeline: root.TimelineID, LSN: p.ParentLSN}}) ||
+				credential.validate() != nil || credential.UID == frozen.Reference.UID {
+				t.Fatal("first writer lost fork ancestry or reused original Secret identity")
 			}
 		})
 	}

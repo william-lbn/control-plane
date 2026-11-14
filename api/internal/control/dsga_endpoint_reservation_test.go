@@ -9,20 +9,25 @@ import (
 	"testing"
 )
 
+func dsgaRetainedReleaseCatalogFixture(t *testing.T) dsgaRuntimeCatalog {
+	t.Helper()
+	catalog := dsgaReleaseCatalogFixture(t)
+	for i := range catalog.Releases {
+		c := &catalog.Releases[i].Creation
+		c.VM.ProtocolVersion = 5
+		c.VM.TLSClusterIssuer = ""
+		c.VM.ResourceLimits.SystemMemoryMaxBytes = 64 << 20
+		c.VM.GenericGuest = genericGuestFixture(c.PostgresVersion, c.Budget)
+		c.RetainedCatalog = true
+	}
+	return catalog
+}
+
 func TestDSGARetainedReplicaUsesOriginalCredentialsAndIntent(t *testing.T) {
 	for _, version := range []uint32{17, 18} {
 		t.Run(fmt.Sprint(version), func(t *testing.T) {
 			f := newDSGAProjectFixture(t)
-			catalog := dsgaReleaseCatalogFixture(t)
-			for i := range catalog.Releases {
-				c := &catalog.Releases[i].Creation
-				c.VM.ProtocolVersion = 5
-				c.VM.TLSClusterIssuer = ""
-				c.VM.ResourceLimits.SystemMemoryMaxBytes = 64 << 20
-				c.VM.GenericGuest = genericGuestFixture(c.PostgresVersion, c.Budget)
-				c.RetainedCatalog = true
-			}
-			setDSGACatalog(t, catalog)
+			setDSGACatalog(t, dsgaRetainedReleaseCatalogFixture(t))
 			f.body.PostgresVersion = int(version)
 			if response := f.request("creation_admin", "retained-source-project", f.body); response.Code != 202 {
 				t.Fatal("original project not accepted", response.Code, response.Body.String())

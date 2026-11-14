@@ -18,14 +18,27 @@ type dsgaEndpointCredentialSource struct {
 	Endpoint  string                  `json:"endpoint_id"`
 	Operation string                  `json:"operation_id"`
 	Reference dsgaCredentialReference `json:"reference"`
+	Fork      dsgaRetainedFork        `json:"fork,omitzero"`
+}
+
+type dsgaRetainedFork struct {
+	Operation      string `json:"operation_id"`
+	ParentBranch   string `json:"parent_branch_id"`
+	ParentTimeline string `json:"parent_timeline_id"`
+	LSN            string `json:"lsn"`
 }
 
 var errDSGAEndpointWriterExists = errors.New("a writer already exists on the original branch")
 var errDSGACredentialWriterRetained = errors.New("the original writer runtime still exists")
 
 func (s *dsgaEndpointCredentialSource) valid(target string) bool {
-	return s != nil && s.Endpoint != target && dsgapi.ValidateID(s.Endpoint, "credential endpoint") == nil &&
-		dsgapi.ValidateID(s.Operation, "credential operation") == nil && s.Reference.validate() == nil
+	if s == nil || s.Endpoint == target || dsgapi.ValidateID(s.Endpoint, "credential endpoint") != nil ||
+		dsgapi.ValidateID(s.Operation, "credential operation") != nil || s.Reference.validate() != nil {
+		return false
+	}
+	return s.Fork == (dsgaRetainedFork{}) ||
+		(dsgapi.ValidateID(s.Fork.Operation, "fork operation") == nil && dsgapi.ValidateID(s.Fork.ParentBranch, "parent branch") == nil &&
+			s.Fork.Operation != s.Operation && dsgaStorageID.MatchString(s.Fork.ParentTimeline) && validateRestoreInput("", s.Fork.LSN, time.Now()) == nil && s.Fork.LSN != "")
 }
 
 func (s *server) createDSGARetainedEndpoint(w http.ResponseWriter, r *http.Request, body endpointCreateRequest) {
@@ -177,12 +190,56 @@ func readDSGARetainedWriter(ctx context.Context, db connectionDefaultReader, p c
  ORDER BY e.created_at DESC,e.id DESC LIMIT 1`, p.ProjectID, p.BranchID, p.EndpointID, p.TenantID, p.TimelineID, p.EndpointType).
 		Scan(&source.Endpoint, &source.Operation, &raw)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) && p.EndpointType == "read_write" {
+			return readDSGAFirstForkWriter(ctx, db, p)
+		}
 		if errors.Is(err, pgx.ErrNoRows) {
 			return source, errDSGACreationConflict
 		}
 		return source, err
 	}
 	if decodeDSGAObject(raw, &source.Reference) != nil || !source.valid(p.EndpointID) {
+		return source, errDSGACredentialSource
+	}
+	return source, nil
+}
+
+func readDSGAFirstForkWriter(ctx context.Context, db connectionDefaultReader, p createPayload) (dsgaEndpointCredentialSource, error) {
+	var source dsgaEndpointCredentialSource
+	var raw []byte
+	// Anchor the credential lookup to the immutable fork and confirmed storage
+	// request. Retirement or later re-creation on the parent cannot change it.
+	// PG verifies both original role verifiers on the child before it can serve.
+	err := db.QueryRow(ctx, `SELECT e.id,writer.id,writer.payload#>'{dsga_creation,credentials}',fork.id,parent.id,parent.timeline_id,child.parent_lsn
+ FROM branches child JOIN branches parent ON parent.id=child.parent_branch_id AND parent.project_id=child.project_id
+ JOIN operations fork ON fork.project_id=child.project_id AND fork.resource_type='branch' AND fork.resource_id=child.id
+ JOIN dsga_creation_timelines timeline ON timeline.operation_id=fork.id AND timeline.confirmed_at IS NOT NULL
+ JOIN endpoints e ON e.project_id=parent.project_id AND e.branch_id=parent.id AND e.endpoint_type='read_write'
+ JOIN operations writer ON writer.project_id=e.project_id AND writer.payload->>'endpoint_id'=e.id
+ JOIN dsga_creation_bindings binding ON binding.operation_id=writer.id AND binding.config_uid IS NOT NULL
+ WHERE child.project_id=$1 AND child.id=$2 AND child.timeline_id=$3 AND child.deleted_at IS NULL
+ AND parent.state='ready' AND parent.deleted_at IS NULL
+ AND fork.action='create_branch_dsga_v1' AND fork.state='succeeded'
+ AND fork.payload->>'endpoint_id'='' AND fork.payload->>'branch_id'=child.id
+ AND fork.payload->>'tenant_id'=$4 AND fork.payload->>'timeline_id'=child.timeline_id
+ AND fork.payload->>'parent_branch_id'=parent.id AND fork.payload->>'parent_timeline_id'=parent.timeline_id
+ AND fork.payload->>'parent_lsn'=child.parent_lsn AND timeline.tenant_id=$4 AND timeline.timeline_id=child.timeline_id
+ AND timeline.request->>'ancestor_timeline_id'=parent.timeline_id AND timeline.request->>'ancestor_start_lsn'=child.parent_lsn
+ AND writer.action IN ('create_project_dsga_v1','create_branch_dsga_v1','create_endpoint_dsga_v1') AND writer.state='succeeded'
+ AND writer.finished_at<=fork.created_at AND writer.payload->>'branch_id'=parent.id
+ AND writer.payload->>'tenant_id'=$4 AND writer.payload->>'timeline_id'=parent.timeline_id
+ AND NOT EXISTS (SELECT 1 FROM operations old WHERE old.project_id=child.project_id AND old.state='succeeded'
+     AND old.action IN ('create_project_dsga_v1','create_branch_dsga_v1','create_endpoint_dsga_v1')
+     AND old.payload->>'branch_id'=child.id AND old.payload->>'endpoint_id'<>'' AND old.payload->>'endpoint_type'='read_write')
+ ORDER BY writer.finished_at DESC,writer.id DESC LIMIT 1`, p.ProjectID, p.BranchID, p.TimelineID, p.TenantID).
+		Scan(&source.Endpoint, &source.Operation, &raw, &source.Fork.Operation, &source.Fork.ParentBranch, &source.Fork.ParentTimeline, &source.Fork.LSN)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return source, errDSGACreationConflict
+	}
+	if err != nil {
+		return source, err
+	}
+	if decodeDSGAObject(raw, &source.Reference) != nil || !source.valid(p.EndpointID) || source.Fork.ParentBranch == p.BranchID || source.Fork.ParentTimeline == p.TimelineID {
 		return source, errDSGACredentialSource
 	}
 	return source, nil
@@ -254,6 +311,12 @@ func (s *server) reserveDSGAEndpoint(ctx context.Context, actor, org, project, s
 	source, err := readDSGARetainedWriter(ctx, tx, p)
 	if err != nil {
 		return empty, err
+	}
+	if source.Fork != (dsgaRetainedFork{}) {
+		original, err := readDSGAProjectStoragePlan(ctx, tx, project, tenant)
+		if err != nil || original == nil || original.Storage != policy.Creation.Storage {
+			return empty, errDSGAStorageManagement
+		}
 	}
 	plan, err := newDSGACreationPlan(p, policy.Creation, time.Now())
 	if err != nil {

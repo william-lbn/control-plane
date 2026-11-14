@@ -172,9 +172,9 @@ func (s *server) reconcileDSGAEndpoint(ctx context.Context, binding *dsgaCreatio
 	}
 	err = s.createStep(ctx, binding.operationID, binding.workerID, 0, "verify_retained_timeline", func(ctx context.Context) error {
 		p := binding.intent.createPayload
+		var fork dsgaRetainedFork
 		if p.EndpointType == "read_write" {
-			// Only the Worker may list the original Runner Pods. Re-read the accepted
-			// credential source before any replacement VM is allowed to start.
+			// Confirm the accepted provenance before allowing any VM to start.
 			var raw []byte
 			var frozen dsgaEndpointCredentialSource
 			if err := s.db.QueryRow(ctx, `SELECT draft->'credential_source' FROM dsga_creation_reservations
@@ -188,8 +188,13 @@ func (s *server) reconcileDSGAEndpoint(ctx context.Context, binding *dsgaCreatio
 			if err != nil || original != frozen {
 				return errDSGACreationIdentity
 			}
-			if err := s.kube.verifyDSGAPriorWriterAbsent(ctx, plan.Namespace, frozen.Endpoint); err != nil {
-				return err
+			fork = frozen.Fork
+			if fork == (dsgaRetainedFork{}) {
+				// Same-Timeline successors must wait for the old VM and Runner to exit.
+				// Only the Worker can read the original Runner Pods.
+				if err := s.kube.verifyDSGAPriorWriterAbsent(ctx, plan.Namespace, frozen.Endpoint); err != nil {
+					return err
+				}
 			}
 		}
 		storage, err := newDSGAStorageClientAccess(ctx, s.kube, plan.Storage, false)
@@ -201,7 +206,8 @@ func (s *server) reconcileDSGAEndpoint(ctx context.Context, binding *dsgaCreatio
 		if err != nil {
 			return err
 		}
-		return validateDSGATimelineAggregate(fact, p.TenantID, p.TimelineID, plan.PostgresVersion, "", "", false)
+		return validateDSGATimelineAggregate(fact, p.TenantID, p.TimelineID, plan.PostgresVersion,
+			fork.ParentTimeline, fork.LSN, fork != (dsgaRetainedFork{}))
 	})
 	if err != nil {
 		return err
