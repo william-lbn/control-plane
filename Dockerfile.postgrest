@@ -6,10 +6,12 @@ COPY containers/services.lock.json containers/services.lock.json
 # standard-library downloader avoids adding an unpinned curl/apt dependency.
 COPY tools/postgrest-installer/ ./
 RUN go mod download && go run . /opt/postgrest
+RUN install -d -m 0755 /runtime-root/etc/ssl/certs /runtime-root/opt/neon-control /runtime-root/usr/share/licenses/postgrest \
+    && install -m 0644 /etc/ssl/certs/ca-certificates.crt /runtime-root/etc/ssl/certs/ca-certificates.crt \
+    && install -m 0755 /opt/postgrest/postgrest /runtime-root/opt/neon-control/postgrest
+COPY --chmod=0644 third_party/licenses/PostgREST-16.4-MIT.txt /runtime-root/usr/share/licenses/postgrest/LICENSE
 FROM scratch
-COPY third_party/licenses/PostgREST-16.4-MIT.txt /usr/share/licenses/postgrest/LICENSE
-COPY --from=build --chmod=0644 /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
-COPY --from=build --chmod=0755 /opt/postgrest/postgrest /opt/neon-control/postgrest
+COPY --from=build /runtime-root/ /
 USER 65532:65532
 EXPOSE 3000
 ENTRYPOINT ["/opt/neon-control/postgrest"]
