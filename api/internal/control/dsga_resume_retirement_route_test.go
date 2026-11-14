@@ -11,11 +11,13 @@ import (
 	"testing"
 
 	vmv1 "github.com/neondatabase/autoscaling/neonvm/apis/neonvm/v1"
+	"github.com/neondatabase/autoscaling/pkg/dsga/budget"
 	"github.com/neondatabase/autoscaling/pkg/dsga/hostguard"
 	"github.com/neondatabase/autoscaling/pkg/dsga/journal"
 	"github.com/neondatabase/autoscaling/pkg/dsga/vmguard"
 	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 func TestDSGAResumeRetirementUsesBothCredentialDigests(t *testing.T) {
@@ -116,7 +118,7 @@ func TestDSGAResumeRetirementRequiresRealBirthSourceNotFound(t *testing.T) {
 			}))
 			defer h.Close()
 			k := &kubeClient{http: h.Client(), base: h.URL, namespace: binding.Namespace}
-			err := confirmDSGAFailedResumeBirthAbsent(context.Background(), k, binding)
+			err := confirmDSGAFailedResumeUnpublished(context.Background(), k, nil, binding)
 			if (err == nil) != (status == http.StatusNotFound) {
 				t.Fatalf("HTTP %d produced incorrect absence result: %v", status, err)
 			}
@@ -129,6 +131,62 @@ func TestDSGAResumeRetirementRequiresRealBirthSourceNotFound(t *testing.T) {
 			}
 			if len(paths) != 0 && <-paths != want+names[1] {
 				t.Fatal("wrong immutable Runner state source")
+			}
+		})
+	}
+}
+
+func TestDSGAResumeRetirementRetainsRegisteredEmptyRunnerState(t *testing.T) {
+	binding := journal.Binding{Namespace: "neon", Name: "cp-original", VMUID: "original-vm",
+		Incarnation: "0123456789abcdef0123456789abcdef"}
+	vm := &vmv1.VirtualMachine{ObjectMeta: metav1.ObjectMeta{Namespace: binding.Namespace, Name: binding.Name, UID: binding.VMUID}}
+	names := vmguard.BirthSourceNames(binding)
+	birthRef := budget.ObjectRef{Name: names[0], UID: "original-birth"}
+	stateRef := budget.ObjectRef{Name: names[1], UID: "original-state"}
+	id := vmguard.Identity{VMUID: string(vm.UID), Incarnation: binding.Incarnation, NodeUID: "original-node",
+		RunnerPodUID: "original-pod", RunnerBootID: "1234567890abcdef1234567890abcdef",
+		MinimumBytes: 8 << 20, MaximumBytes: 16 << 20, BlockBytes: 8 << 20}
+	birth := vmguard.Birth{ProtocolVersion: 1, Identity: id, StateClaim: stateRef}
+	controller := true
+	for _, mode := range []string{"registered", "published", "missing-state", "replaced-state"} {
+		t.Run(mode, func(t *testing.T) {
+			state := vmguard.Publication{ProtocolVersion: 1, Identity: id}
+			if mode == "published" {
+				state.BindingClaim = &birthRef
+			}
+			h := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var ref budget.ObjectRef
+				var value any
+				var kind string
+				immutable := false
+				switch r.URL.Path {
+				case "/api/v1/namespaces/neon/configmaps/" + names[0]:
+					ref, value, kind, immutable = birthRef, birth, "binding-v1", true
+				case "/api/v1/namespaces/neon/configmaps/" + names[1]:
+					if mode == "missing-state" {
+						w.WriteHeader(http.StatusNotFound)
+						return
+					}
+					ref, value, kind = stateRef, state, "state-v1"
+					if mode == "replaced-state" {
+						ref.UID = "replaced-state"
+					}
+				default:
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				raw, _ := json.Marshal(value)
+				cm := &core.ConfigMap{ObjectMeta: metav1.ObjectMeta{Namespace: binding.Namespace, Name: ref.Name, UID: types.UID(ref.UID), ResourceVersion: "1",
+					Labels: map[string]string{vmguard.ClaimLabel: kind}, Finalizers: []string{vmguard.ProtectionFinalizer},
+					OwnerReferences: []metav1.OwnerReference{{APIVersion: vmv1.SchemeGroupVersion.String(), Kind: "VirtualMachine", Name: vm.Name,
+						UID: vm.UID, Controller: &controller, BlockOwnerDeletion: &controller}}},
+					Immutable: &immutable, Data: map[string]string{vmguard.ClaimKey: string(raw)}}
+				_ = json.NewEncoder(w).Encode(cm)
+			}))
+			defer h.Close()
+			k := &kubeClient{http: h.Client(), base: h.URL, namespace: binding.Namespace}
+			if err := confirmDSGAFailedResumeUnpublished(context.Background(), k, vm, binding); (err == nil) != (mode == "registered") {
+				t.Fatalf("wrong disposition for original Runner: %v", err)
 			}
 		})
 	}

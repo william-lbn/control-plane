@@ -151,15 +151,15 @@ func (s *server) settleFailedDSGAResume(ctx context.Context, id, worker string, 
 				return errDSGACreationIdentity
 			}
 		}
-		boundary = "verify_pre_birth"
+		boundary = "verify_unpublished_boot"
 		if beforeRunning {
 			// A failed readiness step can also be a timeout with a live VM.
-			// This path requires terminal pre-birth proof, including no native
-			// resource, budget, session or service ownership ever published.
+			// Terminal boot recovery needs the unused native journal and the
+			// exact Runner registration state. Host separately proves exit.
 			if vm.Status.Phase != vmv1.VmFailed || !unusedDSGAFailedResumeJournal(state) {
 				return errDSGACreationIdentity
 			}
-			if err := confirmDSGAFailedResumeBirthAbsent(ctx, s.kube, binding); err != nil {
+			if err := confirmDSGAFailedResumeUnpublished(ctx, s.kube, vm, binding); err != nil {
 				return err
 			}
 		}
@@ -276,23 +276,46 @@ func dsgaRetirementOwns(item metav1.Object, vm *vmv1.VirtualMachine, uid string)
 		dsgaRetirementOwnsReference(item, vm)
 }
 
-// Use the established JSON API client so the explicit HTTP outcome is kept
-// for absence. Scheduler separately confirms the same immutable source names.
-func confirmDSGAFailedResumeBirthAbsent(ctx context.Context, kube *kubeClient, binding journal.Binding) error {
+func confirmDSGAFailedResumeUnpublished(ctx context.Context, kube *kubeClient, vm *vmv1.VirtualMachine, binding journal.Binding) error {
 	if binding.Namespace != kube.namespace || dsgapi.ValidateID(binding.Namespace, "namespace") != nil ||
 		dsgapi.ValidateID(binding.Name, "VM name") != nil || dsgapi.ValidateID(string(binding.VMUID), "VM UID") != nil ||
 		dsgapi.ValidateIncarnation(binding.Incarnation) != nil {
 		return errDSGACreationIdentity
 	}
-	for _, name := range vmguard.BirthSourceNames(binding) {
-		_, err := kube.request(ctx, http.MethodGet, kube.path("configmap", name), nil)
+	names := vmguard.BirthSourceNames(binding)
+	var sources [2]*core.ConfigMap
+	for i, name := range names {
+		obj, err := kube.request(ctx, http.MethodGet, kube.path("configmap", name), nil)
 		var status kubeError
-		if !errors.As(err, &status) || status.Status != http.StatusNotFound {
-			if err != nil {
-				return err
-			}
+		if errors.As(err, &status) && status.Status == http.StatusNotFound {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		raw, err := json.Marshal(obj)
+		var source core.ConfigMap
+		if err != nil || json.Unmarshal(raw, &source) != nil || source.Name != name || source.Namespace != binding.Namespace {
 			return errDSGACreationIdentity
 		}
+		sources[i] = &source
+	}
+	if sources[0] == nil && sources[1] == nil {
+		return nil
+	}
+	state := sources[1]
+	birth, _, err := vmguard.InspectBirthForExit(sources[0], binding, nil)
+	if err != nil || state == nil || birth.StateClaim.Name != state.Name || birth.StateClaim.UID != string(state.UID) ||
+		!dsgaRetirementOwns(state, vm, birth.StateClaim.UID) ||
+		state.Immutable == nil || *state.Immutable || len(state.Data) != 1 || len(state.BinaryData) != 0 ||
+		state.Labels[vmguard.ClaimLabel] != "state-v1" || !slices.Contains(state.Finalizers, vmguard.ProtectionFinalizer) {
+		return errDSGACreationIdentity
+	}
+	var view vmguard.Publication
+	if json.Unmarshal([]byte(state.Data[vmguard.ClaimKey]), &view) != nil ||
+		view.ProtocolVersion != birth.ProtocolVersion || view.Identity != birth.Identity ||
+		view.BindingClaim != nil || view.State != nil || view.Actual != nil || view.InitialBootstrap != nil {
+		return errDSGACreationIdentity
 	}
 	return nil
 }
