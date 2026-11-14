@@ -6,6 +6,39 @@ import (
 	"time"
 )
 
+func TestDSGATimelineRestoreWindowUsesCommonShardBounds(t *testing.T) {
+	tenant := "11111111111111111111111111111111"
+	timeline := "22222222222222222222222222222222"
+	for _, major := range []uint32{17, 18} {
+		shards := []any{
+			map[string]any{"tenant_id": tenant + "-0002", "timeline_id": timeline, "pg_version": major,
+				"state": "Active", "initdb_lsn": "0/120", "min_readable_lsn": "0/180", "last_record_lsn": "0/300"},
+			map[string]any{"tenant_id": tenant + "-0102", "timeline_id": timeline, "pg_version": major,
+				"state": "Active", "initdb_lsn": "0/200", "min_readable_lsn": "0/160", "last_record_lsn": "0/280"},
+		}
+		item := map[string]any{"shards": shards}
+		window, err := dsgaTimelineRestoreWindow(item, tenant, timeline, major)
+		if err != nil || window.MinimumLSN != "0/200" || window.LatestLSN != "0/280" {
+			t.Fatalf("PG%d common window = %#v, %v", major, window, err)
+		}
+		for _, change := range []struct{ field, value string }{
+			{"min_readable_lsn", "0/400"}, {"initdb_lsn", "0/400"},
+			{"timeline_id", tenant}, {"state", "Loading"}, {"last_record_lsn", "0/190"},
+		} {
+			shard := shards[0].(map[string]any)
+			original := shard[change.field]
+			shard[change.field] = change.value
+			if _, err := dsgaTimelineRestoreWindow(item, tenant, timeline, major); err == nil {
+				t.Fatalf("PG%d accepted wrong %s", major, change.field)
+			}
+			shard[change.field] = original
+		}
+		if _, err := dsgaTimelineRestoreWindow(map[string]any{"shards": shards[:1]}, tenant, timeline, major); err == nil {
+			t.Fatalf("PG%d accepted missing shard", major)
+		}
+	}
+}
+
 func TestRestorePointValidation(t *testing.T) {
 	now := time.Date(2026, 10, 7, 10, 0, 0, 0, time.UTC)
 	for _, tc := range []struct {

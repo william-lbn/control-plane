@@ -33,7 +33,7 @@ func canonicalLSN(value string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return fmt.Sprintf("%X/%X", n>>32, n&0xffffffff), nil
+	return formatRestoreLSN(n), nil
 }
 
 type restoreError struct {
@@ -56,32 +56,96 @@ func (k *kubeClient) timelineRestoreWindow(ctx context.Context, tenant, timeline
 	if err != nil {
 		return restoreWindow{}, err
 	}
+	min, max, err := timelineRestoreBounds(item)
+	if err != nil {
+		return restoreWindow{}, err
+	}
+	return restoreWindow{MinimumLSN: formatRestoreLSN(min), LatestLSN: formatRestoreLSN(max), ObservedAt: time.Now().UTC()}, nil
+}
+
+func formatRestoreLSN(lsn uint64) string {
+	return fmt.Sprintf("%X/%X", lsn>>32, lsn&0xffffffff)
+}
+
+func timelineRestoreBounds(item map[string]any) (uint64, uint64, error) {
 	// min_readable_lsn includes the effective retention boundary; the applied GC
 	// cutoff alone can advertise data that is already eligible for collection.
-	minimum, err := canonicalLSN(stringVal(item["min_readable_lsn"]))
+	minimum, err := parseLSN(stringVal(item["min_readable_lsn"]))
 	if err != nil {
-		return restoreWindow{}, errors.New("storage retention boundary unavailable")
+		return 0, 0, errors.New("storage retention boundary unavailable")
 	}
 	if initdb := stringVal(item["initdb_lsn"]); initdb != "" {
 		n, err := parseLSN(initdb)
 		if err != nil {
+			return 0, 0, err
+		}
+		minimum = max(minimum, n)
+	}
+	latest, err := parseLSN(stringVal(item["last_record_lsn"]))
+	if err != nil {
+		return 0, 0, err
+	}
+	if minimum > latest {
+		return 0, 0, errors.New("invalid storage restore window")
+	}
+	return minimum, latest, nil
+}
+
+func dsgaTimelineRestoreWindow(item map[string]any, tenant, timeline string, major uint32) (restoreWindow, error) {
+	if err := validateDSGATimelineAggregate(item, tenant, timeline, major, "", "", false); err != nil {
+		return restoreWindow{}, err
+	}
+	shards, ok := item["shards"].([]any)
+	if !ok || len(shards) == 0 {
+		return restoreWindow{}, errDSGAStorageManagement
+	}
+	var minimum uint64
+	latest := ^uint64(0)
+	for _, raw := range shards {
+		shard, ok := raw.(map[string]any)
+		if !ok {
+			return restoreWindow{}, errDSGAStorageManagement
+		}
+		low, high, err := timelineRestoreBounds(shard)
+		if err != nil {
 			return restoreWindow{}, err
 		}
-		m, _ := parseLSN(minimum)
-		if n > m {
-			minimum, _ = canonicalLSN(initdb)
-		}
+		minimum, latest = max(minimum, low), min(latest, high)
 	}
-	latest, err := canonicalLSN(stringVal(item["last_record_lsn"]))
+	if minimum > latest {
+		return restoreWindow{}, errors.New("storage shards have no common restore window")
+	}
+	return restoreWindow{MinimumLSN: formatRestoreLSN(minimum), LatestLSN: formatRestoreLSN(latest), ObservedAt: time.Now().UTC()}, nil
+}
+
+func (s *server) branchRestoreWindow(ctx context.Context, project, tenant, timeline string) (restoreWindow, error) {
+	// The original project operation already freezes the storage trust domain.
+	// A historical branch must keep this domain even after a catalog rollout.
+	var count int
+	var raw *string
+	err := s.db.QueryRow(ctx, `SELECT count(*),max((payload->'dsga_creation')::text)
+ FILTER (WHERE state='succeeded' AND payload->>'tenant_id'=$2)
+ FROM operations WHERE project_id=$1 AND action='create_project_dsga_v1'`, project, tenant).Scan(&count, &raw)
 	if err != nil {
 		return restoreWindow{}, err
 	}
-	lo, _ := parseLSN(minimum)
-	hi, _ := parseLSN(latest)
-	if lo > hi {
-		return restoreWindow{}, errors.New("invalid storage restore window")
+	if count == 0 {
+		return s.kube.timelineRestoreWindow(ctx, tenant, timeline)
 	}
-	return restoreWindow{MinimumLSN: minimum, LatestLSN: latest, ObservedAt: time.Now().UTC()}, nil
+	var plan dsgaCreationPlan
+	if count != 1 || raw == nil || decodeDSGAObject([]byte(*raw), &plan) != nil {
+		return restoreWindow{}, errDSGAStorageManagement
+	}
+	client, err := newDSGAStorageClientAccess(ctx, s.kube, plan.Storage, false)
+	if err != nil {
+		return restoreWindow{}, err
+	}
+	defer client.CloseIdleConnections()
+	item, err := client.request(ctx, http.MethodGet, "control/v1/tenant/"+tenant+"/timeline/"+timeline, nil)
+	if err != nil {
+		return restoreWindow{}, err
+	}
+	return dsgaTimelineRestoreWindow(item, tenant, timeline, plan.PostgresVersion)
 }
 
 func (s *server) readRestoreWindow(w http.ResponseWriter, r *http.Request) {
@@ -100,7 +164,7 @@ func (s *server) readRestoreWindow(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	window, err := s.kube.timelineRestoreWindow(r.Context(), stringVal(branch["tenant_id"]), stringVal(branch["timeline_id"]))
+	window, err := s.branchRestoreWindow(r.Context(), r.PathValue("project"), stringVal(branch["tenant_id"]), stringVal(branch["timeline_id"]))
 	if err != nil {
 		fail(w, r, 503, "restore_window_unavailable", "Could not read storage retention window")
 		return
