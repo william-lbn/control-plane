@@ -117,6 +117,10 @@ func applyManagedAuthSQLTx(ctx context.Context, tx pgx.Tx, p managedAuthPayload,
 	return applyManagedAuthSQLWithFactorsTx(ctx, tx, p, verifier, false)
 }
 func applyManagedAuthSQLWithFactorsTx(ctx context.Context, tx pgx.Tx, p managedAuthPayload, verifier string, migrated bool) error {
+	return applyManagedAuthInstallationTx(ctx, tx, p, verifier, migrated, false)
+}
+
+func applyManagedAuthInstallationTx(ctx context.Context, tx pgx.Tx, p managedAuthPayload, verifier string, migrated, nativeLogin bool) error {
 	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,922742))`, p.BranchID); err != nil {
 		return err
 	}
@@ -222,6 +226,9 @@ func applyManagedAuthSQLWithFactorsTx(ctx context.Context, tx pgx.Tx, p managedA
 		return errors.New("Managed Auth role ownership conflict")
 	}
 	if isNoRows(err) {
+		if nativeLogin {
+			return errors.New("Managed Auth native login is unavailable")
+		}
 		if _, err = tx.Exec(ctx, "CREATE ROLE "+pgQuote(login)+" NOLOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS"); err != nil {
 			return err
 		}
@@ -229,16 +236,20 @@ func applyManagedAuthSQLWithFactorsTx(ctx context.Context, tx pgx.Tx, p managedA
 			return err
 		}
 	}
-	for _, statement := range []string{
-		"ALTER ROLE " + pgQuote(login) + " LOGIN PASSWORD " + pgLiteral(verifier) + " CONNECTION LIMIT 4",
-		"ALTER ROLE " + pgQuote(login) + " SET idle_session_timeout='5s'",
-		"ALTER ROLE " + pgQuote(login) + " SET search_path=neon_auth,pg_catalog",
-		"GRANT CONNECT ON DATABASE " + pgQuote(p.Spec.Database) + " TO " + pgQuote(login),
-		"GRANT USAGE ON SCHEMA neon_auth TO " + pgQuote(login),
-	} {
-		if _, err = tx.Exec(ctx, statement); err != nil {
-			return err
+	if !nativeLogin {
+		for _, statement := range []string{
+			"ALTER ROLE " + pgQuote(login) + " LOGIN PASSWORD " + pgLiteral(verifier) + " CONNECTION LIMIT 4",
+			"ALTER ROLE " + pgQuote(login) + " SET idle_session_timeout='5s'",
+			"ALTER ROLE " + pgQuote(login) + " SET search_path=neon_auth,pg_catalog",
+			"GRANT CONNECT ON DATABASE " + pgQuote(p.Spec.Database) + " TO " + pgQuote(login),
+		} {
+			if _, err = tx.Exec(ctx, statement); err != nil {
+				return err
+			}
 		}
+	}
+	if _, err = tx.Exec(ctx, "GRANT USAGE ON SCHEMA neon_auth TO "+pgQuote(login)); err != nil {
+		return err
 	}
 	tables := []string{"user", "session", "account", "verification", "jwks", "rateLimit"}
 	if p.Spec.TwoFactorEnabled {
@@ -265,7 +276,7 @@ func applyManagedAuthSQLWithFactorsTx(ctx context.Context, tx pgx.Tx, p managedA
 	}
 	return nil
 }
-func (s *server) applyManagedAuthSQL(ctx context.Context, p managedAuthPayload) error {
+func (s *server) applyManagedAuthSQL(ctx context.Context, p managedAuthPayload, authorize func(context.Context) error) error {
 	release, err := s.acquireProbeGate(ctx, p.EndpointID, true)
 	if err != nil {
 		return err
@@ -278,6 +289,18 @@ func (s *server) applyManagedAuthSQL(ctx context.Context, p managedAuthPayload) 
 	verifier, err := secretText(secret, "verifier")
 	if err != nil {
 		return err
+	}
+	runtime, err := s.dsgaEndpointRuntime(ctx, p.ProjectID, p.EndpointID)
+	if err != nil {
+		return err
+	}
+	if runtime != nil {
+		if p.Spec.InheritTwoFactor {
+			return dataAPIPrerequisiteError{"auth_dsga_factor_inheritance_unavailable", "Inherited Auth factors require a verified DSGA child-role transition"}
+		}
+		if err = s.reconcileDSGAAuthLogin(ctx, runtime, p, &verifier, authorize); err != nil {
+			return err
+		}
 	}
 	conn, err := s.dataAPIConnection(ctx, dataAPIPayload{ProjectID: p.ProjectID, BranchID: p.BranchID, EndpointID: p.EndpointID, Spec: DataAPISpec{Database: p.Spec.Database}})
 	if err != nil {
@@ -296,7 +319,7 @@ func (s *server) applyManagedAuthSQL(ctx context.Context, p managedAuthPayload) 
 			return err
 		}
 	}
-	if err = applyManagedAuthSQLWithFactorsTx(ctx, tx, p, verifier, proof != nil); err != nil {
+	if err = applyManagedAuthInstallationTx(ctx, tx, p, verifier, proof != nil, runtime != nil); err != nil {
 		return err
 	}
 	if err = tx.Commit(ctx); err != nil {
@@ -379,6 +402,23 @@ func (s *server) reconcileManagedAuth(ctx context.Context, id, worker, action st
 		return errors.New("Managed Auth intent generation mismatch")
 	}
 	enable := action == "enable_managed_auth"
+	authorize := func(ctx context.Context) error {
+		tx, err := s.db.Begin(ctx)
+		if err != nil {
+			return err
+		}
+		defer tx.Rollback(ctx)
+		if err = assertCreateLeaseTx(ctx, tx, id, worker); err != nil {
+			return err
+		}
+		var generation int64
+		err = tx.QueryRow(ctx, `SELECT generation FROM managed_auth_instances
+		 WHERE branch_id=$1 AND project_id=$2 AND endpoint_id=$3 AND secret_ref=$4`, p.BranchID, p.ProjectID, p.EndpointID, p.SecretRef).Scan(&generation)
+		if err != nil || generation != p.Generation {
+			return errLeaseLost
+		}
+		return tx.Commit(ctx)
+	}
 	steps := []func(context.Context) error{
 		func(ctx context.Context) error {
 			if !enable {
@@ -390,7 +430,7 @@ func (s *server) reconcileManagedAuth(ctx context.Context, id, worker, action st
 			if !enable {
 				return nil
 			}
-			return s.applyManagedAuthSQL(ctx, p)
+			return s.applyManagedAuthSQL(ctx, p, authorize)
 		},
 		func(ctx context.Context) error {
 			verifier := ""
@@ -403,6 +443,9 @@ func (s *server) reconcileManagedAuth(ctx context.Context, id, worker, action st
 				if err != nil {
 					return err
 				}
+			}
+			if err := authorize(ctx); err != nil {
+				return err
 			}
 			return s.publishBranchServiceIdentity(ctx, p.ProjectID, p.BranchID, p.EndpointID, managedAuthLogin(p.BranchID), verifier, enable)
 		},
@@ -463,7 +506,7 @@ func (s *server) managedAuthUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer release()
-	conn, err := s.dataAPIConnection(r.Context(), dataAPIPayload{ProjectID: p.ProjectID, EndpointID: p.EndpointID, Spec: DataAPISpec{Database: p.Spec.Database}})
+	conn, err := s.dataAPIConnection(r.Context(), dataAPIPayload{ProjectID: p.ProjectID, BranchID: p.BranchID, EndpointID: p.EndpointID, Spec: DataAPISpec{Database: p.Spec.Database}})
 	if err != nil {
 		s.sqlFailureResponse(w, r, err)
 		return
