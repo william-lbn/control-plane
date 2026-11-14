@@ -122,7 +122,7 @@ func (s *server) installObjectStorage(ctx context.Context, p objectStoragePayloa
 		return err
 	}
 	defer release()
-	conn, err := s.dataAPIConnection(ctx, dataAPIPayload{ProjectID: p.ProjectID, EndpointID: p.EndpointID, Spec: DataAPISpec{Database: p.Spec.Database}})
+	conn, err := s.dataAPIConnection(ctx, dataAPIPayload{ProjectID: p.ProjectID, BranchID: p.BranchID, EndpointID: p.EndpointID, Spec: DataAPISpec{Database: p.Spec.Database}})
 	if err != nil {
 		return err
 	}
@@ -300,7 +300,7 @@ func (s *server) openObjectStorage(r *http.Request, project, branch string) (*pg
 		case <-time.After(100 * time.Millisecond):
 		}
 	}
-	conn, err := s.dataAPIConnection(r.Context(), dataAPIPayload{ProjectID: p.ProjectID, EndpointID: p.EndpointID, Spec: DataAPISpec{Database: p.Spec.Database}})
+	conn, err := s.dataAPIConnection(r.Context(), dataAPIPayload{ProjectID: p.ProjectID, BranchID: p.BranchID, EndpointID: p.EndpointID, Spec: DataAPISpec{Database: p.Spec.Database}})
 	if err != nil {
 		cleanup()
 		return nil, p, nil, err

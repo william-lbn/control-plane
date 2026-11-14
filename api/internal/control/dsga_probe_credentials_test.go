@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 func TestDSGAProbeCredentialSnapshotAndLegacyReadOnly(t *testing.T) {
@@ -80,6 +81,34 @@ func TestDSGAProbeCredentialLegacyProducerRefusesRewrite(t *testing.T) {
 	f.mu.Unlock()
 	if posts != 1 || !bytes.Equal(before, after) {
 		t.Fatal("legacy retry rewrote immutable original source")
+	}
+}
+
+func TestDSGABoundProbePasswordRejectsAlternateSecret(t *testing.T) {
+	const project, endpoint = "prj_test", "ep_0123456789abcdef"
+	secret := credentialSourceSecret()
+	seed := bytes.Repeat([]byte{17}, 32)
+	want := base64.RawURLEncoding.EncodeToString(seed)
+	secret.Data["probeCredentialSeed"] = seed
+	secret.Data["probeVerifier"] = []byte(dsgaVerifier(want, bytes.Repeat([]byte{3}, 16)))
+	snapshot, err := snapshotDSGACredentials(secret, secret.Namespace, secret.Name, project, endpoint)
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime := &dsgaEndpointRuntime{Payload: createPayload{ProjectID: project, EndpointID: endpoint},
+		Plan: dsgaCreationPlan{dsgaCreationIdentity: dsgaCreationIdentity{Namespace: secret.Namespace}, Credentials: snapshot.reference()}}
+	if password, err := readDSGABoundProbePassword(secret, runtime); err != nil || password != want {
+		t.Fatal("could not authenticate using the selected immutable source")
+	}
+	alternate := secret.DeepCopy()
+	alternate.UID = types.UID("other-uid")
+	if password, err := readDSGABoundProbePassword(alternate, runtime); !errors.Is(err, errDSGACredentialSource) || password != "" {
+		t.Fatal("accepted same-named credential Secret with a different UID")
+	}
+	alternate = secret.DeepCopy()
+	alternate.Data["probePassword"] = []byte("legacy-probe-value")
+	if password, err := readDSGABoundProbePassword(alternate, runtime); !errors.Is(err, errDSGACredentialSource) || password != "" {
+		t.Fatal("accepted legacy credential field for a bound DSGA endpoint")
 	}
 }
 

@@ -216,11 +216,7 @@ func (s *server) sampleDSGAStats(ctx context.Context, endpoint record, uid *stri
 	if err != nil {
 		return nil, time.Time{}, 0, err
 	}
-	source, err := snapshotDSGACredentials(secret, vm.Namespace, name, e.Payload.ProjectID, e.Payload.EndpointID)
-	if err != nil || source.reference() != e.Plan.Credentials {
-		return nil, time.Time{}, 0, errDSGACredentialSource
-	}
-	password, err := source.probePassword()
+	password, err := readDSGABoundProbePassword(secret, e)
 	if err != nil {
 		return nil, time.Time{}, 0, err
 	}

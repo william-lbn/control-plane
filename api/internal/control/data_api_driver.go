@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func pgLiteral(value string) string { return "'" + strings.ReplaceAll(value, "'", "''") + "'" }
@@ -23,6 +24,13 @@ func dataAPIGuardSchema(branch string) string {
 }
 
 func (s *server) dataAPIConnection(ctx context.Context, p dataAPIPayload) (*pgx.Conn, error) {
+	runtime, err := s.dsgaEndpointRuntime(ctx, p.ProjectID, p.EndpointID)
+	if err != nil {
+		return nil, err
+	}
+	if runtime != nil {
+		return s.dsgaBackendConnection(ctx, runtime, p)
+	}
 	secret, err := s.kube.request(ctx, http.MethodGet, s.kube.path("secret", kubeName(p.EndpointID)+"-credentials"), nil)
 	if err != nil || !owned(secret, p.ProjectID, p.EndpointID) {
 		return nil, errors.New("Data API writer credential ownership mismatch")
@@ -32,6 +40,41 @@ func (s *server) dataAPIConnection(ctx context.Context, p dataAPIPayload) (*pgx.
 		return nil, err
 	}
 	return connectSQL(ctx, s.proxyHost, s.proxyPort, "control_probe", password, p.Spec.Database, selector(p.EndpointID))
+}
+
+func (s *server) dsgaBackendConnection(ctx context.Context, runtime *dsgaEndpointRuntime, p dataAPIPayload) (*pgx.Conn, error) {
+	if runtime.Payload.EndpointType != "read_write" || runtime.Payload.BranchID != p.BranchID {
+		return nil, errDSGACreationIdentity
+	}
+	clients, vm, _, _, err := s.readDSGABoundSelection(ctx, runtime)
+	if err != nil {
+		return nil, err
+	}
+	secret, err := clients.CoreV1().Secrets(vm.Namespace).Get(ctx, vm.Name+"-credentials", metav1.GetOptions{})
+	if err != nil {
+		return nil, errDSGACredentialSource
+	}
+	password, err := readDSGABoundProbePassword(secret, runtime)
+	if err != nil {
+		return nil, err
+	}
+	conn, err := connectSQL(ctx, s.proxyHost, s.proxyPort, "control_probe", password, p.Spec.Database, selector(p.EndpointID))
+	if err != nil {
+		return nil, err
+	}
+	var tenant, timeline string
+	var replica bool
+	if err = conn.QueryRow(ctx, `SELECT current_setting('neon.tenant_id'), current_setting('neon.timeline_id'), pg_is_in_recovery()`).Scan(&tenant, &timeline, &replica); err != nil ||
+		tenant != runtime.Payload.TenantID || timeline != runtime.Payload.TimelineID || replica {
+		conn.Close(context.Background())
+		return nil, errDSGACreationIdentity
+	}
+	_, latest, _, _, err := s.readDSGABoundSelection(ctx, runtime)
+	if err != nil || latest.UID != vm.UID || latest.Status.PodName != vm.Status.PodName {
+		conn.Close(context.Background())
+		return nil, errDSGACreationIdentity
+	}
+	return conn, nil
 }
 
 func (s *server) applyDataAPISQL(ctx context.Context, p dataAPIPayload) error {

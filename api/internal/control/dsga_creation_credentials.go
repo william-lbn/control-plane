@@ -74,6 +74,15 @@ func snapshotDSGACredentials(secret *core.Secret, namespace, name, project, endp
 	}, append([]byte(nil), probeSeed...)}, nil
 }
 
+func readDSGABoundProbePassword(secret *core.Secret, runtime *dsgaEndpointRuntime) (string, error) {
+	name := kubeName(runtime.Payload.EndpointID) + "-credentials"
+	snapshot, err := snapshotDSGACredentials(secret, runtime.Plan.Namespace, name, runtime.Payload.ProjectID, runtime.Payload.EndpointID)
+	if err != nil || snapshot.reference() != runtime.Plan.Credentials {
+		return "", errDSGACredentialSource
+	}
+	return snapshot.probePassword()
+}
+
 func (binding *dsgaCreationBinding) verifyCredentialProvenance(ctx context.Context, secret *core.Secret, plan dsgaCreationPlan) bool {
 	if binding.action != dsgaResumeAction {
 		return dsgaCredentialProvenance(secret, binding.operationID, plan)

@@ -107,7 +107,7 @@ func (s *server) exportStorageFunctionEvents(ctx context.Context, b storageEvent
 		return err
 	}
 	defer release()
-	conn, err := s.dataAPIConnection(ctx, dataAPIPayload{ProjectID: p.ProjectID, EndpointID: p.EndpointID, Spec: DataAPISpec{Database: p.Spec.Database}})
+	conn, err := s.dataAPIConnection(ctx, dataAPIPayload{ProjectID: p.ProjectID, BranchID: p.BranchID, EndpointID: p.EndpointID, Spec: DataAPISpec{Database: p.Spec.Database}})
 	if err != nil {
 		return err
 	}
