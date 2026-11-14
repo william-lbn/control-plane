@@ -79,6 +79,32 @@ func TestDSGARetainedReplicaUsesOriginalCredentialsAndIntent(t *testing.T) {
 			if endpoint == p.EndpointID || action != "create_endpoint_dsga_v1" || tenant != p.TenantID || timeline != p.TimelineID || !retained {
 				t.Fatal("retained compute lost original data identity")
 			}
+			var replicaOperation string
+			if err := f.s.db.QueryRow(f.ctx, `SELECT operation_id FROM idempotency_keys WHERE actor_id='creation_admin' AND key_hash=$1`,
+				keyHash("retained-replica-key")).Scan(&replicaOperation); err != nil {
+				t.Fatal(err)
+			}
+			f.exec(`UPDATE operations SET state='running',lease_owner='fixture-worker',lease_expires_at=clock_timestamp()+interval '1 hour' WHERE id=$1`, replicaOperation)
+			replica, err := f.s.loadDSGACreationBinding(f.ctx, replicaOperation, "fixture-worker")
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := replica.bind(f.ctx, "fixture-retained-replica-vm", ""); err != nil {
+				t.Fatal(err)
+			}
+			if err := replica.bind(f.ctx, "fixture-retained-replica-vm", "fixture-retained-replica-config"); err != nil {
+				t.Fatal(err)
+			}
+			job := dsgaSupplyObject{"replica-job", "original-replica-job", "job-sha"}
+			for range 2 {
+				if _, err := replica.supplyFact(f.ctx, "qualification_job", job); err != nil {
+					t.Fatal("retained endpoint cannot persist or replay its qualification Job", err)
+				}
+			}
+			f.exec(`UPDATE operations SET lease_expires_at=clock_timestamp()-interval '1 second' WHERE id=$1`, replicaOperation)
+			if _, err := replica.supplyFact(f.ctx, "runtime_selection", job); err == nil {
+				t.Fatal("expired retained Worker published a new supply fact")
+			}
 			f.credentials.mu.Lock()
 			old := f.credentials.objects[kubeName(p.EndpointID)+"-credentials"]
 			new := f.credentials.objects[kubeName(endpoint)+"-credentials"]
