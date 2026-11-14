@@ -137,7 +137,13 @@ func (s *server) reconcileDSGACompute(ctx context.Context, binding *dsgaCreation
 		if initialization.Observed.Instance != originalInstance {
 			return errDSGACreationIdentity
 		}
-		return binding.recordInitialization(ctx, initialization)
+		if err := binding.recordInitialization(ctx, initialization); err != nil {
+			return err
+		}
+		if binding.action == dsgaResumeAction && binding.intent.EndpointType == "read_write" {
+			return binding.revokeDisabledDSGAAuthOnResume(ctx, initialization.Observed.Instance.PGBootID)
+		}
+		return nil
 	}); err != nil {
 		return err
 	}

@@ -106,7 +106,8 @@ func (s *server) queueDSGAResume(ctx context.Context, project, endpoint string, 
  WHERE e.id=$1 AND e.project_id=$2 AND gone.action='suspend_endpoint_dsga_v1' AND gone.state='succeeded'
  AND ((e.dsga_runtime_operation_id=original.id AND original.action='resume_endpoint_dsga_v1')
    OR (e.dsga_runtime_operation_id IS NULL AND original.action IN ('create_project_dsga_v1','create_endpoint_dsga_v1')))
- AND NOT EXISTS(SELECT 1 FROM operations active WHERE active.project_id=e.project_id AND active.resource_type='endpoint' AND active.resource_id=e.id
+ AND NOT EXISTS(SELECT 1 FROM operations active WHERE active.project_id=e.project_id
+   AND ((active.resource_type='endpoint' AND active.resource_id=e.id) OR (active.resource_type='managed_auth' AND active.payload->>'endpoint_id'=e.id))
    AND active.state IN ('queued','running','retry_wait'))`, endpoint, project).Scan(&originalSuspension, &frozen); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return "", errDSGACreationConflict

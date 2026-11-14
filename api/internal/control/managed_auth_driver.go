@@ -444,7 +444,7 @@ func (s *server) reconcileManagedAuth(ctx context.Context, id, worker, action st
 		},
 		func(ctx context.Context) error {
 			if !enable {
-				return nil
+				return s.revokeDSGAAuthLogin(ctx, p, authorize)
 			}
 			return s.applyManagedAuthSQL(ctx, p, authorize)
 		},

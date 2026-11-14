@@ -54,14 +54,29 @@ func dsgaAuthLoginJWT(key ed25519.PrivateKey, runtime *dsgaEndpointRuntime, raw 
 // authorizing one exact request. No credential or authorization is persisted
 // in the public operation result.
 func (s *server) reconcileDSGAAuthLogin(ctx context.Context, runtime *dsgaEndpointRuntime, p managedAuthPayload, verifier *string, authorize func(context.Context) error) error {
+	if authorize == nil {
+		return errDSGACreationIdentity
+	}
+	return s.applyDSGAAuthLogin(ctx, runtime, p, verifier, 0, func(ctx context.Context) error {
+		latest, err := s.dsgaEndpointRuntime(ctx, p.ProjectID, p.EndpointID)
+		if err != nil || latest == nil || latest.Operation != runtime.Operation || latest.VMUID != runtime.VMUID {
+			return errDSGACreationIdentity
+		}
+		return authorize(ctx)
+	})
+}
+
+// The caller proves which operation owns this generation. A resume can use
+// its bound, initialized Writer before that Writer becomes the active endpoint.
+func (s *server) applyDSGAAuthLogin(ctx context.Context, runtime *dsgaEndpointRuntime, p managedAuthPayload, verifier *string, boot dsgapi.Uint64, authorize func(context.Context) error) error {
 	refusal := dataAPIPrerequisiteError{"auth_writer_service_login_unconfirmed", "Original DSGA Writer service login is unconfirmed"}
-	if runtime.Payload.ProjectID != p.ProjectID || runtime.Payload.BranchID != p.BranchID ||
+	if runtime == nil || runtime.Payload.ProjectID != p.ProjectID || runtime.Payload.BranchID != p.BranchID ||
 		runtime.Payload.EndpointID != p.EndpointID || runtime.Payload.EndpointType != "read_write" ||
 		p.Generation < 1 || authorize == nil {
 		return refusal
 	}
 	_, vm, _, selected, err := s.readDSGABoundSelection(ctx, runtime)
-	if err != nil {
+	if err != nil || boot != 0 && selected.Instance.PGBootID != boot {
 		return refusal
 	}
 	var uid string
@@ -84,9 +99,7 @@ func (s *server) reconcileDSGAAuthLogin(ctx context.Context, runtime *dsgaEndpoi
 	if err != nil || source.reference() != runtime.Plan.Credentials {
 		return refusal
 	}
-	latest, err := s.dsgaEndpointRuntime(ctx, p.ProjectID, p.EndpointID)
-	if err != nil || latest == nil || latest.Operation != runtime.Operation || latest.VMUID != runtime.VMUID ||
-		authorize(ctx) != nil {
+	if err := authorize(ctx); err != nil {
 		return refusal
 	}
 	input := dsgaAuthLoginRequest{1, p.ProjectID, p.BranchID, p.EndpointID, selected.Instance.PGBootID,

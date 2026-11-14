@@ -122,7 +122,8 @@ func (s *server) queueDSGASuspension(ctx context.Context, project, endpoint stri
 		return "", errDSGACreationIdentity
 	}
 	var pending bool
-	if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM operations WHERE project_id=$2 AND resource_type='endpoint' AND resource_id=$1
+	if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM operations WHERE project_id=$2
+ AND ((resource_type='endpoint' AND resource_id=$1) OR (resource_type='managed_auth' AND payload->>'endpoint_id'=$1))
  AND state IN ('queued','running','retry_wait'))`, endpoint, project).Scan(&pending); err != nil {
 		return "", err
 	}
