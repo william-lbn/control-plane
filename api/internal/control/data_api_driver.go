@@ -1,6 +1,7 @@
 package control
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
@@ -11,6 +12,10 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	dsgapi "github.com/neondatabase/autoscaling/pkg/api/dsga"
+	"github.com/william-lbn/control-plane/api/internal/adapter"
+	"github.com/william-lbn/control-plane/api/internal/functionsql"
+	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -260,8 +265,45 @@ func (s *server) publishDataAPIIdentity(ctx context.Context, p dataAPIPayload, e
 }
 
 func (s *server) publishBranchServiceIdentity(ctx context.Context, project, branch, endpoint, login, verifier string, enable bool) error {
+	runtime, err := s.dsgaEndpointRuntime(ctx, project, endpoint)
+	if err != nil {
+		return err
+	}
+	var expectedService string
+	if runtime != nil {
+		if runtime.Payload.EndpointType != "read_write" || runtime.Payload.BranchID != branch ||
+			!dataBranchID.MatchString(branch) ||
+			(login != dataAPILogin(branch) && login != managedAuthLogin(branch) &&
+				(!strings.HasPrefix(login, "fn_") || !functionDefinitionID.MatchString("fnc_"+strings.TrimPrefix(login, "fn_")))) ||
+			(enable && !functionsql.ValidVerifier(verifier)) {
+			return errDSGACreationIdentity
+		}
+		if err = s.db.QueryRow(ctx, `SELECT service_uid FROM dsga_creation_services
+		 WHERE operation_id=$1 AND service_kind='postgres' AND vm_uid=$2`, runtime.Operation, runtime.VMUID).Scan(&expectedService); err != nil {
+			return err
+		}
+	}
+	return publishBranchServiceRoute(ctx, s.kube, project, branch, endpoint, login, verifier, enable, runtime, expectedService)
+}
+
+func publishBranchServiceRoute(ctx context.Context, kube *kubeClient, project, branch, endpoint, login, verifier string, enable bool, runtime *dsgaEndpointRuntime, serviceUID string) error {
+	key := selector(endpoint)
+	var registryUID string
+	var credentialDigest string
+	if runtime != nil {
+		var secret core.Secret
+		name := kubeName(endpoint) + "-credentials"
+		if err := managedSQLRead(kube, ctx, "secret", name, &secret); err != nil {
+			return errDSGACredentialSource
+		}
+		source, err := snapshotDSGACredentials(&secret, runtime.Plan.Namespace, name, project, endpoint)
+		if err != nil || source.reference() != runtime.Plan.Credentials {
+			return errDSGACredentialSource
+		}
+		credentialDigest = managedSQLDataDigest(secret.Data)
+	}
 	for attempt := 0; attempt < 6; attempt++ {
-		secret, err := s.kube.request(ctx, http.MethodGet, s.kube.path("secret", routesSecret), nil)
+		secret, err := kube.request(ctx, http.MethodGet, kube.path("secret", routesSecret), nil)
 		if err != nil {
 			return err
 		}
@@ -269,33 +311,82 @@ func (s *server) publishBranchServiceIdentity(ctx context.Context, project, bran
 		if err != nil {
 			return err
 		}
-		var routes map[string]map[string]any
-		if err = json.Unmarshal([]byte(raw), &routes); err != nil {
+		routes, err := managedSQLRouteMap([]byte(raw))
+		if err != nil {
 			return err
 		}
-		route := routes[selector(endpoint)]
-		if route == nil || route["project_id"] != project || route["branch_id"] != branch {
+		route, err := managedSQLRouteMap(routes[key])
+		if err != nil || stringValFromJSON(route["project_id"]) != project || stringValFromJSON(route["branch_id"]) != branch {
 			return errors.New("Branch service writer route ownership mismatch")
 		}
-		roles, ok := route["roles"].(map[string]any)
-		if !ok {
+		uid := stringVal(nested(secret, "metadata", "uid"))
+		if runtime != nil {
+			var binding adapter.ManagedSQLBinding
+			if uid == "" || (registryUID != "" && uid != registryUID) || stringVal(nested(secret, "metadata", "resourceVersion")) == "" ||
+				nested(secret, "metadata", "deletionTimestamp") != nil ||
+				dsgapi.UnmarshalObject(route["managed_binding"], &binding) != nil || binding.Validate() != nil ||
+				binding.ProjectID != project || binding.BranchID != branch || binding.EndpointID != endpoint ||
+				binding.Namespace != runtime.Plan.Namespace || binding.TenantID != runtime.Payload.TenantID ||
+				binding.TimelineID != runtime.Payload.TimelineID || binding.VMUID != runtime.VMUID ||
+				binding.Incarnation != runtime.Plan.Incarnation || binding.ComputeInstanceID != runtime.Plan.ComputeInstanceID ||
+				binding.ConfigSecretUID != runtime.ConfigUID || binding.CredentialSecretUID != runtime.Plan.Credentials.UID ||
+				binding.CredentialDataSHA256 != credentialDigest || binding.ServiceUID != serviceUID {
+				return errDSGACreationIdentity
+			}
+			registryUID = uid
+		} else if len(route["managed_binding"]) != 0 {
+			return errDSGACreationIdentity
+		}
+		var roles map[string]json.RawMessage
+		if err = json.Unmarshal(route["roles"], &roles); err != nil || roles == nil {
 			return errors.New("writer route role registry unavailable")
 		}
+		previous, exists := roles[login]
 		if enable {
-			roles[login] = verifier
+			roles[login], _ = json.Marshal(verifier)
 		} else {
 			delete(roles, login)
 		}
-		b, _ := json.Marshal(routes)
-		secret["data"].(map[string]any)["routes.json"] = base64.StdEncoding.EncodeToString(b)
-		_, err = s.kube.request(ctx, http.MethodPut, s.kube.path("secret", routesSecret), secret)
+		route["roles"], _ = json.Marshal(roles)
+		routes[key], _ = json.Marshal(route)
+		if runtime != nil && enable && adapter.ValidateManagedSQLRoute(ctx, adapterKubernetes{kube}, runtime.Plan.Namespace, key, routes[key]) != nil {
+			return errDSGACreationIdentity
+		}
+		if enable && bytes.Equal(previous, roles[login]) || !enable && !exists {
+			return nil
+		}
+		b, err := json.Marshal(routes)
+		if err != nil || len(b) > 2<<20 {
+			return errDSGACreationIdentity
+		}
+		data, ok := secret["data"].(map[string]any)
+		if !ok {
+			return errDSGACreationIdentity
+		}
+		data["routes.json"] = base64.StdEncoding.EncodeToString(b)
+		updated, err := kube.request(ctx, http.MethodPut, kube.path("secret", routesSecret), secret)
 		var ke kubeError
 		if errors.As(err, &ke) && ke.Status == 409 {
 			continue
 		}
-		return err
+		if err != nil || runtime == nil {
+			return err
+		}
+		actual, err := secretText(updated, "routes.json")
+		after, parseErr := managedSQLRouteMap([]byte(actual))
+		if err != nil || parseErr != nil || stringVal(nested(updated, "metadata", "uid")) != uid ||
+			stringVal(nested(updated, "metadata", "resourceVersion")) == "" || !bytes.Equal(after[key], routes[key]) {
+			return errDSGACreationIdentity
+		}
+		return nil
 	}
 	return errors.New("Branch service credential registry conflict")
+}
+
+func stringValFromJSON(raw json.RawMessage) string {
+	var value string
+	_ = json.Unmarshal(raw, &value)
+	return value
 }
 
 func dataAPIDeployment(p dataAPIPayload, namespace string, enable bool) map[string]any {

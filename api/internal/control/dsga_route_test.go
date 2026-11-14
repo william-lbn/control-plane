@@ -284,6 +284,82 @@ func TestManagedSQLRoutePublisherNativeThenCASPreservesRegistry(t *testing.T) {
 	}
 }
 
+func TestManagedSQLBranchServiceRouteFencesGeneration(t *testing.T) {
+	ctx := context.Background()
+	for _, mode := range []string{"success", "obsolete VM", "wrong Service", "replacement credential", "unconfirmed route"} {
+		t.Run(mode, func(t *testing.T) {
+			f := newManagedSQLFixture(t)
+			if _, err := publishManagedSQLRoute(ctx, f.k, f.in, f.observe, nil); err != nil {
+				t.Fatal(err)
+			}
+			b := f.in.Binding
+			p := createPayload{ProjectID: b.ProjectID, BranchID: b.BranchID, EndpointID: b.EndpointID,
+				TenantID: b.TenantID, TimelineID: b.TimelineID, EndpointType: "read_write"}
+			name := kubeName(p.EndpointID) + "-credentials"
+			var credentials core.Secret
+			if err := managedSQLRead(f.k, ctx, "secret", name, &credentials); err != nil {
+				t.Fatal(err)
+			}
+			source, err := snapshotDSGACredentials(&credentials, b.Namespace, name, p.ProjectID, p.EndpointID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			runtime := &dsgaEndpointRuntime{Payload: p, VMUID: b.VMUID, ConfigUID: b.ConfigSecretUID}
+			runtime.Plan.Namespace = b.Namespace
+			runtime.Plan.Incarnation = b.Incarnation
+			runtime.Plan.ComputeInstanceID = b.ComputeInstanceID
+			runtime.Plan.Credentials = source.reference()
+			service := b.ServiceUID
+			switch mode {
+			case "success":
+				f.conflicts = 1
+			case "obsolete VM":
+				runtime.VMUID = "old-physical-vm"
+			case "wrong Service":
+				service = "other-service"
+			case "replacement credential":
+				f.mutate(func(objects map[string]map[string]any) {
+					objects[f.k.path("secret", name)]["metadata"].(map[string]any)["uid"] = "other-credentials"
+				})
+			case "unconfirmed route":
+				runtime = nil
+			}
+			login := managedAuthLogin(b.BranchID)
+			verifier, err := scramVerifier("disposable-service-fixture")
+			if err != nil {
+				t.Fatal(err)
+			}
+			publish := func(enable bool) error {
+				return publishBranchServiceRoute(ctx, f.k, p.ProjectID, p.BranchID, p.EndpointID, login, verifier, enable, runtime, service)
+			}
+			before, _ := f.counts()
+			err = publish(true)
+			if mode != "success" {
+				if puts, _ := f.counts(); err == nil || puts != before {
+					t.Fatalf("stale or unconfirmed route admitted: %v, PUT=%d", err, puts-before)
+				}
+				return
+			}
+			if err != nil || publish(true) != nil {
+				t.Fatal("service identity could not publish and replay", err)
+			}
+			if puts, _ := f.counts(); puts != before+2 {
+				t.Fatal("expected one retry and one successful write")
+			}
+			// A stopped Writer can still have its service verifier removed.
+			f.mutate(func(objects map[string]map[string]any) {
+				delete(objects, f.k.path("vm", kubeName(p.EndpointID)))
+			})
+			if err = publish(false); err != nil || publish(false) != nil {
+				t.Fatal("service revocation could not settle after physical exit", err)
+			}
+			if puts, _ := f.counts(); puts != before+3 {
+				t.Fatal("expected one additional revocation write")
+			}
+		})
+	}
+}
+
 func TestManagedSQLRouteMissingBranchBeforeAnyRead(t *testing.T) {
 	f := newManagedSQLFixture(t)
 	f.in.Binding.BranchID = ""
