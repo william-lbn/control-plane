@@ -67,6 +67,15 @@ func (s *server) catalogWriter(ctx context.Context, project, branch string) (str
 // All catalog traffic follows the same Proxy endpoint selector and TLS policy
 // as user traffic. No direct guest access or public superuser password is used.
 func (s *server) catalogConnection(ctx context.Context, p catalogPayload) (*pgx.Conn, error) {
+	runtime, err := s.dsgaEndpointRuntime(ctx, p.ProjectID, p.EndpointID)
+	if err != nil {
+		return nil, err
+	}
+	if runtime != nil {
+		// Catalog inspection needs a stable maintenance database on both PG
+		// majors. The shared connection proves the actual tenant and timeline.
+		return s.dsgaBackendConnection(ctx, runtime, p.BranchID, "postgres")
+	}
 	secret, err := s.kube.request(ctx, http.MethodGet, s.kube.path("secret", kubeName(p.EndpointID)+"-credentials"), nil)
 	if err != nil || !owned(secret, p.ProjectID, p.EndpointID) {
 		return nil, errors.New("catalog service credential unavailable")

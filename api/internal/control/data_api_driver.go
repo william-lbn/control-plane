@@ -33,7 +33,7 @@ func (s *server) dataAPIConnection(ctx context.Context, p dataAPIPayload) (*pgx.
 			return nil, err
 		}
 		if runtime != nil {
-			return s.dsgaBackendConnection(ctx, runtime, p)
+			return s.dsgaBackendConnection(ctx, runtime, p.BranchID, p.Spec.Database)
 		}
 	}
 	secret, err := s.kube.request(ctx, http.MethodGet, s.kube.path("secret", kubeName(p.EndpointID)+"-credentials"), nil)
@@ -47,8 +47,8 @@ func (s *server) dataAPIConnection(ctx context.Context, p dataAPIPayload) (*pgx.
 	return connectSQL(ctx, s.proxyHost, s.proxyPort, "control_probe", password, p.Spec.Database, selector(p.EndpointID))
 }
 
-func (s *server) dsgaBackendConnection(ctx context.Context, runtime *dsgaEndpointRuntime, p dataAPIPayload) (*pgx.Conn, error) {
-	if runtime.Payload.EndpointType != "read_write" || runtime.Payload.BranchID != p.BranchID {
+func (s *server) dsgaBackendConnection(ctx context.Context, runtime *dsgaEndpointRuntime, branch, database string) (*pgx.Conn, error) {
+	if runtime.Payload.EndpointType != "read_write" || runtime.Payload.BranchID != branch {
 		return nil, errDSGACreationIdentity
 	}
 	clients, vm, _, _, err := s.readDSGABoundSelection(ctx, runtime)
@@ -63,7 +63,7 @@ func (s *server) dsgaBackendConnection(ctx context.Context, runtime *dsgaEndpoin
 	if err != nil {
 		return nil, err
 	}
-	conn, err := connectSQL(ctx, s.proxyHost, s.proxyPort, "control_probe", password, p.Spec.Database, selector(p.EndpointID))
+	conn, err := connectSQL(ctx, s.proxyHost, s.proxyPort, "control_probe", password, database, selector(runtime.Payload.EndpointID))
 	if err != nil {
 		return nil, err
 	}
