@@ -389,7 +389,11 @@ func stringValFromJSON(raw json.RawMessage) string {
 	return value
 }
 
-func dataAPIDeployment(p dataAPIPayload, namespace string, enable bool) map[string]any {
+func dataAPIDeployment(p dataAPIPayload, namespace string, enable bool) (map[string]any, error) {
+	hostnames, err := backendRuntimeHostnames("NEON_DATA_API_RUNTIME_HOSTNAMES")
+	if err != nil {
+		return nil, err
+	}
 	name := dataAPIName(p.BranchID)
 	labels := dataAPILabels(p)
 	labels["neon-control/data-api"] = p.BranchID
@@ -405,7 +409,7 @@ func dataAPIDeployment(p dataAPIPayload, namespace string, enable bool) map[stri
 	if !enable {
 		replicas = 0
 	}
-	return map[string]any{"apiVersion": "apps/v1", "kind": "Deployment", "metadata": map[string]any{"name": name, "namespace": namespace, "labels": labels},
+	deployment := map[string]any{"apiVersion": "apps/v1", "kind": "Deployment", "metadata": map[string]any{"name": name, "namespace": namespace, "labels": labels},
 		"spec": map[string]any{"replicas": replicas, "strategy": map[string]any{"type": "Recreate"}, "selector": map[string]any{"matchLabels": map[string]string{"neon-control/data-api": p.BranchID}},
 			"template": map[string]any{"metadata": map[string]any{"labels": labels, "annotations": map[string]string{"neon-control/generation": fmt.Sprint(p.Generation)}},
 				"spec": map[string]any{"automountServiceAccountToken": false, "securityContext": security, "terminationGracePeriodSeconds": 15,
@@ -416,9 +420,15 @@ func dataAPIDeployment(p dataAPIPayload, namespace string, enable bool) map[stri
 							"readinessProbe": map[string]any{"httpGet": map[string]any{"path": "/readyz", "port": "health"}, "periodSeconds": 5}, "livenessProbe": map[string]any{"httpGet": map[string]any{"path": "/healthz", "port": "health"}, "periodSeconds": 15}},
 						map[string]any{"name": "postgrest", "image": env("NEON_DATA_API_POSTGREST_IMAGE", ""), "imagePullPolicy": "IfNotPresent", "args": []string{"/run/data-api/postgrest.conf"}, "securityContext": containerSecurity, "resources": resources, "volumeMounts": mounts("sql-config")},
 					}, "volumes": []any{authVolume, sqlVolume, map[string]any{"name": "tmp", "emptyDir": map[string]any{"sizeLimit": "16Mi"}}}}}}}
+	applyBackendRuntimeHostnames(nested(deployment, "spec", "template", "spec").(map[string]any), hostnames)
+	return deployment, nil
 }
 func (s *server) reconcileDataAPIWorkload(ctx context.Context, p dataAPIPayload, enable bool) error {
 	name := dataAPIName(p.BranchID)
+	body, err := dataAPIDeployment(p, s.kube.namespace, enable)
+	if err != nil {
+		return err
+	}
 	service := map[string]any{"apiVersion": "v1", "kind": "Service", "metadata": map[string]any{"name": name, "labels": dataAPILabels(p)},
 		"spec": map[string]any{"type": "ClusterIP", "selector": map[string]string{"neon-control/data-api": p.BranchID}, "ports": []any{map[string]any{"name": "data", "port": 9080, "targetPort": "data"}}}}
 	if enable {
@@ -426,7 +436,6 @@ func (s *server) reconcileDataAPIWorkload(ctx context.Context, p dataAPIPayload,
 			return err
 		}
 	}
-	body := dataAPIDeployment(p, s.kube.namespace, enable)
 	current, err := s.kube.request(ctx, http.MethodGet, s.kube.path("deployment", name), nil)
 	var ke kubeError
 	if errors.As(err, &ke) && ke.Status == 404 && enable {

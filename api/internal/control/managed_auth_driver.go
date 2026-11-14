@@ -332,7 +332,7 @@ func (s *server) applyManagedAuthSQL(ctx context.Context, p managedAuthPayload, 
 }
 
 func managedAuthDeployment(p managedAuthPayload, namespace string, enable bool) (map[string]any, error) {
-	hostnames, err := managedAuthRuntimeHostnames()
+	hostnames, err := backendRuntimeHostnames("NEON_AUTH_RUNTIME_HOSTNAMES")
 	if err != nil {
 		return nil, err
 	}
@@ -348,15 +348,7 @@ func managedAuthDeployment(p managedAuthPayload, namespace string, enable bool) 
 			"volumes":    []any{record{"name": "config", "secret": record{"secretName": p.SecretRef, "defaultMode": 0440, "items": []any{record{"key": "config.json", "path": "config.json"}}}}, record{"name": "ca", "secret": record{"secretName": env("NEON_AUTH_PG_CA_SECRET", ""), "defaultMode": 0440, "items": []any{record{"key": env("NEON_AUTH_PG_CA_KEY", "ca.crt"), "path": "ca.crt"}}}}, record{"name": "tmp", "emptyDir": record{"sizeLimit": "16Mi"}}},
 		}}}}
 	pod := nested(deployment, "spec", "template", "spec").(map[string]any)
-	if len(hostnames) != 0 {
-		pod["affinity"] = record{"nodeAffinity": record{
-			"requiredDuringSchedulingIgnoredDuringExecution": record{
-				"nodeSelectorTerms": []record{{"matchExpressions": []record{{
-					"key": "kubernetes.io/hostname", "operator": "In", "values": hostnames,
-				}}}},
-			},
-		}}
-	}
+	applyBackendRuntimeHostnames(pod, hostnames)
 	if managedAuthMailConfigured() {
 		container := pod["containers"].([]any)[0].(map[string]any)
 		container["env"] = append(container["env"].([]any), record{"name": "NEON_AUTH_MAIL_CONFIG_FILE", "value": "/run/auth-mail/config.json"})

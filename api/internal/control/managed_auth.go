@@ -61,31 +61,43 @@ func managedAuthBase(branch string) string {
 	return os.Getenv("NEON_AUTH_PUBLIC_ORIGIN") + "/auth/v1/" + branch
 }
 func managedAuthEnabled() bool {
-	_, err := managedAuthRuntimeHostnames()
+	_, err := backendRuntimeHostnames("NEON_AUTH_RUNTIME_HOSTNAMES")
 	return err == nil && os.Getenv("NEON_AUTH_ENABLED") == "true" && os.Getenv("NEON_AUTH_LAB_HTTP") == "true" && digestImage.MatchString(os.Getenv("NEON_AUTH_RUNTIME_IMAGE")) && validAuthOrigin(os.Getenv("NEON_AUTH_PUBLIC_ORIGIN")) && managedAuthSQLTrustConfigured()
 }
 
-func managedAuthRuntimeHostnames() ([]string, error) {
-	raw := os.Getenv("NEON_AUTH_RUNTIME_HOSTNAMES")
+func backendRuntimeHostnames(name string) ([]string, error) {
+	raw := os.Getenv(name)
 	if raw == "" {
 		return nil, nil
 	}
 	names := strings.Split(raw, ",")
 	if len(names) > 64 {
-		return nil, errors.New("too many Managed Auth runtime hostnames")
+		return nil, errors.New("too many backend runtime hostnames")
 	}
 	seen := make(map[string]struct{}, len(names))
 	for _, name := range names {
 		if len(validation.IsDNS1123Subdomain(name)) != 0 || len(validation.IsValidLabelValue(name)) != 0 {
-			return nil, errors.New("invalid Managed Auth runtime hostname")
+			return nil, errors.New("invalid backend runtime hostname")
 		}
 		if _, duplicate := seen[name]; duplicate {
-			return nil, errors.New("duplicate Managed Auth runtime hostname")
+			return nil, errors.New("duplicate backend runtime hostname")
 		}
 		seen[name] = struct{}{}
 	}
 	return names, nil
 }
+func applyBackendRuntimeHostnames(pod record, hostnames []string) {
+	if len(hostnames) != 0 {
+		pod["affinity"] = record{"nodeAffinity": record{
+			"requiredDuringSchedulingIgnoredDuringExecution": record{
+				"nodeSelectorTerms": []record{{"matchExpressions": []record{{
+					"key": "kubernetes.io/hostname", "operator": "In", "values": hostnames,
+				}}}},
+			},
+		}}
+	}
+}
+
 func managedAuthSQLTrustConfigured() bool {
 	secret, key, name := os.Getenv("NEON_AUTH_PG_CA_SECRET"), os.Getenv("NEON_AUTH_PG_CA_KEY"), os.Getenv("NEON_AUTH_PG_SERVER_NAME")
 	if !regexp.MustCompile(`^[a-z0-9](?:[a-z0-9.-]{0,251}[a-z0-9])?$`).MatchString(secret) || !regexp.MustCompile(`^[a-zA-Z0-9._-]{1,253}$`).MatchString(key) || len(name) == 0 || len(name) > 253 {

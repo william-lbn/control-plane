@@ -47,7 +47,8 @@ var dataSchema = regexp.MustCompile(`^[a-z][a-z0-9_]{0,62}$`)
 // The first native Driver explicitly requires the lab transport profile.
 // It does not advertise a production TLS gate while its Pod and relay use HTTP.
 func dataAPIEnabled() bool {
-	return os.Getenv("NEON_DATA_API_ENABLED") == "true" && os.Getenv("NEON_DATA_API_LAB_HTTP") == "true" &&
+	_, err := backendRuntimeHostnames("NEON_DATA_API_RUNTIME_HOSTNAMES")
+	return err == nil && os.Getenv("NEON_DATA_API_ENABLED") == "true" && os.Getenv("NEON_DATA_API_LAB_HTTP") == "true" &&
 		digestImage.MatchString(os.Getenv("NEON_DATA_API_GATEWAY_IMAGE")) && digestImage.MatchString(os.Getenv("NEON_DATA_API_POSTGREST_IMAGE"))
 }
 func dataAPIName(branch string) string  { return "neon-da-" + strings.TrimPrefix(branch, "br_") }

@@ -104,6 +104,9 @@
 - {name: NEON_DATA_API_LAB_HTTP, value: 'true'}
 - {name: NEON_DATA_API_GATEWAY_IMAGE, value: {{ .Values.dataAPI.gatewayImage | quote }}}
 - {name: NEON_DATA_API_POSTGREST_IMAGE, value: {{ .Values.dataAPI.postgrestImage | quote }}}
+{{- with .Values.dataAPI.runtimeHostnames }}
+- {name: NEON_DATA_API_RUNTIME_HOSTNAMES, value: {{ join "," . | quote }}}
+{{- end }}
 {{- end }}
 - {name: NEON_KUBE_NAMESPACE, value: {{ .Release.Namespace | quote }}}
 - {name: NEON_V2_CREATE_ENABLED, value: {{ .Values.api.creationEnabled | quote }}}

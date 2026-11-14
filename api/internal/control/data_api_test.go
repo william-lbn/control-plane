@@ -71,7 +71,10 @@ func TestDataAPINativeCapabilityFailClosed(t *testing.T) {
 }
 func TestDataAPINativeWorkloadIsolation(t *testing.T) {
 	p := dataAPITestPayload(t)
-	d := dataAPIDeployment(p, "neon", true)
+	d, err := dataAPIDeployment(p, "neon", true)
+	if err != nil {
+		t.Fatal(err)
+	}
 	spec := nested(d, "spec", "template", "spec").(map[string]any)
 	if spec["automountServiceAccountToken"] != false {
 		t.Fatal("runtime has a Kubernetes token")
@@ -93,10 +96,35 @@ func TestDataAPINativeWorkloadIsolation(t *testing.T) {
 	if strings.Contains(string(keys), "delegation-seed") || strings.Contains(string(keys), "config.json") {
 		t.Fatal("PostgREST has provider/signing credentials")
 	}
-	if number(nested(dataAPIDeployment(p, "neon", false), "spec", "replicas")) != 0 {
+	disabled, err := dataAPIDeployment(p, "neon", false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if number(nested(disabled, "spec", "replicas")) != 0 {
 		t.Fatal("disable did not scale to zero")
 	}
 	if !protectedPGRole(dataAPIRole(p.BranchID)) || !protectedPGRole(dataAPILogin(p.BranchID)) {
 		t.Fatal("service identity can be mutated by ordinary catalog API")
+	}
+}
+
+func TestDataAPIRuntimePlacement(t *testing.T) {
+	p := dataAPITestPayload(t)
+	const env = "NEON_DATA_API_RUNTIME_HOSTNAMES"
+	t.Setenv(env, "worker-117,worker-118,worker-119")
+	for _, enable := range []bool{true, false} {
+		d, err := dataAPIDeployment(p, "neon", enable)
+		if err != nil {
+			t.Fatal(err)
+		}
+		terms, _ := json.Marshal(nested(d, "spec", "template", "spec", "affinity", "nodeAffinity", "requiredDuringSchedulingIgnoredDuringExecution", "nodeSelectorTerms"))
+		const expected = `[{"matchExpressions":[{"key":"kubernetes.io/hostname","operator":"In","values":["worker-117","worker-118","worker-119"]}]}]`
+		if string(terms) != expected {
+			t.Fatalf("unexpected node selector terms: %s", terms)
+		}
+	}
+	t.Setenv(env, "worker-117,worker-117")
+	if _, err := dataAPIDeployment(p, "neon", true); err == nil {
+		t.Fatal("duplicate runtime hostname was accepted")
 	}
 }
