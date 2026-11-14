@@ -351,8 +351,8 @@ func (s *server) reconcileDataAPI(ctx context.Context, id, worker, action string
 		func(ctx context.Context) error { return s.reconcileDataAPIWorkload(ctx, p, !disabling) },
 		func(ctx context.Context) error {
 			if !disabling {
-				// Deployment readiness uses only the gateway's configuration
-				// listener. Verify the real database and restricted login once.
+				// The workload has already proved PostgREST startup. Verify
+				// the exact scoped login and application grants independently.
 				if err := s.verifyDataAPILogin(ctx, p); err != nil {
 					return err
 				}

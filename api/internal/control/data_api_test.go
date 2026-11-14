@@ -82,6 +82,14 @@ func TestDataAPINativeWorkloadIsolation(t *testing.T) {
 	containers := spec["containers"].([]any)
 	auth := containers[0].(map[string]any)
 	sql := containers[1].(map[string]any)
+	probe, _ := json.Marshal(nested(sql, "startupProbe", "exec", "command"))
+	if string(probe) != `["/opt/neon-control/postgrest","--ready","/run/data-api/postgrest.conf"]` ||
+		sql["readinessProbe"] != nil || sql["livenessProbe"] != nil {
+		t.Fatal("PostgREST must prove startup without recurring database probes")
+	}
+	if sql["ports"] != nil {
+		t.Fatal("The PostgREST management listener is private to the Pod")
+	}
 	a, _ := json.Marshal(auth)
 	b, _ := json.Marshal(sql)
 	if strings.Contains(string(a), "sql-config") || strings.Contains(string(b), "auth-config") {

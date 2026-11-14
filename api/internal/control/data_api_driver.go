@@ -449,6 +449,15 @@ func dataAPIDeployment(p dataAPIPayload, namespace string, enable bool) (map[str
 		return []any{map[string]any{"name": name, "mountPath": "/run/data-api", "readOnly": true}, map[string]any{"name": "tmp", "mountPath": "/tmp"}}
 	}
 	resources := map[string]any{"requests": map[string]string{"cpu": "50m", "memory": "48Mi"}, "limits": map[string]string{"cpu": "500m", "memory": "192Mi"}}
+	const postgrestConfig = "/run/data-api/postgrest.conf"
+	postgrest := record{"name": "postgrest", "image": env("NEON_DATA_API_POSTGREST_IMAGE", ""), "imagePullPolicy": "IfNotPresent",
+		"args": []string{postgrestConfig}, "securityContext": containerSecurity, "resources": resources, "volumeMounts": mounts("sql-config"),
+		"env": []record{{"name": "PGRST_ADMIN_SERVER_HOST", "value": "127.0.0.1"}, {"name": "PGRST_ADMIN_SERVER_PORT", "value": "3001"}},
+		// The startup probe observes PostgREST's actual database pool and
+		// schema cache. A recurring probe could keep an idle Writer awake.
+		"startupProbe": record{"exec": record{"command": []string{"/opt/neon-control/postgrest", "--ready", postgrestConfig}},
+			"timeoutSeconds": 3, "periodSeconds": 5, "failureThreshold": 36},
+	}
 	replicas := 1
 	if !enable {
 		replicas = 0
@@ -462,7 +471,7 @@ func dataAPIDeployment(p dataAPIPayload, namespace string, enable bool) (map[str
 							"ports":          []any{map[string]any{"name": "data", "containerPort": 9080}, map[string]any{"name": "health", "containerPort": 9081}},
 							"env":            []any{map[string]string{"name": "NEON_DATA_API_CONFIG_FILE", "value": "/run/data-api/config.json"}, map[string]string{"name": "NEON_DATA_API_SIGNING_SEED_FILE", "value": "/run/data-api/delegation-seed"}, map[string]string{"name": "NEON_DATA_API_ALLOW_PLAINTEXT_UPSTREAM", "value": "true"}},
 							"readinessProbe": map[string]any{"httpGet": map[string]any{"path": "/readyz", "port": "health"}, "periodSeconds": 5}, "livenessProbe": map[string]any{"httpGet": map[string]any{"path": "/healthz", "port": "health"}, "periodSeconds": 15}},
-						map[string]any{"name": "postgrest", "image": env("NEON_DATA_API_POSTGREST_IMAGE", ""), "imagePullPolicy": "IfNotPresent", "args": []string{"/run/data-api/postgrest.conf"}, "securityContext": containerSecurity, "resources": resources, "volumeMounts": mounts("sql-config")},
+						postgrest,
 					}, "volumes": []any{authVolume, sqlVolume, map[string]any{"name": "tmp", "emptyDir": map[string]any{"sizeLimit": "16Mi"}}}}}}}
 	applyBackendRuntimeHostnames(nested(deployment, "spec", "template", "spec").(map[string]any), hostnames)
 	return deployment, nil

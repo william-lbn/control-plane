@@ -112,6 +112,12 @@ END $$`, quote(guard), testBranch, testBranch),
 	if err := os.WriteFile(keyPath, g.DelegationJWKS(), 0600); err != nil {
 		t.Fatal(err)
 	}
+	listener, err = net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	adminPort := listener.Addr().(*net.TCPAddr).Port
+	listener.Close()
 	configPath := filepath.Join(temp, "postgrest.conf")
 	config := fmt.Sprintf(`db-uri = %s
 db-schemas = %s
@@ -145,6 +151,18 @@ server-port = %d
 	// No inherited provider keys, database configuration overrides or proxy
 	// environment may alter the pinned child process's test configuration.
 	process.Env = []string{"PATH=" + os.Getenv("PATH"), "LANG=C.UTF-8"}
+	process.Env = append(process.Env, "PGRST_ADMIN_SERVER_HOST=127.0.0.1", "PGRST_ADMIN_SERVER_PORT="+strconv.Itoa(adminPort))
+	probe := func() error {
+		test, cancel := context.WithTimeout(ctx, 3*time.Second)
+		defer cancel()
+		cmd := exec.CommandContext(test, binary, "--ready", configPath)
+		cmd.Env = process.Env
+		return cmd.Run()
+	}
+	if err := probe(); err == nil {
+		childLog.Close()
+		t.Fatal("Absent PostgREST passed the startup probe")
+	}
 	if err := process.Start(); err != nil {
 		childLog.Close()
 		t.Fatal("Pinned PostgREST process failed to start")
@@ -175,7 +193,7 @@ server-port = %d
 			if readErr != nil {
 				lastBody += " [body read error: " + readErr.Error() + "]"
 			}
-			if response.StatusCode == 401 {
+			if response.StatusCode == 401 && probe() == nil {
 				ready = true
 				break
 			}
