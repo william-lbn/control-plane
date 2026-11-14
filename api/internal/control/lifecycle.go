@@ -283,6 +283,15 @@ func (s *server) queueSuspend(ctx context.Context, p suspendPayload, actor, requ
 }
 
 func (s *server) suspendEndpoint(w http.ResponseWriter, r *http.Request) {
+	var managed bool
+	if err := s.db.QueryRow(r.Context(), dsgaEndpointLifecycleQuery, r.PathValue("project"), r.PathValue("endpoint")).Scan(&managed); err != nil {
+		fail(w, r, 503, "metadata_unavailable", "Could not check the Compute lifecycle")
+		return
+	}
+	if managed {
+		s.suspendDSGAEndpoint(w, r)
+		return
+	}
 	item, ok := s.requireEndpoint(w, r)
 	if !ok {
 		return

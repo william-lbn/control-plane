@@ -88,6 +88,7 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 	defer close(leaseDone)
 	var stepErr error
 	var createP createPayload
+	var suspensionP dsgaSuspensionPayload
 	func() {
 		defer func() {
 			if recovered := recover(); recovered != nil {
@@ -223,13 +224,12 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 				})
 			}
 		case dsgaSuspendAction:
-			var p dsgaSuspensionPayload
-			if err := decodeDSGAObject(payload, &p); err != nil {
+			if err := decodeDSGAObject(payload, &suspensionP); err != nil {
 				stepErr = err
-			} else if p.ProjectID != projectID || p.EndpointID != resourceID {
+			} else if suspensionP.ProjectID != projectID || suspensionP.EndpointID != resourceID {
 				stepErr = errDSGACreationIdentity
 			} else {
-				stepErr = s.reconcileDSGASuspension(runCtx, id, workerID, p)
+				stepErr = s.reconcileDSGASuspension(runCtx, id, workerID, suspensionP)
 			}
 		case "update_endpoint":
 			var p boundsPayload
@@ -342,6 +342,12 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 		return err
 	}
 	defer finishTx.Rollback(ctx)
+	if state == "succeeded" && action == dsgaSuspendAction {
+		scope := createPayload{ProjectID: projectID, BranchID: suspensionP.BranchID, EndpointID: resourceID}
+		if err = lockDSGAProjectParents(ctx, finishTx, scope); err != nil {
+			return err
+		}
+	}
 	if state == "failed" && dsgaCreationBaseAction(action) != "" && createP.ProjectID != "" {
 		if err = lockDSGAProjectParents(ctx, finishTx, createP); err != nil {
 			return err

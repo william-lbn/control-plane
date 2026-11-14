@@ -138,6 +138,8 @@ dataAPI:
 # 默认关闭新建；只配置目录但不开启创建时，可以安全展示只读版本选项。
 dsga:
   createEnabled: false
+  # Enable after the Agent that understands the versioned suspension selection.
+  suspensionEnabled: false
   runtimeCatalogSecret: ''
 
 worker:

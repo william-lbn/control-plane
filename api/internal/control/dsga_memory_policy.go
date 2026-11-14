@@ -33,6 +33,7 @@ func (s *server) dsgaEndpointRuntime(ctx context.Context, project, endpoint stri
  FROM operations o LEFT JOIN dsga_creation_bindings b ON b.operation_id=o.id
  WHERE o.project_id=$1 AND o.payload->>'endpoint_id'=$2
  AND o.action IN ('create_project_dsga_v1','create_branch_dsga_v1','create_endpoint_dsga_v1')
+ AND NOT (o.state='failed' AND b.operation_id IS NULL)
  ORDER BY o.created_at DESC LIMIT 2`, project, endpoint)
 	if err != nil {
 		return nil, err

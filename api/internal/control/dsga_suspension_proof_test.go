@@ -63,25 +63,23 @@ func TestDSGASuspensionHostRequiresOriginalNodeAndRetiredPlacement(t *testing.T)
 }
 
 func TestDSGASuspensionIntentPinsBootAndHostAcrossWorkerRetry(t *testing.T) {
-	ctx, b, _, _, _, _, _, fact := initializationBindingFixture(t)
+	ctx, b, fact := dsgaSuspensionAdmissionFixture(t)
 	p := dsgaSuspensionPayload{ProjectID: b.intent.ProjectID, BranchID: b.intent.BranchID, EndpointID: b.intent.EndpointID,
 		CreationOperation: b.operationID, VMUID: fact.Observed.Instance.VMUID}
 	binding := journal.Binding{Namespace: b.intent.Creation.Namespace, Name: kubeName(p.EndpointID),
 		VMUID: types.UID(p.VMUID), Incarnation: b.intent.Creation.Incarnation}
-	if _, err := b.server.db.Exec(ctx, "UPDATE operations SET state='succeeded',lease_owner=NULL,lease_expires_at=NULL WHERE id=$1", b.operationID); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := b.server.db.Exec(ctx, "UPDATE endpoints SET state='active' WHERE id=$1", p.EndpointID); err != nil {
-		t.Fatal(err)
-	}
 	id := "suspension-intent-test"
 	payload, err := json.Marshal(p)
 	if err != nil {
 		t.Fatal(err)
 	}
 	_, err = b.server.db.Exec(ctx, `INSERT INTO operations(id,project_id,resource_type,resource_id,action,state,actor_id,request_id,payload,lease_owner,lease_expires_at)
- VALUES($1,$2,'endpoint',$3,$4,'running','local-admin','suspension-test',$5,$6,clock_timestamp()+interval '5 minutes')`,
-		id, p.ProjectID, p.EndpointID, dsgaSuspendAction, payload, b.workerID)
+ VALUES($1,$2,'endpoint',$3,$4,'queued','local-admin','suspension-test',$5,NULL,NULL)`,
+		id, p.ProjectID, p.EndpointID, dsgaSuspendAction, payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = b.server.db.Exec(ctx, `UPDATE operations SET state='running',lease_owner=$2,lease_expires_at=clock_timestamp()+interval '5 minutes' WHERE id=$1`, id, b.workerID)
 	if err != nil {
 		t.Fatal(err)
 	}

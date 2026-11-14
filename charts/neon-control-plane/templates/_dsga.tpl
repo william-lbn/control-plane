@@ -10,7 +10,13 @@ Secret; this prevents unnecessary release-catalog disclosure to the Worker.
 {{- if and .Values.dsga.createEnabled (not .Values.dsga.runtimeCatalogSecret) }}
 {{- fail "dsga.createEnabled requires dsga.runtimeCatalogSecret" }}
 {{- end }}
+{{- if and .Values.dsga.suspensionEnabled (not .Values.dsga.createEnabled) }}
+{{- fail "dsga.suspensionEnabled requires dsga.createEnabled" }}
+{{- end }}
 - {name: NEON_DSGA_CREATE_ENABLED, value: {{ .Values.dsga.createEnabled | quote }}}
+{{- if .Values.dsga.suspensionEnabled }}
+- {name: NEON_DSGA_SUSPENSION_ENABLED, value: "true"}
+{{- end }}
 {{- if .Values.dsga.runtimeCatalogSecret }}
 - name: NEON_DSGA_RUNTIME_CATALOG
   valueFrom:
