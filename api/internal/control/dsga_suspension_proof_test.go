@@ -145,7 +145,7 @@ func TestDSGASuspensionIntentPinsBootAndHostAcrossWorkerRetry(t *testing.T) {
 	if _, err := b.server.db.Exec(ctx, "DELETE FROM dsga_suspension_retirements WHERE operation_id=$1", id); err == nil {
 		t.Fatal("retirement authorization could be removed")
 	}
-	if _, err := b.server.db.Exec(ctx, `UPDATE operations SET state='succeeded',lease_owner=NULL,lease_expires_at=NULL
+	if _, err := b.server.db.Exec(ctx, `UPDATE operations SET state='succeeded',finished_at=clock_timestamp(),lease_owner=NULL,lease_expires_at=NULL
  WHERE id=$1`, id); err != nil {
 		t.Fatal(err)
 	}
@@ -169,5 +169,15 @@ func TestDSGASuspensionIntentPinsBootAndHostAcrossWorkerRetry(t *testing.T) {
 	var state string
 	if err := tx.QueryRow(ctx, "SELECT state FROM endpoints WHERE id=$1", p.EndpointID).Scan(&state); err != nil || state != "suspended" {
 		t.Fatalf("operation did not finalize the original endpoint: %v", err)
+	}
+	original, err := readDSGAResumeSource(ctx, tx, b.intent.createPayload, id)
+	if err != nil || original.Creation != b.operationID || original.VMUID != p.VMUID || original.PGBootID != selected.Instance.PGBootID ||
+		original.ServiceUID == "" || original.ConfigUID == "" {
+		t.Fatalf("resume lacks the authoritative retired generation: %v", err)
+	}
+	foreignTimeline := b.intent.createPayload
+	foreignTimeline.TimelineID = strings.Repeat("e", 32)
+	if _, err = readDSGAResumeSource(ctx, tx, foreignTimeline, id); err == nil {
+		t.Fatal("resume accepted a different Timeline")
 	}
 }

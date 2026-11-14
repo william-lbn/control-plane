@@ -35,6 +35,10 @@ func ManagedSQLRouteFailureCode(err error) string {
 // 只允许同一数据与逻辑身份的物理替换，不改变公共Eq或Adapter唤醒的严格比较。
 // 同UID的Config/凭据漂移不属于物理替换。三个新Config输入必须确实随新实例生成。
 func managedSQLReplacementIdentity(old, next adapter.ManagedSQLBinding) bool {
+	return old.ServiceUID == next.ServiceUID && managedSQLSuccessorIdentity(old, next)
+}
+
+func managedSQLSuccessorIdentity(old, next adapter.ManagedSQLBinding) bool {
 	if old.Validate() != nil || next.Validate() != nil || old.VMUID == next.VMUID ||
 		old.Incarnation == next.Incarnation || old.ConfigSecretUID == next.ConfigSecretUID ||
 		old.ConfigSHA256 == next.ConfigSHA256 || old.SecretDataSHA256 == next.SecretDataSHA256 {
@@ -45,7 +49,21 @@ func managedSQLReplacementIdentity(old, next adapter.ManagedSQLBinding) bool {
 		old.TenantID == next.TenantID && old.TimelineID == next.TimelineID &&
 		old.ComputeInstanceID == next.ComputeInstanceID &&
 		old.CredentialSecretUID == next.CredentialSecretUID &&
-		old.CredentialDataSHA256 == next.CredentialDataSHA256 && old.ServiceUID == next.ServiceUID
+		old.CredentialDataSHA256 == next.CredentialDataSHA256
+}
+
+// A resume may replace the VM-owned Service. The caller must match this state
+// with the completed suspension and the Service bound by the current Worker.
+// The public publisher cannot supply this process-local proof.
+type managedSQLResumeProof struct {
+	OriginalVMUID, OriginalConfigUID, OriginalServiceUID string
+	Verify                                               func(context.Context, adapter.ManagedSQLBinding) error
+}
+
+func (p *managedSQLResumeProof) matches(old, next adapter.ManagedSQLBinding) bool {
+	return p != nil && p.Verify != nil && managedSQLSuccessorIdentity(old, next) &&
+		old.VMUID == p.OriginalVMUID && old.ConfigSecretUID == p.OriginalConfigUID && old.ServiceUID == p.OriginalServiceUID &&
+		old.ServiceUID != next.ServiceUID
 }
 
 // 当前同名VM及sealed Config已由readManagedSQLRouteSource确认成新UID。

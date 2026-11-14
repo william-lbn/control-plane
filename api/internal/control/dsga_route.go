@@ -37,6 +37,7 @@ type managedSQLRouteInput struct {
 	Binding              adapter.ManagedSQLBinding `json:"binding"`
 	RegistryUID          string                    `json:"registry_uid"`
 	ManagementServiceUID string                    `json:"management_service_uid"`
+	resume               *managedSQLResumeProof
 }
 
 // ManagedSQLRouteReceipt只回传来源元数据；路由正文与凭据不得进入日志。
@@ -246,7 +247,7 @@ func publishManagedSQLRoute(ctx context.Context, k *kubeClient, in managedSQLRou
 	observe func(context.Context, managedSQLRouteInput, managedSQLRouteSource) (dsgaInitializationResponse, error),
 	authorize func(context.Context) error) (ManagedSQLRouteReceipt, error) {
 	var receipt ManagedSQLRouteReceipt
-	if in.validate() != nil || k == nil || k.namespace != in.Binding.Namespace || observe == nil {
+	if in.validate() != nil || k == nil || k.namespace != in.Binding.Namespace || observe == nil || in.resume != nil && in.resume.Verify == nil {
 		return receipt, managedSQLRefuse("input")
 	}
 	ctx, cancel := context.WithTimeout(ctx, 45*time.Second)
@@ -294,7 +295,8 @@ func publishManagedSQLRoute(ctx context.Context, k *kubeClient, in managedSQLRou
 				return receipt, managedSQLRefuse("existing_binding")
 			}
 			if !adapter.ManagedSQLBindingEqual(oldBinding, b) {
-				if !managedSQLReplacementIdentity(oldBinding, b) {
+				if in.resume != nil && !in.resume.matches(oldBinding, b) ||
+					in.resume == nil && !managedSQLReplacementIdentity(oldBinding, b) {
 					return receipt, managedSQLRefuse("replacement_identity")
 				}
 				if err := managedSQLReplacementRetired(ctx, k, oldBinding); err != nil {
@@ -313,6 +315,9 @@ func publishManagedSQLRoute(ctx context.Context, k *kubeClient, in managedSQLRou
 			route = previousMap
 			hadPrevious = true
 
+		}
+		if in.resume != nil && !hadPrevious {
+			return receipt, managedSQLRefuse("existing_binding")
 		}
 		owned := map[string]any{"project_id": b.ProjectID, "branch_id": b.BranchID, "tenant_id": b.TenantID,
 			"kind": "neonvm", "workload": source.vm.Name, "address": source.vm.Name + "." + b.Namespace + ".svc.cluster.local:55432",
@@ -339,6 +344,9 @@ func publishManagedSQLRoute(ctx context.Context, k *kubeClient, in managedSQLRou
 			return receipt, managedSQLRefuse("selected_route")
 		}
 		if authorize != nil && authorize(ctx) != nil {
+			return receipt, managedSQLRefuse("authority")
+		}
+		if in.resume != nil && in.resume.Verify(ctx, b) != nil {
 			return receipt, managedSQLRefuse("authority")
 		}
 		// Native读取之后、CAS之前再权威核同一新VM/immutable Config，不能复用旧事实。

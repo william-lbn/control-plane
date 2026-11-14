@@ -498,6 +498,50 @@ func TestManagedSQLRouteReplacementPreservesPolicyAndCAS(t *testing.T) {
 	}
 }
 
+func TestManagedSQLRouteResumeRequiresOriginalSuspensionProofForNewService(t *testing.T) {
+	f, old, _ := managedSQLReplacementFixture(t)
+	old.ServiceUID = "original-retired-service"
+	f.mutate(func(objects map[string]map[string]any) {
+		registry := objects[f.k.path("secret", routesSecret)]
+		raw, _ := secretText(registry, "routes.json")
+		var routes map[string]map[string]json.RawMessage
+		_ = json.Unmarshal([]byte(raw), &routes)
+		routes["ep-test"]["managed_binding"], _ = json.Marshal(old)
+		rawRoutes, _ := json.Marshal(routes)
+		registry["data"].(map[string]any)["routes.json"] = base64.StdEncoding.EncodeToString(rawRoutes)
+		objects[f.k.path("pod", "")] = managedSQLTestPodList()
+	})
+	ctx := context.Background()
+	if _, err := publishManagedSQLRoute(ctx, f.k, f.in, f.observe, nil); ManagedSQLRouteFailureCode(err) != "managed_sql_route_replacement_identity" {
+		t.Fatalf("ordinary publisher accepted a new Service: %v", err)
+	}
+	in := f.in
+	checked := 0
+	authorized := false
+	in.resume = &managedSQLResumeProof{
+		OriginalVMUID: old.VMUID, OriginalConfigUID: old.ConfigSecretUID, OriginalServiceUID: old.ServiceUID,
+		Verify: func(_ context.Context, next adapter.ManagedSQLBinding) error {
+			checked++
+			if !authorized || next.ServiceUID != f.in.Binding.ServiceUID {
+				return errDSGACreationIdentity
+			}
+			return nil
+		},
+	}
+	if _, err := publishManagedSQLRoute(ctx, f.k, in, f.observe, nil); ManagedSQLRouteFailureCode(err) != "managed_sql_route_authority" {
+		t.Fatalf("missing retirement authority was accepted: %v", err)
+	}
+	authorized = true
+	for range 2 {
+		if receipt, err := publishManagedSQLRoute(ctx, f.k, in, f.observe, nil); err != nil || receipt.VMUID != in.Binding.VMUID {
+			t.Fatalf("qualified resume or replay failed: %v", err)
+		}
+	}
+	if checked != 3 {
+		t.Fatalf("publication and replay must both verify original authority, checks = %d", checked)
+	}
+}
+
 func TestManagedSQLRouteReplacementLifecycleRefuses(t *testing.T) {
 	for _, name := range []string{"lease-present", "lease-deleting", "lease-forbidden", "lease-server-error", "pod-running", "pod-failed", "pod-succeeded", "pod-terminating", "pods-forbidden", "pods-expired", "pods-malformed", "pods-no-rv", "pods-wrong-namespace", "pods-incomplete"} {
 		t.Run(name, func(t *testing.T) {
