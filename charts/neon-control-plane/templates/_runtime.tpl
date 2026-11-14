@@ -85,6 +85,9 @@
 - {name: NEON_AUTH_ENABLED, value: 'true'}
 - {name: NEON_AUTH_LAB_HTTP, value: 'true'}
 - {name: NEON_AUTH_RUNTIME_IMAGE, value: {{ .Values.managedAuth.runtimeImage | quote }}}
+{{- with .Values.managedAuth.runtimeHostnames }}
+- {name: NEON_AUTH_RUNTIME_HOSTNAMES, value: {{ join "," . | quote }}}
+{{- end }}
 - {name: NEON_AUTH_PUBLIC_ORIGIN, value: {{ .Values.managedAuth.publicOrigin | quote }}}
 - {name: NEON_AUTH_PG_CA_SECRET, value: {{ .Values.managedAuth.pgCASecret | quote }}}
 - {name: NEON_AUTH_PG_CA_KEY, value: {{ .Values.managedAuth.pgCAKey | quote }}}

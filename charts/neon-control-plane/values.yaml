@@ -92,6 +92,8 @@ functions:
   proxyCAKey: ca.crt
 managedAuth:
   enabled: false
+  # Hostname labels of nodes with the trusted Auth runtime artifact available.
+  runtimeHostnames: []
   # Immutable operator registry; only authorized selected entries are copied
   # into an owned branch Secret. The global registry is never mounted there.
   integrationsSecret: ''

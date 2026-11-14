@@ -331,7 +331,11 @@ func (s *server) applyManagedAuthSQL(ctx context.Context, p managedAuthPayload, 
 	return nil
 }
 
-func managedAuthDeployment(p managedAuthPayload, namespace string, enable bool) map[string]any {
+func managedAuthDeployment(p managedAuthPayload, namespace string, enable bool) (map[string]any, error) {
+	hostnames, err := managedAuthRuntimeHostnames()
+	if err != nil {
+		return nil, err
+	}
 	replicas := 1
 	if !enable {
 		replicas = 0
@@ -343,23 +347,35 @@ func managedAuthDeployment(p managedAuthPayload, namespace string, enable bool) 
 			"containers": []any{record{"name": "managed-auth", "image": env("NEON_AUTH_RUNTIME_IMAGE", ""), "imagePullPolicy": "IfNotPresent", "ports": []any{record{"name": "auth", "containerPort": 9082}}, "env": []any{record{"name": "NEON_AUTH_CONFIG_FILE", "value": "/run/auth/config.json"}}, "securityContext": record{"allowPrivilegeEscalation": false, "readOnlyRootFilesystem": true, "capabilities": record{"drop": []string{"ALL"}}}, "resources": record{"requests": map[string]string{"cpu": "50m", "memory": "64Mi"}, "limits": map[string]string{"cpu": "500m", "memory": "256Mi"}}, "volumeMounts": []any{record{"name": "config", "mountPath": "/run/auth", "readOnly": true}, record{"name": "ca", "mountPath": "/run/auth-ca", "readOnly": true}, record{"name": "tmp", "mountPath": "/tmp"}}, "readinessProbe": record{"httpGet": record{"path": "/readyz", "port": "auth"}, "periodSeconds": 5}, "livenessProbe": record{"httpGet": record{"path": "/livez", "port": "auth"}, "periodSeconds": 10}}},
 			"volumes":    []any{record{"name": "config", "secret": record{"secretName": p.SecretRef, "defaultMode": 0440, "items": []any{record{"key": "config.json", "path": "config.json"}}}}, record{"name": "ca", "secret": record{"secretName": env("NEON_AUTH_PG_CA_SECRET", ""), "defaultMode": 0440, "items": []any{record{"key": env("NEON_AUTH_PG_CA_KEY", "ca.crt"), "path": "ca.crt"}}}}, record{"name": "tmp", "emptyDir": record{"sizeLimit": "16Mi"}}},
 		}}}}
+	pod := nested(deployment, "spec", "template", "spec").(map[string]any)
+	if len(hostnames) != 0 {
+		pod["affinity"] = record{"nodeAffinity": record{
+			"requiredDuringSchedulingIgnoredDuringExecution": record{
+				"nodeSelectorTerms": []record{{"matchExpressions": []record{{
+					"key": "kubernetes.io/hostname", "operator": "In", "values": hostnames,
+				}}}},
+			},
+		}}
+	}
 	if managedAuthMailConfigured() {
-		pod := nested(deployment, "spec", "template", "spec").(map[string]any)
 		container := pod["containers"].([]any)[0].(map[string]any)
 		container["env"] = append(container["env"].([]any), record{"name": "NEON_AUTH_MAIL_CONFIG_FILE", "value": "/run/auth-mail/config.json"})
 		container["volumeMounts"] = append(container["volumeMounts"].([]any), record{"name": "auth-mail", "mountPath": "/run/auth-mail", "readOnly": true})
 		pod["volumes"] = append(pod["volumes"].([]any), record{"name": "auth-mail", "secret": record{"secretName": os.Getenv("NEON_AUTH_MAIL_SECRET"), "defaultMode": 0440}})
 	}
-	return deployment
+	return deployment, nil
 }
 func (s *server) reconcileManagedAuthWorkload(ctx context.Context, p managedAuthPayload, enable bool) error {
 	name := managedAuthName(p.BranchID)
+	body, err := managedAuthDeployment(p, s.kube.namespace, enable)
+	if err != nil {
+		return err
+	}
 	if enable {
 		if _, err := s.kube.createOwned(ctx, "service", record{"apiVersion": "v1", "kind": "Service", "metadata": record{"name": name, "labels": managedAuthLabels(p)}, "spec": record{"selector": map[string]string{"neon-control/managed-auth": p.BranchID}, "ports": []any{record{"name": "auth", "port": 9082, "targetPort": "auth"}}}}, p.ProjectID, p.EndpointID); err != nil {
 			return err
 		}
 	}
-	body := managedAuthDeployment(p, s.kube.namespace, enable)
 	current, err := s.kube.request(ctx, http.MethodGet, s.kube.path("deployment", name), nil)
 	if kubeStatusIs(err, 404) {
 		if !enable {

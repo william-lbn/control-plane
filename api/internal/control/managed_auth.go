@@ -10,6 +10,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 type ManagedAuthSpec struct {
@@ -59,7 +61,30 @@ func managedAuthBase(branch string) string {
 	return os.Getenv("NEON_AUTH_PUBLIC_ORIGIN") + "/auth/v1/" + branch
 }
 func managedAuthEnabled() bool {
-	return os.Getenv("NEON_AUTH_ENABLED") == "true" && os.Getenv("NEON_AUTH_LAB_HTTP") == "true" && digestImage.MatchString(os.Getenv("NEON_AUTH_RUNTIME_IMAGE")) && validAuthOrigin(os.Getenv("NEON_AUTH_PUBLIC_ORIGIN")) && managedAuthSQLTrustConfigured()
+	_, err := managedAuthRuntimeHostnames()
+	return err == nil && os.Getenv("NEON_AUTH_ENABLED") == "true" && os.Getenv("NEON_AUTH_LAB_HTTP") == "true" && digestImage.MatchString(os.Getenv("NEON_AUTH_RUNTIME_IMAGE")) && validAuthOrigin(os.Getenv("NEON_AUTH_PUBLIC_ORIGIN")) && managedAuthSQLTrustConfigured()
+}
+
+func managedAuthRuntimeHostnames() ([]string, error) {
+	raw := os.Getenv("NEON_AUTH_RUNTIME_HOSTNAMES")
+	if raw == "" {
+		return nil, nil
+	}
+	names := strings.Split(raw, ",")
+	if len(names) > 64 {
+		return nil, errors.New("too many Managed Auth runtime hostnames")
+	}
+	seen := make(map[string]struct{}, len(names))
+	for _, name := range names {
+		if len(validation.IsDNS1123Subdomain(name)) != 0 || len(validation.IsValidLabelValue(name)) != 0 {
+			return nil, errors.New("invalid Managed Auth runtime hostname")
+		}
+		if _, duplicate := seen[name]; duplicate {
+			return nil, errors.New("duplicate Managed Auth runtime hostname")
+		}
+		seen[name] = struct{}{}
+	}
+	return names, nil
 }
 func managedAuthSQLTrustConfigured() bool {
 	secret, key, name := os.Getenv("NEON_AUTH_PG_CA_SECRET"), os.Getenv("NEON_AUTH_PG_CA_KEY"), os.Getenv("NEON_AUTH_PG_SERVER_NAME")

@@ -81,9 +81,16 @@ func TestManagedAuthConfigurationFailClosed(t *testing.T) {
 	}
 }
 func TestManagedAuthWorkloadIsolation(t *testing.T) {
+	t.Setenv("NEON_AUTH_RUNTIME_HOSTNAMES", "")
 	p := managedAuthPayload{ProjectID: "prj_0123456789abcdef", BranchID: "br_0123456789abcdef", EndpointID: "ep_0123456789abcdef", Generation: 2, SecretRef: "neon-auth-0123456789abcdef-g2"}
-	body := managedAuthDeployment(p, "neon", true)
+	body, err := managedAuthDeployment(p, "neon", true)
+	if err != nil {
+		t.Fatal(err)
+	}
 	spec := nested(body, "spec", "template", "spec").(record)
+	if spec["affinity"] != nil {
+		t.Fatal("legacy runtime has an implicit placement constraint")
+	}
 	if spec["automountServiceAccountToken"] != false {
 		t.Fatal("Auth runtime has a Kubernetes token")
 	}
@@ -103,7 +110,30 @@ func TestManagedAuthWorkloadIsolation(t *testing.T) {
 	if !strings.Contains(string(encoded), p.SecretRef) {
 		t.Fatal("generation-scoped credential reference missing")
 	}
-	if number(nested(managedAuthDeployment(p, "neon", false), "spec", "replicas")) != 0 {
+	disabled, err := managedAuthDeployment(p, "neon", false)
+	if err != nil || number(nested(disabled, "spec", "replicas")) != 0 {
 		t.Fatal("disable leaves Auth running")
+	}
+}
+
+func TestManagedAuthRuntimePlacement(t *testing.T) {
+	t.Setenv("NEON_AUTH_RUNTIME_HOSTNAMES", "worker-a,worker-b.ci")
+	p := managedAuthPayload{BranchID: "br_0123456789abcdef"}
+	want := `{"nodeAffinity":{"requiredDuringSchedulingIgnoredDuringExecution":{"nodeSelectorTerms":[{"matchExpressions":[{"key":"kubernetes.io/hostname","operator":"In","values":["worker-a","worker-b.ci"]}]}]}}}`
+	for _, enable := range []bool{true, false} {
+		body, err := managedAuthDeployment(p, "neon", enable)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got, err := json.Marshal(nested(body, "spec", "template", "spec", "affinity"))
+		if err != nil || string(got) != want {
+			t.Fatalf("unexpected required Auth placement: %s (%v)", got, err)
+		}
+	}
+	for _, bad := range []string{"worker-a,worker-a", "worker-a,", "worker-a, worker-b", "*", strings.Repeat("a", 64)} {
+		t.Setenv("NEON_AUTH_RUNTIME_HOSTNAMES", bad)
+		if _, err := managedAuthDeployment(p, "neon", true); err == nil {
+			t.Fatalf("invalid placement accepted: %q", bad)
+		}
 	}
 }

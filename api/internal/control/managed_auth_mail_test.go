@@ -30,7 +30,10 @@ func TestManagedAuthMailPolicyPreservesDefaultHashAndLimitsRoutes(t *testing.T) 
 		t.Fatal("Mail mutation accepted GET")
 	}
 	p := managedAuthPayload{ProjectID: "prj_0123456789abcdef", BranchID: "br_0123456789abcdef", EndpointID: "ep_0123456789abcdef", SecretRef: "auth-ci", Generation: 1}
-	deployment := managedAuthDeployment(p, "neon", true)
+	deployment, err := managedAuthDeployment(p, "neon", true)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !managedAuthMailMounted(deployment) {
 		t.Fatal("Operator mail mount missing")
 	}
