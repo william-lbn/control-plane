@@ -60,6 +60,7 @@ cp containers/functions.lock.json "$task_output/carrier/functions-build-inputs.j
 # no customer bundle is executed by this privileged, isolated CI check.
 task_carrier="neon-functions-carrier-verified:$FUNCTIONS_SOURCE_COMMIT"
 docker build --platform linux/amd64 -f Dockerfile.functions-vm \
+  --build-arg "GO_BUILDER_IMAGE=$task_go" \
   --build-arg "NODE_BUILDER_IMAGE=$task_node" \
   --build-arg "DEBIAN_SNAPSHOT=${task_inputs[4]}" -t "$task_carrier" "$task_output/carrier"
 docker run --rm --privileged --network none --entrypoint /bin/sh "$task_carrier" -ec \
