@@ -12516,7 +12516,7 @@
           "Compute"
         ],
         "summary": "Queue guarded 1-to-0 NeonVM suspension",
-        "description": "Checks route recovery template, ownership and active PostgreSQL sessions before a UID-preconditioned VM deletion. Proxy SQL wakes the VM on next connection.",
+        "description": "For DSGA, supply If-Match and Idempotency-Key. The Worker closes admission, drains the original PostgreSQL boot and confirms VM, Runner and Host retirement. Use the resume operation for DSGA. Older managed runtimes use their stored route template and can wake on the next Proxy SQL connection.",
         "parameters": [
           {
             "$ref": "#/components/parameters/project"
@@ -12552,6 +12552,39 @@
           }
         },
         "operationId": "suspendEndpoint"
+      }
+    },
+    "/api/v1/projects/{project}/endpoints/{endpoint}/resume": {
+      "post": {
+        "operationId": "resumeEndpoint",
+        "tags": ["Compute"],
+        "summary": "Resume a suspended DSGA Compute",
+        "description": "Queues a new physical generation on the same endpoint, timeline and application credentials. Resending the same version and idempotency key returns the original operation. Check the operation result before reconnecting to the same SQL endpoint.",
+        "parameters": [
+          {"$ref": "#/components/parameters/project"},
+          {"$ref": "#/components/parameters/endpoint"},
+          {"$ref": "#/components/parameters/csrf"},
+          {"$ref": "#/components/parameters/resourceVersion"},
+          {"$ref": "#/components/parameters/idempotency"}
+        ],
+        "security": [{"sessionCookie": []}, {"bearerToken": []}],
+        "responses": {
+          "202": {
+            "description": "Resume operation queued or replayed",
+            "content": {
+              "application/json": {
+                "schema": {"$ref": "#/components/schemas/Accepted"}
+              }
+            }
+          },
+          "403": {"$ref": "#/components/responses/Error"},
+          "404": {"$ref": "#/components/responses/Error"},
+          "409": {"$ref": "#/components/responses/Error"},
+          "412": {"$ref": "#/components/responses/Error"},
+          "422": {"$ref": "#/components/responses/Error"},
+          "428": {"$ref": "#/components/responses/Error"},
+          "503": {"$ref": "#/components/responses/Error"}
+        }
       }
     },
     "/api/v1/organizations": {

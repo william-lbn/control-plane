@@ -52,6 +52,7 @@ request_id/operation_id/error_code，再由显式 retry 接口恢复可重试操
 | POST | `/api/v1/projects/{project}/operations/{operation}/retry` | `retryOperation` | 202 |
 | PATCH | `/api/v1/projects/{project}/endpoints/{endpoint}/lifecycle` | `configureEndpointLifecycle` | 200 |
 | POST | `/api/v1/projects/{project}/endpoints/{endpoint}/suspend` | `suspendEndpoint` | 202 |
+| POST | `/api/v1/projects/{project}/endpoints/{endpoint}/resume` | `resumeEndpoint` | 202 |
 | GET | `/api/v1/organizations` | `listOrganizations` | 200 |
 | POST | `/api/v1/organizations` | `createOrganization` | 201 |
 | GET | `/api/v1/organizations/{org}` | `getOrganization` | 200 |
