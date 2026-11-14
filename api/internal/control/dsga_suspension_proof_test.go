@@ -296,6 +296,17 @@ func testDSGAResumeGeneration(t *testing.T, ctx context.Context, b *dsgaCreation
 		t.Fatalf("retirement accepted a possibly published resume: %d %s", w.Code, w.Body.String())
 	}
 	exec(`UPDATE operation_steps SET attempts=0 WHERE operation_id=$1 AND ordinal=4`, id)
+	exec(`UPDATE operation_steps SET state='failed',attempts=1 WHERE operation_id=$1 AND ordinal=2`, id)
+	exec(`UPDATE operation_steps SET state='queued',attempts=0 WHERE operation_id=$1 AND ordinal=3`, id)
+	if w := post(retirePath, `"2"`, "retire-failed-resume-key"); w.Code != 409 {
+		t.Fatalf("retirement accepted an unclassified readiness failure: %d %s", w.Code, w.Body.String())
+	}
+	exec(`UPDATE operations SET error_code='compute_not_ready' WHERE id=$1`, id)
+	exec(`UPDATE operation_steps SET attempts=1 WHERE operation_id=$1 AND ordinal=3`, id)
+	if w := post(retirePath, `"2"`, "retire-failed-resume-key"); w.Code != 409 {
+		t.Fatalf("retirement accepted an attempted native initialization: %d %s", w.Code, w.Body.String())
+	}
+	exec(`UPDATE operation_steps SET attempts=0 WHERE operation_id=$1 AND ordinal=3`, id)
 	if w := post(retirePath, `"1"`, "retire-failed-resume-key"); w.Code != 412 {
 		t.Fatalf("retirement accepted a stale endpoint version: %d %s", w.Code, w.Body.String())
 	}

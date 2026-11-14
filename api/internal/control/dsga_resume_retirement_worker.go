@@ -6,13 +6,16 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strconv"
 
 	"github.com/jackc/pgx/v5"
 	vmv1 "github.com/neondatabase/autoscaling/neonvm/apis/neonvm/v1"
 	dsgapi "github.com/neondatabase/autoscaling/pkg/api/dsga"
 	"github.com/neondatabase/autoscaling/pkg/dsga/bootstrap"
+	"github.com/neondatabase/autoscaling/pkg/dsga/hostguard"
 	"github.com/neondatabase/autoscaling/pkg/dsga/journal"
+	"github.com/neondatabase/autoscaling/pkg/dsga/vmguard"
 	"github.com/william-lbn/control-plane/api/internal/adapter"
 	core "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -46,7 +49,10 @@ func (s *server) settleFailedDSGAResume(ctx context.Context, id, worker string, 
 	}
 	var raw []byte
 	var uid, config, sqlService, managementService string
-	err := s.db.QueryRow(ctx, `SELECT o.payload,b.vm_uid,b.config_uid,sql.service_uid,mgmt.service_uid
+	var beforeRunning bool
+	err := s.db.QueryRow(ctx, `SELECT o.payload,b.vm_uid,b.config_uid,sql.service_uid,mgmt.service_uid,
+ EXISTS(SELECT 1 FROM operation_steps step WHERE step.operation_id=o.id AND step.ordinal=2
+  AND step.name='wait_neonvm_running' AND step.state='failed')
  FROM operations o JOIN dsga_creation_bindings b ON b.operation_id=o.id
  JOIN dsga_creation_services sql ON sql.operation_id=o.id AND sql.vm_uid=b.vm_uid AND sql.service_kind='postgres'
  JOIN dsga_creation_services mgmt ON mgmt.operation_id=o.id AND mgmt.vm_uid=b.vm_uid AND mgmt.service_kind='management'
@@ -55,7 +61,7 @@ func (s *server) settleFailedDSGAResume(ctx context.Context, id, worker string, 
  AND b.namespace=$5 AND b.vm_name=$6 AND b.config_uid IS NOT NULL
  AND NOT EXISTS (SELECT 1 FROM dsga_creation_initialization_observations WHERE operation_id=o.id)`,
 		p.FailedResume, p.ProjectID, p.EndpointID, dsgaResumeAction, s.kube.namespace, kubeName(p.EndpointID)).
-		Scan(&raw, &uid, &config, &sqlService, &managementService)
+		Scan(&raw, &uid, &config, &sqlService, &managementService, &beforeRunning)
 	if err != nil {
 		return err
 	}
@@ -131,7 +137,18 @@ func (s *server) settleFailedDSGAResume(ctx context.Context, id, worker string, 
 				return errDSGACreationIdentity
 			}
 		}
-		current, err := readDSGAFailedResumeIntent(ctx, clients, vm, binding, config)
+		if beforeRunning {
+			// A failed readiness step can also be a timeout with a live VM.
+			// This path requires terminal pre-birth proof, including no native
+			// resource, budget, session or service ownership ever published.
+			if vm.Status.Phase != vmv1.VmFailed || !unusedDSGAFailedResumeJournal(state) {
+				return errDSGACreationIdentity
+			}
+			if err := vmguard.ConfirmBirthSourcesAbsent(ctx, clients.CoreV1(), binding); err != nil {
+				return err
+			}
+		}
+		current, err := readDSGAFailedResumeIntent(ctx, clients, vm, binding, config, beforeRunning)
 		if err != nil {
 			return err
 		}
@@ -236,23 +253,50 @@ func (s *server) settleFailedDSGAResume(ctx context.Context, id, worker string, 
 }
 
 func dsgaRetirementOwns(item metav1.Object, vm *vmv1.VirtualMachine, uid string) bool {
-	ref := metav1.GetControllerOf(item)
 	return uid != "" && string(item.GetUID()) == uid && item.GetResourceVersion() != "" && item.GetDeletionTimestamp() == nil &&
-		ref != nil && ref.APIVersion == vmv1.SchemeGroupVersion.String() && ref.Kind == "VirtualMachine" && ref.Name == vm.Name && ref.UID == vm.UID
+		dsgaRetirementOwnsReference(item, vm)
 }
 
-func readDSGAFailedResumeIntent(ctx context.Context, clients kubernetes.Interface, vm *vmv1.VirtualMachine, binding journal.Binding, config string) (dsgaFailedResumeIntent, error) {
-	if vm.Status.Node == "" || vm.Status.PodName == "" {
+func unusedDSGAFailedResumeJournal(m journal.Model) bool {
+	return m.ProtocolVersion == 1 && m.HighWater == nil && m.Active == nil && len(m.History) == 0 &&
+		m.ExpiredResults == 0 && m.ResourceIdentity == nil && m.PGInstance == nil &&
+		m.BudgetHeld == nil && m.CapacityHeld == nil && m.InitialHeld == nil && m.BudgetBoundary == nil &&
+		m.ServiceClosure == nil && m.ServiceLifecycle == nil && m.RetainedCoverage == nil && m.RetainedContextSHA256 == ""
+}
+
+func isDSGAFailedResumeTerminalRunner(vm *vmv1.VirtualMachine, pod *core.Pod) bool {
+	if vm.Status.Phase != vmv1.VmFailed || vm.Spec.RestartPolicy != vmv1.RestartPolicyNever ||
+		pod.Namespace != vm.Namespace || pod.Name != vm.Status.PodName || pod.Spec.NodeName == "" ||
+		(vm.Status.Node != "" && pod.Spec.NodeName != vm.Status.Node) || pod.UID == "" ||
+		pod.ResourceVersion == "" || len(pod.OwnerReferences) != 1 ||
+		!slices.Contains(pod.Finalizers, hostguard.PodProtectionFinalizer) || !dsgaRetirementOwnsReference(pod, vm) {
+		return false
+	}
+	// The original terminal Pod may have lost its container status during
+	// eviction. This only permits the VM deletion request. The Host ledger and
+	// Scheduler must still verify physical absence before settlement succeeds.
+	return hostguard.PreBirthTerminalPod(pod) == nil ||
+		(pod.DeletionTimestamp != nil && pod.Spec.RestartPolicy == core.RestartPolicyNever &&
+			pod.Status.Phase == core.PodFailed && pod.Status.Reason == "Evicted")
+}
+
+func dsgaRetirementOwnsReference(item metav1.Object, vm *vmv1.VirtualMachine) bool {
+	ref := metav1.GetControllerOf(item)
+	return ref != nil && ref.APIVersion == vmv1.SchemeGroupVersion.String() && ref.Kind == "VirtualMachine" && ref.Name == vm.Name && ref.UID == vm.UID
+}
+
+func readDSGAFailedResumeIntent(ctx context.Context, clients kubernetes.Interface, vm *vmv1.VirtualMachine, binding journal.Binding, config string, beforeRunning bool) (dsgaFailedResumeIntent, error) {
+	if vm.Status.PodName == "" {
 		return dsgaFailedResumeIntent{}, errDSGACreationIdentity
 	}
 	pod, err := clients.CoreV1().Pods(binding.Namespace).Get(ctx, vm.Status.PodName, metav1.GetOptions{})
 	if err != nil {
 		return dsgaFailedResumeIntent{}, err
 	}
-	if !isDSGASuspensionRunner(vm, pod) {
+	if beforeRunning && !isDSGAFailedResumeTerminalRunner(vm, pod) || !beforeRunning && !isDSGASuspensionRunner(vm, pod) {
 		return dsgaFailedResumeIntent{}, errDSGACreationIdentity
 	}
-	node, err := clients.CoreV1().Nodes().Get(ctx, vm.Status.Node, metav1.GetOptions{})
+	node, err := clients.CoreV1().Nodes().Get(ctx, pod.Spec.NodeName, metav1.GetOptions{})
 	if err != nil {
 		return dsgaFailedResumeIntent{}, err
 	}

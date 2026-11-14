@@ -8,7 +8,10 @@ import (
 	"strings"
 	"testing"
 
+	vmv1 "github.com/neondatabase/autoscaling/neonvm/apis/neonvm/v1"
+	"github.com/neondatabase/autoscaling/pkg/dsga/hostguard"
 	core "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 func TestDSGAResumeRetirementUsesBothCredentialDigests(t *testing.T) {
@@ -59,5 +62,38 @@ func TestDSGAResumeRetirementUsesBothCredentialDigests(t *testing.T) {
 	}
 	if n, _ := f.counts(); n != 1 {
 		t.Fatalf("retirement verification wrote routing state: %d PUTs", n)
+	}
+}
+
+func TestDSGAResumeRetirementIdentifiesOriginalEvictedRunner(t *testing.T) {
+	controller := true
+	deleting := metav1.Now()
+	vm := &vmv1.VirtualMachine{ObjectMeta: metav1.ObjectMeta{Namespace: "neon", Name: "cp-original", UID: "original-vm"},
+		Spec:   vmv1.VirtualMachineSpec{RestartPolicy: vmv1.RestartPolicyNever},
+		Status: vmv1.VirtualMachineStatus{Phase: vmv1.VmFailed, PodName: "original-runner"}}
+	pod := &core.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "neon", Name: "original-runner", UID: "original-pod", ResourceVersion: "123", DeletionTimestamp: &deleting,
+		Finalizers:      []string{hostguard.PodProtectionFinalizer},
+		OwnerReferences: []metav1.OwnerReference{{APIVersion: vmv1.SchemeGroupVersion.String(), Kind: "VirtualMachine", Name: vm.Name, UID: vm.UID, Controller: &controller}}},
+		Spec: core.PodSpec{RestartPolicy: core.RestartPolicyNever, NodeName: "worker-original"},
+		Status: core.PodStatus{Phase: core.PodFailed, Reason: "Evicted",
+			ContainerStatuses: []core.ContainerStatus{{Name: "neonvm-runner", RestartCount: 1,
+				State: core.ContainerState{Terminated: &core.ContainerStateTerminated{Reason: "ContainerStatusUnknown"}}}}}}
+	if !isDSGAFailedResumeTerminalRunner(vm, pod) {
+		t.Fatal("original evicted Runner could not be bound for a deletion request")
+	}
+	for name, change := range map[string]func(*vmv1.VirtualMachine, *core.Pod){
+		"live VM":              func(v *vmv1.VirtualMachine, p *core.Pod) { v.Status.Phase = vmv1.VmRunning },
+		"wrong node":           func(v *vmv1.VirtualMachine, p *core.Pod) { v.Status.Node = "replacement-node" },
+		"wrong owner":          func(v *vmv1.VirtualMachine, p *core.Pod) { p.OwnerReferences[0].UID = "replacement-vm" },
+		"unprotected":          func(v *vmv1.VirtualMachine, p *core.Pod) { p.Finalizers = nil },
+		"unknown non-eviction": func(v *vmv1.VirtualMachine, p *core.Pod) { p.Status.Reason = "Error" },
+	} {
+		t.Run(name, func(t *testing.T) {
+			v, p := vm.DeepCopy(), pod.DeepCopy()
+			change(v, p)
+			if isDSGAFailedResumeTerminalRunner(v, p) {
+				t.Fatal("incorrect terminal VM/Runner binding accepted")
+			}
+		})
 	}
 }
