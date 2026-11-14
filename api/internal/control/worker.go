@@ -222,6 +222,15 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 					return s.suspendCompute(ctx, p)
 				})
 			}
+		case dsgaSuspendAction:
+			var p dsgaSuspensionPayload
+			if err := decodeDSGAObject(payload, &p); err != nil {
+				stepErr = err
+			} else if p.ProjectID != projectID || p.EndpointID != resourceID {
+				stepErr = errDSGACreationIdentity
+			} else {
+				stepErr = s.reconcileDSGASuspension(runCtx, id, workerID, p)
+			}
 		case "update_endpoint":
 			var p boundsPayload
 			if err := json.Unmarshal(payload, &p); err != nil {
@@ -409,6 +418,11 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 	}
 	if tag.RowsAffected() != 1 {
 		return errLeaseLost
+	}
+	if state == "succeeded" && action == dsgaSuspendAction {
+		if err = commitDSGASuspension(ctx, finishTx, id, projectID, resourceID); err != nil {
+			return err
+		}
 	}
 	return finishTx.Commit(ctx)
 }

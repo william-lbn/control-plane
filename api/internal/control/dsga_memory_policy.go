@@ -4,6 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"strconv"
+	"time"
+
 	"github.com/jackc/pgx/v5"
 	vmv1 "github.com/neondatabase/autoscaling/neonvm/apis/neonvm/v1"
 	dsgapi "github.com/neondatabase/autoscaling/pkg/api/dsga"
@@ -14,9 +18,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
-	"net/http"
-	"strconv"
-	"time"
 )
 
 // 在线策略只读原创建发行/容量，不重新选镜像，不修改VM几何或启动配置。
@@ -83,6 +84,14 @@ func (e *dsgaEndpointRuntime) validateBounds(p boundsPayload) error {
 	return nil
 }
 func (s *server) readDSGASelection(ctx context.Context, e *dsgaEndpointRuntime) (kubernetes.Interface, *vmv1.VirtualMachine, *core.ConfigMap, runtimeselection.Selection, error) {
+	clients, vm, cm, selected, err := s.readDSGABoundSelection(ctx, e)
+	if err == nil && selected.Automatic == nil {
+		err = errDSGACreationIdentity
+	}
+	return clients, vm, cm, selected, err
+}
+
+func (s *server) readDSGABoundSelection(ctx context.Context, e *dsgaEndpointRuntime) (kubernetes.Interface, *vmv1.VirtualMachine, *core.ConfigMap, runtimeselection.Selection, error) {
 	var empty runtimeselection.Selection
 	if e == nil || e.Plan.VM.supply() == nil || e.VMUID == "" || e.ConfigUID == "" {
 		return nil, nil, nil, empty, errDSGACreationIdentity
@@ -120,7 +129,7 @@ func (s *server) readDSGASelection(ctx context.Context, e *dsgaEndpointRuntime) 
 		return nil, nil, nil, empty, err
 	}
 	var q qualificationissuer.Result
-	if json.Unmarshal(proof, &q) != nil || q.Source != selected.Qualification || selected.Automatic == nil {
+	if json.Unmarshal(proof, &q) != nil || q.Source != selected.Qualification {
 		return nil, nil, nil, empty, errDSGACreationIdentity
 	}
 	return clients, vm, cm, selected, nil
@@ -199,26 +208,10 @@ func (s *server) reconcileEndpointBounds(ctx context.Context, id, worker string,
 	if err != nil {
 		return err
 	}
-	if string(cm.UID) != intent.SelectionUID {
-		return errDSGACreationIdentity
+	if err = writeDSGASelection(ctx, clients, cm, current, intent); err != nil {
+		return err
 	}
 	desired := intent.Next.Digest()
-	if current.Digest() != desired {
-		if current.Digest() != intent.PreviousSHA256 || current.Instance != intent.Next.Instance || current.Qualification != intent.Next.Qualification || current.Generation+1 != intent.Next.Generation {
-			return errDSGACreationIdentity
-		}
-		raw, _ := json.Marshal(intent.Next)
-		cm.Data[runtimeselection.DataKey] = string(raw)
-		updated := &core.ConfigMap{}
-		// 一次RV CAS；未知写入保留原intent，下次只确认同UID/摘要，不递增新代次。
-		err = clients.CoreV1().RESTClient().Put().Namespace(cm.Namespace).Resource("configmaps").Name(cm.Name).Body(cm).MaxRetries(0).Do(ctx).Into(updated)
-		if err != nil {
-			return err
-		}
-		if updated.UID != cm.UID {
-			return errDSGACreationIdentity
-		}
-	}
 	wait, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	for {
@@ -232,16 +225,59 @@ func (s *server) reconcileEndpointBounds(ctx context.Context, id, worker string,
 	}
 }
 
+func writeDSGASelection(ctx context.Context, clients kubernetes.Interface, cm *core.ConfigMap, current runtimeselection.Selection, intent dsgaPolicyIntent) error {
+	if string(cm.UID) != intent.SelectionUID {
+		return errDSGACreationIdentity
+	}
+	currentDigest := current.Digest()
+	desired := intent.Next.Digest()
+	if currentDigest == desired {
+		return nil
+	}
+	if currentDigest != intent.PreviousSHA256 || current.Instance != intent.Next.Instance || current.Qualification != intent.Next.Qualification ||
+		current.Generation == ^dsgapi.Uint64(0) || current.Generation+1 != intent.Next.Generation || intent.Next.Validate() != nil {
+		return errDSGACreationIdentity
+	}
+	raw, _ := json.Marshal(intent.Next)
+	cm = cm.DeepCopy()
+	cm.Data[runtimeselection.DataKey] = string(raw)
+	updated := &core.ConfigMap{}
+	// One resourceVersion CAS. A lost response is recovered by reading the same
+	// ConfigMap UID and exact digest from the persisted intent.
+	err := clients.CoreV1().RESTClient().Put().Namespace(cm.Namespace).Resource("configmaps").Name(cm.Name).Body(cm).MaxRetries(0).Do(ctx).Into(updated)
+	if err != nil {
+		return err
+	}
+	binding := journal.Binding{Namespace: current.Namespace, Name: current.Name, VMUID: types.UID(current.Instance.VMUID), Incarnation: current.Incarnation}
+	applied, err := runtimeselection.Decode(updated, binding, cm.Namespace)
+	if err != nil || updated.UID != cm.UID || applied.Digest() != desired {
+		return errDSGACreationIdentity
+	}
+	return nil
+}
+
 // 上游Agent原dump-state仅证明策略采纳，真实PG/硬限另读。观察超时不停止SQL。
 func readDSGAOwnerPolicy(ctx context.Context, clients kubernetes.Interface, vm *vmv1.VirtualMachine, p *dsgaSupplyProfile, selected runtimeselection.Selection) (runtimeselection.Status, error) {
-	var empty runtimeselection.Status
+	raw, err := readDSGAOwnerDump(ctx, clients, vm, p)
+	if err != nil {
+		return runtimeselection.Status{}, err
+	}
+	return decodeDSGAOwnerPolicy(raw, vm.Namespace, vm.Status.PodName, selected, time.Now())
+}
+
+func readDSGAOwnerDump(ctx context.Context, clients kubernetes.Interface, vm *vmv1.VirtualMachine, p *dsgaSupplyProfile) ([]byte, error) {
+	raw, _, err := readDSGAOwnerPodDump(ctx, clients, vm, p)
+	return raw, err
+}
+
+func readDSGAOwnerPodDump(ctx context.Context, clients kubernetes.Interface, vm *vmv1.VirtualMachine, p *dsgaSupplyProfile) ([]byte, types.UID, error) {
 	ds, err := clients.AppsV1().DaemonSets(p.AgentNamespace).Get(ctx, p.AgentDaemonSet, metav1.GetOptions{})
 	if err != nil {
-		return empty, err
+		return nil, "", err
 	}
 	pods, err := clients.CoreV1().Pods(p.AgentNamespace).List(ctx, metav1.ListOptions{FieldSelector: "spec.nodeName=" + vm.Status.Node})
 	if err != nil {
-		return empty, err
+		return nil, "", err
 	}
 	var target *core.Pod
 	for i := range pods.Items {
@@ -249,24 +285,41 @@ func readDSGAOwnerPolicy(ctx context.Context, clients kubernetes.Interface, vm *
 		ref := metav1.GetControllerOf(pod)
 		if pod.DeletionTimestamp == nil && pod.Status.Phase == core.PodRunning && pod.Spec.ServiceAccountName == p.AgentServiceAccount && ref != nil && ref.Kind == "DaemonSet" && ref.UID == ds.UID {
 			if target != nil {
-				return empty, errDSGACreationIdentity
+				return nil, "", errDSGACreationIdentity
 			}
 			target = pod
 		}
 	}
 	if target == nil {
-		return empty, errDSGAInitializationPending
+		return nil, "", errDSGAInitializationPending
 	}
 	// client-go removes a bare trailing slash. Use a path handled by the
 	// Agent dump mux so Kubernetes forwards the GET body instead of redirecting.
 	raw, err := clients.CoreV1().RESTClient().Get().Namespace(p.AgentNamespace).Resource("pods").Name(target.Name+":"+strconv.Itoa(int(p.AgentDumpPort))).SubResource("proxy").Suffix("dump-state").SetHeader("Content-Type", "application/json").Body([]byte("{}")).DoRaw(ctx)
 	if err != nil || len(raw) > 2<<20 {
-		return empty, errDSGAInitializationPending
+		return nil, "", errDSGAInitializationPending
 	}
-	return decodeDSGAOwnerPolicy(raw, vm.Namespace, vm.Status.PodName, selected, time.Now())
+	return raw, target.UID, nil
 }
+
+type dsgaOwnerObservation struct {
+	Instance         dsgapi.Instance          `json:"instance"`
+	IssuerEpoch      dsgapi.Uint64            `json:"issuerEpoch"`
+	ObservedAt       time.Time                `json:"observedAt"`
+	RuntimeSelection *runtimeselection.Status `json:"runtimeSelection"`
+	SuspensionDrain  *dsgapi.PreparedResponse `json:"suspensionDrain,omitempty"`
+}
+
 func decodeDSGAOwnerPolicy(raw []byte, namespace, podName string, selected runtimeselection.Selection, now time.Time) (runtimeselection.Status, error) {
-	var empty runtimeselection.Status
+	value, err := decodeDSGAOwnerObservation(raw, namespace, podName, selected, now)
+	if err != nil {
+		return runtimeselection.Status{}, err
+	}
+	return *value.RuntimeSelection, nil
+}
+
+func decodeDSGAOwnerObservation(raw []byte, namespace, podName string, selected runtimeselection.Selection, now time.Time) (dsgaOwnerObservation, error) {
+	var empty dsgaOwnerObservation
 	var dump struct {
 		Stopped *bool `json:"stopped"`
 		Pods    []struct {
@@ -280,7 +333,7 @@ func decodeDSGAOwnerPolicy(raw []byte, namespace, podName string, selected runti
 	if dsgapi.ValidateObservationJSON(raw, 2<<20, 65536) != nil || json.Unmarshal(raw, &dump) != nil || dump.Stopped == nil || *dump.Stopped {
 		return empty, errDSGAInitializationPending
 	}
-	var matched *runtimeselection.Status
+	var matched *dsgaOwnerObservation
 	for _, pod := range dump.Pods {
 		if pod.PodName.Namespace != namespace || pod.PodName.Name != podName {
 			continue
@@ -288,11 +341,7 @@ func decodeDSGAOwnerPolicy(raw []byte, namespace, podName string, selected runti
 		// Other Runners can legitimately have no PG boot during startup or
 		// after retirement. Decode the strict instance only for the original Pod.
 		var runner struct {
-			DSGA struct {
-				Instance         dsgapi.Instance          `json:"instance"`
-				ObservedAt       time.Time                `json:"observedAt"`
-				RuntimeSelection *runtimeselection.Status `json:"runtimeSelection"`
-			} `json:"dsga"`
+			DSGA dsgaOwnerObservation `json:"dsga"`
 		}
 		if matched != nil || json.Unmarshal(pod.Runner, &runner) != nil {
 			return empty, errDSGAInitializationPending
@@ -307,7 +356,7 @@ func decodeDSGAOwnerPolicy(raw []byte, namespace, podName string, selected runti
 		if state.DesiredGeneration != selected.Generation || state.DesiredSHA256 != selected.Digest() {
 			return empty, errDSGAInitializationPending
 		}
-		matched = &state
+		matched = &d
 	}
 	if matched == nil {
 		return empty, errDSGAInitializationPending

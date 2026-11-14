@@ -20,6 +20,7 @@ import (
 	"github.com/neondatabase/autoscaling/pkg/dsga/bootstrap"
 	"github.com/neondatabase/autoscaling/pkg/dsga/journal"
 	"github.com/neondatabase/autoscaling/pkg/dsga/owner"
+	coordination "k8s.io/api/coordination/v1"
 	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -187,16 +188,17 @@ func (proxy *dsgaProxy) current(ctx context.Context, store *journal.Store, claim
 	proof := owner.Ownership{Namespace: binding.Namespace, VMName: binding.Name, VMUID: binding.VMUID, Incarnation: binding.Incarnation,
 		LeaseUID: lease.UID, HolderID: snapshot.State().Owner.HolderID, IssuerEpoch: claims.IssuerEpoch}
 	snapshot, lease, err = owner.VerifyCurrent(ctx, proxy.broker.coord, store, proof)
-	if err != nil || !snapshot.Dispatchable() || lease.Spec.RenewTime == nil || lease.Spec.LeaseDurationSeconds == nil || *lease.Spec.LeaseDurationSeconds <= 2 {
+	if err != nil || !snapshot.Dispatchable() || !dsgaOwnerLeaseFresh(lease, time.Now()) || ctx.Err() != nil {
 		return nil, owner.ErrLeadershipLost
 	}
 	// 不将短JWT当永续Lease。保守扣除2秒时钟/传播余量，未来续约时间亦
 	// 有界；最终检查后仍可换主，PG的单调issuer floor仍是必需的最后栅栏。
-	now := time.Now()
-	if lease.Spec.RenewTime.After(now.Add(2*time.Second)) || !now.Before(lease.Spec.RenewTime.Add(time.Duration(*lease.Spec.LeaseDurationSeconds-2)*time.Second)) || ctx.Err() != nil {
-		return nil, owner.ErrLeadershipLost
-	}
 	return snapshot, nil
+}
+
+func dsgaOwnerLeaseFresh(lease *coordination.Lease, now time.Time) bool {
+	return lease != nil && lease.Spec.RenewTime != nil && lease.Spec.LeaseDurationSeconds != nil && *lease.Spec.LeaseDurationSeconds > 2 &&
+		!lease.Spec.RenewTime.After(now.Add(2*time.Second)) && now.Before(lease.Spec.RenewTime.Add(time.Duration(*lease.Spec.LeaseDurationSeconds-2)*time.Second))
 }
 
 func (proxy *dsgaProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
