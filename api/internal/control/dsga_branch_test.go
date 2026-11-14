@@ -167,9 +167,10 @@ func TestDSGAStorageBranchLeasesAndReplaysExactAncestor(t *testing.T) {
 				}
 			}
 			var frozenRaw, credentialRaw []byte
-			if err := f.s.db.QueryRow(ctx, `SELECT r.draft->'credential_source',o.payload#>'{dsga_creation,credentials}' FROM dsga_creation_reservations r
+			var endpoint string
+			if err := f.s.db.QueryRow(ctx, `SELECT r.draft->'credential_source',o.payload#>'{dsga_creation,credentials}',o.resource_id FROM dsga_creation_reservations r
  JOIN operations o ON o.id=r.accepted_id AND o.action='create_endpoint_dsga_v1' WHERE r.actor_id=$1 AND r.key_hash=$2
- AND o.payload->>'timeline_id'=$3`, auth.Actor, keyHash("first-fork-writer-accepted"), p.TimelineID).Scan(&frozenRaw, &credentialRaw); err != nil {
+ AND o.payload->>'timeline_id'=$3`, auth.Actor, keyHash("first-fork-writer-accepted"), p.TimelineID).Scan(&frozenRaw, &credentialRaw, &endpoint); err != nil {
 				t.Fatal(err)
 			}
 			var frozen dsgaEndpointCredentialSource
@@ -179,6 +180,14 @@ func TestDSGAStorageBranchLeasesAndReplaysExactAncestor(t *testing.T) {
 					Fork: dsgaRetainedFork{Operation: branchOp, ParentBranch: root.BranchID, ParentTimeline: root.TimelineID, LSN: p.ParentLSN}}) ||
 				credential.validate() != nil || credential.UID == frozen.Reference.UID {
 				t.Fatal("first writer lost fork ancestry or reused original Secret identity")
+			}
+			f.exec("UPDATE endpoints SET state='active' WHERE id=$1", endpoint)
+			suspend := suspendPayload{ProjectID: p.ProjectID, EndpointID: endpoint, WorkloadName: kubeName(endpoint)}
+			if _, err := f.s.queueSuspend(ctx, suspend, auth.Actor, "manual-suspend"); err != errDSGALifecycleDriverRequired {
+				t.Fatal("managed writer entered the legacy suspend queue", err)
+			}
+			if err := f.s.suspendCompute(ctx, suspend); err != errDSGALifecycleDriverRequired {
+				t.Fatal("managed writer used the legacy worker path", err)
 			}
 		})
 	}

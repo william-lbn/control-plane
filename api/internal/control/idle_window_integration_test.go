@@ -30,11 +30,28 @@ func TestAutomaticSuspendRejectsChangedUID(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	pool, err := pgxpool.New(ctx, url)
+	admin, err := pgxpool.New(ctx, url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer admin.Close()
+	schema := newID("v2_migration_idle_suspend_")
+	if _, err = admin.Exec(ctx, "CREATE SCHEMA "+pgx.Identifier{schema}.Sanitize()); err != nil {
+		t.Fatal(err)
+	}
+	config, err := pgxpool.ParseConfig(url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	config.ConnConfig.RuntimeParams["search_path"] = schema
+	pool, err := pgxpool.NewWithConfig(ctx, config)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer pool.Close()
+	if _, err = pool.Exec(ctx, "CREATE TABLE operations(project_id text, payload jsonb, action text)"); err != nil {
+		t.Fatal(err)
+	}
 	project, endpoint := "prj_idle_generation", "ep_0123456789abcdef"
 	name := kubeName(endpoint)
 	requests := 0

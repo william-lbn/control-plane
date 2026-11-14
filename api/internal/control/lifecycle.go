@@ -17,6 +17,11 @@ type suspendPayload struct {
 	ExpectedVMUID string `json:"expected_vm_uid,omitempty"`
 }
 
+var errDSGALifecycleDriverRequired = errors.New("DSGA endpoint requires a versioned suspension driver")
+
+const dsgaEndpointLifecycleQuery = `SELECT EXISTS(SELECT 1 FROM operations WHERE project_id=$1 AND payload->>'endpoint_id'=$2
+ AND action IN ('create_project_dsga_v1','create_branch_dsga_v1','create_endpoint_dsga_v1'))`
+
 const idleGuardSQL = `SELECT
  (SELECT count(*) FROM pg_stat_activity WHERE pid<>pg_backend_pid()
   AND backend_type='client backend' AND usename<>'control_probe' AND client_addr IS NOT NULL
@@ -75,6 +80,13 @@ func (s *server) suspendCompute(ctx context.Context, p suspendPayload) error {
 	name := kubeName(p.EndpointID)
 	if p.WorkloadName != name {
 		return errors.New("suspend workload identity mismatch")
+	}
+	var managed bool
+	if err := s.db.QueryRow(ctx, dsgaEndpointLifecycleQuery, p.ProjectID, p.EndpointID).Scan(&managed); err != nil {
+		return err
+	}
+	if managed {
+		return errDSGALifecycleDriverRequired
 	}
 	release, err := s.acquireProbeGate(ctx, p.EndpointID, false)
 	if err != nil {
@@ -238,6 +250,13 @@ func (s *server) queueSuspend(ctx context.Context, p suspendPayload, actor, requ
 		return "", err
 	}
 	defer tx.Rollback(ctx)
+	var managed bool
+	if err = tx.QueryRow(ctx, dsgaEndpointLifecycleQuery, p.ProjectID, p.EndpointID).Scan(&managed); err != nil {
+		return "", err
+	}
+	if managed {
+		return "", errDSGALifecycleDriverRequired
+	}
 	var exists bool
 	if err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM operations WHERE resource_type='endpoint'
 		AND resource_id=$1 AND state IN ('queued','running','retry_wait'))`, p.EndpointID).Scan(&exists); err != nil {
@@ -275,6 +294,10 @@ func (s *server) suspendEndpoint(w http.ResponseWriter, r *http.Request) {
 	p := suspendPayload{ProjectID: r.PathValue("project"), EndpointID: r.PathValue("endpoint"), WorkloadName: stringVal(item["workload_name"])}
 	opID, err := s.queueSuspend(r.Context(), p, userFrom(r).ID, requestID(r))
 	if err != nil {
+		if errors.Is(err, errDSGALifecycleDriverRequired) {
+			fail(w, r, 409, "dsga_lifecycle_not_available", "This Compute requires the DSGA suspension driver")
+			return
+		}
 		fail(w, r, 409, "operation_conflict", "Could not queue suspend operation")
 		return
 	}
@@ -299,6 +322,17 @@ func (s *server) endpointLifecycle(w http.ResponseWriter, r *http.Request) {
 	if err := readJSON(r, &body); err != nil || body.IdleTimeoutSeconds < 60 || body.IdleTimeoutSeconds > 3600 {
 		fail(w, r, 422, "invalid_lifecycle", "idle_timeout_seconds must be 60-3600")
 		return
+	}
+	if body.ScaleToZero {
+		var managed bool
+		if err := s.db.QueryRow(r.Context(), dsgaEndpointLifecycleQuery, r.PathValue("project"), r.PathValue("endpoint")).Scan(&managed); err != nil {
+			fail(w, r, 503, "metadata_unavailable", "Could not confirm endpoint lifecycle driver")
+			return
+		}
+		if managed {
+			fail(w, r, 409, "dsga_lifecycle_not_available", "This Compute requires the DSGA suspension driver")
+			return
+		}
 	}
 	if r.Header.Get("If-Match") != fmt.Sprintf("\"%v\"", item["version"]) {
 		fail(w, r, 412, "version_mismatch", "Reload endpoint before editing")
@@ -328,8 +362,10 @@ func (s *server) runIdleController(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			items, err := s.many(ctx, `SELECT id,project_id,workload_name,idle_timeout_seconds FROM endpoints
-			WHERE scale_to_zero AND state='active' AND workload_kind='neonvm' AND deleted_at IS NULL`)
+			items, err := s.many(ctx, `SELECT e.id,e.project_id,e.workload_name,e.idle_timeout_seconds FROM endpoints e
+				WHERE e.scale_to_zero AND e.state='active' AND e.workload_kind='neonvm' AND e.deleted_at IS NULL
+				AND NOT EXISTS(SELECT 1 FROM operations o WHERE o.project_id=e.project_id AND o.payload->>'endpoint_id'=e.id AND o.action IN
+				 ('create_project_dsga_v1','create_branch_dsga_v1','create_endpoint_dsga_v1'))`)
 			if err != nil {
 				s.logger.Error("idle candidates", "error", err)
 				continue
