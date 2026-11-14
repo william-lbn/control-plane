@@ -4,14 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 
 	"github.com/jackc/pgx/v5"
 	vmv1 "github.com/neondatabase/autoscaling/neonvm/apis/neonvm/v1"
 	dsgapi "github.com/neondatabase/autoscaling/pkg/api/dsga"
+	"github.com/neondatabase/autoscaling/pkg/dsga/bootstrap"
 	"github.com/neondatabase/autoscaling/pkg/dsga/journal"
 	"github.com/william-lbn/control-plane/api/internal/adapter"
+	core "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -116,7 +119,7 @@ func (s *server) settleFailedDSGAResume(ctx context.Context, id, worker string, 
 		if err != nil {
 			return err
 		}
-		if !dsgaRetirementOwns(cfg, vm, config) {
+		if !dsgaRetirementOwns(cfg, vm, config) || bootstrap.CheckReady(vm, cfg, false) != nil {
 			return errDSGACreationIdentity
 		}
 		for name, serviceUID := range map[string]string{binding.Name: sqlService, binding.Name + "-management": managementService} {
@@ -283,8 +286,8 @@ func verifyDSGAFailedResumeHostLease(ctx context.Context, clients kubernetes.Int
 
 func observeDSGAFailedResumeChildren(ctx context.Context, clients kubernetes.Interface, b journal.Binding, config, sql, management string) error {
 	for {
-		// Only the child UID is checked; the bound credentials are never read,
-		// modified or removed by retirement.
+		// These children are tied to the failed VM. The retained credential
+		// Secret is a separate object and is never modified by retirement.
 		cfg, err := clients.CoreV1().Secrets(b.Namespace).Get(ctx, b.Name+"-config", metav1.GetOptions{})
 		switch {
 		case err == nil && string(cfg.UID) != config:
@@ -314,6 +317,16 @@ func observeDSGAFailedResumeChildren(ctx context.Context, clients kubernetes.Int
 }
 
 func (s *server) verifyDSGAUnpublishedResumeRoute(ctx context.Context, p createPayload, plan dsgaCreationPlan, previous dsgaResumeSource) error {
+	// The creation digest is domain-separated. The route uses the canonical
+	// Secret data digest. Verify each against its own representation.
+	var credentials core.Secret
+	if err := managedSQLRead(s.kube, ctx, "secret", kubeName(p.EndpointID)+"-credentials", &credentials); err != nil {
+		return fmt.Errorf("read retained credentials: %w", errDSGACredentialSource)
+	}
+	snapshot, err := snapshotDSGACredentials(&credentials, plan.Namespace, credentials.Name, p.ProjectID, p.EndpointID)
+	if err != nil || credentials.Name != kubeName(p.EndpointID)+"-credentials" || snapshot.reference() != plan.Credentials {
+		return fmt.Errorf("match retained credentials: %w", errDSGACredentialSource)
+	}
 	registry, err := s.kube.request(ctx, http.MethodGet, s.kube.path("secret", routesSecret), nil)
 	if err != nil {
 		return err
@@ -337,8 +350,8 @@ func (s *server) verifyDSGAUnpublishedResumeRoute(ctx context.Context, p createP
 		binding.TenantID != p.TenantID || binding.TimelineID != p.TimelineID || binding.Namespace != plan.Namespace ||
 		binding.VMUID != previous.VMUID || binding.ConfigSecretUID != previous.ConfigUID || binding.ServiceUID != previous.ServiceUID ||
 		binding.Incarnation != previous.Incarnation || binding.ComputeInstanceID != previous.ComputeInstanceID ||
-		binding.CredentialSecretUID != plan.Credentials.UID || binding.CredentialDataSHA256 != plan.Credentials.ContentSHA256 {
-		return errDSGACreationIdentity
+		binding.CredentialSecretUID != snapshot.uid || binding.CredentialDataSHA256 != managedSQLDataDigest(credentials.Data) {
+		return fmt.Errorf("match predecessor route: %w", errDSGACreationIdentity)
 	}
 	return nil
 }
