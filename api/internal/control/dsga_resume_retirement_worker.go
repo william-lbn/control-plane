@@ -159,7 +159,7 @@ func (s *server) settleFailedDSGAResume(ctx context.Context, id, worker string, 
 			if vm.Status.Phase != vmv1.VmFailed || !unusedDSGAFailedResumeJournal(state) {
 				return errDSGACreationIdentity
 			}
-			if err := vmguard.ConfirmBirthSourcesAbsent(ctx, clients.CoreV1(), binding); err != nil {
+			if err := confirmDSGAFailedResumeBirthAbsent(ctx, s.kube, binding); err != nil {
 				return err
 			}
 		}
@@ -274,6 +274,27 @@ func (s *server) settleFailedDSGAResume(ctx context.Context, id, worker string, 
 func dsgaRetirementOwns(item metav1.Object, vm *vmv1.VirtualMachine, uid string) bool {
 	return uid != "" && string(item.GetUID()) == uid && item.GetResourceVersion() != "" && item.GetDeletionTimestamp() == nil &&
 		dsgaRetirementOwnsReference(item, vm)
+}
+
+// Use the established JSON API client so the explicit HTTP outcome is kept
+// for absence. Scheduler separately confirms the same immutable source names.
+func confirmDSGAFailedResumeBirthAbsent(ctx context.Context, kube *kubeClient, binding journal.Binding) error {
+	if binding.Namespace != kube.namespace || dsgapi.ValidateID(binding.Namespace, "namespace") != nil ||
+		dsgapi.ValidateID(binding.Name, "VM name") != nil || dsgapi.ValidateID(string(binding.VMUID), "VM UID") != nil ||
+		dsgapi.ValidateIncarnation(binding.Incarnation) != nil {
+		return errDSGACreationIdentity
+	}
+	for _, name := range vmguard.BirthSourceNames(binding) {
+		_, err := kube.request(ctx, http.MethodGet, kube.path("configmap", name), nil)
+		var status kubeError
+		if !errors.As(err, &status) || status.Status != http.StatusNotFound {
+			if err != nil {
+				return err
+			}
+			return errDSGACreationIdentity
+		}
+	}
+	return nil
 }
 
 func unusedDSGAFailedResumeJournal(m journal.Model) bool {

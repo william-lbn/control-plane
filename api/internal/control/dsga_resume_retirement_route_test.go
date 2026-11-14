@@ -5,11 +5,15 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
 	vmv1 "github.com/neondatabase/autoscaling/neonvm/apis/neonvm/v1"
 	"github.com/neondatabase/autoscaling/pkg/dsga/hostguard"
+	"github.com/neondatabase/autoscaling/pkg/dsga/journal"
+	"github.com/neondatabase/autoscaling/pkg/dsga/vmguard"
 	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -93,6 +97,38 @@ func TestDSGAResumeRetirementIdentifiesOriginalEvictedRunner(t *testing.T) {
 			change(v, p)
 			if isDSGAFailedResumeTerminalRunner(v, p) {
 				t.Fatal("incorrect terminal VM/Runner binding accepted")
+			}
+		})
+	}
+}
+
+func TestDSGAResumeRetirementRequiresRealBirthSourceNotFound(t *testing.T) {
+	binding := journal.Binding{Namespace: "neon", Name: "cp-original", VMUID: "original-vm",
+		Incarnation: "0123456789abcdef0123456789abcdef"}
+	names := vmguard.BirthSourceNames(binding)
+	for _, status := range []int{http.StatusNotFound, http.StatusOK, http.StatusForbidden, http.StatusServiceUnavailable} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			paths := make(chan string, 2)
+			h := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				paths <- r.Method + " " + r.URL.Path
+				w.WriteHeader(status)
+				w.Write([]byte("{}"))
+			}))
+			defer h.Close()
+			k := &kubeClient{http: h.Client(), base: h.URL, namespace: binding.Namespace}
+			err := confirmDSGAFailedResumeBirthAbsent(context.Background(), k, binding)
+			if (err == nil) != (status == http.StatusNotFound) {
+				t.Fatalf("HTTP %d produced incorrect absence result: %v", status, err)
+			}
+			want := "GET /api/v1/namespaces/neon/configmaps/"
+			if got := <-paths; got != want+names[0] {
+				t.Fatalf("wrong immutable birth source request: %s", got)
+			}
+			if status == http.StatusNotFound && len(paths) != 1 {
+				t.Fatal("both independently named sources must be checked")
+			}
+			if len(paths) != 0 && <-paths != want+names[1] {
+				t.Fatal("wrong immutable Runner state source")
 			}
 		})
 	}

@@ -165,6 +165,8 @@ func (k *kubeClient) path(kind, name string) string {
 		collection = "/api/v1/namespaces/" + n + "/pods"
 	case "secret":
 		collection = "/api/v1/namespaces/" + n + "/secrets"
+	case "configmap":
+		collection = "/api/v1/namespaces/" + n + "/configmaps"
 	case "service":
 		collection = "/api/v1/namespaces/" + n + "/services"
 	default:
