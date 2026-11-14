@@ -24,12 +24,17 @@ func dataAPIGuardSchema(branch string) string {
 }
 
 func (s *server) dataAPIConnection(ctx context.Context, p dataAPIPayload) (*pgx.Conn, error) {
-	runtime, err := s.dsgaEndpointRuntime(ctx, p.ProjectID, p.EndpointID)
-	if err != nil {
-		return nil, err
-	}
-	if runtime != nil {
-		return s.dsgaBackendConnection(ctx, runtime, p)
+	// The standalone gateway can read only explicitly named credential
+	// Secrets and its own metadata projection. The DSGA connection requires
+	// privileged creation receipts, VM and selection observations.
+	if s.processRole != roleStorageGateway {
+		runtime, err := s.dsgaEndpointRuntime(ctx, p.ProjectID, p.EndpointID)
+		if err != nil {
+			return nil, err
+		}
+		if runtime != nil {
+			return s.dsgaBackendConnection(ctx, runtime, p)
+		}
 	}
 	secret, err := s.kube.request(ctx, http.MethodGet, s.kube.path("secret", kubeName(p.EndpointID)+"-credentials"), nil)
 	if err != nil || !owned(secret, p.ProjectID, p.EndpointID) {

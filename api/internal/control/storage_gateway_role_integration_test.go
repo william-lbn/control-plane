@@ -2,10 +2,14 @@ package control
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"errors"
+	"net/http"
 	"net/http/httptest"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -161,6 +165,28 @@ func TestStorageGatewayRestrictedMetadataRole(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := &server{db: gateway, processRole: roleStorageGateway}
+	// Probe the same data-path helper used after restricted request
+	// admission. Legacy may use its allowlisted Secret. A DSGA seed is
+	// never interpreted as a legacy cleartext probe credential.
+	var secretReads atomic.Int32
+	kube := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		secretReads.Add(1)
+		if r.Method != http.MethodGet || r.URL.Path != s.kube.path("secret", kubeName(endpoint)+"-credentials") {
+			w.WriteHeader(http.StatusForbidden)
+			return
+		}
+		data := map[string]string{"probeCredentialSeed": base64.StdEncoding.EncodeToString(make([]byte, 32))}
+		_ = json.NewEncoder(w).Encode(record{
+			"metadata": record{"labels": record{"neon-control/project-id": project, "neon-control/endpoint-id": endpoint}},
+			"data":     data,
+		})
+	}))
+	defer kube.Close()
+	s.kube = &kubeClient{base: kube.URL, namespace: "neon", http: kube.Client()}
+	probe := dataAPIPayload{ProjectID: project, BranchID: branch, EndpointID: endpoint, Spec: DataAPISpec{Database: "neondb"}}
+	if conn, err := s.dataAPIConnection(ctx, probe); conn != nil || err == nil || secretReads.Load() != 1 {
+		t.Fatal("restricted role failed to reach its own credential path or used a DSGA seed as legacy", err)
+	}
 	usage := &storageUsage{s: s, protocol: "rest", started: time.Now()}
 	request := httptest.NewRequest("GET", "/storage/v1/fixture/bucket", nil).WithContext(context.WithValue(ctx, storageUsageKey{}, usage))
 	if err = s.admitStorageUsage(request, project, branch); err != nil {
