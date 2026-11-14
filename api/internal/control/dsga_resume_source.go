@@ -35,6 +35,7 @@ func readDSGAResumeSource(ctx context.Context, db connectionDefaultReader, p cre
  AND o.payload->>'branch_id'=$4 AND o.payload->>'vm_uid'=b.vm_uid
  AND c.project_id=$2 AND c.payload->>'endpoint_id'=$3 AND c.payload->>'branch_id'=$4
  AND c.payload->>'tenant_id'=$5 AND c.payload->>'timeline_id'=$6 AND c.state='succeeded'
+ AND c.action IN ('create_project_dsga_v1','create_endpoint_dsga_v1','resume_endpoint_dsga_v1')
  AND EXISTS(SELECT 1 FROM operation_steps st WHERE st.operation_id=o.id AND st.ordinal=1 AND st.name=$7 AND st.state='succeeded')`,
 		operation, p.ProjectID, p.EndpointID, p.BranchID, p.TenantID, p.TimelineID, dsgaSuspensionSteps[1]).
 		Scan(&source.Operation, &source.Creation, &source.VMUID, &source.ConfigUID, &source.ServiceUID,
@@ -65,7 +66,23 @@ func newDSGAResumePlan(p createPayload, previous dsgaCreationPlan, policy dsgaCr
 	next.Credentials = previous.Credentials
 	next.ComputeInstanceID = previous.ComputeInstanceID
 	next.RetainCatalog = true
+	next.ResumeGeneration = true
+	next.ResumeMinMem, next.ResumeMaxMem = p.MinMem, p.MaxMem
 	return next, next.validate(p)
+}
+
+func readDSGAResumePlan(ctx context.Context, db connectionDefaultReader, source dsgaResumeSource, p createPayload) (dsgaCreationPlan, error) {
+	var plan dsgaCreationPlan
+	var raw []byte
+	err := db.QueryRow(ctx, `SELECT payload->'dsga_creation' FROM operations WHERE id=$1`, source.Creation).Scan(&raw)
+	if err != nil {
+		return plan, err
+	}
+	if decodeDSGAObject(raw, &plan) != nil || plan.validate(p) != nil || plan.Credentials.validate() != nil ||
+		plan.Incarnation != source.Incarnation || plan.ComputeInstanceID != source.ComputeInstanceID {
+		return dsgaCreationPlan{}, errDSGACreationIdentity
+	}
+	return plan, nil
 }
 
 // Called by the resume Worker with its currently bound new VM and fresh

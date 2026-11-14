@@ -74,6 +74,30 @@ func snapshotDSGACredentials(secret *core.Secret, namespace, name, project, endp
 	}, append([]byte(nil), probeSeed...)}, nil
 }
 
+func (binding *dsgaCreationBinding) verifyCredentialProvenance(ctx context.Context, secret *core.Secret, plan dsgaCreationPlan) bool {
+	if binding.action != dsgaResumeAction {
+		return dsgaCredentialProvenance(secret, binding.operationID, plan)
+	}
+	if secret == nil {
+		return false
+	}
+	// Subsequent suspensions still reference the first immutable credentials.
+	// Confirm the Secret annotations against that endpoint's original receipt.
+	origin := secret.Annotations[dsgaCredentialOperation]
+	var incarnation string
+	if err := binding.server.db.QueryRow(ctx, `SELECT o.payload#>>'{dsga_creation,incarnation}' FROM operations o
+ JOIN dsga_creation_credential_sources c ON c.operation_id=o.id
+ WHERE o.id=$1 AND o.project_id=$2 AND o.payload->>'endpoint_id'=$3 AND o.payload->>'branch_id'=$4
+ AND o.action IN ('create_project_dsga_v1','create_endpoint_dsga_v1') AND o.state='succeeded'
+ AND c.credentials_uid=$5 AND encode(c.content_digest,'hex')=$6
+ AND o.payload#>>'{dsga_creation,compute_instance_id}'=$7`, origin, binding.intent.ProjectID, binding.intent.EndpointID,
+		binding.intent.BranchID, plan.Credentials.UID, plan.Credentials.ContentSHA256, plan.ComputeInstanceID).Scan(&incarnation); err != nil {
+		return false
+	}
+	plan.Incarnation = incarnation
+	return dsgaCredentialProvenance(secret, origin, plan)
+}
+
 // renderDSGABootstrap为真实typed创建执行器的Render回调：读取原计划和当前owned
 // immutable凭据，先生成无副作用的确定性文档，再在Operation锁内固定/比对来源。
 // Kube/计划读取/渲染均不持SQL锁。输入缺失不创建Secret、不轮转seed、不回落到旧
@@ -107,7 +131,7 @@ func (binding *dsgaCreationBinding) renderDSGABootstrap(ctx context.Context, vm 
 	if err != nil {
 		return nil, err
 	}
-	if snapshot.reference() != plan.Credentials || !dsgaCredentialProvenance(secret, binding.operationID, plan) {
+	if snapshot.reference() != plan.Credentials || !binding.verifyCredentialProvenance(ctx, secret, plan) {
 		return nil, errDSGACredentialSource
 	}
 	data, err := renderDSGABootstrapFiles(binding.intent.createPayload, plan, string(vm.UID), snapshot.credentials)

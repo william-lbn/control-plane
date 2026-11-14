@@ -108,13 +108,16 @@ func (s *server) queueDSGASuspension(ctx context.Context, project, endpoint stri
 		return "", err
 	}
 	err = tx.QueryRow(ctx, `SELECT o.id,b.vm_uid FROM operations o
+ JOIN endpoints e ON e.project_id=o.project_id AND e.id=o.payload->>'endpoint_id'
  JOIN dsga_creation_bindings b ON b.operation_id=o.id
  WHERE o.project_id=$1 AND o.payload->>'endpoint_id'=$2 AND o.payload->>'branch_id'=$3
- AND o.payload->>'timeline_id'=$4 AND o.action IN ('create_project_dsga_v1','create_endpoint_dsga_v1')
+ AND o.payload->>'timeline_id'=$4
  AND o.state='succeeded' AND o.finished_at IS NOT NULL AND b.config_uid IS NOT NULL
+ AND ((e.dsga_runtime_operation_id=o.id AND o.action='resume_endpoint_dsga_v1')
+ OR (e.dsga_runtime_operation_id IS NULL AND o.action IN ('create_project_dsga_v1','create_endpoint_dsga_v1')
  AND (SELECT count(*) FROM operations original WHERE original.project_id=$1 AND original.payload->>'endpoint_id'=$2
    AND original.action IN ('create_project_dsga_v1','create_endpoint_dsga_v1')
-   AND EXISTS(SELECT 1 FROM dsga_creation_bindings previous WHERE previous.operation_id=original.id))=1
+   AND EXISTS(SELECT 1 FROM dsga_creation_bindings previous WHERE previous.operation_id=original.id))=1))
  AND EXISTS(SELECT 1 FROM dsga_creation_supply_facts f WHERE f.operation_id=o.id AND f.kind='runtime_selection')`,
 		project, endpoint, p.BranchID, timeline).Scan(&p.CreationOperation, &p.VMUID)
 	if isNoRows(err) {

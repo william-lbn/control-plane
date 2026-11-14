@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"testing"
 	"time"
+
+	core "k8s.io/api/core/v1"
 )
 
 func TestDSGAResumePlanPreservesLogicalIdentityAndRefreshesBootInputs(t *testing.T) {
@@ -25,6 +27,17 @@ func TestDSGAResumePlanPreservesLogicalIdentityAndRefreshesBootInputs(t *testing
 			}
 			if next.Incarnation == previous.Incarnation || next.OperationUUID == previous.OperationUUID {
 				t.Fatal("resume reused the previous physical generation")
+			}
+			vm, err := renderDSGAVM(p, next)
+			if err != nil {
+				t.Fatal(err)
+			}
+			vm.UID = "resume-vm"
+			if vm.Spec.ServiceAccountName == previous.runnerAccount(vm.Name) || vm.Spec.ServiceAccountName != next.runnerAccount(vm.Name) {
+				t.Fatal("resume reused the previous Runner grants")
+			}
+			if access := dsgaSupplyAccess(vm, next); len(access) < 4 || access[0].(*core.ServiceAccount).Name != vm.Spec.ServiceAccountName {
+				t.Fatal("resume VM and its RBAC use different ServiceAccounts")
 			}
 			for _, changed := range []dsgaCreationPolicy{
 				{PostgresVersion: 16, RetainedCatalog: true},

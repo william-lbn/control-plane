@@ -86,7 +86,10 @@ type dsgaCreationPlan struct {
 	// 从当前env偷偷补齐旧计划，以免原操作落到另一个controller或身份域。
 	Storage dsgaStorageProfile `json:"storage,omitzero"`
 	// A successor on an existing timeline attests the retained SQL catalog before serving.
-	RetainCatalog bool `json:"retain_catalog,omitempty"`
+	RetainCatalog    bool `json:"retain_catalog,omitempty"`
+	ResumeGeneration bool `json:"resume_generation,omitempty"`
+	ResumeMinMem     int  `json:"resume_min_memory_mib,omitempty"`
+	ResumeMaxMem     int  `json:"resume_max_memory_mib,omitempty"`
 }
 
 type dsgaCredentialReference struct {
@@ -153,6 +156,12 @@ func (plan dsgaCreationPlan) validate(p createPayload) error {
 	if plan.RetainCatalog && (!plan.VM.generic() || p.ParentTimelineID != "" || p.ParentLSN != "" || p.RestoreSource != "" || p.CatalogPolicy != "") {
 		return errDSGACreationPlan
 	}
+	if plan.ResumeGeneration && (!plan.RetainCatalog || plan.VM.supply() == nil || plan.VM.ProtocolVersion != 5 || plan.Credentials.validate() != nil) {
+		return errDSGACreationPlan
+	}
+	if !plan.ResumeGeneration && (plan.ResumeMinMem != 0 || plan.ResumeMaxMem != 0) {
+		return errDSGACreationPlan
+	}
 	if plan.Credentials != (dsgaCredentialReference{}) && plan.Credentials.validate() != nil {
 		return errDSGACreationPlan
 	}
@@ -199,6 +208,13 @@ func (plan dsgaCreationPlan) validate(p createPayload) error {
 	}
 	if err := plan.validateSupply(p); err != nil {
 		return err
+	}
+	if plan.ResumeGeneration {
+		if err := (&dsgaEndpointRuntime{Payload: p, Plan: plan}).validateBounds(boundsPayload{
+			p.ProjectID, p.EndpointID, kubeName(p.EndpointID), p.MinCPU, p.MaxCPU, plan.ResumeMinMem, plan.ResumeMaxMem,
+		}); err != nil {
+			return err
+		}
 	}
 	if err := plan.Budget.validate(); err != nil {
 		return err
@@ -270,7 +286,8 @@ func (binding *dsgaCreationBinding) creationPlan(ctx context.Context) (dsgaCreat
 	var plan dsgaCreationPlan
 	decoder := json.NewDecoder(bytes.NewReader(envelope.Creation))
 	decoder.DisallowUnknownFields()
-	if decoder.Decode(&plan) != nil || plan.dsgaCreationIdentity != binding.intent.Creation || plan.validate(binding.intent.createPayload) != nil {
+	if decoder.Decode(&plan) != nil || plan.dsgaCreationIdentity != binding.intent.Creation || plan.validate(binding.intent.createPayload) != nil ||
+		plan.ResumeGeneration != (binding.action == dsgaResumeAction) {
 		return dsgaCreationPlan{}, errDSGACreationPlan
 	}
 	return plan, nil
@@ -281,7 +298,7 @@ func (binding *dsgaCreationBinding) creationPlan(ctx context.Context) (dsgaCreat
 // 目前公开handler尚未切换，待完整Renderer/角色/预算链接齐后才启用。
 func addDSGACreateOperation(ctx context.Context, tx pgx.Tx, baseAction, resourceType, resourceID, projectID, operationID, actor, requestID string, p createPayload, plan dsgaCreationPlan, key, hash string, steps []string) error {
 	action := baseAction + "_dsga_v1"
-	if baseAction == "" || dsgaCreationBaseAction(action) != baseAction || p.ProjectID != projectID || plan.validate(p) != nil {
+	if baseAction == "" || dsgaCreationBaseAction(action) != baseAction || p.ProjectID != projectID || plan.validate(p) != nil || plan.ResumeGeneration {
 		return errDSGACreationPlan
 	}
 	wantedType, wantedID := "project", p.ProjectID

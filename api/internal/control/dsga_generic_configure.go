@@ -62,7 +62,7 @@ func (binding *dsgaCreationBinding) configureGenericCompute(ctx context.Context)
 			return errDSGACredentialSource
 		}
 		source, err := snapshotDSGACredentials(credentials, plan.Namespace, name+"-credentials", current.intent.ProjectID, current.intent.EndpointID)
-		if err != nil || source.reference() != plan.Credentials || !dsgaCredentialProvenance(credentials, current.operationID, plan) {
+		if err != nil || source.reference() != plan.Credentials || !current.verifyCredentialProvenance(ctx, credentials, plan) {
 			return errDSGACredentialSource
 		}
 		service, err := clients.CoreV1().Services(plan.Namespace).Get(ctx, name+"-management", metav1.GetOptions{})

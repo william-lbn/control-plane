@@ -4,6 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
+	"log/slog"
+	"net/http"
+	"net/http/httptest"
 	"reflect"
 	"strings"
 	"testing"
@@ -12,6 +17,7 @@ import (
 	dsgapi "github.com/neondatabase/autoscaling/pkg/api/dsga"
 	"github.com/neondatabase/autoscaling/pkg/dsga/hostguard"
 	"github.com/neondatabase/autoscaling/pkg/dsga/journal"
+	"github.com/neondatabase/autoscaling/pkg/dsga/runtimeselection"
 	core "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -179,5 +185,153 @@ func TestDSGASuspensionIntentPinsBootAndHostAcrossWorkerRetry(t *testing.T) {
 	foreignTimeline.TimelineID = strings.Repeat("e", 32)
 	if _, err = readDSGAResumeSource(ctx, tx, foreignTimeline, id); err == nil {
 		t.Fatal("resume accepted a different Timeline")
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	t.Run("public-resume-and-next-generation", func(t *testing.T) {
+		testDSGAResumeGeneration(t, ctx, b, fact, original)
+	})
+}
+
+func testDSGAResumeGeneration(t *testing.T, ctx context.Context, b *dsgaCreationBinding, fact dsgaInitializationResponse, source dsgaResumeSource) {
+	t.Helper()
+	s := b.server
+	s.logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+	p := b.intent.createPayload
+	previous, err := readDSGAResumePlan(ctx, s.db, source, p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, release := supplyFixture(t, previous.PostgresVersion)
+	setDSGACatalog(t, dsgaRuntimeCatalog{1, []dsgaProjectPolicy{{1, "test", createBounds{p.MinCPU, p.MaxCPU, p.MinMem, p.MaxMem}, dsgaCreationPolicy{
+		PostgresVersion: previous.PostgresVersion, NativeBootstrapVersion: release.NativeBootstrapVersion,
+		Namespace: previous.Namespace, Image: release.Image, MemorySlotBytes: release.MemorySlotBytes, Budget: release.Budget,
+		VM: release.VM, Storage: previous.Storage, RetainedCatalog: true,
+	}}}})
+	s.idempotencyKey = []byte(strings.Repeat("k", 32))
+	t.Setenv("NEON_V2_CREATE_ENABLED", "true")
+	exec := func(sql string, args ...any) {
+		t.Helper()
+		if _, err := s.db.Exec(ctx, sql, args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	exec(`INSERT INTO users(id,username,password_hash,role) VALUES('resume-admin','resume-admin','unused','viewer')`)
+	exec(`INSERT INTO organization_members(org_id,user_id,role) VALUES('local','resume-admin','admin')`)
+	exec(`INSERT INTO sessions(token_hash,user_id,csrf_hash,expires_at) VALUES($1,'resume-admin',$2,clock_timestamp()+interval '1 hour')`, digest("resume-session"), digest("resume-csrf"))
+	exec(`UPDATE endpoints SET min_cpu_milli=$2,max_cpu_milli=$3,min_memory_mib=$4,max_memory_mib=$5 WHERE id=$1`, p.EndpointID, p.MinCPU, p.MaxCPU, p.MinMem, p.MaxMem)
+	router := s.routes()
+	post := func(action, version, key string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/projects/"+p.ProjectID+"/endpoints/"+p.EndpointID+"/"+action, nil)
+		req.AddCookie(&http.Cookie{Name: "neon_v2_session", Value: "resume-session"})
+		req.AddCookie(&http.Cookie{Name: "neon_v2_csrf", Value: "resume-csrf"})
+		req.Header.Set("X-CSRF-Token", "resume-csrf")
+		req.Header.Set("If-Match", version)
+		req.Header.Set("Idempotency-Key", key)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		return w
+	}
+	t.Setenv("NEON_DSGA_SUSPENSION_ENABLED", "false")
+	if w := post("resume", `"2"`, "same-resume-intent"); w.Code != 409 {
+		t.Fatalf("disabled driver accepted resume: %d %s", w.Code, w.Body.String())
+	}
+	t.Setenv("NEON_DSGA_SUSPENSION_ENABLED", "true")
+	if w := post("resume", `"1"`, "same-resume-intent"); w.Code != 412 {
+		t.Fatalf("stale version accepted: %d %s", w.Code, w.Body.String())
+	}
+	w := post("resume", `"2"`, "same-resume-intent")
+	var op struct{ Operation struct{ ID, Action string } }
+	if w.Code != 202 || json.Unmarshal(w.Body.Bytes(), &op) != nil || op.Operation.ID == "" || op.Operation.Action != dsgaResumeAction {
+		t.Fatalf("resume was not queued: %d %s", w.Code, w.Body.String())
+	}
+	id := op.Operation.ID
+	if w := post("resume", `"2"`, "same-resume-intent"); w.Code != 202 || !strings.HasSuffix(w.Header().Get("Location"), "/"+id) {
+		t.Fatalf("replay changed the original Operation: %d %s", w.Code, w.Body.String())
+	}
+	if w := post("resume", `"2"`, "different-resume-key"); w.Code != 409 {
+		t.Fatalf("a concurrent resume was accepted: %d %s", w.Code, w.Body.String())
+	}
+	if _, err := s.db.Exec(ctx, `UPDATE operations SET payload=payload-'resume_from' WHERE id=$1`, id); err == nil {
+		t.Fatal("settled predecessor could be changed")
+	}
+	exec(`UPDATE operations SET state='failed',retryable=true WHERE id=$1`, id)
+	if err := s.retryFailed(ctx, id, p.ProjectID); err != nil {
+		t.Fatal(err)
+	}
+	exec(`UPDATE operations SET state='running',lease_owner=$2,lease_expires_at=clock_timestamp()+interval '1 minute' WHERE id=$1`, id, b.workerID)
+	next, err := s.loadDSGACreationBinding(ctx, id, b.workerID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := next.creationPlan(ctx)
+	if err != nil || !plan.ResumeGeneration || plan.Credentials != previous.Credentials || plan.ComputeInstanceID != previous.ComputeInstanceID || next.intent.ResumeFrom != source.Operation {
+		t.Fatalf("accepted intent changed the stable endpoint: %v", err)
+	}
+	if err := next.bind(ctx, "resume-vm-uid", ""); err != nil {
+		t.Fatal(err)
+	}
+	exec(`INSERT INTO dsga_creation_credential_sources(operation_id,source_version,credentials_uid,content_digest)
+ SELECT $1,source_version,credentials_uid,content_digest FROM dsga_creation_credential_sources WHERE operation_id=$2`, id, source.Creation)
+	if err := next.bind(ctx, "resume-vm-uid", "resume-config-uid"); err != nil {
+		t.Fatal(err)
+	}
+	exec(`INSERT INTO dsga_creation_services(operation_id,service_kind,namespace,service_name,vm_uid,service_uid)
+ SELECT $1,service_kind,namespace,service_name,'resume-vm-uid','resume-'||service_uid FROM dsga_creation_services WHERE operation_id=$2`, id, source.Creation)
+	if _, err = next.supplyFact(ctx, "runtime_selection", dsgaSupplyObject{runtimeselection.Name("resume-vm-uid"), "resume-selection-uid", strings.Repeat("a", 64)}); err != nil {
+		t.Fatal(err)
+	}
+	// These test receipts exercise the real database guards without booting a VM.
+	fact.Observed.Instance.VMUID = "resume-vm-uid"
+	fact.Observed.Instance.PGBootID++
+	native, err := plan.nativeBootstrap(p, "resume-vm-uid")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fact.Startup, fact.OperationUUID = native, plan.OperationUUID
+	raw, err := json.Marshal(fact)
+	if err != nil {
+		t.Fatal(err)
+	}
+	exec(`INSERT INTO dsga_creation_initialization_observations(operation_id,pg_boot_id,vm_uid,config_uid,credentials_uid,management_service_uid,receipt)
+ SELECT $1,$2,'resume-vm-uid','resume-config-uid',$3,service_uid,$4 FROM dsga_creation_services WHERE operation_id=$1 AND service_kind='management'`,
+		id, fmt.Sprint(uint64(fact.Observed.Instance.PGBootID)), plan.Credentials.UID, raw)
+	if e, err := s.dsgaEndpointRuntime(ctx, p.ProjectID, p.EndpointID); err != nil || e.Operation != source.Creation {
+		t.Fatalf("incomplete successor displaced original runtime: %v", err)
+	}
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback(ctx)
+	if err := lockDSGAProjectParents(ctx, tx, p); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tx.Exec(ctx, `UPDATE operations SET state='succeeded',finished_at=now(),lease_owner=NULL,lease_expires_at=NULL WHERE id=$1`, id); err != nil {
+		t.Fatal(err)
+	}
+	if err := commitDSGAResume(ctx, tx, id, p.ProjectID, p.EndpointID); !errors.Is(err, errDSGACreationIdentity) {
+		t.Fatalf("promoted a resume before its steps: %v", err)
+	}
+	if _, err := tx.Exec(ctx, `UPDATE operation_steps SET state='succeeded' WHERE operation_id=$1`, id); err != nil {
+		t.Fatal(err)
+	}
+	if err := commitDSGAResume(ctx, tx, id, p.ProjectID, p.EndpointID); err != nil {
+		t.Fatal(err)
+	}
+	if err := tx.Commit(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if e, err := s.dsgaEndpointRuntime(ctx, p.ProjectID, p.EndpointID); err != nil || e.Operation != id || e.VMUID != "resume-vm-uid" {
+		t.Fatalf("completed successor did not become authoritative: %v", err)
+	}
+	w = post("suspend", `"3"`, "next-suspension-key")
+	if w.Code != 202 || json.Unmarshal(w.Body.Bytes(), &op) != nil || op.Operation.Action != dsgaSuspendAction {
+		t.Fatalf("second suspension was not queued: %d %s", w.Code, w.Body.String())
+	}
+	var generation string
+	if err := s.db.QueryRow(ctx, `SELECT payload->>'creation_operation_id' FROM operations WHERE id=$1`, op.Operation.ID).Scan(&generation); err != nil || generation != id {
+		t.Fatalf("second suspension selected the previous VM: %v", err)
 	}
 }

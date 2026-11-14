@@ -331,7 +331,7 @@ func (binding *dsgaCreationBinding) probeOriginalSQL(ctx context.Context) error 
 		}
 		p := current.intent.createPayload
 		source, err := snapshotDSGACredentials(secret, plan.Namespace, vm.Name+"-credentials", p.ProjectID, p.EndpointID)
-		if err != nil || source.reference() != plan.Credentials || !dsgaCredentialProvenance(secret, current.operationID, plan) {
+		if err != nil || source.reference() != plan.Credentials || !current.verifyCredentialProvenance(ctx, secret, plan) {
 			return errDSGACredentialSource
 		}
 		password, err := source.probePassword()
@@ -415,8 +415,13 @@ func (binding *dsgaCreationBinding) persistComputeReady(ctx context.Context, fac
 	}
 	project := binding.action == "create_project_dsga_v1" && previousSteps == 7 && !plan.RetainCatalog
 	endpoint := binding.action == "create_endpoint_dsga_v1" && previousSteps == 6 && plan.RetainCatalog
-	if !original || (!project && !endpoint) {
+	resume := binding.action == dsgaResumeAction && previousSteps == 6 && plan.ResumeGeneration
+	if !original || (!project && !endpoint && !resume) {
 		return errDSGACreationIdentity
+	}
+	if resume {
+		// Promote the active runtime only in the terminal Worker transaction.
+		return binding.checkLease(ctx, tx)
 	}
 	p := binding.intent.createPayload
 	type update struct {

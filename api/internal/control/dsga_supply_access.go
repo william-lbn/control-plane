@@ -25,7 +25,7 @@ func dsgaSupplyAccess(vm *vmv1.VirtualMachine, p dsgaCreationPlan) []any {
 		return nil
 	}
 	b := journal.Binding{Namespace: vm.Namespace, Name: vm.Name, VMUID: vm.UID, Incarnation: p.Incarnation}
-	account := dsgaRunnerAccount(vm.Name)
+	account := p.runnerAccount(vm.Name)
 	metadata := func(name, ns string) metav1.ObjectMeta {
 		m := metav1.ObjectMeta{Name: name, Namespace: ns, Labels: map[string]string{dsgaSupplyVMLabel: string(vm.UID)}}
 		if ns == vm.Namespace {

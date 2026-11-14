@@ -371,6 +371,7 @@ func (s *server) routes() *http.ServeMux {
 	mux.Handle("PATCH /api/v1/projects/{project}/endpoints/{endpoint}", s.auth(http.HandlerFunc(s.updateEndpoint), true))
 	mux.Handle("PATCH /api/v1/projects/{project}/endpoints/{endpoint}/lifecycle", s.auth(http.HandlerFunc(s.endpointLifecycle), true))
 	mux.Handle("POST /api/v1/projects/{project}/endpoints/{endpoint}/suspend", s.auth(http.HandlerFunc(s.suspendEndpoint), true))
+	mux.Handle("POST /api/v1/projects/{project}/endpoints/{endpoint}/resume", s.auth(http.HandlerFunc(s.resumeDSGAEndpoint), true))
 	mux.Handle("POST /api/v1/projects/{project}/endpoints/{endpoint}/query", s.auth(http.HandlerFunc(s.querySQL), true))
 	mux.Handle("POST /api/v1/projects/{project}/endpoints/{endpoint}/query-script", s.auth(http.HandlerFunc(s.querySQLScript), true))
 	mux.HandleFunc("GET /api/openapi.json", s.openapi)

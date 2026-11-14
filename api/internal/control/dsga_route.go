@@ -453,6 +453,23 @@ func (binding *dsgaCreationBinding) publishInitializedSQLRoute(ctx context.Conte
 		Binding: adapter.ManagedSQLBinding{ProtocolVersion: 1, Namespace: plan.Namespace, ProjectID: p.ProjectID, EndpointID: p.EndpointID, BranchID: p.BranchID, TenantID: p.TenantID, TimelineID: p.TimelineID,
 			VMUID: current.vmUID, Incarnation: plan.Incarnation, ComputeInstanceID: plan.ComputeInstanceID, ConfigSecretUID: current.configUID,
 			ConfigSHA256: fresh.configSHA256, SecretDataSHA256: fresh.secretDataSHA256, CredentialSecretUID: string(credentials.UID), CredentialDataSHA256: managedSQLDataDigest(credentials.Data), ServiceUID: string(sqlService.UID)}}
+	if current.action == dsgaResumeAction {
+		source, e := readDSGAResumeSource(ctx, current.server.db, p, current.intent.ResumeFrom)
+		if e != nil || source.PGBootID == fresh.Observed.Instance.PGBootID || source.VMUID == current.vmUID || source.ConfigUID == current.configUID {
+			return errManagedSQLPublish
+		}
+		in.resume = source.routeProof(func(ctx context.Context, selected adapter.ManagedSQLBinding) error {
+			latest, e := readDSGAResumeSource(ctx, current.server.db, p, current.intent.ResumeFrom)
+			if e != nil || latest != source || !adapter.ManagedSQLBindingEqual(selected, in.Binding) {
+				return errManagedSQLPublish
+			}
+			uid, e := current.serviceIdentity(ctx, "postgres", nil)
+			if e != nil || uid != selected.ServiceUID || uid == source.ServiceUID {
+				return errManagedSQLPublish
+			}
+			return nil
+		})
+	}
 	_, err = publishManagedSQLRoute(ctx, k, in, func(ctx context.Context, in managedSQLRouteInput, source managedSQLRouteSource) (dsgaInitializationResponse, error) {
 		// 仅复用本次Driver刚读取、严格验证且已记录的响应；不读取旧持久fact。
 		// publisher仍在CAS前fresh读取VM/Config及原UID/hash，CLI不能传入该事实。

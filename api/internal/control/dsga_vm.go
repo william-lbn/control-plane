@@ -263,7 +263,7 @@ func renderDSGAVM(p createPayload, plan dsgaCreationPlan) (*vmv1.VirtualMachine,
 		// 通用Guest沿固定镜像启动；配置由原Controller交公钥ISO，再由Worker
 		// 调原生认证configure。不能恢复旧command/env/mount脚本绕过Guest检查。
 		if v.supply() != nil {
-			vm.Spec.ServiceAccountName = dsgaRunnerAccount(name)
+			vm.Spec.ServiceAccountName = plan.runnerAccount(name)
 		}
 		vm.Spec.Guest.Command = nil
 		vm.Spec.Guest.Args = nil

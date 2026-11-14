@@ -105,3 +105,12 @@ func (p dsgaCreationPlan) validateSupply(input createPayload) error {
 	return nil
 }
 func dsgaRunnerAccount(name string) string { return name + "-runner" }
+
+func (p dsgaCreationPlan) runnerAccount(name string) string {
+	if p.ResumeGeneration {
+		// Cluster and cross-namespace grants cannot have a VM owner reference.
+		// A new ServiceAccount must never activate grants left by a prior VM.
+		return dsgaRunnerAccount(name) + "-" + p.Incarnation
+	}
+	return dsgaRunnerAccount(name)
+}

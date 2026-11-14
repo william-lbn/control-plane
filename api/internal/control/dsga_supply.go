@@ -227,8 +227,12 @@ func (b *dsgaCreationBinding) provisionDSGARuntime(ctx context.Context, fact dsg
 		return err
 	}
 	automatic := s.clone().Automatic
-	automatic.MinimumVMMemoryBytes = dsgapi.Uint64(current.intent.MinMem) * (1 << 20)
-	automatic.MaximumVMMemoryBytes = dsgapi.Uint64(current.intent.MaxMem) * (1 << 20)
+	minMem, maxMem := current.intent.MinMem, current.intent.MaxMem
+	if plan.ResumeGeneration {
+		minMem, maxMem = plan.ResumeMinMem, plan.ResumeMaxMem
+	}
+	automatic.MinimumVMMemoryBytes = dsgapi.Uint64(minMem) * (1 << 20)
+	automatic.MaximumVMMemoryBytes = dsgapi.Uint64(maxMem) * (1 << 20)
 	selection := runtimeselection.Selection{ProtocolVersion: 1, Namespace: vm.Namespace, Name: vm.Name, Instance: fact.Observed.Instance, Incarnation: plan.Incarnation, Generation: 1, Qualification: result.Source, Automatic: &automatic}
 	return current.publishInitialRuntimeSelection(ctx, clients, selection, plan)
 }

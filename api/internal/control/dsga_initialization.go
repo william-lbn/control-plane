@@ -135,7 +135,7 @@ func (binding *dsgaCreationBinding) observeInitializationWithHTTP(ctx context.Co
 		return empty, errDSGACredentialSource
 	}
 	source, err := snapshotDSGACredentials(credentials, plan.Namespace, name+"-credentials", p.ProjectID, p.EndpointID)
-	if err != nil || source.reference() != plan.Credentials || !dsgaCredentialProvenance(credentials, current.operationID, plan) || len(source.probeSeed) != 32 {
+	if err != nil || source.reference() != plan.Credentials || !current.verifyCredentialProvenance(ctx, credentials, plan) || len(source.probeSeed) != 32 {
 		return empty, errDSGACredentialSource
 	}
 	config, err := clients.CoreV1().Secrets(plan.Namespace).Get(ctx, name+"-config", metav1.GetOptions{})

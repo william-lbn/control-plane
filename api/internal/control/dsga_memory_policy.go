@@ -29,10 +29,12 @@ type dsgaEndpointRuntime struct {
 }
 
 func (s *server) dsgaEndpointRuntime(ctx context.Context, project, endpoint string) (*dsgaEndpointRuntime, error) {
-	rows, err := s.db.Query(ctx, `SELECT o.id,o.payload,b.vm_uid,COALESCE(b.config_uid,'')
- FROM operations o LEFT JOIN dsga_creation_bindings b ON b.operation_id=o.id
- WHERE o.project_id=$1 AND o.payload->>'endpoint_id'=$2
- AND o.action IN ('create_project_dsga_v1','create_branch_dsga_v1','create_endpoint_dsga_v1')
+	rows, err := s.db.Query(ctx, `SELECT o.id,o.action,o.payload,b.vm_uid,COALESCE(b.config_uid,'')
+ FROM endpoints e JOIN operations o ON o.project_id=e.project_id AND o.payload->>'endpoint_id'=e.id
+ LEFT JOIN dsga_creation_bindings b ON b.operation_id=o.id
+ WHERE e.project_id=$1 AND e.id=$2
+ AND ((e.dsga_runtime_operation_id IS NULL AND o.action IN ('create_project_dsga_v1','create_branch_dsga_v1','create_endpoint_dsga_v1'))
+ OR (e.dsga_runtime_operation_id=o.id AND o.action='resume_endpoint_dsga_v1' AND o.state='succeeded'))
  AND NOT (o.state='failed' AND b.operation_id IS NULL)
  ORDER BY o.created_at DESC LIMIT 2`, project, endpoint)
 	if err != nil {
@@ -45,16 +47,18 @@ func (s *server) dsgaEndpointRuntime(ctx context.Context, project, endpoint stri
 			return nil, errDSGACreationIdentity
 		}
 		var raw []byte
-		var id string
+		var id, action string
 		var vm, cfg *string
-		if err = rows.Scan(&id, &raw, &vm, &cfg); err != nil {
+		if err = rows.Scan(&id, &action, &raw, &vm, &cfg); err != nil {
 			return nil, err
 		}
 		var envelope struct {
 			createPayload
-			Plan dsgaCreationPlan `json:"dsga_creation"`
+			Plan       dsgaCreationPlan `json:"dsga_creation"`
+			ResumeFrom string           `json:"resume_from,omitempty"`
 		}
-		if decodeDSGAObject(raw, &envelope) != nil || envelope.Plan.validate(envelope.createPayload) != nil || envelope.ProjectID != project || envelope.EndpointID != endpoint {
+		if decodeDSGAObject(raw, &envelope) != nil || envelope.Plan.validate(envelope.createPayload) != nil || envelope.ProjectID != project || envelope.EndpointID != endpoint ||
+			envelope.Plan.ResumeGeneration != (action == dsgaResumeAction) || envelope.Plan.ResumeGeneration != (envelope.ResumeFrom != "") {
 			return nil, errDSGACreationIdentity
 		}
 		result = &dsgaEndpointRuntime{Operation: id, Payload: envelope.createPayload, Plan: envelope.Plan}

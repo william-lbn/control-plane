@@ -18,7 +18,8 @@ import (
 // 不将payload转成map/float64后重写；绑定事实独立存表，原意图始终保持原样。
 type dsgaCreationEnvelope struct {
 	createPayload
-	Creation dsgaCreationIdentity `json:"dsga_creation"`
+	Creation   dsgaCreationIdentity `json:"dsga_creation"`
+	ResumeFrom string               `json:"resume_from,omitempty"`
 }
 
 type dsgaCreationBinding struct {
@@ -38,6 +39,8 @@ func dsgaCreationBaseAction(action string) string {
 		return "create_branch"
 	case "create_endpoint_dsga_v1":
 		return "create_endpoint"
+	case dsgaResumeAction:
+		return "resume_endpoint"
 	default:
 		return ""
 	}
@@ -80,7 +83,7 @@ func (binding *dsgaCreationBinding) lockOperationTx(ctx context.Context, tx pgx.
 	wantedType, wantedID := "project", binding.intent.ProjectID
 	if base == "create_branch" {
 		wantedType, wantedID = "branch", binding.intent.BranchID
-	} else if base == "create_endpoint" {
+	} else if base == "create_endpoint" || action == dsgaResumeAction {
 		wantedType, wantedID = "endpoint", binding.intent.EndpointID
 	}
 	if base == "" || resourceType != wantedType || resourceID != wantedID {
@@ -97,7 +100,7 @@ func (binding *dsgaCreationBinding) lockOperationTx(ctx context.Context, tx pgx.
 	}
 	if version != int(binding.intent.Creation.PostgresVersion) || tenant != binding.intent.TenantID || timeline != binding.intent.TimelineID ||
 		(projectState != "ready" && (base != "create_project" || (projectState != "provisioning" && projectState != "error"))) ||
-		(branchState != "ready" && (base == "create_endpoint" || (branchState != "creating" && branchState != "error"))) {
+		(branchState != "ready" && (base == "create_endpoint" || action == dsgaResumeAction || (branchState != "creating" && branchState != "error"))) {
 		return errDSGACreationIdentity
 	}
 	if base == "create_branch" && binding.intent.EndpointID == "" {
@@ -118,7 +121,14 @@ func (binding *dsgaCreationBinding) lockOperationTx(ctx context.Context, tx pgx.
 	if err != nil {
 		return err
 	}
-	if endpointBranch != binding.intent.BranchID || (endpointState != "provisioning" && endpointState != "active" && endpointState != "error") {
+	if endpointBranch != binding.intent.BranchID {
+		return errDSGACreationIdentity
+	}
+	if action == dsgaResumeAction {
+		if endpointState != "suspended" {
+			return errDSGACreationIdentity
+		}
+	} else if endpointState != "provisioning" && endpointState != "active" && endpointState != "error" {
 		return errDSGACreationIdentity
 	}
 	return nil
@@ -151,6 +161,7 @@ func (s *server) loadDSGACreationBinding(ctx context.Context, operationID, worke
 	// 首次读取本身不授予创建权；两次读取间的改写、换主和父生命周期变化都要拒绝。
 	if len(payload) > 1<<20 || json.Unmarshal(payload, &intent) != nil || dsgaCreationBaseAction(action) == "" || intent.ProjectID == "" || intent.BranchID == "" ||
 		(intent.EndpointID == "" && action != "create_branch_dsga_v1") ||
+		(action == dsgaResumeAction && dsgapi.ValidateID(intent.ResumeFrom, "suspension Operation") != nil) || (action != dsgaResumeAction && intent.ResumeFrom != "") ||
 		intent.Creation.ProtocolVersion != 1 || !dsgaSupportedPostgresVersion(intent.Creation.PostgresVersion) || intent.Creation.Namespace != s.kube.namespace ||
 		dsgapi.ValidateIncarnation(intent.Creation.Incarnation) != nil || dsgapi.ValidateID(intent.Creation.ComputeInstanceID, "Compute") != nil {
 		return nil, errDSGACreationIdentity
