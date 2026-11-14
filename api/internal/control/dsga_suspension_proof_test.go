@@ -190,6 +190,9 @@ func TestDSGASuspensionIntentPinsBootAndHostAcrossWorkerRetry(t *testing.T) {
 	if err := tx.Commit(ctx); err != nil {
 		t.Fatal(err)
 	}
+	t.Run("auth-disable-on-settled-suspension", func(t *testing.T) {
+		testSuspendedDSGAAuthAdmission(t, ctx, b)
+	})
 	t.Run("public-resume-and-next-generation", func(t *testing.T) {
 		testDSGAResumeGeneration(t, ctx, b, fact, original)
 	})

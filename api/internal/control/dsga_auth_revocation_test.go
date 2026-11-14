@@ -1,9 +1,48 @@
 package control
 
 import (
+	"context"
 	"errors"
 	"testing"
+
+	"github.com/jackc/pgx/v5/pgconn"
 )
+
+func testSuspendedDSGAAuthAdmission(t *testing.T, ctx context.Context, b *dsgaCreationBinding) {
+	t.Helper()
+	tx, err := b.server.db.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer tx.Rollback(ctx)
+	p := b.intent.createPayload
+	if _, err = tx.Exec(ctx, `INSERT INTO managed_auth_instances(branch_id,project_id,endpoint_id,generation,state,spec,secret_ref)
+ VALUES($1,$2,$3,8,'disabling','{"database":"neondb"}','auth-previous')`, p.BranchID, p.ProjectID, p.EndpointID); err != nil {
+		t.Fatal(err)
+	}
+	const query = `INSERT INTO operations(id,project_id,resource_type,resource_id,action,state,actor_id,request_id,payload)
+ VALUES($1,$2,'managed_auth',$3,$4,'queued','auth-fixture','auth-fixture',
+ jsonb_build_object('project_id',$2::text,'branch_id',$3::text,'endpoint_id',$5::text,'generation',$6::int,
+ 'secret_ref','auth-previous','spec','{"database":"neondb"}'::jsonb))`
+	for _, tc := range []struct {
+		action     string
+		generation int
+	}{{"enable_managed_auth", 8}, {"disable_managed_auth", 7}} {
+		attempt, err := tx.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = attempt.Exec(ctx, query, "auth-negative", p.ProjectID, p.BranchID, tc.action, p.EndpointID, tc.generation)
+		_ = attempt.Rollback(ctx)
+		var denied *pgconn.PgError
+		if !errors.As(err, &denied) || denied.Code != "23514" {
+			t.Fatalf("unexpected admission for %s at generation %d: %v", tc.action, tc.generation, err)
+		}
+	}
+	if _, err = tx.Exec(ctx, query, "auth-suspended-original", p.ProjectID, p.BranchID, "disable_managed_auth", p.EndpointID, 8); err != nil {
+		t.Fatal(err)
+	}
+}
 
 func TestDSGAAuthRevocationReadsOnlyExactRetainedWriter(t *testing.T) {
 	ctx, binding, _ := dsgaSuspensionAdmissionFixture(t)
