@@ -6,12 +6,20 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
 var errDSGASuspensionVersion = errors.New("suspension endpoint version changed")
+var errDSGAIdleSuspensionIneligible = errors.New("DSGA idle suspension is no longer eligible")
+
+const dsgaIdleActor = "system:idle-controller"
+
+func dsgaAutoSuspensionEnabled() bool {
+	return os.Getenv("NEON_DSGA_AUTO_SUSPENSION_ENABLED") == "true" && creationEnabled()
+}
 
 func (s *server) suspendDSGAEndpoint(w http.ResponseWriter, r *http.Request) {
 	if os.Getenv("NEON_DSGA_SUSPENSION_ENABLED") != "true" || !creationEnabled() || len(s.idempotencyKey) < 32 {
@@ -37,7 +45,7 @@ func (s *server) suspendDSGAEndpoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	actor := userFrom(r).ID
-	id, err := s.queueDSGASuspension(ctx, project, endpoint, version, actor, requestID(r), keyHash(key), hash)
+	id, err := s.queueDSGASuspension(ctx, project, endpoint, version, actor, requestID(r), keyHash(key), hash, nil)
 	if err != nil {
 		// The concurrent winner may have advanced the endpoint version before
 		// this request acquired the parent locks. Check its key after rollback.
@@ -62,7 +70,10 @@ func (s *server) suspendDSGAEndpoint(w http.ResponseWriter, r *http.Request) {
 	s.acceptCreate(w, r, project, endpoint, id, "endpoint")
 }
 
-func (s *server) queueDSGASuspension(ctx context.Context, project, endpoint string, version int64, actor, request, key, hash string) (string, error) {
+func (s *server) queueDSGASuspension(ctx context.Context, project, endpoint string, version int64, actor, request, key, hash string, idle *dsgaIdleCandidate) (string, error) {
+	if idle != nil && (!dsgaAutoSuspensionEnabled() || actor != dsgaIdleActor || idle.vmUID == "" || idle.window < 60 || idle.window > 3600) {
+		return "", errDSGAIdleSuspensionIneligible
+	}
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
 		return "", err
@@ -75,8 +86,18 @@ func (s *server) queueDSGASuspension(ctx context.Context, project, endpoint stri
 		endpoint, project).Scan(&p.BranchID, &org); err != nil {
 		return "", err
 	}
-	if _, _, _, err = lockDSGAEndpointAuthority(ctx, tx, org, project, actor); err != nil {
-		return "", err
+	if idle == nil {
+		if _, _, _, err = lockDSGAEndpointAuthority(ctx, tx, org, project, actor); err != nil {
+			return "", err
+		}
+	} else {
+		var active bool
+		if err = tx.QueryRow(ctx, "SELECT state='active' FROM organizations WHERE id=$1 FOR NO KEY UPDATE", org).Scan(&active); err != nil {
+			return "", err
+		}
+		if !active {
+			return "", errDSGAIdleSuspensionIneligible
+		}
 	}
 	scope := createPayload{ProjectID: project, BranchID: p.BranchID, EndpointID: endpoint}
 	if err = lockDSGAProjectParents(ctx, tx, scope); err != nil {
@@ -84,8 +105,13 @@ func (s *server) queueDSGASuspension(ctx context.Context, project, endpoint stri
 	}
 	var endpointReady bool
 	var current int64
-	err = tx.QueryRow(ctx, `SELECT workload_kind='neonvm' AND state='active' AND workload_name=$3,version
- FROM endpoints WHERE project_id=$1 AND id=$2`, project, endpoint, kubeName(endpoint)).Scan(&endpointReady, &current)
+	var scaleToZero bool
+	var idleSeconds int
+	var updated time.Time
+	err = tx.QueryRow(ctx, `SELECT e.workload_kind='neonvm' AND e.state='active' AND e.workload_name=$3
+ AND p.state='ready' AND p.source='managed',e.version,e.scale_to_zero,e.idle_timeout_seconds,e.updated_at
+ FROM endpoints e JOIN projects p ON p.id=e.project_id WHERE e.project_id=$1 AND e.id=$2`,
+		project, endpoint, kubeName(endpoint)).Scan(&endpointReady, &current, &scaleToZero, &idleSeconds, &updated)
 	if err != nil {
 		return "", err
 	}
@@ -126,6 +152,18 @@ func (s *server) queueDSGASuspension(ctx context.Context, project, endpoint stri
 	if err != nil {
 		return "", err
 	}
+	if idle != nil {
+		if !scaleToZero || idleSeconds != idle.window || p.VMUID != idle.vmUID {
+			return "", errDSGAIdleSuspensionIneligible
+		}
+		ok, err := dsgaIdleEligible(ctx, tx, endpoint, p.VMUID, updated, idleSeconds)
+		if err != nil {
+			return "", err
+		}
+		if !ok {
+			return "", errDSGAIdleSuspensionIneligible
+		}
+	}
 	id := newID("op_")
 	payload, err := json.Marshal(p)
 	if err != nil {
@@ -140,9 +178,11 @@ func (s *server) queueDSGASuspension(ctx context.Context, project, endpoint stri
 			return "", err
 		}
 	}
-	if _, err = tx.Exec(ctx, `INSERT INTO idempotency_keys(actor_id,key_hash,request_hash,operation_id) VALUES($1,$2,$3,$4)`,
-		actor, key, hash, id); err != nil {
-		return "", err
+	if idle == nil {
+		if _, err = tx.Exec(ctx, `INSERT INTO idempotency_keys(actor_id,key_hash,request_hash,operation_id) VALUES($1,$2,$3,$4)`,
+			actor, key, hash, id); err != nil {
+			return "", err
+		}
 	}
 	return id, tx.Commit(ctx)
 }

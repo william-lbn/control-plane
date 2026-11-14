@@ -106,6 +106,10 @@
 - {name: NEON_V2_CREATE_ENABLED, value: {{ .Values.api.creationEnabled | quote }}}
 - {name: NEON_V2_PITR_ENABLED, value: {{ .Values.api.pitrEnabled | quote }}}
 - {name: NEON_V2_SCALE_ZERO_ENABLED, value: {{ .Values.api.scaleToZeroEnabled | quote }}}
+{{- if and .Values.dsga.autoSuspensionEnabled (not .Values.dsga.suspensionEnabled) }}
+{{- fail "dsga.autoSuspensionEnabled requires dsga.suspensionEnabled" }}
+{{- end }}
+- {name: NEON_DSGA_AUTO_SUSPENSION_ENABLED, value: {{ .Values.dsga.autoSuspensionEnabled | quote }}}
 - {name: NEON_COOKIE_SECURE, value: {{ .Values.api.cookieSecure | quote }}}
 - {name: NEON_PROXY_HOST, value: {{ .Values.api.proxyHost | quote }}}
 - {name: NEON_PROXY_PORT, value: {{ .Values.api.proxyPort | quote }}}

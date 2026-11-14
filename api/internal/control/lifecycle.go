@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"time"
 )
 
@@ -20,7 +21,11 @@ type suspendPayload struct {
 var errDSGALifecycleDriverRequired = errors.New("DSGA endpoint requires a versioned suspension driver")
 
 const dsgaEndpointLifecycleQuery = `SELECT EXISTS(SELECT 1 FROM operations WHERE project_id=$1 AND payload->>'endpoint_id'=$2
- AND action IN ('create_project_dsga_v1','create_branch_dsga_v1','create_endpoint_dsga_v1'))`
+ AND action IN ('create_project_dsga_v1','create_branch_dsga_v1','create_endpoint_dsga_v1','resume_endpoint_dsga_v1'))`
+
+const dsgaEndpointLifecycleExists = `EXISTS(SELECT 1 FROM operations o WHERE o.project_id=e.project_id
+ AND o.payload->>'endpoint_id'=e.id AND o.action IN
+ ('create_project_dsga_v1','create_branch_dsga_v1','create_endpoint_dsga_v1','resume_endpoint_dsga_v1'))`
 
 const idleGuardSQL = `SELECT
  (SELECT count(*) FROM pg_stat_activity WHERE pid<>pg_backend_pid()
@@ -332,30 +337,65 @@ func (s *server) endpointLifecycle(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 422, "invalid_lifecycle", "idle_timeout_seconds must be 60-3600")
 		return
 	}
-	if body.ScaleToZero {
-		var managed bool
-		if err := s.db.QueryRow(r.Context(), dsgaEndpointLifecycleQuery, r.PathValue("project"), r.PathValue("endpoint")).Scan(&managed); err != nil {
-			fail(w, r, 503, "metadata_unavailable", "Could not confirm endpoint lifecycle driver")
-			return
-		}
-		if managed {
-			fail(w, r, 409, "dsga_lifecycle_not_available", "This Compute requires the DSGA suspension driver")
-			return
-		}
+	project, endpoint := r.PathValue("project"), r.PathValue("endpoint")
+	var managed bool
+	if err := s.db.QueryRow(r.Context(), dsgaEndpointLifecycleQuery, project, endpoint).Scan(&managed); err != nil {
+		fail(w, r, 503, "metadata_unavailable", "Could not confirm endpoint lifecycle driver")
+		return
+	}
+	if body.ScaleToZero && managed && !dsgaAutoSuspensionEnabled() {
+		fail(w, r, 409, "dsga_lifecycle_not_available", "Automatic DSGA suspension is unavailable")
+		return
 	}
 	if r.Header.Get("If-Match") != fmt.Sprintf("\"%v\"", item["version"]) {
 		fail(w, r, 412, "version_mismatch", "Reload endpoint before editing")
 		return
 	}
-	tag, err := s.db.Exec(r.Context(), `UPDATE endpoints SET scale_to_zero=$3,idle_timeout_seconds=$4,
+	ctx := r.Context()
+	tx, err := s.db.Begin(ctx)
+	if err != nil {
+		fail(w, r, 503, "metadata_unavailable", "Could not update lifecycle")
+		return
+	}
+	defer tx.Rollback(ctx)
+	if managed {
+		// Share the endpoint row lock with manual and automatic admission so a
+		// policy edit is ordered before selection or rejected once selected.
+		var version int64
+		if err := tx.QueryRow(ctx, "SELECT version FROM endpoints WHERE id=$1 AND project_id=$2 FOR UPDATE",
+			endpoint, project).Scan(&version); err != nil {
+			fail(w, r, 503, "metadata_unavailable", "Could not confirm current lifecycle policy")
+			return
+		}
+		if r.Header.Get("If-Match") != fmt.Sprintf("\"%d\"", version) {
+			fail(w, r, 412, "version_mismatch", "Reload endpoint before editing")
+			return
+		}
+		var selected bool
+		if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM operations WHERE project_id=$1 AND resource_id=$2 AND action=$3
+ AND (state IN ('queued','running','retry_wait') OR (state='failed' AND retryable)))`,
+			project, endpoint, dsgaSuspendAction).Scan(&selected); err != nil {
+			fail(w, r, 503, "metadata_unavailable", "Could not confirm selected suspension")
+			return
+		}
+		if selected {
+			fail(w, r, 409, "operation_conflict", "Finish the selected suspension before editing lifecycle")
+			return
+		}
+	}
+	tag, err := tx.Exec(ctx, `UPDATE endpoints SET scale_to_zero=$3,idle_timeout_seconds=$4,
 		version=version+1,updated_at=now() WHERE id=$1 AND project_id=$2 AND version=$5 AND state='active' AND deleted_at IS NULL`,
-		r.PathValue("endpoint"), r.PathValue("project"), body.ScaleToZero, body.IdleTimeoutSeconds, item["version"])
+		endpoint, project, body.ScaleToZero, body.IdleTimeoutSeconds, item["version"])
 	if err != nil {
 		fail(w, r, 503, "metadata_unavailable", "Could not update lifecycle")
 		return
 	}
 	if tag.RowsAffected() != 1 {
 		fail(w, r, 412, "version_mismatch", "Reload endpoint before editing")
+		return
+	}
+	if err := tx.Commit(ctx); err != nil {
+		fail(w, r, 503, "metadata_unavailable", "Could not update lifecycle")
 		return
 	}
 	s.audit(r.Context(), userFrom(r).ID, "update_lifecycle", "endpoint", r.PathValue("endpoint"), "succeeded", requestID(r))
@@ -371,15 +411,20 @@ func (s *server) runIdleController(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			items, err := s.many(ctx, `SELECT e.id,e.project_id,e.workload_name,e.idle_timeout_seconds FROM endpoints e
+			items, err := s.many(ctx, `SELECT e.id,e.project_id,e.workload_name,e.idle_timeout_seconds,e.version,
+				`+dsgaEndpointLifecycleExists+` AS dsga FROM endpoints e
 				WHERE e.scale_to_zero AND e.state='active' AND e.workload_kind='neonvm' AND e.deleted_at IS NULL
-				AND NOT EXISTS(SELECT 1 FROM operations o WHERE o.project_id=e.project_id AND o.payload->>'endpoint_id'=e.id AND o.action IN
-				 ('create_project_dsga_v1','create_branch_dsga_v1','create_endpoint_dsga_v1'))`)
+				AND NOT EXISTS(SELECT 1 FROM operations o WHERE o.resource_type='endpoint' AND o.resource_id=e.id
+				 AND o.state IN ('queued','running','retry_wait'))`)
 			if err != nil {
 				s.logger.Error("idle candidates", "error", err)
 				continue
 			}
 			for _, item := range items {
+				managed := item["dsga"] == true
+				if managed && !dsgaAutoSuspensionEnabled() || !managed && os.Getenv("NEON_V2_SCALE_ZERO_ENABLED") != "true" {
+					continue
+				}
 				endpointID := stringVal(item["id"])
 				runtime := s.kube.runtime(ctx, "neonvm", stringVal(item["workload_name"]))
 				if runtime["observed_state"] != "active" {
@@ -387,6 +432,14 @@ func (s *server) runIdleController(ctx context.Context) {
 				}
 				seconds, ok := item["idle_timeout_seconds"].(int32)
 				if !ok {
+					continue
+				}
+				if managed {
+					version, ok := item["version"].(int64)
+					if ok {
+						s.queueIdleDSGA(ctx, stringVal(item["project_id"]), endpointID, version,
+							dsgaIdleCandidate{vmUID: stringVal(runtime["workload_uid"]), window: int(seconds)})
+					}
 					continue
 				}
 				born, parseErr := time.Parse(time.RFC3339Nano, stringVal(runtime["workload_created_at"]))
@@ -398,10 +451,23 @@ func (s *server) runIdleController(ctx context.Context) {
 					continue
 				}
 				p := suspendPayload{ProjectID: stringVal(item["project_id"]), EndpointID: endpointID, WorkloadName: stringVal(item["workload_name"]), ExpectedVMUID: stringVal(runtime["workload_uid"])}
-				if _, err = s.queueSuspend(ctx, p, "system:idle-controller", newID("req_")); err != nil {
+				if _, err = s.queueSuspend(ctx, p, dsgaIdleActor, newID("req_")); err != nil {
 					s.logger.Warn("idle suspend enqueue", "endpoint_id", endpointID, "error_type", fmt.Sprintf("%T", err))
 				}
 			}
 		}
 	}
+}
+
+func (s *server) queueIdleDSGA(ctx context.Context, project, endpoint string, version int64, idle dsgaIdleCandidate) {
+	op, err := s.queueDSGASuspension(ctx, project, endpoint, version, dsgaIdleActor, newID("req_"), "", "", &idle)
+	if errors.Is(err, errDSGAIdleSuspensionIneligible) || errors.Is(err, errDSGASuspensionVersion) ||
+		errors.Is(err, errDSGACreationConflict) || dsgaSuspensionAdmissionConflict(err) {
+		return
+	}
+	if err != nil {
+		s.logger.Warn("DSGA idle suspend enqueue", "endpoint_id", endpoint, "error_type", fmt.Sprintf("%T", err))
+		return
+	}
+	s.logger.Info("DSGA idle suspension queued", "endpoint_id", endpoint, "operation", op)
 }

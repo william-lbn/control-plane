@@ -959,6 +959,9 @@
         "suspensionEnabled": {
           "type": "boolean"
         },
+        "autoSuspensionEnabled": {
+          "type": "boolean"
+        },
         "runtimeCatalogSecret": {
           "type": "string",
           "maxLength": 253,

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/neondatabase/autoscaling/pkg/dsga/runtimeselection"
 )
@@ -33,6 +35,74 @@ func dsgaSuspensionAdmissionFixture(t *testing.T) (context.Context, *dsgaCreatio
 		}
 	}
 	return ctx, b, fact
+}
+
+func TestDSGAAutomaticSuspensionBindsSamplesAndCurrentPolicy(t *testing.T) {
+	ctx, b, fact := dsgaSuspensionAdmissionFixture(t)
+	s := b.server
+	project, endpoint := b.intent.ProjectID, b.intent.EndpointID
+	vm := fact.Observed.Instance.VMUID
+	t.Setenv("NEON_V2_CREATE_ENABLED", "true")
+	t.Setenv("NEON_DSGA_AUTO_SUSPENSION_ENABLED", "true")
+	eligible := dsgaIdleCandidate{vmUID: vm, window: 60}
+	queue := func(version int64, candidate dsgaIdleCandidate) (string, error) {
+		return s.queueDSGASuspension(ctx, project, endpoint, version, dsgaIdleActor, "idle-test", "", "", &candidate)
+	}
+	reject := func(version int64, candidate dsgaIdleCandidate, reason error) {
+		t.Helper()
+		if id, err := queue(version, candidate); id != "" || !errors.Is(err, reason) {
+			t.Fatalf("unexpected idle admission: %s %v", id, err)
+		}
+	}
+	var now time.Time
+	if err := s.db.QueryRow(ctx, "SELECT clock_timestamp()").Scan(&now); err != nil {
+		t.Fatal(err)
+	}
+	setPolicy := func(enabled bool, updated time.Time) {
+		t.Helper()
+		if _, err := s.db.Exec(ctx, `UPDATE endpoints SET scale_to_zero=$2,idle_timeout_seconds=60,updated_at=$3 WHERE id=$1`,
+			endpoint, enabled, updated); err != nil {
+			t.Fatal(err)
+		}
+	}
+	put := func(at, boot time.Time, uid string, count int, sessions int64) {
+		t.Helper()
+		if _, err := s.db.Exec(ctx, `INSERT INTO metric_samples(endpoint_id,sampled_at,observed_state,connections,dsga_vm_uid,dsga_pg_started_at,dsga_pg_sessions)
+ VALUES($1,$2,'active',$3,$4,$5,$6)`, endpoint, at, count, uid, boot, sessions); err != nil {
+			t.Fatal(err)
+		}
+	}
+	boot := now.Add(-time.Hour)
+	put(now.Add(-95*time.Second), boot, vm, 0, 100)
+	put(now.Add(-65*time.Second), boot, vm, 0, 101)
+	put(now.Add(-35*time.Second), boot, vm, 0, 104)
+	put(now.Add(-5*time.Second), boot, vm, 0, 105)
+	setPolicy(false, now.Add(-2*time.Minute))
+	reject(1, eligible, errDSGAIdleSuspensionIneligible)
+	setPolicy(true, now.Add(-75*time.Second))
+	reject(1, eligible, errDSGAIdleSuspensionIneligible)
+	setPolicy(true, now.Add(-2*time.Minute))
+	reject(1, eligible, errDSGAIdleSuspensionIneligible) // a short connection between probes
+	reject(9, eligible, errDSGASuspensionVersion)
+	reject(1, dsgaIdleCandidate{vmUID: "previous-vm", window: 60}, errDSGAIdleSuspensionIneligible)
+	if _, err := s.db.Exec(ctx, "UPDATE metric_samples SET dsga_pg_sessions=dsga_pg_sessions-2 WHERE sampled_at>$1 AND endpoint_id=$2", now.Add(-40*time.Second), endpoint); err != nil {
+		t.Fatal(err)
+	}
+	put(now.Add(-time.Second), boot.Add(20*time.Minute), vm, 0, 5)
+	reject(1, eligible, errDSGAIdleSuspensionIneligible)
+	if _, err := s.db.Exec(ctx, "DELETE FROM metric_samples WHERE sampled_at>$1 AND endpoint_id=$2", now.Add(-2*time.Second), endpoint); err != nil {
+		t.Fatal(err)
+	}
+	id, err := queue(1, eligible)
+	if err != nil || id == "" {
+		t.Fatalf("current idle window was not accepted: %v", err)
+	}
+	reject(1, eligible, errDSGACreationConflict)
+	var action, actor, selectedVM string
+	if err := s.db.QueryRow(ctx, "SELECT action,actor_id,payload->>'vm_uid' FROM operations WHERE id=$1", id).
+		Scan(&action, &actor, &selectedVM); err != nil || action != dsgaSuspendAction || actor != dsgaIdleActor || selectedVM != vm {
+		t.Fatalf("unexpected suspension Operation: %s %s %s %v", action, actor, selectedVM, err)
+	}
 }
 
 func TestDSGASuspensionAdmissionReplaysOriginalPublicOperation(t *testing.T) {

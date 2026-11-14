@@ -140,6 +140,7 @@ dsga:
   createEnabled: false
   # Enable after the Agent that understands the versioned suspension selection.
   suspensionEnabled: false
+  autoSuspensionEnabled: false
   runtimeCatalogSecret: ''
 
 worker:

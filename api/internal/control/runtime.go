@@ -189,7 +189,7 @@ func (s *server) runLeaderControllers(ctx context.Context, role processRole, sta
 			start(s.runFunctionTriggerDispatcher)
 		}
 	}
-	if os.Getenv("NEON_V2_SCALE_ZERO_ENABLED") == "true" {
+	if os.Getenv("NEON_V2_SCALE_ZERO_ENABLED") == "true" || dsgaAutoSuspensionEnabled() {
 		start(s.runIdleController)
 	}
 	state.leading.Store(true)
