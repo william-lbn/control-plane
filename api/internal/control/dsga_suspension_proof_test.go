@@ -199,6 +199,23 @@ func testDSGASuspensionIntentPinsBootAndHostAcrossWorkerRetry(t *testing.T, init
 	if err := tx.Commit(ctx); err != nil {
 		t.Fatal(err)
 	}
+	t.Run("retained-deletion-source", func(t *testing.T) {
+		scope := endpointDeletionPayload{ProjectID: p.ProjectID, BranchID: p.BranchID, EndpointID: p.EndpointID}
+		got, err := readSuspendedEndpointDeletionSource(ctx, b.server.db, scope)
+		if err != nil || got.dsgaResumeSource != original || got.Namespace != binding.Namespace ||
+			got.Intent.RunnerUID != first.RunnerUID || got.Intent.RunnerName != first.RunnerName ||
+			got.Intent.Host != first.Host {
+			t.Fatalf("deletion did not freeze settled compute: %v", err)
+		}
+		scope.SuspensionOperationID = id
+		if replay, err := readSuspendedEndpointDeletionSource(ctx, b.server.db, scope); err != nil || replay.dsgaResumeSource != original {
+			t.Fatalf("deletion did not replay frozen suspension: %v", err)
+		}
+		scope.SuspensionOperationID = "different-suspension"
+		if _, err := readSuspendedEndpointDeletionSource(ctx, b.server.db, scope); err == nil {
+			t.Fatal("deletion accepted a different suspension")
+		}
+	})
 	t.Run("auth-disable-on-settled-suspension", func(t *testing.T) {
 		testSuspendedDSGAServiceAdmission(t, ctx, b)
 	})

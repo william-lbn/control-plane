@@ -393,6 +393,10 @@ func (k *kubeClient) setDeletionRoutes(ctx context.Context, p deletionPayload, o
 // failed creation was verified by the endpoint retirement Driver. Normal and
 // recovery callers retain the strict existing-route contract.
 func (k *kubeClient) setDeletionRoutesAllowUnpublished(ctx context.Context, p deletionPayload, operationID string, recovering bool, unpublished map[string]bool) error {
+	return k.setDeletionRoutesWithProof(ctx, p, operationID, recovering, unpublished, nil)
+}
+
+func (k *kubeClient) setDeletionRoutesWithProof(ctx context.Context, p deletionPayload, operationID string, recovering bool, unpublished map[string]bool, verify func(map[string]any, string) error) error {
 	if recovering && len(unpublished) != 0 {
 		return errors.New("recovery cannot omit retained routes")
 	}
@@ -441,6 +445,11 @@ func (k *kubeClient) setDeletionRoutesAllowUnpublished(ctx context.Context, p de
 			prior := stringVal(route["deletion_operation_id"])
 			if prior != "" && prior != expected {
 				return errors.New("deletion route generation changed")
+			}
+			if verify != nil {
+				if err := verify(route, operationID); err != nil {
+					return err
+				}
 			}
 			if recovering {
 				if prior == "" && route["recovery_operation_id"] == operationID {

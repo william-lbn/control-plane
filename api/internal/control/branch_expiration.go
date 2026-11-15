@@ -372,7 +372,7 @@ func (s *server) reconcileBranchExpiration(ctx context.Context, id, worker strin
 		},
 		func(ctx context.Context) error {
 			for _, endpoint := range p.EndpointIDs {
-				if err := s.retireExpiredEndpointService(ctx, p.ProjectID, endpoint, p.ExpectedServiceUIDs[endpoint]); err != nil {
+				if err := s.retireBoundEndpointService(ctx, p.ProjectID, endpoint, p.ExpectedServiceUIDs[endpoint]); err != nil {
 					return err
 				}
 			}
@@ -388,7 +388,7 @@ func (s *server) reconcileBranchExpiration(ctx context.Context, id, worker strin
 	return nil
 }
 
-func (s *server) retireExpiredEndpointService(ctx context.Context, project, endpoint, uid string) error {
+func (s *server) retireBoundEndpointService(ctx context.Context, project, endpoint, uid string) error {
 	path := s.kube.path("service", kubeName(endpoint))
 	scope := endpointDeletionPayload{ProjectID: project, EndpointID: endpoint}
 	for {
@@ -400,7 +400,7 @@ func (s *server) retireExpiredEndpointService(ctx context.Context, project, endp
 			return err
 		}
 		if !failedEndpointServiceOwned(value, scope) || nested(value, "metadata", "uid") != uid {
-			return errors.New("expiration Service identity changed")
+			return errors.New("retained Service identity changed")
 		}
 		if nested(value, "metadata", "deletionTimestamp") == nil {
 			_, err = s.kube.request(ctx, http.MethodDelete, path, record{"apiVersion": "v1", "kind": "DeleteOptions", "preconditions": record{"uid": uid, "resourceVersion": nested(value, "metadata", "resourceVersion")}})

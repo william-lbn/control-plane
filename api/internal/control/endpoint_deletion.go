@@ -18,6 +18,7 @@ type endpointDeletionPayload struct {
 	BranchID                string `json:"branch_id"`
 	EndpointID              string `json:"endpoint_id"`
 	FailedCreateOperationID string `json:"failed_create_operation_id,omitempty"`
+	SuspensionOperationID   string `json:"suspension_operation_id,omitempty"`
 }
 
 type failedEndpointCreationReader interface {
@@ -99,8 +100,8 @@ func (s *server) deleteEndpoint(w http.ResponseWriter, r *http.Request) {
 	var selector, workload string
 	var current int64
 	err = tx.QueryRow(r.Context(), `SELECT selector,state,workload_kind,version FROM endpoints WHERE id=$1 AND project_id=$2 AND branch_id=$3 AND deleted_at IS NULL FOR UPDATE`, p.EndpointID, p.ProjectID, p.BranchID).Scan(&selector, &state, &workload, &current)
-	if err != nil || (state != "active" && state != "error") || workload != "neonvm" {
-		fail(w, r, 409, "compute_not_ready", "Ready Compute or verified failed independent creation required")
+	if err != nil || (state != "active" && state != "error" && state != "suspended") || workload != "neonvm" {
+		fail(w, r, 409, "compute_not_ready", "Ready or verified suspended Compute or failed independent creation required")
 		return
 	}
 	if current != version {
@@ -152,6 +153,18 @@ func (s *server) deleteEndpoint(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 409, "endpoint_has_services", "Retire dependent Data API, Auth, Object Storage and Functions before deleting their endpoint")
 		return
 	}
+	if state == "suspended" {
+		source, err := readSuspendedEndpointDeletionSource(r.Context(), tx, p)
+		if errors.Is(err, pgx.ErrNoRows) || errors.Is(err, errDSGACreationIdentity) {
+			fail(w, r, 409, "suspension_not_settled", "The current Compute suspension and any failed resume must be settled")
+			return
+		}
+		if err != nil {
+			fail(w, r, 503, "metadata_unavailable", "Could not verify the Compute suspension")
+			return
+		}
+		p.SuspensionOperationID = source.Operation
+	}
 	op := newID("op_")
 	action := "delete_endpoint"
 	if p.FailedCreateOperationID != "" {
@@ -160,7 +173,7 @@ func (s *server) deleteEndpoint(w http.ResponseWriter, r *http.Request) {
 	raw, _ := json.Marshal(p)
 	_, err = tx.Exec(r.Context(), `INSERT INTO operations(id,project_id,resource_type,resource_id,action,state,actor_id,request_id,payload) VALUES($1,$2,'endpoint',$3,$4,'queued',$5,$6,$7)`, op, p.ProjectID, p.EndpointID, action, userFrom(r).ID, requestID(r), raw)
 	names := []string{"close_endpoint_proxy_admission", "retire_owned_endpoint_compute", "observe_endpoint_runners_gone"}
-	if p.FailedCreateOperationID != "" {
+	if p.FailedCreateOperationID != "" || p.SuspensionOperationID != "" {
 		names = append(names, "retire_owned_endpoint_service")
 	}
 	names = append(names, "persist_endpoint_tombstone")
@@ -203,6 +216,16 @@ func (s *server) reconcileEndpointDeletion(ctx context.Context, id, worker strin
 			return err
 		}
 	}
+	var suspended suspendedEndpointDeletionSource
+	if p.SuspensionOperationID != "" {
+		if p.FailedCreateOperationID != "" {
+			return errDSGACreationIdentity
+		}
+		suspended, err = readSuspendedEndpointDeletionSource(ctx, s.db, p)
+		if err != nil {
+			return err
+		}
+	}
 	scope := deletionPayload{ProjectID: p.ProjectID, BranchIDs: []string{p.BranchID}, EndpointIDs: []string{p.EndpointID}}
 	type retirementStep struct {
 		name string
@@ -213,11 +236,20 @@ func (s *server) reconcileEndpointDeletion(ctx context.Context, id, worker strin
 			if p.FailedCreateOperationID != "" {
 				return s.kube.setDeletionRoutesAllowUnpublished(ctx, scope, id, false, map[string]bool{selector(p.EndpointID): true})
 			}
+			if p.SuspensionOperationID != "" {
+				if err := s.observeSuspendedEndpointDeletion(ctx, suspended); err != nil {
+					return err
+				}
+				return s.kube.setDeletionRoutesWithProof(ctx, scope, id, false, nil, suspended.verifyRoute)
+			}
 			return s.kube.setDeletionRoutes(ctx, scope, id, false)
 		}},
 		{"retire_owned_endpoint_compute", func(ctx context.Context) error {
 			if p.FailedCreateOperationID != "" {
 				return s.retireFailedEndpointCompute(ctx, id, worker, p, scope)
+			}
+			if p.SuspensionOperationID != "" {
+				return s.observeSuspendedEndpointDeletion(ctx, suspended)
 			}
 			return s.retireDeletedCompute(ctx, scope)
 		}},
@@ -226,6 +258,10 @@ func (s *server) reconcileEndpointDeletion(ctx context.Context, id, worker strin
 	if p.FailedCreateOperationID != "" {
 		steps = append(steps, retirementStep{"retire_owned_endpoint_service", func(ctx context.Context) error {
 			return s.retireFailedEndpointService(ctx, id, worker, p)
+		}})
+	} else if p.SuspensionOperationID != "" {
+		steps = append(steps, retirementStep{"retire_owned_endpoint_service", func(ctx context.Context) error {
+			return s.retireBoundEndpointService(ctx, p.ProjectID, p.EndpointID, suspended.ServiceUID)
 		}})
 	}
 	steps = append(steps, retirementStep{"persist_endpoint_tombstone", func(ctx context.Context) error { return s.commitEndpointDeletion(ctx, id, worker, p) }})

@@ -53,10 +53,15 @@ sequenceDiagram
   W->>K: Start new VM and publish new Selector
 ```
 
-Metadata 状态 `active → deleting → deleted`。`active` Endpoint 的 VM 可处于休眠。
+Metadata 从 `active` 或已结算的 DSGA `suspended` 进入 `deleting → deleted`。`active` Endpoint 的 VM 可处于休眠。
 API 受理事务关闭新控制请求；Worker 第一阶段关闭 SQL Proxy 路由。删除允许中断
 原地址上的现有 SQL 连接，调用方须先停止应用访问。不能将此流程描述成已经通过
 跨实例外部连接栅栏、HA 或磁盘延迟 SLO。
+
+已暂停的 DSGA Compute 绑定当前成功的原暂停 Operation。若仍有待结算的唤醒，
+返回 `suspension_not_settled`。Worker 从原暂停、VM 和 Runner 身份复核 Host 结算，
+确认原 VM、Runner 和 Owner Lease 已退出，随后通过原 VM、配置与 Service 绑定关闭
+对应 Proxy 路由。原 Service 若仍存在则按原 UID 退役。分支及其存储继续保留。
 
 ## 3. API 与模型合同
 
