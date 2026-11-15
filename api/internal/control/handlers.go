@@ -338,6 +338,7 @@ func (s *server) routes() *http.ServeMux {
 	// of Console cookies. The handler validates methods and branch ownership.
 	mux.HandleFunc("/data/v1/{dataBranch}/{rest...}", s.dataAPIRelay)
 	mux.HandleFunc("/auth/v1/{authBranch}/{rest...}", s.managedAuthRelay)
+	mux.HandleFunc("GET /realtime/v1/{rtBranch}/queries/{rtQuery}", s.realtimeStream)
 	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/roles", s.auth(http.HandlerFunc(s.catalogList), false))
 	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/roles", s.auth(http.HandlerFunc(s.catalogMutation), true))
 	mux.Handle("PATCH /api/v1/projects/{project}/branches/{branch}/roles/{role}", s.auth(http.HandlerFunc(s.catalogMutation), true))

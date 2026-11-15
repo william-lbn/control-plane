@@ -87,12 +87,12 @@ func validateBackendCredentialSpec(spec *backendCredentialSpec, now time.Time) e
 	if len(spec.Name) < 1 || len(spec.Name) > 100 || strings.ContainsAny(spec.Name, "\r\n\x00") {
 		return errors.New("Name must contain 1 to 100 bytes")
 	}
-	if len(spec.Scopes) < 1 || len(spec.Scopes) > 3 {
-		return errors.New("One to three known Backend scopes required")
+	if len(spec.Scopes) < 1 || len(spec.Scopes) > 4 {
+		return errors.New("One to four known Backend scopes required")
 	}
 	scopeSeen := map[string]bool{}
 	for _, scope := range spec.Scopes {
-		if (scope != "ai_gateway:invoke" && scope != "storage:read" && scope != "storage:write") || scopeSeen[scope] {
+		if (scope != "ai_gateway:invoke" && scope != "storage:read" && scope != "storage:write" && scope != subscribeRealtime) || scopeSeen[scope] {
 			return errors.New("Unknown or duplicate Backend scope")
 		}
 		scopeSeen[scope] = true
@@ -398,13 +398,14 @@ func (s *server) verifyBackendCredential(ctx context.Context, token, target, sco
 	id := "bcr_" + token[4:28]
 	var hash, version, orgRole, grant string
 	var permitted bool
+	var generation int64
 	var scopes, models []string
 	var expiry time.Time
 	err := s.db.QueryRow(ctx, `WITH RECURSIVE lineage AS (
       SELECT id,project_id,parent_branch_id,ARRAY[id] AS seen FROM branches WHERE id=$2 AND deleted_at IS NULL AND state='ready'
       UNION ALL SELECT b.id,b.project_id,b.parent_branch_id,l.seen||b.id FROM branches b JOIN lineage l ON b.id=l.parent_branch_id
       WHERE b.project_id=l.project_id AND b.deleted_at IS NULL AND b.state='ready' AND NOT b.id=ANY(l.seen) AND cardinality(l.seen)<128
-    ) SELECT c.token_hash,c.pepper_version,m.role,COALESCE(g.role,''),c.scopes,c.allowed_models,c.expires_at,
+    ) SELECT c.token_hash,c.pepper_version,m.role,COALESCE(g.role,''),c.scopes,c.allowed_models,c.expires_at,c.generation,
       EXISTS(SELECT 1 FROM lineage l WHERE l.id=c.branch_id AND l.project_id=c.project_id AND (c.branch_scope='self_and_descendants' OR c.branch_id=$2))
       FROM backend_credentials c JOIN users u ON u.id=c.issuer_id AND NOT u.disabled
       JOIN projects p ON p.id=c.project_id AND p.org_id=c.org_id AND p.deleted_at IS NULL AND p.state='ready'
@@ -412,7 +413,8 @@ func (s *server) verifyBackendCredential(ctx context.Context, token, target, sco
       JOIN branches root ON root.id=c.branch_id AND root.project_id=c.project_id AND root.deleted_at IS NULL AND root.state='ready'
       JOIN organization_members m ON m.org_id=c.org_id AND m.user_id=c.issuer_id
       LEFT JOIN project_grants g ON g.project_id=c.project_id AND g.user_id=c.issuer_id
-      WHERE c.id=$1 AND c.revoked_at IS NULL AND c.expires_at>now()`, id, target).Scan(&hash, &version, &orgRole, &grant, &scopes, &models, &expiry, &permitted)
+      WHERE c.id=$1 AND c.revoked_at IS NULL AND c.expires_at>now()`, id, target).
+		Scan(&hash, &version, &orgRole, &grant, &scopes, &models, &expiry, &generation, &permitted)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, errBackendCredentialInvalid
 	}
@@ -440,7 +442,8 @@ func (s *server) verifyBackendCredential(ctx context.Context, token, target, sco
 	if !permitted || effectivePermission(orgRole, grant) < 2 || !hasScope || !hasModel {
 		return nil, errBackendCredentialForbidden
 	}
-	return map[string]any{"valid": true, "credential_id": id, "branch_id": target, "scopes": scopes, "expires_at": expiry, "inference_available": s.aiEnabled()}, nil
+	return map[string]any{"valid": true, "credential_id": id, "branch_id": target, "scopes": scopes, "expires_at": expiry,
+		"generation": generation, "inference_available": s.aiEnabled()}, nil
 }
 
 // A Console-only access check provides a real authentication/lineage probe.

@@ -6,6 +6,8 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
+	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -185,11 +187,11 @@ func TestRealtimeSourceWorker(t *testing.T) {
 	}
 	exec(`CREATE SCHEMA wire_worker_meta;
 CREATE ROLE rt_wire_worker LOGIN REPLICATION;
-CREATE ROLE rt_wire_reader LOGIN;
+CREATE ROLE rtr_555555555555555555555555 LOGIN;
 CREATE TABLE public.rt_worker_events(id integer PRIMARY KEY);
 CREATE TABLE public.rt_worker_private(id integer PRIMARY KEY);
 INSERT INTO public.rt_worker_private VALUES(4);
-GRANT SELECT ON public.rt_worker_events TO rt_wire_reader;
+GRANT SELECT ON public.rt_worker_events TO rtr_555555555555555555555555;
 CREATE PUBLICATION rt_worker_pub FOR TABLE public.rt_worker_events;`)
 	cfg.ConnConfig.RuntimeParams["search_path"] = "wire_worker_meta"
 	db, err := pgxpool.NewWithConfig(ctx, cfg)
@@ -200,7 +202,7 @@ CREATE PUBLICATION rt_worker_pub FOR TABLE public.rt_worker_events;`)
 INSERT INTO projects(id,org_id,name,tenant_id,region_id,postgres_version,state,source,created_at,updated_at)
 VALUES('prj_worker','org_worker','Worker','33333333333333333333333333333333','rke2-lab',17,'ready','managed',now(),now());
 INSERT INTO branches(id,project_id,name,timeline_id,is_default,state,created_at)
-VALUES('br_worker','prj_worker','main','44444444444444444444444444444444',true,'ready',now());`)
+VALUES('br_4444444444444444','prj_worker','main','44444444444444444444444444444444',true,'ready',now());`)
 	must(err)
 
 	var created string
@@ -221,7 +223,7 @@ VALUES('br_worker','prj_worker','main','44444444444444444444444444444444',true,'
 
 	store := realtime.Store{DB: db}
 	key := realtime.SourceKey{ID: "rts_333333333333333333333333", Scope: realtime.Scope{
-		Project: "prj_worker", Branch: "br_worker", Timeline: "44444444444444444444444444444444", Database: cfg.ConnConfig.Database,
+		Project: "prj_worker", Branch: "br_4444444444444444", Timeline: "44444444444444444444444444444444", Database: cfg.ConnConfig.Database,
 	}}
 	relation := realtime.Relation{Schema: "public", Name: "rt_worker_events"}
 	must(store.Register(ctx, key, realtime.Source{
@@ -229,7 +231,7 @@ VALUES('br_worker','prj_worker','main','44444444444444444444444444444444',true,'
 		Publication: "rt_worker_pub", ConfirmedLSN: start, Relations: []realtime.Relation{relation},
 	}, 4))
 	readConfig := cfg.ConnConfig.Copy()
-	readConfig.User = "rt_wire_reader"
+	readConfig.User = "rtr_555555555555555555555555"
 	reader, err := pgx.ConnectConfig(ctx, readConfig)
 	must(err)
 	defer reader.Close(ctx)
@@ -383,11 +385,11 @@ VALUES('br_worker','prj_worker','main','44444444444444444444444444444444',true,'
 	}
 	write := query
 	write.Statement, write.Params = "INSERT INTO public.rt_worker_events VALUES(7) RETURNING id", nil
-	exec("GRANT INSERT ON public.rt_worker_events TO rt_wire_reader")
+	exec("GRANT INSERT ON public.rt_worker_events TO rtr_555555555555555555555555")
 	if _, err := store.Snapshot(ctx, key, reader, write); !errors.Is(err, realtime.ErrQueryRejected) {
 		t.Fatalf("read-only transaction admitted a write: %v", err)
 	}
-	exec("REVOKE INSERT ON public.rt_worker_events FROM rt_wire_reader")
+	exec("REVOKE INSERT ON public.rt_worker_events FROM rtr_555555555555555555555555")
 	readSnapshot(2, 2)
 	blocked.Store(true)
 	exec("INSERT INTO public.rt_worker_events VALUES (3)")
@@ -497,6 +499,7 @@ VALUES('br_worker','prj_worker','main','44444444444444444444444444444444',true,'
 	if err := <-httpListener; !errors.Is(err, context.Canceled) {
 		t.Fatalf("SSE notification listener exit: %v", err)
 	}
+	testRealtimePublicRoute(t, ctx, db, key, relation, readConfig)
 	must(store.Retire(ctx, key))
 	if _, err := store.Snapshot(ctx, key, reader, query); !errors.Is(err, realtime.ErrSourceUnavailable) {
 		t.Fatalf("retired source snapshot: %v", err)
@@ -513,4 +516,82 @@ VALUES('br_worker','prj_worker','main','44444444444444444444444444444444',true,'
 	exec("SELECT pg_drop_replication_slot('rt_worker_slot')")
 	t.Logf("PostgreSQL %s resumed the durable source across two worker leases at %s and %s",
 		sql.PgConn().ParameterStatus("server_version"), a.EndLSN, b.EndLSN)
+}
+
+func testRealtimePublicRoute(t *testing.T, ctx context.Context, db *pgxpool.Pool, key realtime.SourceKey,
+	relation realtime.Relation, readConfig *pgx.ConnConfig) {
+	t.Helper()
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	_, err := db.Exec(ctx, `INSERT INTO users(id,username,password_hash,role) VALUES('realtime_user','realtime_fixture','unused','owner');
+INSERT INTO organization_members(org_id,user_id,role) VALUES('org_worker','realtime_user','admin');
+INSERT INTO endpoints(id,project_id,branch_id,selector,workload_kind,workload_name,service_name,state,role_name,database_name,endpoint_type,created_at,updated_at)
+VALUES('ep_5555555555555555','prj_worker','br_4444444444444444','realtime-fixture','neonvm','fixture','fixture','active','owner','realtime_wire_test','read_write',now(),now());`)
+	must(err)
+	_, err = db.Exec(ctx, `INSERT INTO realtime_queries(id,source_id,project_id,branch_id,writer_id,name,statement,relations,parameter_count,
+        read_role,credential_ref,credential_uid,max_rows,max_result_bytes,max_frame_bytes,query_timeout_ms)
+VALUES('rtq_555555555555555555555555',$1,$2,$3,'ep_5555555555555555','latest',
+       'SELECT id FROM public.rt_worker_events WHERE id>$1::text::integer ORDER BY id',$4,1,$5,'neon-rt-555555555555555555555555',
+       '55555555-5555-4555-8555-555555555555',10,4096,131072,2000)`, key.ID, key.Project, key.Branch, []realtime.Relation{relation}, readConfig.User)
+	must(err)
+	s := &server{db: db, logger: slog.New(slog.NewTextHandler(io.Discard, nil)), idempotencyKey: []byte(strings.Repeat("k", 32)),
+		backendKeys: &backendKeyring{Active: "v1", decoded: map[string][]byte{"v1": []byte(strings.Repeat("p", 32))}}}
+	n := realtime.NewNotifications(db, 2)
+	s.realtime = &realtimeRuntime{notifications: n, openWriter: func(call context.Context, q registeredRealtimeQuery) (*pgx.Conn, error) {
+		if q.Source != key || q.Query.Role != readConfig.User {
+			return nil, realtime.ErrSourceUnavailable
+		}
+		return pgx.ConnectConfig(call, readConfig.Copy())
+	}}
+	issue := func(digit, permission string) string {
+		id := strings.Repeat(digit, 24)
+		token := "ncb_" + id + "." + strings.Repeat(digit, 64)
+		_, err := db.Exec(ctx, `INSERT INTO backend_credentials(id,project_id,org_id,branch_id,issuer_id,name,token_hash,pepper_version,scopes,branch_scope,expires_at)
+VALUES($1,$2,'org_worker',$3,'realtime_user',$4,$5,'v1',$6,'self',now()+interval '1 hour')`,
+			"bcr_"+id, key.Project, key.Branch, permission, s.backendHash("backend-token", token, "v1"), []string{permission})
+		must(err)
+		return token
+	}
+	valid, storageOnly := issue("a", subscribeRealtime), issue("b", "storage:read")
+	server := httptest.NewServer(s.middleware(s.routes()))
+	defer func() {
+		server.CloseClientConnections()
+		server.Close()
+	}()
+	call := func(path, token string, expected int) *http.Response {
+		t.Helper()
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL+path, nil)
+		must(err)
+		if token != "" {
+			req.Header.Set("Authorization", "Bearer "+token)
+		}
+		response, err := server.Client().Do(req)
+		must(err)
+		t.Cleanup(func() { _ = response.Body.Close() })
+		if response.StatusCode != expected {
+			t.Fatalf("public Realtime route returned %d, expected %d", response.StatusCode, expected)
+		}
+		return response
+	}
+	path := "/realtime/v1/" + key.Branch + "/queries/latest"
+	must(call(path+"?arg=0", "", http.StatusUnauthorized).Body.Close())
+	must(call(path+"?arg=0", storageOnly, http.StatusForbidden).Body.Close())
+	must(call("/realtime/v1/br_7777777777777777/queries/latest?arg=0", valid, http.StatusForbidden).Body.Close())
+	must(call(path, valid, http.StatusUnprocessableEntity).Body.Close())
+	response := call(path+"?arg=2", valid, http.StatusOK)
+	lines := bufio.NewReader(response.Body)
+	first, err := lines.ReadString('\n')
+	must(err)
+	kind, err := lines.ReadString('\n')
+	must(err)
+	data, err := lines.ReadString('\n')
+	must(err)
+	if !strings.HasPrefix(first, "id: ") || kind != "event: snapshot\n" || data != "data: {\"columns\":[\"id\"],\"rows\":[[3],[4]]}\n" {
+		t.Fatal("public route differs from the registered query and its bound parameter")
+	}
+	must(response.Body.Close())
 }

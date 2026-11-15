@@ -47,6 +47,7 @@ type server struct {
 	billing           *billingSettings
 	functionSlotsOnce sync.Once
 	functionSlots     chan struct{}
+	realtime          *realtimeRuntime
 }
 
 func env(name, fallback string) string {
@@ -254,6 +255,11 @@ func runProcess(ctx context.Context, role processRole) error {
 	}
 	processCtx, cancelProcess := context.WithCancel(ctx)
 	defer cancelProcess()
+	if role != roleWorker {
+		if err := s.configureRealtime(processCtx); err != nil {
+			return err
+		}
+	}
 	if role != roleWorker && s.billing != nil {
 		go s.runBilling(processCtx)
 	}
