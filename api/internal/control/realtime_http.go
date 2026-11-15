@@ -23,6 +23,7 @@ var realtimeQueryName = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,47}$`)
 type registeredRealtimeQuery struct {
 	Source                                realtime.SourceKey
 	ID, Writer, Credential, CredentialUID string
+	CredentialNamespace                   string
 	Version                               int64
 	RelationNames                         []realtime.Relation
 	ParameterCount                        int
@@ -40,8 +41,8 @@ func (s *server) configureRealtime(ctx context.Context) error {
 		return nil
 	}
 	limit, err := strconv.Atoi(os.Getenv("NEON_REALTIME_SUBSCRIPTION_LIMIT"))
-	if err != nil || limit <= 0 || s.backendKeys == nil || len(s.idempotencyKey) < sha256.Size {
-		return errors.New("Realtime requires an explicit subscription budget and Backend credential keys")
+	if err != nil || limit <= 0 || s.backendKeys == nil || len(s.idempotencyKey) < sha256.Size || s.realtimeCredentialNamespace() == "" {
+		return errors.New("Realtime requires subscription budgets, Backend keys and a dedicated credential namespace")
 	}
 	n := realtime.NewNotifications(s.db, limit)
 	sourceLimit, err := realtimeWorkerLimit()
@@ -61,7 +62,7 @@ func (s *server) readRealtimeQuery(ctx context.Context, branch, name string) (re
 	var q registeredRealtimeQuery
 	var timeout int
 	err := s.db.QueryRow(ctx, `
-SELECT q.id,q.version,q.writer_id,q.credential_ref,q.credential_uid,s.id,s.project_id,s.branch_id,s.timeline_id,s.database_name,
+SELECT q.id,q.version,q.writer_id,q.credential_ref,q.credential_uid,q.credential_namespace,s.id,s.project_id,s.branch_id,s.timeline_id,s.database_name,
        q.statement,q.read_role,q.relations,q.parameter_count,q.max_rows,q.max_result_bytes,q.max_frame_bytes,q.query_timeout_ms
 FROM realtime_queries q JOIN realtime_sources s ON s.id=q.source_id
 JOIN projects p ON p.id=s.project_id
@@ -71,7 +72,7 @@ WHERE q.branch_id=$1 AND q.name=$2 AND q.retired_at IS NULL AND s.retired_at IS 
  AND p.state='ready' AND p.deleted_at IS NULL AND b.state='ready' AND b.deleted_at IS NULL
  AND e.state='active' AND e.deleted_at IS NULL AND e.endpoint_type='read_write'
  AND jsonb_array_length(q.relations)>0 AND q.relations <@ s.relations`, branch, name).
-		Scan(&q.ID, &q.Version, &q.Writer, &q.Credential, &q.CredentialUID, &q.Source.ID,
+		Scan(&q.ID, &q.Version, &q.Writer, &q.Credential, &q.CredentialUID, &q.CredentialNamespace, &q.Source.ID,
 			&q.Source.Project, &q.Source.Branch, &q.Source.Timeline, &q.Source.Database,
 			&q.Query.Statement, &q.Query.Role, &q.RelationNames, &q.ParameterCount,
 			&q.Query.MaxRows, &q.Query.MaxBytes, &q.Query.MaxFrameBytes, &timeout)
@@ -81,7 +82,8 @@ WHERE q.branch_id=$1 AND q.name=$2 AND q.retired_at IS NULL AND s.retired_at IS 
 
 func (s *server) openRealtimeWriter(ctx context.Context, q registeredRealtimeQuery) (*pgx.Conn, error) {
 	return s.openRealtimeSQL(ctx, realtimeLoginBinding{key: q.Source, writer: q.Writer, role: q.Query.Role,
-		credential: q.Credential, credentialUID: q.CredentialUID, ownerLabel: "neon-control/realtime-query", ownerID: q.ID})
+		credential: q.Credential, credentialUID: q.CredentialUID, credentialNamespace: q.CredentialNamespace,
+		ownerLabel: "neon-control/realtime-query", ownerID: q.ID})
 }
 
 func (s *server) realtimeStream(w http.ResponseWriter, r *http.Request) {

@@ -25,12 +25,16 @@ type realtimeSourceSpec struct {
 }
 
 func (p realtimeSourceSpec) valid() bool {
-	if !realtimeDatabaseName.MatchString(p.Database) || !realtimeDatabaseName.MatchString(p.Publication) ||
-		len(p.Relations) == 0 || len(p.Relations) > 32 {
+	return realtimeDatabaseName.MatchString(p.Database) && realtimeDatabaseName.MatchString(p.Publication) &&
+		validRealtimeRelations(p.Relations)
+}
+
+func validRealtimeRelations(relations []dsgaRealtimeRelation) bool {
+	if len(relations) == 0 || len(relations) > 32 {
 		return false
 	}
-	seen := make(map[dsgaRealtimeRelation]bool, len(p.Relations))
-	for _, r := range p.Relations {
+	seen := make(map[dsgaRealtimeRelation]bool, len(relations))
+	for _, r := range relations {
 		schema := strings.ToLower(r.Schema)
 		if !realtimeIdentifier.MatchString(r.Schema) || !realtimeIdentifier.MatchString(r.Name) ||
 			strings.HasPrefix(schema, "pg_") || strings.HasPrefix(schema, "neon_") ||
@@ -42,20 +46,29 @@ func (p realtimeSourceSpec) valid() bool {
 	return true
 }
 
+func sortRealtimeRelations(relations []dsgaRealtimeRelation) {
+	sort.Slice(relations, func(i, j int) bool {
+		a, b := relations[i], relations[j]
+		return a.Schema < b.Schema || a.Schema == b.Schema && a.Name < b.Name
+	})
+}
+
 type realtimeSourceOperation struct {
-	ID         string             `json:"id"`
-	ProjectID  string             `json:"project_id"`
-	BranchID   string             `json:"branch_id"`
-	WriterID   string             `json:"writer_id"`
-	TimelineID string             `json:"timeline_id"`
-	MaxWAL     int64              `json:"max_wal_bytes"`
-	Spec       realtimeSourceSpec `json:"spec"`
+	ID                  string             `json:"id"`
+	ProjectID           string             `json:"project_id"`
+	BranchID            string             `json:"branch_id"`
+	WriterID            string             `json:"writer_id"`
+	TimelineID          string             `json:"timeline_id"`
+	CredentialNamespace string             `json:"credential_namespace,omitempty"`
+	MaxWAL              int64              `json:"max_wal_bytes"`
+	Spec                realtimeSourceSpec `json:"spec"`
 }
 
 func (p realtimeSourceOperation) valid() bool {
 	return strings.HasPrefix(p.ID, "rts_") && dsgaRealtimeLoginID.MatchString(p.ID) &&
 		p.ProjectID != "" && dataBranchID.MatchString(p.BranchID) && p.WriterID != "" &&
-		dsgaStorageID.MatchString(p.TimelineID) && p.MaxWAL > 0 && p.Spec.valid()
+		dsgaStorageID.MatchString(p.TimelineID) && p.MaxWAL > 0 && p.Spec.valid() &&
+		(p.CredentialNamespace == "" || len(p.CredentialNamespace) <= 63 && dsgaPlanNamespace.MatchString(p.CredentialNamespace))
 }
 
 func (p realtimeSourceOperation) sourceKey() realtime.SourceKey {
@@ -65,8 +78,12 @@ func (p realtimeSourceOperation) sourceKey() realtime.SourceKey {
 }
 
 func (p realtimeSourceOperation) relations() []realtime.Relation {
-	out := make([]realtime.Relation, 0, len(p.Spec.Relations))
-	for _, r := range p.Spec.Relations {
+	return realtimeRelations(p.Spec.Relations)
+}
+
+func realtimeRelations(relations []dsgaRealtimeRelation) []realtime.Relation {
+	out := make([]realtime.Relation, 0, len(relations))
+	for _, r := range relations {
 		out = append(out, realtime.Relation{Schema: r.Schema, Name: r.Name})
 	}
 	return out
@@ -77,18 +94,18 @@ var realtimeSourceRegistrationSteps = []string{"reserve_realtime_credential", "p
 var realtimeSourceRetirementSteps = []string{"stop_realtime_demand", "release_realtime_slot",
 	"revoke_realtime_login", "retire_realtime_credential"}
 
-func (s *server) acceptRealtimeSource(w http.ResponseWriter, r *http.Request, id string) {
+func (s *server) acceptRealtimeOperation(w http.ResponseWriter, r *http.Request, id, kind string) {
 	project := r.PathValue("project")
 	operation, err := s.operationRecord(r.Context(), id, project)
-	if err != nil || operation["resource_type"] != "realtime_source" {
+	if err != nil || operation["resource_type"] != "realtime_"+kind {
 		fail(w, r, 503, "metadata_unavailable", "Could not load Realtime Operation")
 		return
 	}
 	w.Header().Set("Location", "/api/v1/projects/"+project+"/operations/"+id)
-	jsonResponse(w, http.StatusAccepted, map[string]any{"source_id": operation["resource_id"], "operation": operation})
+	jsonResponse(w, http.StatusAccepted, map[string]any{kind + "_id": operation["resource_id"], "operation": operation})
 }
 
-func (s *server) replayRealtimeSource(w http.ResponseWriter, r *http.Request, db connectionDefaultReader, key, hash string) bool {
+func (s *server) replayRealtimeOperation(w http.ResponseWriter, r *http.Request, db connectionDefaultReader, key, hash, kind string) bool {
 	var storedHash, operation string
 	err := db.QueryRow(r.Context(), "SELECT request_hash,operation_id FROM idempotency_keys WHERE actor_id=$1 AND key_hash=$2",
 		userFrom(r).ID, keyHash(key)).Scan(&storedHash, &operation)
@@ -100,7 +117,7 @@ func (s *server) replayRealtimeSource(w http.ResponseWriter, r *http.Request, db
 	} else if storedHash != hash {
 		fail(w, r, 409, "idempotency_conflict", "Key used with different input")
 	} else {
-		s.acceptRealtimeSource(w, r, operation)
+		s.acceptRealtimeOperation(w, r, operation, kind)
 	}
 	return true
 }
@@ -146,13 +163,10 @@ func (s *server) mutateRealtimeSource(w http.ResponseWriter, r *http.Request) {
 			fail(w, r, 422, "invalid_realtime_source", "Choose an explicit publication and its registered tables")
 			return
 		}
-		sort.Slice(p.Spec.Relations, func(i, j int) bool {
-			a, b := p.Spec.Relations[i], p.Spec.Relations[j]
-			return a.Schema < b.Schema || a.Schema == b.Schema && a.Name < b.Name
-		})
+		sortRealtimeRelations(p.Spec.Relations)
 	}
 	hash := s.createRequestHash(action+":"+p.ProjectID+":"+p.BranchID, record{"source": p.ID, "spec": p.Spec, "writer_version": version})
-	if s.replayRealtimeSource(w, r, s.db, key, hash) {
+	if s.replayRealtimeOperation(w, r, s.db, key, hash, "source") {
 		return
 	}
 	if (register && s.realtime == nil) || s.kube == nil {
@@ -175,7 +189,7 @@ func (s *server) mutateRealtimeSource(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 409, "writer_required", "The original active Writer is required")
 		return
 	}
-	if s.replayRealtimeSource(w, r, tx, key, hash) {
+	if s.replayRealtimeOperation(w, r, tx, key, hash, "source") {
 		return
 	}
 	if actualVersion != version {
@@ -187,6 +201,11 @@ func (s *server) mutateRealtimeSource(w http.ResponseWriter, r *http.Request) {
 		if err != nil || runtime == nil || runtime.Payload.BranchID != p.BranchID || runtime.Payload.TimelineID != p.TimelineID ||
 			runtime.Plan.SlotWALKeepMiB == 0 {
 			fail(w, r, 409, "realtime_wal_budget_required", "Writer must have a finite frozen slot retention budget")
+			return
+		}
+		p.CredentialNamespace = s.realtimeCredentialNamespace()
+		if p.CredentialNamespace == "" {
+			fail(w, r, 503, "realtime_credentials_unavailable", "Dedicated Realtime credential namespace required")
 			return
 		}
 		p.ID, p.MaxWAL = newID("rts_"), int64(runtime.Plan.SlotWALKeepMiB)<<20
@@ -243,5 +262,5 @@ func (s *server) mutateRealtimeSource(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	s.acceptRealtimeSource(w, r, op)
+	s.acceptRealtimeOperation(w, r, op, "source")
 }

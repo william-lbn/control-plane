@@ -16,8 +16,26 @@ import (
 type realtimeLoginBinding struct {
 	key                                     realtime.SourceKey
 	writer, role, credential, credentialUID string
+	credentialNamespace                     string
 	ownerLabel, ownerID                     string
 	maxWALBytes                             int64
+}
+
+func (b realtimeLoginBinding) secretKube(k *kubeClient) *kubeClient {
+	if b.credentialNamespace == "" || b.credentialNamespace == k.namespace {
+		return k
+	}
+	scoped := *k
+	scoped.namespace = b.credentialNamespace
+	return &scoped
+}
+
+func (s *server) realtimeCredentialNamespace() string {
+	ns := os.Getenv("NEON_REALTIME_CREDENTIAL_NAMESPACE")
+	if s.kube == nil || ns == s.kube.namespace || len(ns) > 63 || !dsgaPlanNamespace.MatchString(ns) {
+		return ""
+	}
+	return ns
 }
 
 type verifiedRealtimeConnection struct {
@@ -43,8 +61,10 @@ func (s *server) realtimeLoginConfig(ctx context.Context, binding realtimeLoginB
 	if err != nil || vm == nil {
 		return verifiedRealtimeConnection{}, realtime.ErrSourceUnavailable
 	}
-	secret, err := s.kube.request(ctx, http.MethodGet, s.kube.path("secret", binding.credential), nil)
+	credentials := binding.secretKube(s.kube)
+	secret, err := credentials.request(ctx, http.MethodGet, credentials.path("secret", binding.credential), nil)
 	if err != nil || !owned(secret, scope.Project, binding.writer) || nested(secret, "metadata", "uid") != binding.credentialUID ||
+		nested(secret, "metadata", "namespace") != credentials.namespace ||
 		nested(secret, "metadata", "labels", "neon-control/branch-id") != scope.Branch ||
 		nested(secret, "metadata", "labels", binding.ownerLabel) != binding.ownerID || secret["immutable"] != true {
 		return verifiedRealtimeConnection{}, realtime.ErrSourceUnavailable
@@ -98,7 +118,7 @@ type realtimeWorkerSource struct {
 func (s *server) realtimeWantedSources(ctx context.Context, limit int) ([]realtimeWorkerSource, error) {
 	rows, err := s.db.Query(ctx, `
 SELECT s.id,s.project_id,s.branch_id,s.timeline_id,s.database_name,r.writer_id,
-       r.credential_ref,r.credential_uid,r.max_frame_bytes,r.max_wal_bytes
+       r.credential_ref,r.credential_uid,r.credential_namespace,r.max_frame_bytes,r.max_wal_bytes
 FROM realtime_sources s JOIN realtime_source_runtime r ON r.source_id=s.id
 JOIN projects p ON p.id=s.project_id AND p.state='ready' AND p.deleted_at IS NULL
 JOIN branches b ON b.id=s.branch_id AND b.timeline_id=s.timeline_id AND b.state='ready' AND b.deleted_at IS NULL
@@ -113,7 +133,7 @@ ORDER BY s.id LIMIT $1`, limit)
 	for rows.Next() {
 		var source realtimeWorkerSource
 		if err := rows.Scan(&source.key.ID, &source.key.Project, &source.key.Branch, &source.key.Timeline, &source.key.Database,
-			&source.writer, &source.credential, &source.credentialUID, &source.maxFrameBytes, &source.maxWALBytes); err != nil {
+			&source.writer, &source.credential, &source.credentialUID, &source.credentialNamespace, &source.maxFrameBytes, &source.maxWALBytes); err != nil {
 			return nil, err
 		}
 		source.role, source.ownerLabel, source.ownerID = realtimeRole(source.key.ID), "neon-control/realtime-source", source.key.ID

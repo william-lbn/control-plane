@@ -23,7 +23,8 @@ type realtimeSourceIntent struct {
 
 func (p realtimeSourceOperation) loginBinding(uid string) realtimeLoginBinding {
 	return realtimeLoginBinding{key: p.sourceKey(), writer: p.WriterID, role: realtimeRole(p.ID),
-		credential: "neon-rt-" + p.ID[4:], credentialUID: uid, ownerLabel: realtimeSourceOwner, ownerID: p.ID}
+		credential: "neon-rt-" + p.ID[4:], credentialUID: uid, credentialNamespace: p.CredentialNamespace,
+		ownerLabel: realtimeSourceOwner, ownerID: p.ID}
 }
 
 // Lock the accepted intent under the original operation lease for every
@@ -52,10 +53,11 @@ func (s *server) withRealtimeSourceIntent(ctx context.Context, id, worker, actio
 	})
 }
 
-func realtimeSourceCredential(secret map[string]any, p realtimeSourceOperation, binding realtimeLoginBinding) (string, string, error) {
-	if !owned(secret, p.ProjectID, p.WriterID) || secret["immutable"] != true ||
-		nested(secret, "metadata", "labels", "neon-control/branch-id") != p.BranchID ||
-		nested(secret, "metadata", "labels", realtimeSourceOwner) != p.ID ||
+func realtimeCredential(secret map[string]any, binding realtimeLoginBinding) (string, string, error) {
+	if !owned(secret, binding.key.Project, binding.writer) || secret["immutable"] != true ||
+		(binding.credentialNamespace != "" && nested(secret, "metadata", "namespace") != binding.credentialNamespace) ||
+		nested(secret, "metadata", "labels", "neon-control/branch-id") != binding.key.Branch ||
+		nested(secret, "metadata", "labels", binding.ownerLabel) != binding.ownerID ||
 		nested(secret, "metadata", "deletionTimestamp") != nil {
 		return "", "", realtime.ErrSourceUnavailable
 	}
@@ -71,45 +73,46 @@ func realtimeSourceCredential(secret map[string]any, p realtimeSourceOperation, 
 	return uid, verifier, nil
 }
 
-func (s *server) reserveRealtimeSourceCredential(ctx context.Context, p realtimeSourceOperation, binding realtimeLoginBinding) (string, error) {
-	secret, err := s.kube.request(ctx, http.MethodGet, s.kube.path("secret", binding.credential), nil)
+func (s *server) reserveRealtimeCredential(ctx context.Context, binding realtimeLoginBinding) (string, error) {
+	kube := binding.secretKube(s.kube)
+	secret, err := kube.request(ctx, http.MethodGet, kube.path("secret", binding.credential), nil)
 	if kubeStatusIs(err, http.StatusNotFound) && binding.credentialUID == "" {
 		password := randomToken(32)
 		verifier, generateErr := scramVerifier(password)
 		if generateErr != nil {
 			return "", generateErr
 		}
-		labels := credentialLabels(p.ProjectID, p.WriterID)
-		labels["neon-control/branch-id"], labels[realtimeSourceOwner] = p.BranchID, p.ID
-		secret, err = s.kube.createOwned(ctx, "secret", record{"apiVersion": "v1", "kind": "Secret", "type": "Opaque", "immutable": true,
-			"metadata":   record{"name": binding.credential, "labels": labels},
-			"stringData": record{"user": binding.role, "password": password, "verifier": verifier}}, p.ProjectID, p.WriterID)
+		labels := credentialLabels(binding.key.Project, binding.writer)
+		labels["neon-control/branch-id"], labels[binding.ownerLabel] = binding.key.Branch, binding.ownerID
+		secret, err = kube.createOwned(ctx, "secret", record{"apiVersion": "v1", "kind": "Secret", "type": "Opaque", "immutable": true,
+			"metadata":   record{"name": binding.credential, "namespace": kube.namespace, "labels": labels},
+			"stringData": record{"user": binding.role, "password": password, "verifier": verifier}}, binding.key.Project, binding.writer)
 	}
 	if err != nil {
 		return "", realtime.ErrSourceUnavailable
 	}
-	uid, _, err := realtimeSourceCredential(secret, p, binding)
+	uid, _, err := realtimeCredential(secret, binding)
 	return uid, err
 }
 
-func (s *server) setRealtimeSourceLogin(ctx context.Context, p realtimeSourceOperation, intent realtimeSourceIntent, enable bool,
+func (s *server) setRealtimeServiceLogin(ctx context.Context, binding realtimeLoginBinding, relations []dsgaRealtimeRelation, enable bool,
 	authorize func(context.Context) error) error {
-	binding := p.loginBinding(intent.credential)
-	runtime, err := s.dsgaEndpointRuntime(ctx, p.ProjectID, p.WriterID)
-	if err != nil || runtime == nil || runtime.Payload.BranchID != p.BranchID || runtime.Payload.TimelineID != p.TimelineID {
+	scope := binding.key
+	runtime, err := s.dsgaEndpointRuntime(ctx, scope.Project, binding.writer)
+	if err != nil || runtime == nil || runtime.Payload.BranchID != scope.Branch || runtime.Payload.TimelineID != scope.Timeline {
 		return realtime.ErrSourceUnavailable
 	}
-	relations := []dsgaRealtimeRelation{}
 	request := dsgaAuthLoginRequest{ProtocolVersion: 1, Service: dsgaRealtimeServiceLogin,
-		ProjectID: p.ProjectID, BranchID: p.BranchID, EndpointID: p.WriterID, Database: p.Spec.Database,
-		RealtimeID: p.ID, Generation: 2, Relations: &relations}
+		ProjectID: scope.Project, BranchID: scope.Branch, EndpointID: binding.writer, Database: scope.Database,
+		RealtimeID: binding.ownerID, Generation: 2, Relations: &relations}
 	verifier := ""
 	if enable {
-		secret, err := s.kube.request(ctx, http.MethodGet, s.kube.path("secret", binding.credential), nil)
+		kube := binding.secretKube(s.kube)
+		secret, err := kube.request(ctx, http.MethodGet, kube.path("secret", binding.credential), nil)
 		if err != nil {
 			return realtime.ErrSourceUnavailable
 		}
-		_, verifier, err = realtimeSourceCredential(secret, p, binding)
+		_, verifier, err = realtimeCredential(secret, binding)
 		if err != nil {
 			return err
 		}
@@ -124,10 +127,31 @@ func (s *server) setRealtimeSourceLogin(ctx context.Context, p realtimeSourceOpe
 		}
 		return authorize(ctx)
 	}
-	if err := s.publishBranchServiceIdentity(ctx, p.ProjectID, p.BranchID, p.WriterID, binding.role, verifier, enable, routeAuthority); err != nil {
+	if err := s.publishBranchServiceIdentity(ctx, scope.Project, scope.Branch, binding.writer, binding.role, verifier, enable, routeAuthority); err != nil {
 		return err
 	}
 	return authorize(ctx)
+}
+
+func (s *server) retireRealtimeCredential(ctx context.Context, binding realtimeLoginBinding) error {
+	kube := binding.secretKube(s.kube)
+	secret, err := kube.request(ctx, http.MethodGet, kube.path("secret", binding.credential), nil)
+	if kubeStatusIs(err, http.StatusNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	uid, _, err := realtimeCredential(secret, binding)
+	if err != nil {
+		return err
+	}
+	_, err = kube.request(ctx, http.MethodDelete, kube.path("secret", binding.credential),
+		record{"apiVersion": "v1", "kind": "DeleteOptions", "preconditions": record{"uid": uid}})
+	if kubeStatusIs(err, http.StatusNotFound) {
+		return nil
+	}
+	return err
 }
 
 func (s *server) realtimeSourcePoint(ctx context.Context, p realtimeSourceOperation, sql *pgx.Conn, binding realtimeLoginBinding) (realtime.Source, error) {
@@ -186,7 +210,7 @@ func (s *server) reconcileRealtimeSource(ctx context.Context, id, worker, action
 			if err := authorize(call); err != nil {
 				return err
 			}
-			uid, err := s.reserveRealtimeSourceCredential(call, p, p.loginBinding(intent.credential))
+			uid, err := s.reserveRealtimeCredential(call, p.loginBinding(intent.credential))
 			if err != nil {
 				return err
 			}
@@ -202,7 +226,7 @@ func (s *server) reconcileRealtimeSource(ctx context.Context, id, worker, action
 			if err := authorize(call); err != nil {
 				return err
 			}
-			return s.setRealtimeSourceLogin(call, p, intent, true, authorize)
+			return s.setRealtimeServiceLogin(call, p.loginBinding(intent.credential), []dsgaRealtimeRelation{}, true, authorize)
 		},
 		func(call context.Context) error {
 			if err := authorize(call); err != nil {
@@ -259,8 +283,9 @@ func (s *server) reconcileRealtimeSource(ctx context.Context, id, worker, action
 						return err
 					}
 					if _, err := tx.Exec(call, `INSERT INTO realtime_source_runtime(source_id,project_id,branch_id,writer_id,
- credential_ref,credential_uid,max_wal_bytes,max_frame_bytes) VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,
-						p.ID, p.ProjectID, p.BranchID, p.WriterID, b.credential, state.credential, p.MaxWAL, realtimeSourceMaxFrameBytes); err != nil {
+ credential_ref,credential_uid,credential_namespace,max_wal_bytes,max_frame_bytes) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+						p.ID, p.ProjectID, p.BranchID, p.WriterID, b.credential, state.credential,
+						b.secretKube(s.kube).namespace, p.MaxWAL, realtimeSourceMaxFrameBytes); err != nil {
 						return err
 					}
 					_, err := tx.Exec(call, "UPDATE realtime_source_operations SET state='ready' WHERE id=$1", p.ID)
@@ -310,25 +335,13 @@ func (s *server) reconcileRealtimeSource(ctx context.Context, id, worker, action
 				if err := authorize(call); err != nil || intent.credential == "" {
 					return err
 				}
-				return s.setRealtimeSourceLogin(call, p, intent, false, authorize)
+				return s.setRealtimeServiceLogin(call, p.loginBinding(intent.credential), []dsgaRealtimeRelation{}, false, authorize)
 			},
 			func(call context.Context) error {
 				if err := authorize(call); err != nil || intent.state == "retired" {
 					return err
 				}
-				binding := p.loginBinding(intent.credential)
-				secret, err := s.kube.request(call, http.MethodGet, s.kube.path("secret", binding.credential), nil)
-				if err == nil {
-					uid, _, err := realtimeSourceCredential(secret, p, binding)
-					if err != nil {
-						return err
-					}
-					_, err = s.kube.request(call, http.MethodDelete, s.kube.path("secret", binding.credential),
-						record{"apiVersion": "v1", "kind": "DeleteOptions", "preconditions": record{"uid": uid}})
-					if err != nil && !kubeStatusIs(err, http.StatusNotFound) {
-						return err
-					}
-				} else if !kubeStatusIs(err, http.StatusNotFound) {
+				if err := s.retireRealtimeCredential(call, p.loginBinding(intent.credential)); err != nil {
 					return err
 				}
 				return fence(call, func(tx pgx.Tx, _ realtimeSourceIntent) error {

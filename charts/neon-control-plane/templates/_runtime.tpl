@@ -6,6 +6,7 @@
 - {name: NEON_REALTIME_ENABLED, value: 'true'}
 - {name: NEON_REALTIME_SUBSCRIPTION_LIMIT, value: {{ .Values.realtime.subscriptionLimit | quote }}}
 - {name: NEON_REALTIME_SOURCE_LIMIT, value: {{ .Values.realtime.sourceLimit | quote }}}
+- {name: NEON_REALTIME_CREDENTIAL_NAMESPACE, value: {{ include "neonControl.realtimeCredentialNamespace" . | quote }}}
 {{- end }}
 {{- if and .Values.functions.managerCertificateRenewal.enabled (not .Values.functions.enabled) }}
 {{- fail "Manager certificate renewal requires functions.enabled" }}
