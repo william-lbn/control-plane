@@ -251,6 +251,20 @@ func Consume(ctx context.Context, conn *pgconn.PgConn, source Source, persist fu
 	}); err != nil {
 		return errors.New("logical replication could not start from the confirmed LSN")
 	}
+	defer func() {
+		// A socket close alone leaves the backend slot active until the
+		// walsender processes the disconnect. Read back CopyDone before the
+		// next lease can start when this connection can still exchange data.
+		if conn.IsClosed() {
+			return
+		}
+		cleanup, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		deadline, _ := cleanup.Deadline()
+		if conn.Conn().SetDeadline(deadline) == nil {
+			_, _ = pglogrepl.SendStandbyCopyDone(cleanup, conn)
+		}
+	}()
 
 	confirmed := source.ConfirmedLSN
 	next := time.Now().Add(source.FeedbackInterval)

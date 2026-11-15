@@ -229,6 +229,9 @@ func TestPgoutputWire(t *testing.T) {
 	if confirmed[0].LSN < first.EndLSN || confirmed[1].LSN < confirmed[0].EndLSN {
 		t.Fatalf("reconnect delivered commits out of order: %+v", confirmed)
 	}
+	if err := checkSlot(ctx, db, Lease{Key: lease.Key, Slot: lease.Slot, ConfirmedLSN: confirmed[1].EndLSN}, 16<<20, false); err != nil {
+		t.Fatalf("original slot did not settle after ending replication: %v", err)
+	}
 	exec("SELECT pg_drop_replication_slot('c3_wire_slot')")
 	t.Logf("PostgreSQL %s confirmed commit %s through %s with recovery", db.PgConn().ParameterStatus("server_version"), first.LSN, confirmed[1].EndLSN)
 }
