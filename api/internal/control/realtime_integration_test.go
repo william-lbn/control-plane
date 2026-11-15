@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"regexp"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -253,6 +254,57 @@ VALUES('br_worker','prj_worker','main','44444444444444444444444444444444',true,'
 	if _, err := store.Snapshot(ctx, key, reader, private); !errors.Is(err, realtime.ErrQueryRejected) {
 		t.Fatalf("ungranted relation was readable: %v", err)
 	}
+	notifications := realtime.NewNotifications(db, 1)
+	listening, stopListening := context.WithCancel(ctx)
+	defer stopListening()
+	listener := make(chan error, 1)
+	go func() { listener <- notifications.Run(listening, 25*time.Millisecond) }()
+	var blocked atomic.Bool
+	revoked := errors.New("original query grant revoked")
+	beginSubscription := func(after *int64) (context.CancelFunc, <-chan realtime.Delivery, <-chan error) {
+		live, closeStream := context.WithCancel(ctx)
+		t.Cleanup(closeStream)
+		deliveries := make(chan realtime.Delivery, 1)
+		finish := make(chan error, 1)
+		go func() {
+			finish <- store.Subscribe(live, notifications, realtime.Subscription{
+				Key: key, Query: query, Relations: []realtime.Relation{relation}, After: after, PageSize: 2, DeliveryLimit: time.Second,
+			}, func(context.Context) error {
+				if blocked.Load() {
+					return revoked
+				}
+				return nil
+			}, func(call context.Context) (*pgx.Conn, error) {
+				return pgx.ConnectConfig(call, readConfig.Copy())
+			}, func(call context.Context, result realtime.Delivery) error {
+				select {
+				case deliveries <- result:
+					return nil
+				case <-call.Done():
+					return call.Err()
+				}
+			})
+		}()
+		return closeStream, deliveries, finish
+	}
+	checkDelivery := func(deliveries <-chan realtime.Delivery, finish <-chan error, pos int64, snapshot bool) {
+		t.Helper()
+		select {
+		case result := <-deliveries:
+			if result.Position != pos || result.Snapshot != snapshot || !json.Valid(result.Data) {
+				t.Fatalf("subscription result %+v, expected position %d, snapshot %v", result, pos, snapshot)
+			}
+		case err := <-finish:
+			t.Fatalf("subscription ended before delivering position %d: %v", pos, err)
+		case <-ctx.Done():
+			t.Fatal(ctx.Err())
+		}
+	}
+	closeStream, deliveries, finish := beginSubscription(nil)
+	checkDelivery(deliveries, finish, 0, true)
+	if _, _, err := notifications.Watch(key.ID); !errors.Is(err, realtime.ErrSubscriptionCapacity) {
+		t.Fatalf("subscription limit did not apply: %v", err)
+	}
 	openSQL := func(ctx context.Context, _ realtime.Lease) (*pgx.Conn, error) {
 		cfg := cfg.ConnConfig.Copy()
 		cfg.User = "rt_wire_worker"
@@ -301,17 +353,24 @@ VALUES('br_worker','prj_worker','main','44444444444444444444444444444444',true,'
 		t.Fatalf("notification differs from the committed source: %+v", note)
 	}
 	readSnapshot(1, 1)
+	checkDelivery(deliveries, finish, 1, false)
+	closeStream()
+	if err := <-finish; !errors.Is(err, context.Canceled) {
+		t.Fatalf("subscription cancellation: %v", err)
+	}
 	stop()
 	if err := <-done; !errors.Is(err, context.Canceled) {
 		t.Fatalf("worker cancellation: %v", err)
 	}
 	stop, done = follow()
+	closeStream, deliveries, finish = beginSubscription(&a.Position)
 	exec("INSERT INTO public.rt_worker_events VALUES (2)")
 	b := observe(a.Position, done)
 	if b.Position != 2 || b.LSN < a.EndLSN {
 		t.Fatalf("worker did not resume the original logical slot: %+v %+v", a, b)
 	}
 	readSnapshot(2, 2)
+	checkDelivery(deliveries, finish, 2, false)
 	excess := query
 	excess.MaxRows = 1
 	if _, err := store.Snapshot(ctx, key, reader, excess); !errors.Is(err, realtime.ErrResultBudget) {
@@ -325,6 +384,23 @@ VALUES('br_worker','prj_worker','main','44444444444444444444444444444444',true,'
 	}
 	exec("REVOKE INSERT ON public.rt_worker_events FROM rt_wire_reader")
 	readSnapshot(2, 2)
+	blocked.Store(true)
+	exec("INSERT INTO public.rt_worker_events VALUES (3)")
+	select {
+	case err := <-finish:
+		if !errors.Is(err, revoked) {
+			t.Fatalf("revoked subscription ended with %v", err)
+		}
+	case result := <-deliveries:
+		t.Fatalf("revoked subscription received new data: %+v", result)
+	case <-ctx.Done():
+		t.Fatal(ctx.Err())
+	}
+	closeStream()
+	stopListening()
+	if err := <-listener; !errors.Is(err, context.Canceled) {
+		t.Fatalf("notification listener exit: %v", err)
+	}
 	must(store.Retire(ctx, key))
 	if _, err := store.Snapshot(ctx, key, reader, query); !errors.Is(err, realtime.ErrSourceUnavailable) {
 		t.Fatalf("retired source snapshot: %v", err)

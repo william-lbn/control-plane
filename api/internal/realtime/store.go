@@ -133,6 +133,10 @@ WHERE id=$1 AND project_id=$2 AND branch_id=$3 AND timeline_id=$4 AND database_n
 			return ErrSourceUnavailable
 		}
 		_, err = tx.Exec(ctx, `DELETE FROM realtime_invalidations WHERE source_id=$1`, key.ID)
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx, "SELECT pg_notify($1,$2)", invalidationChannel, key.ID)
 		return err
 	})
 }
@@ -212,7 +216,7 @@ WHERE id=$1 AND lease_epoch=$4 AND lease_until>clock_timestamp()`, key.ID, lates
 		if err != nil {
 			return err
 		}
-		_, err = tx.Exec(ctx, "SELECT pg_notify('realtime_invalidations',$1)", key.ID)
+		_, err = tx.Exec(ctx, "SELECT pg_notify($1,$2)", invalidationChannel, key.ID)
 		return err
 	})
 }
