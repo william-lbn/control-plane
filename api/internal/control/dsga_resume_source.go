@@ -64,6 +64,11 @@ func newDSGAResumePlan(p createPayload, previous dsgaCreationPlan, policy dsgaCr
 	if err != nil {
 		return dsgaCreationPlan{}, err
 	}
+	// Registered logical slots belong to the retained timeline. Keep its
+	// established retention setting across compute generations.
+	if previous.SlotWALKeepMiB != 0 {
+		next.SlotWALKeepMiB = previous.SlotWALKeepMiB
+	}
 	next.FlavorID = previous.FlavorID
 	next.Credentials = previous.Credentials
 	next.ComputeInstanceID = previous.ComputeInstanceID

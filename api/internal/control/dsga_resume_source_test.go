@@ -18,6 +18,7 @@ func TestDSGAResumePlanPreservesLogicalIdentityAndRefreshesBootInputs(t *testing
 				Budget: previous.Budget, Storage: previous.Storage, VM: previous.VM.clone(), RetainedCatalog: true,
 			}
 			previous.FlavorID, policy.FlavorID = "standard", "standard"
+			previous.SlotWALKeepMiB, policy.SlotWALKeepMiB = 64, 128
 			wrong := policy
 			wrong.FlavorID = "reader-preview"
 			if _, err := newDSGAResumePlan(p, previous, wrong, time.Now()); err == nil {
@@ -30,6 +31,14 @@ func TestDSGAResumePlanPreservesLogicalIdentityAndRefreshesBootInputs(t *testing
 			if next.Credentials != previous.Credentials || next.ComputeInstanceID != previous.ComputeInstanceID ||
 				next.PostgresVersion != major || next.FlavorID != previous.FlavorID || next.Storage != previous.Storage || !next.RetainCatalog {
 				t.Fatal("resume changed the original logical Compute or credential source")
+			}
+			if next.SlotWALKeepMiB != 64 {
+				t.Fatal("resume changed the retention of the existing timeline slots")
+			}
+			previous.SlotWALKeepMiB = 0
+			migrated, err := newDSGAResumePlan(p, previous, policy, time.Now())
+			if err != nil || migrated.SlotWALKeepMiB != 128 {
+				t.Fatalf("legacy timeline did not adopt the configured retention: %v", err)
 			}
 			if next.Incarnation == previous.Incarnation || next.OperationUUID == previous.OperationUUID {
 				t.Fatal("resume reused the previous physical generation")

@@ -127,6 +127,45 @@ func TestDSGARendererFreezesLogicalBufferDemandFromFlavor(t *testing.T) {
 	}
 }
 
+func TestDSGARendererFreezesSlotWALKeepForWriter(t *testing.T) {
+	catalog := dsgaFlavorCatalogFixture(t)
+	for i := range catalog.Releases {
+		catalog.Releases[i].Creation.SlotWALKeepMiB = 64
+	}
+	setDSGACatalog(t, catalog)
+	const setting = `"name":"max_slot_wal_keep_size","value":"64","vartype":"integer"`
+	for _, pg := range []uint32{17, 18} {
+		p, _, _ := dsgaPlanFixture(t)
+		policy, err := selectDSGAFlavorPolicy("neon", pg, "test", "standard")
+		if err != nil {
+			t.Fatal(err)
+		}
+		plan, err := newDSGACreationPlan(p, policy.Creation, time.Unix(1700000000, 0))
+		if err != nil || plan.SlotWALKeepMiB != 64 {
+			t.Fatalf("slot WAL retention was not frozen: %v", err)
+		}
+		policy.Creation.SlotWALKeepMiB = 1 << 31
+		if _, err := validateDSGAProjectPolicy("neon", policy); err == nil {
+			t.Fatal("catalog accepted retention outside the PostgreSQL integer range")
+		}
+		if _, err := newDSGACreationPlan(p, policy.Creation, time.Unix(1700000000, 0)); err == nil {
+			t.Fatal("plan accepted retention outside the PostgreSQL integer range")
+		}
+		for _, mode := range []string{"read_write", "read_only"} {
+			p.EndpointType = mode
+			out, err := renderDSGAComputeBootstrap(p, plan, "actual-vm-uid", dsgaRenderFixture())
+			if err != nil || bytes.Contains(out, []byte(setting)) != (mode == "read_write") {
+				t.Fatalf("unexpected slot WAL retention for %s: %v", mode, err)
+			}
+		}
+		plan.SlotWALKeepMiB = 0
+		raw, err := json.Marshal(plan)
+		if err != nil || bytes.Contains(raw, []byte(`"slot_wal_keep_mib"`)) {
+			t.Fatal("legacy plans must preserve their serialized shape")
+		}
+	}
+}
+
 func TestDSGARendererRejectsUnsafeInputsWithoutPartialOutput(t *testing.T) {
 	p, _, plan := dsgaPlanFixture(t)
 	for name, mutate := range map[string]func(*createPayload, *dsgaCreationPlan, *dsgaRenderCredentials, *string){

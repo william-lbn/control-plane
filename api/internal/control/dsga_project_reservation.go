@@ -77,6 +77,7 @@ func readDSGAProjectPolicy(namespace string) (dsgaProjectPolicy, error) {
 
 func validateDSGAProjectPolicy(namespace string, policy dsgaProjectPolicy) (dsgaProjectPolicy, error) {
 	if policy.ProtocolVersion != 1 || !validDSGAFlavorID(policy.Creation.FlavorID) || !dsgaSupportedPostgresVersion(policy.Creation.postgresVersion()) ||
+		!validDSGASlotWALKeep(policy.Creation.SlotWALKeepMiB, policy.Creation.VM) ||
 		policy.Creation.Namespace != namespace || policy.Region == "" || len(policy.Region) > 128 || strings.TrimSpace(policy.Region) != policy.Region ||
 		policy.Creation.VM.ProtocolVersion != 5 || policy.Creation.VM.validateResourceBudget(policy.Creation.Budget) != nil || policy.Creation.Storage.CredentialNamespace == "" || policy.Creation.Storage.validate(namespace) != nil || !dsgaPinnedImage.MatchString(policy.Creation.Image) || len(namespace) > 63 || !dsgaPlanNamespace.MatchString(namespace) || policy.Bounds.MinCPU < 250 || policy.Bounds.MinCPU%250 != 0 || policy.Bounds.MaxCPU < policy.Bounds.MinCPU || policy.Bounds.MaxCPU%250 != 0 || policy.Bounds.MaxCPU > 1<<31-1 ||
 		policy.Bounds.MinMem <= 0 || policy.Bounds.MaxMem < policy.Bounds.MinMem || policy.Bounds.MaxMem > 1<<31-1 {

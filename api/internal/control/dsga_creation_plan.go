@@ -72,6 +72,7 @@ type dsgaCreationPlan struct {
 	Image               string `json:"image"`
 	FlavorID            string `json:"flavor_id,omitempty"`
 	LogicalBufferDemand bool   `json:"logical_buffer_demand,omitempty"`
+	SlotWALKeepMiB      uint32 `json:"slot_wal_keep_mib,omitempty"`
 	// UUID与时间只在接受原意图前生成一次，恢复不重新读取时钟或分配随机值。
 	OperationUUID   string              `json:"operation_uuid"`
 	AcceptedAt      string              `json:"accepted_at"`
@@ -123,6 +124,12 @@ type dsgaCreationPolicy struct {
 	FlavorID               string                     `json:"flavor_id,omitempty"`
 	RetainedCatalog        bool                       `json:"retained_catalog,omitempty"`
 	LogicalBufferDemand    bool                       `json:"logical_buffer_demand,omitempty"`
+	SlotWALKeepMiB         uint32                     `json:"slot_wal_keep_mib,omitempty"`
+}
+
+// PostgreSQL stores max_slot_wal_keep_size as a signed integer in MiB.
+func validDSGASlotWALKeep(size uint32, vm dsgaVMProfile) bool {
+	return size == 0 || size <= 1<<31-1 && vm.generic()
 }
 
 var dsgaPinnedImage = regexp.MustCompile(`^[a-z0-9][a-z0-9./:_-]*@sha256:[0-9a-f]{64}$`)
@@ -158,7 +165,7 @@ func (b dsgaBootstrapBudget) validate() error {
 }
 
 func (plan dsgaCreationPlan) validate(p createPayload) error {
-	if !validDSGAFlavorID(plan.FlavorID) || plan.LogicalBufferDemand &&
+	if !validDSGAFlavorID(plan.FlavorID) || !validDSGASlotWALKeep(plan.SlotWALKeepMiB, plan.VM) || plan.LogicalBufferDemand &&
 		(plan.FlavorID == "" || plan.NativeBootstrapVersion.selected() != 3 || plan.VM.supply() == nil) {
 		return errDSGACreationPlan
 	}
@@ -262,8 +269,9 @@ func makeDSGACreationPlan(p createPayload, policy dsgaCreationPolicy, now time.T
 	entropy[32+8] = (entropy[32+8] & 0x3f) | 0x80
 	uuid := hex.EncodeToString(entropy[32:])
 	plan := dsgaCreationPlan{dsgaCreationIdentity: dsgaCreationIdentity{NativeBootstrapVersion: policy.NativeBootstrapVersion, ProtocolVersion: 1, PostgresVersion: policy.postgresVersion(), Namespace: policy.Namespace, Incarnation: hex.EncodeToString(entropy[:16]), ComputeInstanceID: "ci_" + hex.EncodeToString(entropy[16:32])},
-		Image: policy.Image, FlavorID: policy.FlavorID, LogicalBufferDemand: policy.LogicalBufferDemand, OperationUUID: fmt.Sprintf("%s-%s-%s-%s-%s", uuid[:8], uuid[8:12], uuid[12:16], uuid[16:20], uuid[20:]),
-		AcceptedAt: now.UTC().Format(time.RFC3339Nano), MemorySlotBytes: policy.MemorySlotBytes, Budget: policy.Budget, VM: policy.VM.clone(), Storage: policy.Storage}
+		Image: policy.Image, FlavorID: policy.FlavorID, LogicalBufferDemand: policy.LogicalBufferDemand, SlotWALKeepMiB: policy.SlotWALKeepMiB,
+		OperationUUID: fmt.Sprintf("%s-%s-%s-%s-%s", uuid[:8], uuid[8:12], uuid[12:16], uuid[16:20], uuid[20:]),
+		AcceptedAt:    now.UTC().Format(time.RFC3339Nano), MemorySlotBytes: policy.MemorySlotBytes, Budget: policy.Budget, VM: policy.VM.clone(), Storage: policy.Storage}
 	if err := plan.validate(p); err != nil {
 		return dsgaCreationPlan{}, err
 	}

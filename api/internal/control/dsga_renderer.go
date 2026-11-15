@@ -106,6 +106,9 @@ func renderDSGAComputeBootstrap(p createPayload, plan dsgaCreationPlan, vmUID st
 			option("recovery_prefetch", "off", "enum"))
 	} else {
 		settings = append(settings, option("synchronous_standby_names", "walproposer", "string"))
+		if plan.SlotWALKeepMiB != 0 {
+			settings = append(settings, option("max_slot_wal_keep_size", strconv.FormatUint(uint64(plan.SlotWALKeepMiB), 10), "integer"))
+		}
 	}
 	public := credentials.ControlPublicKey
 	id := sha256.Sum256(public)
