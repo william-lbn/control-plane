@@ -451,6 +451,31 @@ func TestDSGAProxyNeverFollowsRedirectOrRetriesLostPOST(t *testing.T) {
 	}
 }
 
+func TestDSGAProxyCacheObservationIsReadOnly(t *testing.T) {
+	var calls atomic.Int32
+	const path = "/dsg/v1/cache/observation"
+	_, client, base, token := proxyFixture(t, func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		if r.Method != http.MethodGet || r.URL.Path != path {
+			t.Errorf("unexpected Native request: %s %s", r.Method, r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"protocol_version":1}`))
+	})
+	code, _ := proxyRequest(t, client, http.MethodPost, base+path, token, []byte(`{}`))
+	if code != http.StatusBadRequest || calls.Load() != 0 {
+		t.Fatalf("cache observation POST reached Native (HTTP %d)", code)
+	}
+	code, _ = proxyRequest(t, client, http.MethodGet, base+path+"?db=other", token, nil)
+	if code != http.StatusBadRequest || calls.Load() != 0 {
+		t.Fatalf("cache observation query reached Native (HTTP %d)", code)
+	}
+	code, data := proxyRequest(t, client, http.MethodGet, base+path, token, nil)
+	if code != http.StatusOK || calls.Load() != 1 || string(data) != `{"protocol_version":1}` {
+		t.Fatalf("valid cache observation did not reach Native (HTTP %d)", code)
+	}
+}
+
 func TestDSGAProxyRejectsInvalidEnvelopeBeforeNative(t *testing.T) {
 	var calls atomic.Int32
 	_, client, base, token := proxyFixture(t, func(w http.ResponseWriter, r *http.Request) {
