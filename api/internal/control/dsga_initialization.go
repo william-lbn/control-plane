@@ -159,8 +159,33 @@ func (binding *dsgaCreationBinding) observeInitializationWithHTTP(ctx context.Co
 		return empty, errDSGACreationIdentity
 	}
 	key := ed25519.NewKeyFromSeed(credentials.Data["controlSigningSeed"])
-	token := dsgaInitializationJWT(key, name, current.vmUID, plan.ComputeInstanceID, time.Now())
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+net.JoinHostPort(service.Spec.ClusterIP, "3080")+"/dsg/v1/initialization", nil)
+	fact, err := fetchDSGAInitialization(ctx, client, p, plan, current.vmUID, key, service.Spec.ClusterIP)
+	if err != nil {
+		return empty, err
+	}
+	latest, err := readVM()
+	if err != nil {
+		return empty, err
+	}
+	if bootstrap.CheckReady(latest, config, false) != nil {
+		return empty, errDSGACreationIdentity
+	}
+	// 最后复核原lease和已经持久化的来源；仅同来源只读恢复，不创造新事实。
+	if err := current.confirmCredentialSource(ctx, latest, source); err != nil {
+		return empty, err
+	}
+	// 固定本次Native GET前已验证的immutable配置快照，CAS前再比同一UID/hash。
+	fact.configSHA256 = managedSQLDigest(config.Data["config.json"])
+	fact.secretDataSHA256 = managedSQLDataDigest(config.Data)
+	return fact, nil
+}
+
+// fetchDSGAInitialization only reads the native startup receipt. The caller
+// verifies the frozen VM, signing credential and exact management Service.
+func fetchDSGAInitialization(ctx context.Context, client *http.Client, p createPayload, plan dsgaCreationPlan, vmUID string, key ed25519.PrivateKey, clusterIP string) (dsgaInitializationResponse, error) {
+	var empty dsgaInitializationResponse
+	token := dsgaInitializationJWT(key, kubeName(p.EndpointID), vmUID, plan.ComputeInstanceID, time.Now())
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://"+net.JoinHostPort(clusterIP, "3080")+"/dsg/v1/initialization", nil)
 	if err != nil {
 		return empty, errDSGACreationIdentity
 	}
@@ -187,22 +212,8 @@ func (binding *dsgaCreationBinding) observeInitializationWithHTTP(ctx context.Co
 	raw, readErr := io.ReadAll(io.LimitReader(response.Body, (64<<10)+1))
 	var fact dsgaInitializationResponse
 	if response.StatusCode != 200 || response.Header.Get("Cache-Control") != "no-store" || response.Header.Get("Content-Encoding") != "" || len(response.Header.Values("Content-Type")) != 1 || mediaErr != nil || media != "application/json" ||
-		readErr != nil || len(raw) > 64<<10 || dsgapi.UnmarshalObject(raw, &fact) != nil || fact.validate(p, plan, current.vmUID) != nil {
+		readErr != nil || len(raw) > 64<<10 || dsgapi.UnmarshalObject(raw, &fact) != nil || fact.validate(p, plan, vmUID) != nil {
 		return empty, errDSGACreationIdentity
 	}
-	latest, err := readVM()
-	if err != nil {
-		return empty, err
-	}
-	if bootstrap.CheckReady(latest, config, false) != nil {
-		return empty, errDSGACreationIdentity
-	}
-	// 最后复核原lease和已经持久化的来源；仅同来源只读恢复，不创造新事实。
-	if err := current.confirmCredentialSource(ctx, latest, source); err != nil {
-		return empty, err
-	}
-	// 固定本次Native GET前已验证的immutable配置快照，CAS前再比同一UID/hash。
-	fact.configSHA256 = managedSQLDigest(config.Data["config.json"])
-	fact.secretDataSHA256 = managedSQLDataDigest(config.Data)
 	return fact, nil
 }

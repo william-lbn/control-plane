@@ -70,6 +70,15 @@ func TestDSGASuspensionHostRequiresOriginalNodeAndRetiredPlacement(t *testing.T)
 }
 
 func TestDSGASuspensionIntentPinsBootAndHostAcrossWorkerRetry(t *testing.T) {
+	t.Run("before-running", func(t *testing.T) {
+		testDSGASuspensionIntentPinsBootAndHostAcrossWorkerRetry(t, false)
+	})
+	t.Run("initialized-never-admitted", func(t *testing.T) {
+		testDSGASuspensionIntentPinsBootAndHostAcrossWorkerRetry(t, true)
+	})
+}
+
+func testDSGASuspensionIntentPinsBootAndHostAcrossWorkerRetry(t *testing.T, initialized bool) {
 	ctx, b, fact := dsgaSuspensionAdmissionFixture(t)
 	p := dsgaSuspensionPayload{ProjectID: b.intent.ProjectID, BranchID: b.intent.BranchID, EndpointID: b.intent.EndpointID,
 		CreationOperation: b.operationID, VMUID: fact.Observed.Instance.VMUID}
@@ -194,11 +203,11 @@ func TestDSGASuspensionIntentPinsBootAndHostAcrossWorkerRetry(t *testing.T) {
 		testSuspendedDSGAServiceAdmission(t, ctx, b)
 	})
 	t.Run("public-resume-and-next-generation", func(t *testing.T) {
-		testDSGAResumeGeneration(t, ctx, b, fact, original)
+		testDSGAResumeGeneration(t, ctx, b, fact, original, initialized)
 	})
 }
 
-func testDSGAResumeGeneration(t *testing.T, ctx context.Context, b *dsgaCreationBinding, fact dsgaInitializationResponse, source dsgaResumeSource) {
+func testDSGAResumeGeneration(t *testing.T, ctx context.Context, b *dsgaCreationBinding, fact dsgaInitializationResponse, source dsgaResumeSource, initialized bool) {
 	t.Helper()
 	s := b.server
 	s.logger = slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -286,6 +295,17 @@ func testDSGAResumeGeneration(t *testing.T, ctx context.Context, b *dsgaCreation
 	}
 	exec(`INSERT INTO dsga_creation_services(operation_id,service_kind,namespace,service_name,vm_uid,service_uid)
  SELECT $1,service_kind,namespace,service_name,'resume-vm-uid','resume-'||service_uid FROM dsga_creation_services WHERE operation_id=$2`, id, source.Creation)
+	if initialized {
+		initial := initializationFactFixture(t, next.intent.createPayload, plan, "resume-vm-uid")
+		if err := next.recordInitialization(ctx, initial); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := next.supplyFact(ctx, "qualification_job", dsgaSupplyObject{
+			Name: "original-qualifier-job", UID: "original-qualifier-uid", SHA256: strings.Repeat("a", 64),
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
 	// Simulate the same pre-publication failure as a Worker observes. Only
 	// the test fixture supplies the Kube retirement facts directly.
 	exec(`UPDATE operation_steps SET state='failed',attempts=1 WHERE operation_id=$1 AND ordinal=3`, id)
@@ -299,17 +319,24 @@ func testDSGAResumeGeneration(t *testing.T, ctx context.Context, b *dsgaCreation
 		t.Fatalf("retirement accepted a possibly published resume: %d %s", w.Code, w.Body.String())
 	}
 	exec(`UPDATE operation_steps SET attempts=0 WHERE operation_id=$1 AND ordinal=4`, id)
-	exec(`UPDATE operation_steps SET state='failed',attempts=1 WHERE operation_id=$1 AND ordinal=2`, id)
-	exec(`UPDATE operation_steps SET state='queued',attempts=0 WHERE operation_id=$1 AND ordinal=3`, id)
-	if w := post(retirePath, `"2"`, "retire-failed-resume-key"); w.Code != 409 {
-		t.Fatalf("retirement accepted an unclassified readiness failure: %d %s", w.Code, w.Body.String())
+	if initialized {
+		if w := post(retirePath, `"2"`, "retire-failed-resume-key"); w.Code != 409 {
+			t.Fatalf("retirement accepted an unclassified initialized failure: %d %s", w.Code, w.Body.String())
+		}
+		exec(`UPDATE operations SET error_code='qualification_unconfirmed' WHERE id=$1`, id)
+	} else {
+		exec(`UPDATE operation_steps SET state='failed',attempts=1 WHERE operation_id=$1 AND ordinal=2`, id)
+		exec(`UPDATE operation_steps SET state='queued',attempts=0 WHERE operation_id=$1 AND ordinal=3`, id)
+		if w := post(retirePath, `"2"`, "retire-failed-resume-key"); w.Code != 409 {
+			t.Fatalf("retirement accepted an unclassified readiness failure: %d %s", w.Code, w.Body.String())
+		}
+		exec(`UPDATE operations SET error_code='compute_not_ready' WHERE id=$1`, id)
+		exec(`UPDATE operation_steps SET attempts=1 WHERE operation_id=$1 AND ordinal=3`, id)
+		if w := post(retirePath, `"2"`, "retire-failed-resume-key"); w.Code != 409 {
+			t.Fatalf("retirement accepted an attempted native initialization: %d %s", w.Code, w.Body.String())
+		}
+		exec(`UPDATE operation_steps SET attempts=0 WHERE operation_id=$1 AND ordinal=3`, id)
 	}
-	exec(`UPDATE operations SET error_code='compute_not_ready' WHERE id=$1`, id)
-	exec(`UPDATE operation_steps SET attempts=1 WHERE operation_id=$1 AND ordinal=3`, id)
-	if w := post(retirePath, `"2"`, "retire-failed-resume-key"); w.Code != 409 {
-		t.Fatalf("retirement accepted an attempted native initialization: %d %s", w.Code, w.Body.String())
-	}
-	exec(`UPDATE operation_steps SET attempts=0 WHERE operation_id=$1 AND ordinal=3`, id)
 	if w := post(retirePath, `"1"`, "retire-failed-resume-key"); w.Code != 412 {
 		t.Fatalf("retirement accepted a stale endpoint version: %d %s", w.Code, w.Body.String())
 	}

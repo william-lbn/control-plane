@@ -86,19 +86,26 @@ func checkDSGAQualificationRetry(ctx context.Context, clients kubernetes.Interfa
 	if len(pods.Items) != 1 || !dsgaQualificationStoppedWithoutImage(job, &pods.Items[0]) {
 		return retry, errDSGAQualificationUnconfirmed
 	}
+	if err = verifyNoDSGAQualificationClaim(ctx, clients, ns, vmUID); err != nil {
+		return retry, err
+	}
+	return dsgaQualificationRetry{JobUID: job.UID, PodUID: pods.Items[0].UID, VMUID: vmUID, NextJob: nextJob}, nil
+}
+
+func verifyNoDSGAQualificationClaim(ctx context.Context, clients kubernetes.Interface, namespace string, vmUID types.UID) error {
 	options := metav1.ListOptions{
 		LabelSelector: labels.Set{budgetclaims.ClaimLabel: budgetclaims.QualificationKind}.String(),
 		Limit:         128,
 	}
 	for {
-		out, err := clients.CoreV1().ConfigMaps(ns).List(ctx, options)
+		out, err := clients.CoreV1().ConfigMaps(namespace).List(ctx, options)
 		if err != nil {
-			return retry, err
+			return err
 		}
 		for _, cm := range out.Items {
 			for _, owner := range cm.OwnerReferences {
 				if owner.UID == vmUID {
-					return retry, errDSGAQualificationUnconfirmed
+					return errDSGAQualificationUnconfirmed
 				}
 			}
 		}
@@ -107,7 +114,7 @@ func checkDSGAQualificationRetry(ctx context.Context, clients kubernetes.Interfa
 		}
 		options.Continue = out.Continue
 	}
-	return dsgaQualificationRetry{JobUID: job.UID, PodUID: pods.Items[0].UID, VMUID: vmUID, NextJob: nextJob}, nil
+	return nil
 }
 
 func dsgaQualificationRetryKinds(attempt int) (string, string) {

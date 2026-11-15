@@ -27,11 +27,12 @@ import (
 var dsgaResumeRetirementSteps = []string{"settle_unpublished_resume"}
 
 type dsgaFailedResumeIntent struct {
-	VMUID      string            `json:"vm_uid"`
-	ConfigUID  string            `json:"config_uid"`
-	RunnerUID  types.UID         `json:"runner_uid"`
-	RunnerName string            `json:"runner_name"`
-	Host       dsgaSuspendedHost `json:"host"`
+	VMUID        string            `json:"vm_uid"`
+	ConfigUID    string            `json:"config_uid"`
+	RunnerUID    types.UID         `json:"runner_uid"`
+	RunnerName   string            `json:"runner_name"`
+	Host         dsgaSuspendedHost `json:"host"`
+	UnopenedBoot *dsgapi.Instance  `json:"unopened_boot,omitempty"`
 }
 
 func (s *server) reconcileFailedDSGAResumeRetirement(ctx context.Context, id, worker string, p dsgaFailedResumeRetirement) error {
@@ -57,19 +58,19 @@ func (s *server) settleFailedDSGAResume(ctx context.Context, id, worker string, 
 	}
 	var raw []byte
 	var uid, config, sqlService, managementService string
-	var beforeRunning bool
+	var beforeRunning, initialized bool
 	err := s.db.QueryRow(ctx, `SELECT o.payload,b.vm_uid,b.config_uid,sql.service_uid,mgmt.service_uid,
  EXISTS(SELECT 1 FROM operation_steps step WHERE step.operation_id=o.id AND step.ordinal=2
-  AND step.name='wait_neonvm_running' AND step.state='failed')
+  AND step.name='wait_neonvm_running' AND step.state='failed'),
+ EXISTS(SELECT 1 FROM dsga_creation_initialization_observations WHERE operation_id=o.id)
  FROM operations o JOIN dsga_creation_bindings b ON b.operation_id=o.id
  JOIN dsga_creation_services sql ON sql.operation_id=o.id AND sql.vm_uid=b.vm_uid AND sql.service_kind='postgres'
  JOIN dsga_creation_services mgmt ON mgmt.operation_id=o.id AND mgmt.vm_uid=b.vm_uid AND mgmt.service_kind='management'
  WHERE o.id=$1 AND o.project_id=$2 AND o.resource_id=$3 AND o.resource_type='endpoint'
  AND o.action=$4 AND o.state='failed' AND o.finished_at IS NOT NULL AND o.lease_owner IS NULL AND o.lease_expires_at IS NULL
- AND b.namespace=$5 AND b.vm_name=$6 AND b.config_uid IS NOT NULL
- AND NOT EXISTS (SELECT 1 FROM dsga_creation_initialization_observations WHERE operation_id=o.id)`,
+ AND b.namespace=$5 AND b.vm_name=$6 AND b.config_uid IS NOT NULL`,
 		p.FailedResume, p.ProjectID, p.EndpointID, dsgaResumeAction, s.kube.namespace, kubeName(p.EndpointID)).
-		Scan(&raw, &uid, &config, &sqlService, &managementService, &beforeRunning)
+		Scan(&raw, &uid, &config, &sqlService, &managementService, &beforeRunning, &initialized)
 	if err != nil {
 		return err
 	}
@@ -101,7 +102,9 @@ func (s *server) settleFailedDSGAResume(ctx context.Context, id, worker string, 
 	if frozen {
 		if decodeDSGAObject(raw, &in) != nil || in.VMUID != uid || in.ConfigUID != config ||
 			dsgapi.ValidateID(in.RunnerName, "Runner name") != nil || dsgapi.ValidateID(string(in.RunnerUID), "Runner UID") != nil ||
-			in.Host.Binding.Validate() != nil || in.Host.Sequence == 0 {
+			in.Host.Binding.Validate() != nil || in.Host.Sequence == 0 ||
+			(in.UnopenedBoot != nil) != initialized ||
+			(in.UnopenedBoot != nil && (in.UnopenedBoot.Validate() != nil || in.UnopenedBoot.VMUID != uid)) {
 			return errDSGACreationIdentity
 		}
 	} else if !errors.Is(err, pgx.ErrNoRows) {
@@ -131,7 +134,8 @@ func (s *server) settleFailedDSGAResume(ctx context.Context, id, worker string, 
 			return err
 		}
 		state := snapshot.State()
-		if state.PGInstance != nil || state.Active != nil {
+		if state.Active != nil || (state.PGInstance != nil) != initialized ||
+			initialized && (beforeRunning || state.ServiceClosure != nil || frozen && *state.PGInstance != *in.UnopenedBoot) {
 			return errDSGACreationIdentity
 		}
 		boundary = "verify_original_children"
@@ -167,6 +171,14 @@ func (s *server) settleFailedDSGAResume(ctx context.Context, id, worker string, 
 		current, err := readDSGAFailedResumeIntent(ctx, clients, vm, binding, config, beforeRunning)
 		if err != nil {
 			return err
+		}
+		if initialized {
+			boundary = "verify_original_unopened_boot"
+			if err = s.verifyDSGAUnopenedBoot(ctx, clients, vm, envelope.createPayload, envelope.Plan,
+				p.FailedResume, config, managementService, *state.PGInstance); err != nil {
+				return err
+			}
+			current.UnopenedBoot = state.PGInstance
 		}
 		if !frozen {
 			if err = s.recordDSGAFailedResumeIntent(ctx, id, worker, p.FailedResume, current); err != nil {
