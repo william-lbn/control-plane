@@ -10,6 +10,7 @@ import (
 	"os"
 	"reflect"
 	"testing"
+	"time"
 
 	vmv1 "github.com/neondatabase/autoscaling/neonvm/apis/neonvm/v1"
 	dsgapi "github.com/neondatabase/autoscaling/pkg/api/dsga"
@@ -82,6 +83,47 @@ func TestDSGARendererDeterministicPrimaryAndReplicaSafety(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestDSGARendererFreezesLogicalBufferDemandFromFlavor(t *testing.T) {
+	catalog := dsgaFlavorCatalogFixture(t)
+	for i := range catalog.Releases {
+		if !catalog.Releases[i].DefaultFlavor {
+			catalog.Releases[i].Creation.LogicalBufferDemand = true
+		}
+	}
+	setDSGACatalog(t, catalog)
+	for _, pg := range []uint32{17, 18} {
+		p, _, _ := dsgaPlanFixture(t)
+		for _, flavor := range []string{"standard", "reader-preview"} {
+			policy, err := selectDSGAFlavorPolicy("neon", pg, "test", flavor)
+			if err != nil {
+				t.Fatal(err)
+			}
+			plan, err := newDSGACreationPlan(p, policy.Creation, time.Unix(1700000000, 0))
+			if err != nil {
+				t.Fatal(err)
+			}
+			expected := flavor == "reader-preview"
+			if plan.LogicalBufferDemand != expected {
+				t.Fatal("selected cache observation setting was not frozen")
+			}
+			raw, err := json.Marshal(plan)
+			if err != nil || bytes.Contains(raw, []byte(`"logical_buffer_demand"`)) != expected {
+				t.Fatal("default plans must preserve their original serialized shape")
+			}
+			out, err := renderDSGAComputeBootstrap(p, plan, "actual-vm-uid", dsgaRenderFixture())
+			if err != nil || bytes.Contains(out, []byte(`"name":"neon.logical_buffer_demand_enabled","value":"on","vartype":"bool"`)) != expected {
+				t.Fatal("unexpected read-only cache observation setting")
+			}
+			if expected {
+				plan.FlavorID = ""
+				if _, err := renderDSGAComputeBootstrap(p, plan, "actual-vm-uid", dsgaRenderFixture()); err == nil {
+					t.Fatal("unscoped cache observation plan reached the renderer")
+				}
+			}
+		}
 	}
 }
 

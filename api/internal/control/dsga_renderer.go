@@ -93,6 +93,9 @@ func renderDSGAComputeBootstrap(p createPayload, plan dsgaCreationPlan, vmUID st
 		// 从旧规格推测占用。完整预算worker到位后才允许按受支持profile启用。
 		option("neon.max_file_cache_size", "0", "string"),
 	}
+	if plan.LogicalBufferDemand {
+		settings = append(settings, option("neon.logical_buffer_demand_enabled", "on", "bool"))
+	}
 	mode := "Primary"
 	safekeepers := []string{"safekeeper1:5454", "safekeeper2:5454", "safekeeper3:5454"}
 	if p.EndpointType == "read_only" {
