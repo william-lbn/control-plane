@@ -316,7 +316,10 @@ func (s *server) admitDeletion(w http.ResponseWriter, r *http.Request, recoverin
 			return
 		}
 		var unsupported bool
-		err = tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM branch_service_instances WHERE branch_id=ANY($1::text[]) AND service_kind NOT IN ('postgres','data_api','auth','object_storage') AND desired_state<>'disabled')`, p.BranchIDs).Scan(&unsupported)
+		err = tx.QueryRow(r.Context(), `SELECT
+ EXISTS(SELECT 1 FROM branch_service_instances WHERE branch_id=ANY($1::text[]) AND service_kind NOT IN ('postgres','data_api','auth','object_storage') AND desired_state<>'disabled') OR
+ EXISTS(SELECT 1 FROM realtime_source_operations WHERE project_id=$2 AND branch_id=ANY($1::text[]) AND state<>'retired')`,
+			p.BranchIDs, project).Scan(&unsupported)
 		if err != nil || unsupported {
 			fail(w, r, 409, "service_retirement_driver_required", "Every enabled branch service must have a verified retirement driver")
 			return

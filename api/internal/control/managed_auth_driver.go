@@ -455,7 +455,7 @@ func (s *server) reconcileManagedAuth(ctx context.Context, id, worker, action st
 			if err := authorize(ctx); err != nil {
 				return err
 			}
-			return s.publishBranchServiceIdentity(ctx, p.ProjectID, p.BranchID, p.EndpointID, managedAuthLogin(p.BranchID), verifier, enable)
+			return s.publishBranchServiceIdentity(ctx, p.ProjectID, p.BranchID, p.EndpointID, managedAuthLogin(p.BranchID), verifier, enable, nil)
 		},
 		func(ctx context.Context) error { return s.reconcileManagedAuthWorkload(ctx, p, enable) },
 		func(ctx context.Context) error {

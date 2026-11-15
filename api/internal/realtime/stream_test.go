@@ -89,6 +89,26 @@ func TestPgoutputWire(t *testing.T) {
 		assertChanged(name, authorized)
 	}
 	exec("DROP PUBLICATION c3_wire_filter, c3_wire_partial, c3_wire_schema")
+	registrationSlot := SourceKey{ID: "rts_11223344556677889900aabb", Scope: Scope{Database: cfg.Database}}
+	if _, exists, err := ReadInactiveSlot(ctx, db, registrationSlot, registrationSlot.ID, 16<<20); err != nil || exists {
+		t.Fatalf("previously unused source slot is not absent: %v", err)
+	}
+	exec("SELECT pg_create_logical_replication_slot('rts_11223344556677889900aabb','pgoutput')")
+	if lsn, exists, err := ReadInactiveSlot(ctx, db, registrationSlot, registrationSlot.ID, 16<<20); err != nil || !exists || lsn == 0 {
+		t.Fatalf("the original inactive slot has no consistent point: %v", err)
+	}
+	wrongScope := registrationSlot
+	wrongScope.Database = "unrelated_database"
+	if _, _, err := ReadInactiveSlot(ctx, db, wrongScope, registrationSlot.ID, 0); !errors.Is(err, ErrSlotUnavailable) {
+		t.Fatalf("retirement accepted a slot in a different database: %v", err)
+	}
+	if _, _, err := ReadInactiveSlot(ctx, db, registrationSlot, "unrelated_slot", 0); !errors.Is(err, ErrSlotUnavailable) {
+		t.Fatalf("retirement accepted an unbound slot name: %v", err)
+	}
+	exec("SELECT pg_drop_replication_slot('rts_11223344556677889900aabb')")
+	if _, exists, err := ReadInactiveSlot(ctx, db, registrationSlot, registrationSlot.ID, 0); err != nil || exists {
+		t.Fatalf("the original slot was not removed: %v", err)
+	}
 	var initial string
 	if err := db.QueryRow(ctx, "SELECT lsn::text FROM pg_create_logical_replication_slot('c3_wire_slot','pgoutput')").Scan(&initial); err != nil {
 		t.Fatal(err)

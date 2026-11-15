@@ -1,4 +1,12 @@
 {{- define "neonControl.runtimeEnv" -}}
+{{- if .Values.realtime.enabled }}
+{{- if not (and .Values.backendCredentials.enabled .Values.worker.enabled) }}
+{{- fail "Realtime requires Backend credentials and a separated Worker" }}
+{{- end }}
+- {name: NEON_REALTIME_ENABLED, value: 'true'}
+- {name: NEON_REALTIME_SUBSCRIPTION_LIMIT, value: {{ .Values.realtime.subscriptionLimit | quote }}}
+- {name: NEON_REALTIME_SOURCE_LIMIT, value: {{ .Values.realtime.sourceLimit | quote }}}
+{{- end }}
 {{- if and .Values.functions.managerCertificateRenewal.enabled (not .Values.functions.enabled) }}
 {{- fail "Manager certificate renewal requires functions.enabled" }}
 {{- end }}

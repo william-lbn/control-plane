@@ -305,10 +305,11 @@ func (s *server) publishDataAPIIdentity(ctx context.Context, p dataAPIPayload, e
 			return err
 		}
 	}
-	return s.publishBranchServiceIdentity(ctx, p.ProjectID, p.BranchID, p.EndpointID, dataAPILogin(p.BranchID), verifier, enable)
+	return s.publishBranchServiceIdentity(ctx, p.ProjectID, p.BranchID, p.EndpointID, dataAPILogin(p.BranchID), verifier, enable, nil)
 }
 
-func (s *server) publishBranchServiceIdentity(ctx context.Context, project, branch, endpoint, login, verifier string, enable bool) error {
+func (s *server) publishBranchServiceIdentity(ctx context.Context, project, branch, endpoint, login, verifier string, enable bool,
+	authorize func(context.Context, *dsgaEndpointRuntime) error) error {
 	runtime, err := s.dsgaEndpointRuntime(ctx, project, endpoint)
 	if err != nil {
 		return err
@@ -327,10 +328,11 @@ func (s *server) publishBranchServiceIdentity(ctx context.Context, project, bran
 			return err
 		}
 	}
-	return publishBranchServiceRoute(ctx, s.kube, project, branch, endpoint, login, verifier, enable, runtime, expectedService)
+	return publishBranchServiceRoute(ctx, s.kube, project, branch, endpoint, login, verifier, enable, runtime, expectedService, authorize)
 }
 
-func publishBranchServiceRoute(ctx context.Context, kube *kubeClient, project, branch, endpoint, login, verifier string, enable bool, runtime *dsgaEndpointRuntime, serviceUID string) error {
+func publishBranchServiceRoute(ctx context.Context, kube *kubeClient, project, branch, endpoint, login, verifier string, enable bool,
+	runtime *dsgaEndpointRuntime, serviceUID string, authorize func(context.Context, *dsgaEndpointRuntime) error) error {
 	if runtime == nil && dsgaRealtimeRole.MatchString(login) {
 		return errDSGACreationIdentity
 	}
@@ -398,6 +400,11 @@ func publishBranchServiceRoute(ctx context.Context, kube *kubeClient, project, b
 		routes[key], _ = json.Marshal(route)
 		if runtime != nil && enable && adapter.ValidateManagedSQLRoute(ctx, adapterKubernetes{kube}, runtime.Plan.Namespace, key, routes[key]) != nil {
 			return errDSGACreationIdentity
+		}
+		if authorize != nil {
+			if err := authorize(ctx, runtime); err != nil {
+				return err
+			}
 		}
 		if enable && bytes.Equal(previous, roles[login]) || !enable && !exists {
 			return nil

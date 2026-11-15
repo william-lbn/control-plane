@@ -486,7 +486,7 @@ func (s *server) reconcileFunctionStop(ctx context.Context, op, worker string, p
 				}); err != nil {
 					return err
 				}
-				if err = s.publishBranchServiceIdentity(ctx, p.ProjectID, p.BranchID, ref.WriterID, ref.Scope.Role(), "", false); err != nil {
+				if err = s.publishBranchServiceIdentity(ctx, p.ProjectID, p.BranchID, ref.WriterID, ref.Scope.Role(), "", false, nil); err != nil {
 					return errFunctionSQLSecret
 				}
 			}

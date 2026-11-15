@@ -286,7 +286,7 @@ func TestManagedSQLRoutePublisherNativeThenCASPreservesRegistry(t *testing.T) {
 
 func TestManagedSQLBranchServiceRouteFencesGeneration(t *testing.T) {
 	ctx := context.Background()
-	for _, mode := range []string{"success", "realtime reader", "realtime replication", "realtime legacy route", "obsolete VM", "wrong Service", "replacement credential", "unconfirmed route"} {
+	for _, mode := range []string{"success", "realtime reader", "realtime replication", "realtime legacy route", "expired operation", "obsolete VM", "wrong Service", "replacement credential", "unconfirmed route"} {
 		t.Run(mode, func(t *testing.T) {
 			f := newManagedSQLFixture(t)
 			if _, err := publishManagedSQLRoute(ctx, f.k, f.in, f.observe, nil); err != nil {
@@ -311,6 +311,7 @@ func TestManagedSQLBranchServiceRouteFencesGeneration(t *testing.T) {
 			runtime.Plan.Credentials = source.reference()
 			service := b.ServiceUID
 			login := managedAuthLogin(b.BranchID)
+			var authorize func(context.Context, *dsgaEndpointRuntime) error
 			switch mode {
 			case "success":
 				f.conflicts = 1
@@ -323,6 +324,9 @@ func TestManagedSQLBranchServiceRouteFencesGeneration(t *testing.T) {
 			case "realtime legacy route":
 				login = realtimeRole("rtq_0123456789abcdef01234567")
 				runtime = nil
+			case "expired operation":
+				login = realtimeRole("rtq_0123456789abcdef01234567")
+				authorize = func(context.Context, *dsgaEndpointRuntime) error { return errLeaseLost }
 			case "obsolete VM":
 				runtime.VMUID = "old-physical-vm"
 			case "wrong Service":
@@ -339,7 +343,7 @@ func TestManagedSQLBranchServiceRouteFencesGeneration(t *testing.T) {
 				t.Fatal(err)
 			}
 			publish := func(enable bool) error {
-				return publishBranchServiceRoute(ctx, f.k, p.ProjectID, p.BranchID, p.EndpointID, login, verifier, enable, runtime, service)
+				return publishBranchServiceRoute(ctx, f.k, p.ProjectID, p.BranchID, p.EndpointID, login, verifier, enable, runtime, service, authorize)
 			}
 			before, _ := f.counts()
 			err = publish(true)

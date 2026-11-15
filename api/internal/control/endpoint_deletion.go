@@ -142,6 +142,7 @@ func (s *server) deleteEndpoint(w http.ResponseWriter, r *http.Request) {
 	 EXISTS(SELECT 1 FROM data_api_instances WHERE endpoint_id=$1 AND state<>'disabled') OR
 	 EXISTS(SELECT 1 FROM managed_auth_instances WHERE endpoint_id=$1 AND state<>'disabled') OR
 	 EXISTS(SELECT 1 FROM object_storage_instances WHERE endpoint_id=$1 AND state<>'disabled') OR
+	 EXISTS(SELECT 1 FROM realtime_source_operations WHERE writer_id=$1 AND state<>'retired') OR
 	 EXISTS(SELECT 1 FROM function_definitions WHERE endpoint_id=$1 AND state<>'deleted') OR
 	 EXISTS(SELECT 1 FROM function_instances i JOIN function_definitions f ON f.id=i.function_id
 	  WHERE f.endpoint_id=$1 AND i.state<>'retired')`, p.EndpointID).Scan(&dependency)
@@ -150,7 +151,7 @@ func (s *server) deleteEndpoint(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if dependency {
-		fail(w, r, 409, "endpoint_has_services", "Retire dependent Data API, Auth, Object Storage and Functions before deleting their endpoint")
+		fail(w, r, 409, "endpoint_has_services", "Retire dependent Data API, Auth, Object Storage, Functions and Realtime sources before deleting their endpoint")
 		return
 	}
 	if state == "suspended" {

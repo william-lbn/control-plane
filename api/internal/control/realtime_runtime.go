@@ -131,13 +131,11 @@ func (s *server) runRealtimeSource(ctx context.Context, source realtimeWorkerSou
 			if err != nil {
 				return nil, err
 			}
-			var retained int64
-			err = conn.QueryRow(call, "SELECT setting::bigint*1048576 FROM pg_settings WHERE name='max_slot_wal_keep_size' AND unit='MB'").Scan(&retained)
-			if err != nil || retained <= 0 || retained > source.maxWALBytes {
+			if err := realtime.VerifySlotWALRetention(call, conn, source.maxWALBytes); err != nil {
 				cleanup, cancel := context.WithTimeout(context.Background(), time.Second)
 				defer cancel()
 				_ = conn.Close(cleanup)
-				return nil, realtime.ErrSlotWALBudget
+				return nil, err
 			}
 			return conn, nil
 		},

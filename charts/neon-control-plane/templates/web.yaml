@@ -22,6 +22,9 @@
 {{- if not .Values.aiGateway.enabled -}}
 {{- $config = regexReplaceAll "(?s)    location \\^~ /ai/v1/ \\{.*?    \\}\\r?\\n" $config "" -}}
 {{- end -}}
+{{- if not .Values.realtime.enabled -}}
+{{- $config = regexReplaceAll "(?s)    location \\^~ /realtime/v1/ \\{.*?    \\}\\r?\\n" $config "" -}}
+{{- end -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:

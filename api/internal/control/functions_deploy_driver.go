@@ -239,7 +239,7 @@ func (s *server) reconcileFunctionSQL(ctx context.Context, op, worker string, p 
 	if err = s.verifyFunctionIntent(ctx, op, worker, p); err != nil {
 		return empty, err
 	}
-	if err = s.publishBranchServiceIdentity(ctx, p.ProjectID, p.BranchID, ref.WriterID, ref.Scope.Role(), record.Credential.Verifier, true); err != nil {
+	if err = s.publishBranchServiceIdentity(ctx, p.ProjectID, p.BranchID, ref.WriterID, ref.Scope.Role(), record.Credential.Verifier, true, nil); err != nil {
 		return empty, errFunctionSQLSecret
 	}
 	runtime, err := s.connectFunctionRuntime(ctx, ref, record.Credential.Password)

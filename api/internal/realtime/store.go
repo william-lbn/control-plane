@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pglogrepl"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -50,13 +51,25 @@ type Store struct {
 // Register consumes the identity and consistent point of a newly provisioned
 // slot after the caller verifies the original branch and holds its setup fence.
 func (s Store) Register(ctx context.Context, key SourceKey, source Source, retain int32) error {
+	return registerSource(ctx, s.DB, key, source, retain)
+}
+
+// RegisterSource lets the provisioning worker publish the original slot and
+// its runtime credentials in the same metadata transaction.
+func RegisterSource(ctx context.Context, tx pgx.Tx, key SourceKey, source Source, retain int32) error {
+	return registerSource(ctx, tx, key, source, retain)
+}
+
+func registerSource(ctx context.Context, db interface {
+	Exec(context.Context, string, ...any) (pgconn.CommandTag, error)
+}, key SourceKey, source Source, retain int32) error {
 	if _, err := newDecoder(source.Relations); err != nil {
 		return err
 	}
 	if key.Database != source.Database {
 		return ErrSourceUnavailable
 	}
-	tag, err := s.DB.Exec(ctx, `
+	tag, err := db.Exec(ctx, `
 INSERT INTO realtime_sources(id,project_id,branch_id,timeline_id,database_name,system_id,pg_timeline,slot_name,publication,relations,confirmed_lsn,retain_commits)
 SELECT $1,p.id,b.id,b.timeline_id,$5,$6,$7,$8,$9,$10,$11::text::pg_lsn,$12
 FROM projects p JOIN branches b ON b.project_id=p.id

@@ -163,6 +163,13 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 			if stepErr == nil {
 				stepErr = s.reconcileManagedAuth(runCtx, id, workerID, action, p)
 			}
+		case registerRealtimeSource, retireRealtimeSource:
+			var p realtimeSourceOperation
+			if json.Unmarshal(payload, &p) != nil || !p.valid() || p.ProjectID != projectID || p.ID != resourceID {
+				stepErr = errors.New("Realtime source Operation scope rejected")
+			} else {
+				stepErr = s.reconcileRealtimeSource(runCtx, id, workerID, action, p)
+			}
 		case "update_default_database_owner":
 			var p defaultOwnerPayload
 			if err := json.Unmarshal(payload, &p); err != nil {

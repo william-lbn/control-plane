@@ -129,6 +129,10 @@ backendCredentials:
   enabled: false
   existingSecret: ''
   labHTTP: false
+realtime:
+  enabled: false
+  subscriptionLimit: 0
+  sourceLimit: 0
 dataAPI:
   enabled: false
   # Native Driver v1 requires this explicit development transport exception.

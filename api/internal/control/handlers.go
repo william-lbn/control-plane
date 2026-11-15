@@ -334,6 +334,9 @@ func (s *server) routes() *http.ServeMux {
 	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/credentials/check", s.auth(http.HandlerFunc(s.checkBackendCredential), true))
 	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/credentials/{credential}/rotate", s.auth(http.HandlerFunc(s.mutateBackendCredential), true))
 	mux.Handle("DELETE /api/v1/projects/{project}/branches/{branch}/credentials/{credential}", s.auth(http.HandlerFunc(s.mutateBackendCredential), true))
+	mux.Handle("GET /api/v1/projects/{project}/branches/{branch}/realtime/sources", s.auth(http.HandlerFunc(s.realtimeSources), false))
+	mux.Handle("POST /api/v1/projects/{project}/branches/{branch}/realtime/sources", s.auth(http.HandlerFunc(s.mutateRealtimeSource), true))
+	mux.Handle("DELETE /api/v1/projects/{project}/branches/{branch}/realtime/sources/{rtSource}", s.auth(http.HandlerFunc(s.mutateRealtimeSource), true))
 	// Application data requests authenticate at the branch gateway, independently
 	// of Console cookies. The handler validates methods and branch ownership.
 	mux.HandleFunc("/data/v1/{dataBranch}/{rest...}", s.dataAPIRelay)
