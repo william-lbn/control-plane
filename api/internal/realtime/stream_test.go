@@ -70,6 +70,25 @@ func TestPgoutputWire(t *testing.T) {
 		CREATE TABLE c3_hidden(id int PRIMARY KEY);
 		ALTER TABLE c3_alpha REPLICA IDENTITY FULL;
 		CREATE PUBLICATION c3_wire_pub FOR TABLE public.c3_beta, public.c3_alpha;`)
+	alpha, beta := Relation{"public", "c3_alpha"}, Relation{"public", "c3_beta"}
+	authorized := []Relation{alpha, beta}
+	if err := VerifyPublication(ctx, db, "c3_wire_pub", authorized); err != nil {
+		t.Fatal(err)
+	}
+	assertChanged := func(name string, relations []Relation) {
+		t.Helper()
+		if err := VerifyPublication(ctx, db, name, relations); !errors.Is(err, ErrPublicationChanged) {
+			t.Fatalf("publication %s accepted with mismatched coverage: %v", name, err)
+		}
+	}
+	assertChanged("c3_wire_pub", []Relation{alpha})
+	exec(`CREATE PUBLICATION c3_wire_filter FOR TABLE public.c3_alpha WHERE (id > 0), public.c3_beta;
+		CREATE PUBLICATION c3_wire_partial FOR TABLE public.c3_alpha, public.c3_beta WITH (publish='insert');
+		CREATE PUBLICATION c3_wire_schema FOR TABLES IN SCHEMA public;`)
+	for _, name := range []string{"c3_wire_filter", "c3_wire_partial", "c3_wire_schema", "c3_wire_missing"} {
+		assertChanged(name, authorized)
+	}
+	exec("DROP PUBLICATION c3_wire_filter, c3_wire_partial, c3_wire_schema")
 	var initial string
 	if err := db.QueryRow(ctx, "SELECT lsn::text FROM pg_create_logical_replication_slot('c3_wire_slot','pgoutput')").Scan(&initial); err != nil {
 		t.Fatal(err)
@@ -108,7 +127,6 @@ func TestPgoutputWire(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	alpha, beta := Relation{"public", "c3_alpha"}, Relation{"public", "c3_beta"}
 	source := Source{SystemID: identity.SystemID, Timeline: identity.Timeline, Database: cfg.Database,
 		Slot: "c3_wire_slot", Publication: "c3_wire_pub", ConfirmedLSN: start, Relations: []Relation{alpha, beta},
 		MaxFrameBytes: 128 * 1024, FeedbackInterval: 25 * time.Millisecond}

@@ -93,6 +93,9 @@ func (s Store) RunSource(ctx context.Context, key SourceKey, limits WorkerLimits
 	if err := checkSlot(starting, sql, lease, limits.MaxWALBytes, false); err != nil {
 		return err
 	}
+	if err := VerifyPublication(starting, sql, lease.Publication, lease.Relations); err != nil {
+		return err
+	}
 	replication, err := openReplication(starting, lease)
 	if err != nil || replication == nil {
 		return ErrSourceUnavailable
@@ -112,6 +115,9 @@ func (s Store) RunSource(ctx context.Context, key SourceKey, limits WorkerLimits
 			case <-ticker.C:
 				checkCtx, cancel := context.WithTimeout(active, interval)
 				err := checkSlot(checkCtx, sql, lease, limits.MaxWALBytes, true)
+				if err == nil {
+					err = VerifyPublication(checkCtx, sql, lease.Publication, lease.Relations)
+				}
 				if err == nil {
 					err = s.Renew(checkCtx, lease, limits.LeaseDuration)
 				}

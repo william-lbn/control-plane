@@ -17,6 +17,7 @@ type realtimeLoginBinding struct {
 	key                                     realtime.SourceKey
 	writer, role, credential, credentialUID string
 	ownerLabel, ownerID                     string
+	maxWALBytes                             int64
 }
 
 type verifiedRealtimeConnection struct {
@@ -27,10 +28,16 @@ type verifiedRealtimeConnection struct {
 
 func (s *server) realtimeLoginConfig(ctx context.Context, binding realtimeLoginBinding) (verifiedRealtimeConnection, error) {
 	scope := binding.key
+	if binding.role == "" || binding.role != realtimeRole(binding.ownerID) {
+		return verifiedRealtimeConnection{}, realtime.ErrSourceUnavailable
+	}
 	writer, err := s.dsgaEndpointRuntime(ctx, scope.Project, binding.writer)
 	if err != nil || writer == nil || writer.Payload.BranchID != scope.Branch ||
 		writer.Payload.TimelineID != scope.Timeline || writer.Payload.EndpointType != "read_write" {
 		return verifiedRealtimeConnection{}, realtime.ErrSourceUnavailable
+	}
+	if binding.maxWALBytes > 0 && (writer.Plan.SlotWALKeepMiB == 0 || int64(writer.Plan.SlotWALKeepMiB)<<20 > binding.maxWALBytes) {
+		return verifiedRealtimeConnection{}, realtime.ErrSlotWALBudget
 	}
 	_, vm, _, _, err := s.readDSGABoundSelection(ctx, writer)
 	if err != nil || vm == nil {
@@ -86,7 +93,6 @@ func (s *server) openRealtimeSQL(ctx context.Context, binding realtimeLoginBindi
 type realtimeWorkerSource struct {
 	realtimeLoginBinding
 	maxFrameBytes int
-	maxWALBytes   int64
 }
 
 func (s *server) realtimeWantedSources(ctx context.Context, limit int) ([]realtimeWorkerSource, error) {
@@ -110,7 +116,7 @@ ORDER BY s.id LIMIT $1`, limit)
 			&source.writer, &source.credential, &source.credentialUID, &source.maxFrameBytes, &source.maxWALBytes); err != nil {
 			return nil, err
 		}
-		source.role, source.ownerLabel, source.ownerID = "rtp_"+source.key.ID[4:], "neon-control/realtime-source", source.key.ID
+		source.role, source.ownerLabel, source.ownerID = realtimeRole(source.key.ID), "neon-control/realtime-source", source.key.ID
 		desired = append(desired, source)
 	}
 	return desired, rows.Err()
@@ -227,6 +233,8 @@ func (s *server) runRealtimeSources(ctx context.Context, limit int) {
 						outcome = "retained_wal_budget"
 					} else if errors.Is(err, realtime.ErrSlotAhead) {
 						outcome = "slot_ahead"
+					} else if errors.Is(err, realtime.ErrPublicationChanged) {
+						outcome = "publication_changed"
 					}
 					s.logger.Warn("Realtime source stopped", "source", source.key.ID, "outcome", outcome)
 				}

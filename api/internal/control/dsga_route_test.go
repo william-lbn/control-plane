@@ -286,7 +286,7 @@ func TestManagedSQLRoutePublisherNativeThenCASPreservesRegistry(t *testing.T) {
 
 func TestManagedSQLBranchServiceRouteFencesGeneration(t *testing.T) {
 	ctx := context.Background()
-	for _, mode := range []string{"success", "obsolete VM", "wrong Service", "replacement credential", "unconfirmed route"} {
+	for _, mode := range []string{"success", "realtime reader", "realtime replication", "realtime legacy route", "obsolete VM", "wrong Service", "replacement credential", "unconfirmed route"} {
 		t.Run(mode, func(t *testing.T) {
 			f := newManagedSQLFixture(t)
 			if _, err := publishManagedSQLRoute(ctx, f.k, f.in, f.observe, nil); err != nil {
@@ -310,9 +310,19 @@ func TestManagedSQLBranchServiceRouteFencesGeneration(t *testing.T) {
 			runtime.Plan.ComputeInstanceID = b.ComputeInstanceID
 			runtime.Plan.Credentials = source.reference()
 			service := b.ServiceUID
+			login := managedAuthLogin(b.BranchID)
 			switch mode {
 			case "success":
 				f.conflicts = 1
+			case "realtime reader", "realtime replication":
+				f.conflicts = 1
+				login = realtimeRole("rtq_0123456789abcdef01234567")
+				if mode == "realtime replication" {
+					login = realtimeRole("rts_0123456789abcdef01234567")
+				}
+			case "realtime legacy route":
+				login = realtimeRole("rtq_0123456789abcdef01234567")
+				runtime = nil
 			case "obsolete VM":
 				runtime.VMUID = "old-physical-vm"
 			case "wrong Service":
@@ -324,7 +334,6 @@ func TestManagedSQLBranchServiceRouteFencesGeneration(t *testing.T) {
 			case "unconfirmed route":
 				runtime = nil
 			}
-			login := managedAuthLogin(b.BranchID)
 			verifier, err := scramVerifier("disposable-service-fixture")
 			if err != nil {
 				t.Fatal(err)
@@ -334,7 +343,7 @@ func TestManagedSQLBranchServiceRouteFencesGeneration(t *testing.T) {
 			}
 			before, _ := f.counts()
 			err = publish(true)
-			if mode != "success" {
+			if mode != "success" && mode != "realtime reader" && mode != "realtime replication" {
 				if puts, _ := f.counts(); err == nil || puts != before {
 					t.Fatalf("stale or unconfirmed route admitted: %v, PUT=%d", err, puts-before)
 				}

@@ -317,7 +317,7 @@ func (s *server) publishBranchServiceIdentity(ctx context.Context, project, bran
 	if runtime != nil {
 		if runtime.Payload.EndpointType != "read_write" || runtime.Payload.BranchID != branch ||
 			!dataBranchID.MatchString(branch) ||
-			(login != dataAPILogin(branch) && login != managedAuthLogin(branch) &&
+			(login != dataAPILogin(branch) && login != managedAuthLogin(branch) && !dsgaRealtimeRole.MatchString(login) &&
 				(!strings.HasPrefix(login, "fn_") || !functionDefinitionID.MatchString("fnc_"+strings.TrimPrefix(login, "fn_")))) ||
 			(enable && !functionsql.ValidVerifier(verifier)) {
 			return errDSGACreationIdentity
@@ -331,6 +331,9 @@ func (s *server) publishBranchServiceIdentity(ctx context.Context, project, bran
 }
 
 func publishBranchServiceRoute(ctx context.Context, kube *kubeClient, project, branch, endpoint, login, verifier string, enable bool, runtime *dsgaEndpointRuntime, serviceUID string) error {
+	if runtime == nil && dsgaRealtimeRole.MatchString(login) {
+		return errDSGACreationIdentity
+	}
 	key := selector(endpoint)
 	var registryUID string
 	var credentialDigest string

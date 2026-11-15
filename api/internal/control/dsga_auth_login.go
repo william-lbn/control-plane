@@ -24,6 +24,17 @@ const dsgaFunctionServiceLogin = "function"
 const dsgaRealtimeServiceLogin = "realtime"
 
 var dsgaRealtimeLoginID = regexp.MustCompile(`^rt[sq]_[a-f0-9]{24}$`)
+var dsgaRealtimeRole = regexp.MustCompile(`^rt[pr]_[a-f0-9]{24}$`)
+
+func realtimeRole(id string) string {
+	if !dsgaRealtimeLoginID.MatchString(id) {
+		return ""
+	}
+	if strings.HasPrefix(id, "rts_") {
+		return "rtp_" + id[4:]
+	}
+	return "rtr_" + id[4:]
+}
 
 type dsgaRealtimeRelation struct {
 	Schema string `json:"schema"`
