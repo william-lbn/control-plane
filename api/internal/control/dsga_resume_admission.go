@@ -148,7 +148,7 @@ func (s *server) queueDSGAResumeTx(ctx context.Context, tx pgx.Tx, p createPaylo
 	if err != nil {
 		return "", err
 	}
-	policy, err := selectDSGAProjectPolicy(s.kube.namespace, major, region)
+	policy, err := selectDSGAFlavorPolicy(s.kube.namespace, major, region, previousPlan.FlavorID)
 	if err != nil || p.MinCPU < policy.Bounds.MinCPU || p.MaxCPU > policy.Bounds.MaxCPU || p.MinMem < policy.Bounds.MinMem || p.MaxMem > policy.Bounds.MaxMem {
 		return "", errDSGARuntimeUnavailable
 	}

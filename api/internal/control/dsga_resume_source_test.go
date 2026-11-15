@@ -17,12 +17,18 @@ func TestDSGAResumePlanPreservesLogicalIdentityAndRefreshesBootInputs(t *testing
 				Namespace: previous.Namespace, Image: previous.Image, MemorySlotBytes: previous.MemorySlotBytes,
 				Budget: previous.Budget, Storage: previous.Storage, VM: previous.VM.clone(), RetainedCatalog: true,
 			}
+			previous.FlavorID, policy.FlavorID = "standard", "standard"
+			wrong := policy
+			wrong.FlavorID = "reader-preview"
+			if _, err := newDSGAResumePlan(p, previous, wrong, time.Now()); err == nil {
+				t.Fatal("resume accepted a different named flavor")
+			}
 			next, err := newDSGAResumePlan(p, previous, policy, time.Now())
 			if err != nil {
 				t.Fatal(err)
 			}
 			if next.Credentials != previous.Credentials || next.ComputeInstanceID != previous.ComputeInstanceID ||
-				next.PostgresVersion != major || next.Storage != previous.Storage || !next.RetainCatalog {
+				next.PostgresVersion != major || next.FlavorID != previous.FlavorID || next.Storage != previous.Storage || !next.RetainCatalog {
 				t.Fatal("resume changed the original logical Compute or credential source")
 			}
 			if next.Incarnation == previous.Incarnation || next.OperationUUID == previous.OperationUUID {

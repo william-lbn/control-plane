@@ -43,7 +43,7 @@ func newDSGAProjectFixture(t *testing.T) *dsgaProjectFixture {
 	}
 	_, policy, _ := dsgaPlanFixture(t)
 	policy.VM = dsgaVMProfileV5Fixture()
-	raw, _ := json.Marshal(dsgaProjectPolicy{1, "test-region", createBounds{500, 2000, 1024, 4096}, policy})
+	raw, _ := json.Marshal(dsgaProjectPolicy{ProtocolVersion: 1, Region: "test-region", Bounds: createBounds{500, 2000, 1024, 4096}, Creation: policy})
 	t.Setenv("NEON_V2_CREATE_ENABLED", "true")
 	t.Setenv("NEON_DSGA_CREATE_ENABLED", "true")
 	t.Setenv("NEON_DSGA_CREATION_POLICY", string(raw))

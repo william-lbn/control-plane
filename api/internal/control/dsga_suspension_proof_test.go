@@ -208,7 +208,7 @@ func testDSGAResumeGeneration(t *testing.T, ctx context.Context, b *dsgaCreation
 		t.Fatal(err)
 	}
 	_, release := supplyFixture(t, previous.PostgresVersion)
-	setDSGACatalog(t, dsgaRuntimeCatalog{1, []dsgaProjectPolicy{{1, "test", createBounds{p.MinCPU, p.MaxCPU, p.MinMem, p.MaxMem}, dsgaCreationPolicy{
+	setDSGACatalog(t, dsgaRuntimeCatalog{1, []dsgaProjectPolicy{{ProtocolVersion: 1, Region: "test", Bounds: createBounds{p.MinCPU, p.MaxCPU, p.MinMem, p.MaxMem}, Creation: dsgaCreationPolicy{
 		PostgresVersion: previous.PostgresVersion, NativeBootstrapVersion: release.NativeBootstrapVersion,
 		Namespace: previous.Namespace, Image: release.Image, MemorySlotBytes: release.MemorySlotBytes, Budget: release.Budget,
 		VM: release.VM, Storage: previous.Storage, RetainedCatalog: true,

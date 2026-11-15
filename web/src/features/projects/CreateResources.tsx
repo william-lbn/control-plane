@@ -20,6 +20,16 @@ const initialBounds: Bounds = {
   max_memory_mib: 3072,
 };
 
+const runtimeIdentity = (value: PostgresRuntime) =>
+  `${value.postgres_version}:${value.region_id}${value.flavor_id ? `:${value.flavor_id}` : ''}`;
+
+function defaultRuntime(choices: PostgresRuntime[]) {
+  return (
+    choices.find((value) => value.create_enabled && value.default_flavor) ||
+    choices.find((value) => value.create_enabled)
+  );
+}
+
 export function CreateResource({
   kind,
   organizationId = 'local',
@@ -27,6 +37,7 @@ export function CreateResource({
   branches = [],
   branchId,
   writerExists = false,
+  endpointRuntimes = [],
   allowHistorical = false,
   restoreOnly = false,
   onDone,
@@ -38,6 +49,7 @@ export function CreateResource({
   branches?: Branch[];
   branchId?: string;
   writerExists?: boolean;
+  endpointRuntimes?: PostgresRuntime[];
   allowHistorical?: boolean;
   restoreOnly?: boolean;
   onDone: (resourceId: string) => void;
@@ -166,12 +178,14 @@ export function CreateResource({
     writerExists ? 'read_only' : 'read_write',
   );
   const [password, setPassword] = useState('');
-  const [bounds, setBounds] = useState<Bounds>(initialBounds);
-  const [runtimes, setRuntimes] = useState<PostgresRuntime[]>([]);
-  const [runtimeKey, setRuntimeKey] = useState('');
+  const endpointRuntime = defaultRuntime(endpointRuntimes);
+  const [bounds, setBounds] = useState<Bounds>(endpointRuntime?.bounds || initialBounds);
+  const [runtimes, setRuntimes] = useState<PostgresRuntime[]>(endpointRuntimes);
+  const [runtimeKey, setRuntimeKey] = useState(
+    endpointRuntime ? runtimeIdentity(endpointRuntime) : '',
+  );
   const [runtimeError, setRuntimeError] = useState('');
-  const runtimeIdentity = (value: PostgresRuntime) =>
-    `${value.postgres_version}:${value.region_id}`;
+  const selectRuntime = kind === 'project' || (kind === 'endpoint' && runtimes.length > 0);
   const selectedRuntime = runtimes.find(
     (value) => runtimeIdentity(value) === runtimeKey && value.create_enabled,
   );
@@ -181,9 +195,11 @@ export function CreateResource({
     api<Capabilities>('/api/v1/capabilities', { signal: controller.signal })
       .then((capabilities) => {
         if (controller.signal.aborted) return;
-        const choices = capabilities.postgres_runtimes || [];
+        const choices = capabilities.compute_flavors?.length
+          ? capabilities.compute_flavors
+          : capabilities.postgres_runtimes || [];
         setRuntimes(choices);
-        const first = choices.find((value) => value.create_enabled);
+        const first = defaultRuntime(choices);
         if (first) {
           setRuntimeKey(runtimeIdentity(first));
           setBounds(first.bounds);
@@ -194,7 +210,7 @@ export function CreateResource({
       });
     return () => controller.abort();
   }, [kind]);
-  const resourceLimits = kind === 'project' ? selectedRuntime?.bounds : undefined;
+  const resourceLimits = selectedRuntime?.bounds;
 
   const [busy, setBusy] = useState(false);
   const [operation, setOperation] = useState<Operation | null>(null);
@@ -256,7 +272,7 @@ export function CreateResource({
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (busy || operation || (kind === 'project' && !selectedRuntime)) return;
+    if (busy || operation || (selectRuntime && !selectedRuntime)) return;
     if (
       kind === 'branch' &&
       (!parentFunctions ||
@@ -282,6 +298,7 @@ export function CreateResource({
             default_branch_name: defaultBranch,
             region_id: selectedRuntime!.region_id,
             postgres_version: selectedRuntime!.postgres_version,
+            ...(selectedRuntime!.flavor_id ? { flavor_id: selectedRuntime!.flavor_id } : {}),
             password,
             autoscaling: bounds,
           }
@@ -313,6 +330,7 @@ export function CreateResource({
           : {
               branch_id: branchId,
               type: endpointType,
+              ...(selectedRuntime?.flavor_id ? { flavor_id: selectedRuntime.flavor_id } : {}),
               ...(endpointType === 'read_write' ? { password } : {}),
               autoscaling: bounds,
             };
@@ -406,11 +424,11 @@ export function CreateResource({
             : '请求会生成持久 Operation，依次调谐 Storage Controller、NeonVM 和 Proxy，并在 SQL 探针成功后标记就绪。'}
         </p>
         <form onSubmit={submit}>
-          {kind === 'project' && (
+          {selectRuntime && (
             <label className="create-field">
-              PostgreSQL 版本与地域
+              {kind === 'project' ? 'PostgreSQL 版本与地域' : 'Compute 规格'}
               <select
-                aria-label="PostgreSQL 版本与地域"
+                aria-label={kind === 'project' ? 'PostgreSQL 版本与地域' : 'Compute 规格'}
                 value={runtimeKey}
                 disabled={busy || !!operation}
                 onChange={(event) => {
@@ -431,6 +449,7 @@ export function CreateResource({
                     disabled={!value.create_enabled}
                   >
                     PostgreSQL {value.postgres_version} · {value.region_id}
+                    {value.flavor_id ? ` · ${value.flavor_id}` : ''}
                     {value.memory_scaling === 'vm_and_postgres' ? ' · PG 内存自动伸缩' : ''}
                   </option>
                 ))}
@@ -682,7 +701,7 @@ export function CreateResource({
             )}
           {(kind !== 'branch' || withEndpoint) && (
             <div className="form-grid create-bounds">
-              {kind !== 'project' && (
+              {!selectRuntime && (
                 <>
                   <label>
                     资源预设
@@ -782,7 +801,7 @@ export function CreateResource({
               disabled={
                 busy ||
                 !!operation ||
-                (kind === 'project' && !selectedRuntime) ||
+                (selectRuntime && !selectedRuntime) ||
                 (kind === 'branch' &&
                   (!parentFunctions ||
                     !!functionPolicyError ||

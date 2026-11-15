@@ -112,7 +112,7 @@ func TestDSGAResourcePolicySnapshotOwnsLimitsAndPools(t *testing.T) {
 func TestDSGAResourcePublicPolicyRequiresV5RunnerBudgetAndPlacementBeforeReservation(t *testing.T) {
 	_, base, _ := dsgaPlanFixture(t)
 	base.VM = dsgaVMProfileV5Fixture()
-	policy := dsgaProjectPolicy{1, "test-region", createBounds{500, 2000, 1024, 4096}, base}
+	policy := dsgaProjectPolicy{ProtocolVersion: 1, Region: "test-region", Bounds: createBounds{500, 2000, 1024, 4096}, Creation: base}
 	raw, _ := json.Marshal(policy)
 	t.Setenv("NEON_DSGA_CREATION_POLICY", string(raw))
 	if _, err := readDSGAProjectPolicy("neon"); err != nil {

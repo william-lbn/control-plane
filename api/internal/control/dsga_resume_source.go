@@ -55,6 +55,7 @@ func readDSGAResumeSource(ctx context.Context, db connectionDefaultReader, p cre
 // retained release supplies the new compatible image, Runner and limits.
 func newDSGAResumePlan(p createPayload, previous dsgaCreationPlan, policy dsgaCreationPolicy, now time.Time) (dsgaCreationPlan, error) {
 	if previous.validate(p) != nil || previous.Credentials.validate() != nil || !policy.RetainedCatalog ||
+		(previous.FlavorID != "" && policy.FlavorID != previous.FlavorID) ||
 		policy.postgresVersion() != previous.PostgresVersion || policy.Namespace != previous.Namespace ||
 		policy.Storage != previous.Storage || policy.VM.supply() == nil || policy.VM.ProtocolVersion != 5 {
 		return dsgaCreationPlan{}, errDSGACreationPlan
@@ -63,6 +64,7 @@ func newDSGAResumePlan(p createPayload, previous dsgaCreationPlan, policy dsgaCr
 	if err != nil {
 		return dsgaCreationPlan{}, err
 	}
+	next.FlavorID = previous.FlavorID
 	next.Credentials = previous.Credentials
 	next.ComputeInstanceID = previous.ComputeInstanceID
 	next.RetainCatalog = true

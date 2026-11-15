@@ -21,6 +21,7 @@ try {
   const errors = [];
   const requests = [];
   let available = true;
+  let named = false;
   const releases = [17, 18].map((postgres_version) => ({
     postgres_version,
     region_id: 'component-region-' + postgres_version,
@@ -34,6 +35,15 @@ try {
     },
     memory_slot_mib: 1024,
   }));
+  const namedFlavor = {
+    ...releases[0],
+    flavor_id: 'memory-preview',
+    bounds: { ...releases[0].bounds, min_memory_mib: 4096, max_memory_mib: 5120 },
+  };
+  const computeFlavors = [
+    ...releases.map((release) => ({ ...release, flavor_id: 'standard', default_flavor: true })),
+    namedFlavor,
+  ];
   page.on('pageerror', (e) => errors.push(e.message));
   // 不放行任何未声明的API或外域请求，防止测试夹具意外触及集群。
   await page.route('**/*', async (route) => {
@@ -61,6 +71,7 @@ try {
       value = {
         features: { project_create: { enabled: true } },
         postgres_runtimes: available ? releases : [],
+        ...(available && named ? { compute_flavors: computeFlavors } : {}),
       };
     else if (url.pathname === '/api/v1/platform/ai-providers/capabilities')
       value = { enabled: false };
@@ -102,7 +113,7 @@ try {
     .getByLabel('数据库角色密码', { exact: true })
     .fill('component-only-password-20261107');
   const submit = dialog.getByRole('button', { name: '创建并验证', exact: true });
-  async function submitAndInspect(version) {
+  async function submitAndInspect(version, flavor) {
     const before = requests.length;
     await submit.click();
     await page.waitForFunction(() => {
@@ -113,7 +124,8 @@ try {
     });
     assert.equal(requests.length, before + 1);
     const request = requests.at(-1);
-    const release = releases.find((r) => r.postgres_version === version);
+    const release = flavor || releases.find((r) => r.postgres_version === version);
+    assert.equal(request.body.flavor_id, flavor?.flavor_id);
     assert.equal(request.body.postgres_version, version);
     assert.equal(request.body.region_id, release.region_id);
     assert.deepEqual(request.body.autoscaling, release.bounds);
@@ -135,6 +147,23 @@ try {
   await dialog.getByRole('alert').filter({ hasText: '当前没有可创建' }).waitFor();
   assert(await dialog.getByRole('button', { name: '创建并验证', exact: true }).isDisabled());
   checks.push('empty_catalog_prevents_creation');
+  await dialog.getByRole('button', { name: '关闭创建窗口', exact: true }).click();
+  available = true;
+  named = true;
+  await page.getByRole('button', { name: '＋ 创建项目', exact: true }).click();
+  await select.selectOption('17:component-region-17:standard');
+  await dialog.getByLabel('项目名称', { exact: true }).fill('runtime-named-component');
+  await dialog
+    .getByLabel('数据库角色密码', { exact: true })
+    .fill('component-only-password-20261107');
+  const standard = await submitAndInspect(17, computeFlavors[0]);
+  await select.selectOption('17:component-region-17:memory-preview');
+  assert.equal(await dialog.getByLabel('最小内存', { exact: true }).inputValue(), '4096');
+  const custom = await submitAndInspect(17, namedFlavor);
+  assert.notEqual(standard.key, custom.key);
+  const same = await submitAndInspect(17, namedFlavor);
+  assert.equal(same.key, custom.key);
+  checks.push('same_pg_and_region_use_flavor_bounds_and_idempotency');
   assert.deepEqual(errors, []);
   checks.push('no_browser_javascript_errors');
   await context.close();

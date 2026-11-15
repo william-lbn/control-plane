@@ -50,8 +50,8 @@ func (s *server) createDSGARetainedEndpoint(w http.ResponseWriter, r *http.Reque
 	if mode == "" {
 		mode = "read_write"
 	}
-	if (mode != "read_write" && mode != "read_only") || (mode == "read_only" && body.Password != "") {
-		fail(w, r, 422, "invalid_endpoint", "Check Compute mode and password")
+	if !validDSGAFlavorID(body.FlavorID) || (mode != "read_write" && mode != "read_only") || (mode == "read_only" && body.Password != "") {
+		fail(w, r, 422, "invalid_endpoint", "Check Compute mode, password and flavor ID")
 		return
 	}
 	if mode == "read_write" {
@@ -281,7 +281,7 @@ func (s *server) reserveDSGAEndpoint(ctx context.Context, actor, org, project, s
 	if err == nil {
 		p := r.Draft.Payload
 		if r.BaseAction != "create_endpoint" || r.RequestHash != hash || r.Org != org || r.Scope != scope || p.ProjectID != project ||
-			p.BranchID != body.BranchID || p.EndpointType != mode || p.TenantID != tenant || p.TimelineID != timeline {
+			p.BranchID != body.BranchID || (body.FlavorID != "" && r.Draft.Plan.FlavorID != body.FlavorID) || p.EndpointType != mode || p.TenantID != tenant || p.TimelineID != timeline {
 			return empty, errDSGACreationConflict
 		}
 		if !r.Accepted {
@@ -303,7 +303,7 @@ func (s *server) reserveDSGAEndpoint(ctx context.Context, actor, org, project, s
 	if err := checkDSGAReservationQuota(ctx, tx, org, pl, el, false); err != nil {
 		return empty, err
 	}
-	policy, err := selectDSGAProjectPolicy(s.kube.namespace, version, region)
+	policy, err := selectDSGAFlavorPolicy(s.kube.namespace, version, region, body.FlavorID)
 	if err != nil || !policy.Creation.RetainedCatalog {
 		return empty, errDSGARuntimeUnavailable
 	}

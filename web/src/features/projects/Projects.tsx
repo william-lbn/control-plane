@@ -256,6 +256,11 @@ export function ProjectWorkspace({
     return branch ? (
       <BranchDetail
         projectId={projectId}
+        computeFlavors={capabilities?.compute_flavors?.filter(
+          (item) =>
+            item.postgres_version === project.postgres_version &&
+            item.region_id === project.region_id,
+        )}
         branch={branch}
         endpoints={endpoints.filter((item) => item.branch_id === branchId)}
         canCreateEndpoint={
@@ -504,6 +509,7 @@ const serviceDescriptions: Record<string, string> = {
 };
 function BranchDetail({
   projectId,
+  computeFlavors,
   branch,
   endpoints,
   canCreateEndpoint,
@@ -511,6 +517,7 @@ function BranchDetail({
   showError,
 }: {
   projectId: string;
+  computeFlavors?: Capabilities['compute_flavors'];
   branch: Branch;
   endpoints: Endpoint[];
   canCreateEndpoint: boolean;
@@ -531,6 +538,7 @@ function BranchDetail({
       {showCreateEndpoint && (
         <CreateResource
           kind="endpoint"
+          endpointRuntimes={computeFlavors}
           projectId={projectId}
           branchId={branch.id}
           writerExists={endpoints.some((endpoint) => endpoint.endpoint_type === 'read_write')}

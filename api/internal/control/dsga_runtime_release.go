@@ -20,7 +20,7 @@ func (policy dsgaCreationPolicy) postgresVersion() uint32 {
 	return policy.PostgresVersion
 }
 
-// 发行目录只供平台进程配置。API请求仅选择版本/地域，不能传镜像、预算、
+// 发行目录只供平台进程配置。API请求仅选择版本/地域/已配置规格，不能传镜像、预算、
 // 节点名单或原生协议。完整选中项随后冻结到原Operation，恢复不重读目录。
 // 单版本旧变量保持兼容；同时设置两种来源必须报错，不能悄悄覆盖。
 type dsgaRuntimeCatalog struct {
@@ -38,17 +38,19 @@ func readDSGARuntimePolicies(namespace string) ([]dsgaProjectPolicy, error) {
 		return []dsgaProjectPolicy{policy}, nil
 	}
 	var catalog dsgaRuntimeCatalog
-	if os.Getenv("NEON_DSGA_CREATION_POLICY") != "" || decodeDSGAObject([]byte(raw), &catalog) != nil || (catalog.ProtocolVersion != 1 && catalog.ProtocolVersion != 2) || len(catalog.Releases) == 0 || len(catalog.Releases) > 32 {
+	if os.Getenv("NEON_DSGA_CREATION_POLICY") != "" || decodeDSGAObject([]byte(raw), &catalog) != nil || (catalog.ProtocolVersion < 1 || catalog.ProtocolVersion > 3) || len(catalog.Releases) == 0 || len(catalog.Releases) > 32 {
 		return nil, errDSGACreationPlan
 	}
 	type key struct {
 		version uint32
 		region  string
 	}
-	seen := map[key]bool{}
+	seen := map[key]map[string]bool{}
+	defaults := map[key]bool{}
+	storage := map[key]dsgaStorageProfile{}
 	for _, policy := range catalog.Releases {
 		// v2目录必须自动供应；历史v1仅保留原发行读取，不能默默补运行配置。
-		if catalog.ProtocolVersion == 2 && policy.Creation.VM.supply() == nil {
+		if catalog.ProtocolVersion >= 2 && policy.Creation.VM.supply() == nil {
 			return nil, errDSGACreationPlan
 		}
 		// 新目录显式选择PG版本及硬预算合同v3；历史v2不被迁移或自动改写。
@@ -59,15 +61,36 @@ func readDSGARuntimePolicies(namespace string) ([]dsgaProjectPolicy, error) {
 			return nil, err
 		}
 		identity := key{policy.Creation.PostgresVersion, policy.Region}
-		if seen[identity] {
+		flavor := policy.Creation.FlavorID
+		if catalog.ProtocolVersion < 3 && (policy.DefaultFlavor || flavor != "") ||
+			catalog.ProtocolVersion == 3 && flavor == "" {
 			return nil, errDSGACreationPlan
 		}
-		seen[identity] = true
+		if seen[identity] == nil {
+			seen[identity] = map[string]bool{}
+			storage[identity] = policy.Creation.Storage
+		} else if storage[identity] != policy.Creation.Storage {
+			return nil, errDSGACreationPlan
+		}
+		if seen[identity][flavor] || defaults[identity] && policy.DefaultFlavor {
+			return nil, errDSGACreationPlan
+		}
+		seen[identity][flavor] = true
+		defaults[identity] = defaults[identity] || policy.DefaultFlavor || flavor == ""
+	}
+	for key := range seen {
+		if !defaults[key] {
+			return nil, errDSGACreationPlan
+		}
 	}
 	return catalog.Releases, nil
 }
 
 func selectDSGAProjectPolicy(namespace string, version uint32, region string) (dsgaProjectPolicy, error) {
+	return selectDSGAFlavorPolicy(namespace, version, region, "")
+}
+
+func selectDSGAFlavorPolicy(namespace string, version uint32, region, flavor string) (dsgaProjectPolicy, error) {
 	policies, err := readDSGARuntimePolicies(namespace)
 	if err != nil {
 		return dsgaProjectPolicy{}, err
@@ -75,7 +98,9 @@ func selectDSGAProjectPolicy(namespace string, version uint32, region string) (d
 	var selected dsgaProjectPolicy
 	count := 0
 	for _, policy := range policies {
-		if policy.Creation.postgresVersion() == version && (region == "" || policy.Region == region) {
+		eligible := flavor == "" && (policy.DefaultFlavor || policy.Creation.FlavorID == "") ||
+			flavor != "" && policy.Creation.FlavorID == flavor
+		if eligible && policy.Creation.postgresVersion() == version && (region == "" || policy.Region == region) {
 			selected, count = policy, count+1
 		}
 	}
@@ -91,6 +116,8 @@ func selectDSGAProjectPolicy(namespace string, version uint32, region string) (d
 type postgresRuntimeOption struct {
 	PostgresVersion uint32       `json:"postgres_version"`
 	RegionID        string       `json:"region_id"`
+	FlavorID        string       `json:"flavor_id,omitempty"`
+	DefaultFlavor   bool         `json:"default_flavor,omitempty"`
 	CreateEnabled   bool         `json:"create_enabled"`
 	MemoryScaling   string       `json:"memory_scaling"`
 	Bounds          createBounds `json:"bounds"`
@@ -98,9 +125,16 @@ type postgresRuntimeOption struct {
 }
 
 func (s *server) postgresRuntimeOptions() []postgresRuntimeOption {
+	return s.dsgaRuntimeOptions(false)
+}
+
+func (s *server) dsgaRuntimeOptions(flavors bool) []postgresRuntimeOption {
 	// 已配置内存发行目录的部署只公布该目录；不额外显示未配置的PG16。
 	// 全无新目录时保留旧部署兼容入口，不将其纳入本轮PG17/18验收。
 	if os.Getenv("NEON_DSGA_RUNTIME_CATALOG") == "" && os.Getenv("NEON_DSGA_CREATION_POLICY") == "" {
+		if flavors {
+			return []postgresRuntimeOption{}
+		}
 		return []postgresRuntimeOption{{PostgresVersion: 16, RegionID: "rke2-lab", CreateEnabled: creationEnabled(), MemoryScaling: "vm", Bounds: defaults(nil), MemorySlotMiB: 1024}}
 	}
 	options := []postgresRuntimeOption{}
@@ -113,7 +147,15 @@ func (s *server) postgresRuntimeOptions() []postgresRuntimeOption {
 	}
 	enabled := creationEnabled() && os.Getenv("NEON_DSGA_CREATE_ENABLED") == "true" && len(s.idempotencyKey) >= 32
 	for _, p := range policies {
-		options = append(options, postgresRuntimeOption{PostgresVersion: p.Creation.postgresVersion(), RegionID: p.Region, CreateEnabled: enabled, MemoryScaling: "vm_and_postgres", Bounds: p.Bounds, MemorySlotMiB: p.Creation.MemorySlotBytes / (1 << 20)})
+		if flavors && p.Creation.FlavorID == "" || !flavors && p.Creation.FlavorID != "" && !p.DefaultFlavor {
+			continue
+		}
+		option := postgresRuntimeOption{PostgresVersion: p.Creation.postgresVersion(), RegionID: p.Region, CreateEnabled: enabled,
+			MemoryScaling: "vm_and_postgres", Bounds: p.Bounds, MemorySlotMiB: p.Creation.MemorySlotBytes / (1 << 20)}
+		if flavors {
+			option.FlavorID, option.DefaultFlavor = p.Creation.FlavorID, p.DefaultFlavor
+		}
+		options = append(options, option)
 	}
 	return options
 }

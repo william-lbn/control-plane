@@ -234,6 +234,7 @@ type projectCreateRequest struct {
 	Password          string        `json:"password"`
 	DefaultBranchName string        `json:"default_branch_name"`
 	RegionID          string        `json:"region_id"`
+	FlavorID          string        `json:"flavor_id,omitempty"`
 	PostgresVersion   int           `json:"postgres_version"`
 	Autoscaling       *createBounds `json:"autoscaling"`
 }
@@ -265,7 +266,7 @@ func (s *server) createProject(w http.ResponseWriter, r *http.Request) {
 	}
 	bounds := defaults(body.Autoscaling)
 	if !validName(body.Name, 64) || !validName(body.DefaultBranchName, 63) || body.RegionID != "rke2-lab" ||
-		body.PostgresVersion != 16 || !bounds.valid() || len(body.Password) < 12 || len(body.Password) > 256 {
+		body.PostgresVersion != 16 || body.FlavorID != "" || !bounds.valid() || len(body.Password) < 12 || len(body.Password) > 256 {
 		fail(w, r, 422, "invalid_project", "Check name, PostgreSQL 16, region, password and VM bounds")
 		return
 	}
@@ -571,6 +572,7 @@ func (s *server) createBranch(w http.ResponseWriter, r *http.Request) {
 
 type endpointCreateRequest struct {
 	BranchID    string        `json:"branch_id"`
+	FlavorID    string        `json:"flavor_id,omitempty"`
 	Password    string        `json:"password"`
 	Type        string        `json:"type,omitempty"`
 	Autoscaling *createBounds `json:"autoscaling"`
@@ -608,7 +610,7 @@ func (s *server) createEndpoint(w http.ResponseWriter, r *http.Request) {
 	if endpointType == "" {
 		endpointType = "read_write"
 	}
-	if !bounds.valid() || (endpointType != "read_write" && endpointType != "read_only") ||
+	if body.FlavorID != "" || !bounds.valid() || (endpointType != "read_write" && endpointType != "read_only") ||
 		(endpointType == "read_write" && (len(body.Password) < 12 || len(body.Password) > 256)) ||
 		(endpointType == "read_only" && body.Password != "") {
 		fail(w, r, 422, "invalid_endpoint", "Check type, password and VM bounds")

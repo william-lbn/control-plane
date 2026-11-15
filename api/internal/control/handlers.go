@@ -395,6 +395,7 @@ func (s *server) capabilities(w http.ResponseWriter, r *http.Request) {
 		"cluster_id": "rke2-lab", "observed_at": time.Now().UTC(),
 		"runtime":           s.runtimeStatus(r.Context()),
 		"postgres_runtimes": s.postgresRuntimeOptions(),
+		"compute_flavors":   s.dsgaRuntimeOptions(true),
 		"features": map[string]any{
 			"console_invitations":  map[string]any{"enabled": true, "reason": "account_bound_invitation_registration"},
 			"tenant_authorization": map[string]any{"enabled": true, "reason": "organization_and_additive_project_policy"},

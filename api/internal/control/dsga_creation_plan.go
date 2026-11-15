@@ -69,7 +69,8 @@ type dsgaNativeBootstrap struct {
 
 type dsgaCreationPlan struct {
 	dsgaCreationIdentity
-	Image string `json:"image"`
+	Image    string `json:"image"`
+	FlavorID string `json:"flavor_id,omitempty"`
 	// UUID与时间只在接受原意图前生成一次，恢复不重新读取时钟或分配随机值。
 	OperationUUID   string              `json:"operation_uuid"`
 	AcceptedAt      string              `json:"accepted_at"`
@@ -118,6 +119,7 @@ type dsgaCreationPolicy struct {
 	Budget                 dsgaBootstrapBudget        `json:"budget"`
 	VM                     dsgaVMProfile              `json:"vm"`
 	Storage                dsgaStorageProfile         `json:"storage"`
+	FlavorID               string                     `json:"flavor_id,omitempty"`
 	RetainedCatalog        bool                       `json:"retained_catalog,omitempty"`
 }
 
@@ -125,6 +127,12 @@ var dsgaPinnedImage = regexp.MustCompile(`^[a-z0-9][a-z0-9./:_-]*@sha256:[0-9a-f
 var dsgaPlanUUID = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
 var dsgaPlanNamespace = regexp.MustCompile(`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`)
 var dsgaStorageID = regexp.MustCompile(`^[0-9a-f]{32}$`)
+var dsgaFlavorID = regexp.MustCompile(`^[a-z0-9]+(-[a-z0-9]+)*$`)
+
+func validDSGAFlavorID(value string) bool {
+	return value == "" || len(value) <= 48 && dsgaFlavorID.MatchString(value)
+}
+
 var errDSGACreationPlan = errors.New("DSGA frozen creation plan is invalid or differs from the original intent")
 
 func (b dsgaBootstrapBudget) validate() error {
@@ -148,6 +156,9 @@ func (b dsgaBootstrapBudget) validate() error {
 }
 
 func (plan dsgaCreationPlan) validate(p createPayload) error {
+	if !validDSGAFlavorID(plan.FlavorID) {
+		return errDSGACreationPlan
+	}
 	storageFork := p.EndpointID == "" && p.ParentBranchID != "" && p.ParentBranchID != p.BranchID &&
 		p.ParentTimelineID != "" && p.EndpointType == "read_write" && p.CatalogPolicy == catalogPreserveInheritedSQL
 	if p.EndpointID == "" && (!storageFork || plan.Credentials != (dsgaCredentialReference{})) {
@@ -248,7 +259,7 @@ func makeDSGACreationPlan(p createPayload, policy dsgaCreationPolicy, now time.T
 	entropy[32+8] = (entropy[32+8] & 0x3f) | 0x80
 	uuid := hex.EncodeToString(entropy[32:])
 	plan := dsgaCreationPlan{dsgaCreationIdentity: dsgaCreationIdentity{NativeBootstrapVersion: policy.NativeBootstrapVersion, ProtocolVersion: 1, PostgresVersion: policy.postgresVersion(), Namespace: policy.Namespace, Incarnation: hex.EncodeToString(entropy[:16]), ComputeInstanceID: "ci_" + hex.EncodeToString(entropy[16:32])},
-		Image: policy.Image, OperationUUID: fmt.Sprintf("%s-%s-%s-%s-%s", uuid[:8], uuid[8:12], uuid[12:16], uuid[16:20], uuid[20:]),
+		Image: policy.Image, FlavorID: policy.FlavorID, OperationUUID: fmt.Sprintf("%s-%s-%s-%s-%s", uuid[:8], uuid[8:12], uuid[12:16], uuid[16:20], uuid[20:]),
 		AcceptedAt: now.UTC().Format(time.RFC3339Nano), MemorySlotBytes: policy.MemorySlotBytes, Budget: policy.Budget, VM: policy.VM.clone(), Storage: policy.Storage}
 	if err := plan.validate(p); err != nil {
 		return dsgaCreationPlan{}, err

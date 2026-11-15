@@ -89,6 +89,8 @@ export type Endpoint = {
 };
 export type Feature = { enabled: boolean; reason: string };
 export type PostgresRuntime = {
+  flavor_id?: string;
+  default_flavor?: boolean;
   postgres_version: number;
   region_id: string;
   create_enabled: boolean;
@@ -103,6 +105,7 @@ export type PostgresRuntime = {
 };
 export type Capabilities = {
   postgres_runtimes?: PostgresRuntime[];
+  compute_flavors?: PostgresRuntime[];
   cluster_id: string;
   observed_at: string;
   features: Record<string, Feature>;

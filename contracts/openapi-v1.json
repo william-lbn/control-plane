@@ -237,6 +237,13 @@
             "items": {
               "$ref": "#/components/schemas/PostgresRuntime"
             }
+          },
+          "compute_flavors": {
+            "type": "array",
+            "description": "Configured DSGA flavors with product bounds. An enabled entry authorizes a creation attempt subject to the existing resource and readiness gates.",
+            "items": {
+              "$ref": "#/components/schemas/PostgresRuntime"
+            }
           }
         }
       },
@@ -836,6 +843,12 @@
           },
           "autoscaling": {
             "$ref": "#/components/schemas/AutoscalingBounds"
+          },
+          "flavor_id": {
+            "type": "string",
+            "maxLength": 48,
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "description": "Optional configured DSGA compute flavor ID for the selected major and region. Omit to use the catalog default."
           }
         }
       },
@@ -931,6 +944,12 @@
               "read_only"
             ],
             "default": "read_write"
+          },
+          "flavor_id": {
+            "type": "string",
+            "maxLength": 48,
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "description": "Optional configured DSGA compute flavor ID in the project region and PostgreSQL major. Omit to use the catalog default."
           }
         },
         "description": "type defaults to read_write. A writer requires a new password; a read_only endpoint must omit password and reuses the branch writer role verifier."
@@ -10686,6 +10705,16 @@
           "memory_slot_mib": {
             "type": "integer",
             "minimum": 1
+          },
+          "flavor_id": {
+            "type": "string",
+            "maxLength": 48,
+            "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+            "description": "Compute flavor identity, present on entries in compute_flavors."
+          },
+          "default_flavor": {
+            "type": "boolean",
+            "description": "True when omitted flavor IDs resolve to this entry."
           }
         }
       },

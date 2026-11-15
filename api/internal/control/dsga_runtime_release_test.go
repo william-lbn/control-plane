@@ -21,7 +21,7 @@ func dsgaReleaseCatalogFixture(t *testing.T) dsgaRuntimeCatalog {
 		release := policy
 		release.PostgresVersion = version
 		release.Image = fmt.Sprintf("registry.test/neon/pg%d@sha256:%s", version, strings.Repeat("a", 64))
-		catalog.Releases = append(catalog.Releases, dsgaProjectPolicy{1, "test-region", createBounds{500, 2000, 1024, 4096}, release})
+		catalog.Releases = append(catalog.Releases, dsgaProjectPolicy{ProtocolVersion: 1, Region: "test-region", Bounds: createBounds{500, 2000, 1024, 4096}, Creation: release})
 	}
 	return catalog
 }
@@ -281,5 +281,105 @@ func TestDSGARuntimeForwardMigrationKeepsOriginalPG17Intent(t *testing.T) {
 	plan, err := b.creationPlan(f.ctx)
 	if err != nil || plan.PostgresVersion != 17 {
 		t.Fatal("old intent no longer recoverable", err)
+	}
+}
+
+func dsgaFlavorCatalogFixture(t *testing.T) dsgaRuntimeCatalog {
+	t.Helper()
+	catalog := dsgaRuntimeCatalog{ProtocolVersion: 3}
+	for _, version := range []uint32{17, 18} {
+		p, plan := supplyFixture(t, version)
+		release := dsgaProjectPolicy{
+			ProtocolVersion: 1, Region: "test", DefaultFlavor: true,
+			Bounds: createBounds{p.MinCPU, p.MaxCPU, p.MinMem, p.MaxMem},
+			Creation: dsgaCreationPolicy{
+				FlavorID: "standard", PostgresVersion: version, NativeBootstrapVersion: plan.NativeBootstrapVersion,
+				Namespace: plan.Namespace, Image: plan.Image, MemorySlotBytes: plan.MemorySlotBytes, Budget: plan.Budget,
+				VM: plan.VM, Storage: plan.Storage, RetainedCatalog: true,
+			},
+		}
+		alternate := release
+		alternate.DefaultFlavor = false
+		alternate.Creation.FlavorID = "reader-preview"
+		catalog.Releases = append(catalog.Releases, release, alternate)
+	}
+	return catalog
+}
+
+func TestDSGAFlavorCatalogSelectionIsExplicitAndPreservesLegacyProjection(t *testing.T) {
+	catalog := dsgaFlavorCatalogFixture(t)
+	setDSGACatalog(t, catalog)
+	for _, version := range []uint32{17, 18} {
+		for _, flavor := range []string{"", "standard", "reader-preview"} {
+			policy, err := selectDSGAFlavorPolicy("neon", version, "test", flavor)
+			want := flavor
+			if want == "" {
+				want = "standard"
+			}
+			if err != nil || policy.Creation.FlavorID != want || policy.Creation.PostgresVersion != version {
+				t.Fatalf("wrong configured flavor %q for PG%d: %v", flavor, version, err)
+			}
+		}
+	}
+	if _, err := selectDSGAFlavorPolicy("neon", 17, "test", "unconfigured"); !errors.Is(err, errDSGARuntimeUnavailable) {
+		t.Fatalf("unconfigured flavor was selected: %v", err)
+	}
+	s := &server{kube: newCredentialProducerAPI(t, "success").kube}
+	runtimes, flavors := s.postgresRuntimeOptions(), s.dsgaRuntimeOptions(true)
+	if len(runtimes) != 2 || len(flavors) != 4 || runtimes[0].FlavorID != "" ||
+		flavors[0].FlavorID != "standard" || !flavors[0].DefaultFlavor ||
+		flavors[1].FlavorID != "reader-preview" || flavors[1].DefaultFlavor {
+		t.Fatal("legacy runtime projection or named flavor projection differs")
+	}
+
+	for name, mutate := range map[string]func(*dsgaRuntimeCatalog){
+		"ambiguous_default": func(c *dsgaRuntimeCatalog) { c.Releases[1].DefaultFlavor = true },
+		"missing_default":   func(c *dsgaRuntimeCatalog) { c.Releases[0].DefaultFlavor = false },
+		"duplicate_flavor":  func(c *dsgaRuntimeCatalog) { c.Releases[1].Creation.FlavorID = "standard" },
+		"invalid_flavor":    func(c *dsgaRuntimeCatalog) { c.Releases[1].Creation.FlavorID = "../reader" },
+		"old_format":        func(c *dsgaRuntimeCatalog) { c.ProtocolVersion = 2 },
+		"missing_flavor":    func(c *dsgaRuntimeCatalog) { c.Releases[1].Creation.FlavorID = "" },
+		"unsafe_budget":     func(c *dsgaRuntimeCatalog) { c.Releases[1].Creation.Budget.MinimumGuestMemoryBytes = 1 },
+	} {
+		t.Run(name, func(t *testing.T) {
+			candidate := dsgaFlavorCatalogFixture(t)
+			mutate(&candidate)
+			setDSGACatalog(t, candidate)
+			if _, err := selectDSGAFlavorPolicy("neon", 17, "test", "reader-preview"); !errors.Is(err, errDSGACreationPlan) {
+				t.Fatalf("invalid catalog was accepted: %v", err)
+			}
+		})
+	}
+}
+
+func TestDSGAFlavorProjectReplayKeepsFrozenSelectionAcrossCatalogRotation(t *testing.T) {
+	f := newDSGAProjectFixture(t)
+	catalog := dsgaFlavorCatalogFixture(t)
+	setDSGACatalog(t, catalog)
+	f.body.FlavorID = "reader-preview"
+	const key = "explicit-flavor-original-project"
+	if result := f.request("creation_admin", key, f.body); result.Code != 202 {
+		t.Fatalf("configured flavor rejected: %d %s", result.Code, result.Body.String())
+	}
+	operation, raw, _ := f.reservation(key)
+	var draft dsgaCreationDraft
+	if err := json.Unmarshal([]byte(raw), &draft); err != nil {
+		t.Fatal(err)
+	}
+	if draft.Plan.FlavorID != f.body.FlavorID {
+		t.Fatalf("original plan did not retain flavor %q", draft.Plan.FlavorID)
+	}
+	catalog.Releases = append(catalog.Releases[:1], catalog.Releases[2:]...)
+	setDSGACatalog(t, catalog)
+	if result := f.request("creation_admin", key, f.body); result.Code != 202 {
+		t.Fatalf("original request did not replay after catalog rotation: %d", result.Code)
+	}
+	next, frozen, _ := f.reservation(key)
+	if next != operation || frozen != raw {
+		t.Fatal("catalog rotation changed the original accepted intent")
+	}
+	f.body.FlavorID = "standard"
+	if result := f.request("creation_admin", key, f.body); result.Code != 409 {
+		t.Fatalf("same key allowed a different flavor: %d", result.Code)
 	}
 }

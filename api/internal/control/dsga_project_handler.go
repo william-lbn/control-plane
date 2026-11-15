@@ -16,8 +16,8 @@ func (s *server) createDSGAProject(w http.ResponseWriter, r *http.Request, body 
 		fail(w, r, 503, "dsga_creation_disabled", "PostgreSQL DSGA creation is not enabled")
 		return
 	}
-	if !validName(body.Name, 64) || !validName(body.DefaultBranchName, 63) {
-		fail(w, r, 422, "invalid_project", "Check project and branch names")
+	if !validName(body.Name, 64) || !validName(body.DefaultBranchName, 63) || !validDSGAFlavorID(body.FlavorID) {
+		fail(w, r, 422, "invalid_project", "Check project name, branch name and flavor ID")
 		return
 	}
 	if _, ok := dsgaPassword(body.Password); !ok {
@@ -41,7 +41,7 @@ func (s *server) createDSGAProject(w http.ResponseWriter, r *http.Request, body 
 	if s.replayCreate(w, r, key, hash, "", "project") {
 		return
 	}
-	reservation, err := s.reserveDSGAProject(r.Context(), actor, org, scope, key, hash, dsgaProjectDescription{Name: body.Name, DefaultBranch: body.DefaultBranchName, Region: body.RegionID, PostgresVersion: uint32(body.PostgresVersion), Bounds: body.Autoscaling})
+	reservation, err := s.reserveDSGAProject(r.Context(), actor, org, scope, key, hash, dsgaProjectDescription{Name: body.Name, DefaultBranch: body.DefaultBranchName, Region: body.RegionID, FlavorID: body.FlavorID, PostgresVersion: uint32(body.PostgresVersion), Bounds: body.Autoscaling})
 	if err != nil {
 		s.dsgaCreationFailure(w, r, err)
 		return

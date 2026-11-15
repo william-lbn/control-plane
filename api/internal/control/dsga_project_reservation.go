@@ -24,6 +24,7 @@ var errDSGAProjectBounds = errors.New("requested PostgreSQL resources are outsid
 type dsgaProjectPolicy struct {
 	ProtocolVersion uint32             `json:"protocol_version"`
 	Region          string             `json:"region"`
+	DefaultFlavor   bool               `json:"default_flavor,omitempty"`
 	Bounds          createBounds       `json:"bounds"`
 	Creation        dsgaCreationPolicy `json:"creation"`
 }
@@ -31,9 +32,9 @@ type dsgaProjectPolicy struct {
 // 非敏感投影：类型中没有Password字段，避免将HTTP原body写入元数据库。
 // 明文只交给prepareDSGACredentials；原请求关联使用已有带密钥HMAC摘要。
 type dsgaProjectDescription struct {
-	Name, DefaultBranch, Region string
-	PostgresVersion             uint32
-	Bounds                      *createBounds
+	Name, DefaultBranch, Region, FlavorID string
+	PostgresVersion                       uint32
+	Bounds                                *createBounds
 }
 
 type dsgaCreationDraft struct {
@@ -68,14 +69,14 @@ func decodeDSGAObject(raw []byte, into any) error {
 
 func readDSGAProjectPolicy(namespace string) (dsgaProjectPolicy, error) {
 	var policy dsgaProjectPolicy
-	if decodeDSGAObject([]byte(os.Getenv("NEON_DSGA_CREATION_POLICY")), &policy) != nil {
+	if decodeDSGAObject([]byte(os.Getenv("NEON_DSGA_CREATION_POLICY")), &policy) != nil || policy.DefaultFlavor || policy.Creation.FlavorID != "" {
 		return policy, errDSGACreationPlan
 	}
 	return validateDSGAProjectPolicy(namespace, policy)
 }
 
 func validateDSGAProjectPolicy(namespace string, policy dsgaProjectPolicy) (dsgaProjectPolicy, error) {
-	if policy.ProtocolVersion != 1 || !dsgaSupportedPostgresVersion(policy.Creation.postgresVersion()) ||
+	if policy.ProtocolVersion != 1 || !validDSGAFlavorID(policy.Creation.FlavorID) || !dsgaSupportedPostgresVersion(policy.Creation.postgresVersion()) ||
 		policy.Creation.Namespace != namespace || policy.Region == "" || len(policy.Region) > 128 || strings.TrimSpace(policy.Region) != policy.Region ||
 		policy.Creation.VM.ProtocolVersion != 5 || policy.Creation.VM.validateResourceBudget(policy.Creation.Budget) != nil || policy.Creation.Storage.CredentialNamespace == "" || policy.Creation.Storage.validate(namespace) != nil || !dsgaPinnedImage.MatchString(policy.Creation.Image) || len(namespace) > 63 || !dsgaPlanNamespace.MatchString(namespace) || policy.Bounds.MinCPU < 250 || policy.Bounds.MinCPU%250 != 0 || policy.Bounds.MaxCPU < policy.Bounds.MinCPU || policy.Bounds.MaxCPU%250 != 0 || policy.Bounds.MaxCPU > 1<<31-1 ||
 		policy.Bounds.MinMem <= 0 || policy.Bounds.MaxMem < policy.Bounds.MinMem || policy.Bounds.MaxMem > 1<<31-1 {
@@ -197,6 +198,7 @@ func (r dsgaProjectReservation) matches(org, scope, requestHash, namespace strin
 	p := r.Draft.Payload
 	return r.BaseAction == "create_project" && r.Draft.Plan.PostgresVersion == body.PostgresVersion && r.Org == org && r.Scope == scope && r.RequestHash == requestHash && r.Draft.Plan.Namespace == namespace &&
 		r.Draft.ResourceName == body.Name && r.Draft.DefaultBranch == body.DefaultBranch && (body.Region == "" || body.Region == r.Draft.Region) &&
+		(body.FlavorID == "" || body.FlavorID == r.Draft.Plan.FlavorID) &&
 		(body.Bounds == nil || *body.Bounds == (createBounds{p.MinCPU, p.MaxCPU, p.MinMem, p.MaxMem}))
 }
 
@@ -248,7 +250,7 @@ func (s *server) reserveDSGAProject(ctx context.Context, actor, org, scope, key,
 	if err := checkDSGAReservationQuota(ctx, tx, org, pl, el, false); err != nil {
 		return empty, err
 	}
-	policy, err := selectDSGAProjectPolicy(s.kube.namespace, body.PostgresVersion, body.Region)
+	policy, err := selectDSGAFlavorPolicy(s.kube.namespace, body.PostgresVersion, body.Region, body.FlavorID)
 	if err != nil {
 		return empty, err
 	}
