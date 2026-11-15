@@ -14,6 +14,10 @@
         "replicaCount"
       ],
       "properties": {
+        "nodeSelector": {
+          "type": "object",
+          "additionalProperties": {"type": "string"}
+        },
         "enabled": {
           "type": "boolean"
         },
@@ -37,6 +41,10 @@
         "pgTLSMode"
       ],
       "properties": {
+        "nodeSelector": {
+          "type": "object",
+          "additionalProperties": {"type": "string"}
+        },
         "replicaCount": {
           "type": "integer",
           "const": 1
