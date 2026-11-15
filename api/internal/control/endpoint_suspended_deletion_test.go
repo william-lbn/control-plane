@@ -2,11 +2,22 @@ package control
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
 	"testing"
 )
 
 func TestSuspendedEndpointDeletionRouteCAS(t *testing.T) {
-	f, original, _ := managedSQLReplacementFixture(t)
+	f, original, previous := managedSQLReplacementFixture(t)
+	previous["state"] = json.RawMessage(`"active"`)
+	f.mutate(func(objects map[string]map[string]any) {
+		registry := objects[f.k.path("secret", routesSecret)]
+		raw, err := json.Marshal(map[string]map[string]json.RawMessage{selector(original.EndpointID): previous})
+		if err != nil {
+			t.Fatal(err)
+		}
+		registry["data"].(map[string]any)["routes.json"] = base64.StdEncoding.EncodeToString(raw)
+	})
 	scope := createPayload{ProjectID: original.ProjectID, EndpointID: original.EndpointID,
 		BranchID: original.BranchID, TenantID: original.TenantID, TimelineID: original.TimelineID}
 	proof := suspendedEndpointDeletionSource{

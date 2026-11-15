@@ -95,8 +95,12 @@ func (s *server) observeSuspendedEndpointDeletion(ctx context.Context, source su
 }
 
 func (source suspendedEndpointDeletionSource) verifyRoute(route map[string]any, operation string) error {
-	if route["state"] != "suspended" &&
-		(route["state"] != "deleted" || route["deletion_operation_id"] != operation) {
+	// DSGA suspension retains an active route record for the managed wake
+	// path. The committed suspend and absent original VM prove retirement.
+	state := stringVal(route["state"])
+	deletion := stringVal(route["deletion_operation_id"])
+	if (state != "active" && state != "suspended" || deletion != "") &&
+		(state != "deleted" || deletion != operation) {
 		return errors.New("suspended deletion route state changed")
 	}
 	raw, err := json.Marshal(route["managed_binding"])
