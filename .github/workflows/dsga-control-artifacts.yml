@@ -1,0 +1,115 @@
+name: Control Plane artifacts for the unified DSGA release
+on:
+  workflow_call:
+    inputs:
+      source_sha:
+        type: string
+        required: true
+      release_tag:
+        type: string
+        required: true
+    secrets:
+      DOCKERHUB_USERNAME:
+        required: true
+      DOCKERHUB_TOKEN:
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Build control-${{ matrix.component }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        component: [api, web, gateway, dataapi, postgrest, adapter, auth, ai, storage-gateway]
+    env:
+      SOURCE_SHA: ${{ inputs.source_sha }}
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      COMPONENT: ${{ matrix.component }}
+      REGISTRY: docker.io/williamluckyli
+    steps:
+      - name: Verify immutable caller identity
+        shell: bash
+        run: |
+          test "$GITHUB_REPOSITORY" = william-lbn/neon
+          [[ "$SOURCE_SHA" =~ ^[a-f0-9]{40}$ ]]
+          [[ "$GITHUB_RUN_ID" =~ ^[1-9][0-9]*$ && "$GITHUB_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]]
+          test "$RELEASE_TAG" = "0.2.0-dsga.$GITHUB_RUN_ID.$GITHUB_RUN_ATTEMPT.amd64"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          repository: william-lbn/control-plane
+          ref: ${{ inputs.source_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: '24.19.0'
+      - name: Verify checkout, API contract and builder digests
+        id: bundle
+        shell: bash
+        run: |
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          test -z "$(git status --porcelain)"
+          node tools/generate-api-docs.mjs --check
+          {
+            node tools/build-args.mjs
+            echo "name=control-$COMPONENT"
+            echo "image=$REGISTRY/control-$COMPONENT:$RELEASE_TAG"
+            if test "$COMPONENT" = postgrest; then
+              echo 'license=MIT'
+            else
+              echo 'license=Apache-2.0'
+            fi
+          } >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@b5ca514318bd6ebac0fb2aedd5d36ec1b5c232a2
+      - uses: docker/login-action@74a5d142397b4f367a81961eba4e8cd7edddf772
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83
+        id: built
+        with:
+          context: .
+          file: Dockerfile.${{ matrix.component }}
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.bundle.outputs.image }}
+          build-args: |
+            GO_BUILDER_IMAGE=${{ steps.bundle.outputs.GO_BUILDER_IMAGE }}
+            NODE_BUILDER_IMAGE=${{ steps.bundle.outputs.NODE_BUILDER_IMAGE }}
+            WEB_RUNTIME_IMAGE=${{ steps.bundle.outputs.WEB_RUNTIME_IMAGE }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/william-lbn/control-plane
+            org.opencontainers.image.revision=${{ inputs.source_sha }}
+            org.opencontainers.image.licenses=${{ steps.bundle.outputs.license }}
+          sbom: true
+          provenance: mode=max
+          cache-from: type=gha,scope=dsga-control-${{ matrix.component }}
+          cache-to: type=gha,mode=max,scope=dsga-control-${{ matrix.component }}
+      - name: Record immutable image for the caller
+        env:
+          NAME: ${{ steps.bundle.outputs.name }}
+          IMAGE: ${{ steps.bundle.outputs.image }}
+          DIGEST: ${{ steps.built.outputs.digest }}
+        run: |
+          mkdir -p distribution-output
+          node --input-type=module <<'JS'
+          import { writeFileSync } from 'node:fs';
+          const { NAME: name, IMAGE: image, DIGEST: digest, SOURCE_SHA: source_commit,
+            GITHUB_REPOSITORY: repository, GITHUB_RUN_ID: run_id, GITHUB_RUN_ATTEMPT: run_attempt } = process.env;
+          if (!/^sha256:[a-f0-9]{64}$/.test(digest)) throw new Error('Missing immutable OCI digest');
+          const execution = { repository, run_id, run_attempt,
+            run_url: `https://github.com/${repository}/actions/runs/${run_id}/attempts/${run_attempt}` };
+          const receipt = { kind: 'runtime', name, image, digest,
+            source_repository: 'william-lbn/control-plane', source_commit, architecture: 'linux/amd64', execution };
+          writeFileSync(`distribution-output/${name}.json`, JSON.stringify(receipt, null, 2) + '\n', { flag: 'wx' });
+          JS
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: images-control-${{ matrix.component }}-attempt${{ github.run_attempt }}
+          path: distribution-output/${{ steps.bundle.outputs.name }}.json
+          if-no-files-found: error
