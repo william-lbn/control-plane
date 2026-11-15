@@ -39,6 +39,15 @@ func (s *server) runWorker(ctx context.Context) {
 	}
 }
 
+const nextWorkerOperationSQL = `SELECT o.id,o.project_id,o.resource_id,o.action,o.payload FROM operations o
+        WHERE (o.state='queued' OR (o.state='running' AND o.lease_expires_at < now()))
+        AND (o.action<>'deploy_function' OR NOT EXISTS (
+          SELECT 1 FROM operations w JOIN function_definitions f ON f.id=o.resource_id AND f.project_id=o.project_id
+          WHERE w.id=o.payload->>'writer_resume_operation_id' AND w.project_id=o.project_id AND w.resource_id=f.endpoint_id
+          AND w.resource_type='endpoint' AND w.action='resume_endpoint_dsga_v1'
+          AND w.payload->>'branch_id'=f.branch_id AND w.state IN ('queued','running','retry_wait')))
+        ORDER BY o.created_at FOR UPDATE OF o SKIP LOCKED LIMIT 1`
+
 func (s *server) workOnce(ctx context.Context, workerID string) error {
 	tx, err := s.db.Begin(ctx)
 	if err != nil {
@@ -47,9 +56,7 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 	defer tx.Rollback(ctx)
 	var id, projectID, resourceID, action string
 	var payload []byte
-	err = tx.QueryRow(ctx, `SELECT id,project_id,resource_id,action,payload FROM operations
-        WHERE state='queued' OR (state='running' AND lease_expires_at < now())
-        ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1`).Scan(&id, &projectID, &resourceID, &action, &payload)
+	err = tx.QueryRow(ctx, nextWorkerOperationSQL).Scan(&id, &projectID, &resourceID, &action, &payload)
 	if isNoRows(err) {
 		return nil
 	}
@@ -107,11 +114,11 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 				stepErr = s.reconcileEndpointDeletion(runCtx, id, workerID, p)
 			}
 		case "deploy_function":
-			var p functionInstanceTarget
+			var p functionDeploymentOperation
 			if json.Unmarshal(payload, &p) != nil || p.ProjectID != projectID || p.FunctionID != resourceID || !p.valid() {
 				stepErr = errors.New("Function operation scope rejected")
-			} else {
-				stepErr = s.reconcileFunctionDeployment(runCtx, id, workerID, p)
+			} else if stepErr = s.verifyFunctionWriterResume(runCtx, p); stepErr == nil {
+				stepErr = s.reconcileFunctionDeployment(runCtx, id, workerID, p.functionInstanceTarget)
 			}
 		case "suspend_function", "delete_function":
 			var p functionStopTarget
@@ -330,6 +337,9 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 	}
 	if errors.Is(stepErr, errDSGAQualificationUnconfirmed) {
 		code, message = "qualification_unconfirmed", "Inspect the original Job, Pod, and qualification claim; a possible prior publication needs reconciliation"
+	}
+	if errors.Is(stepErr, errFunctionWriterResume) {
+		code, message = "function_writer_resume_required", "Retry the original Writer resume successfully before retrying the Function Operation"
 	}
 	if errors.Is(stepErr, errFunctionRuntimeResource) {
 		code, message = "function_runtime_identity_rejected", "Original Function VM/Service UID, complete specification or availability rejected; preserve its identity and inspect before recovery"

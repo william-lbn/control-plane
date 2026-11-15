@@ -622,9 +622,20 @@ func (s *server) connectionInfo(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *server) operationRecord(ctx context.Context, id, project string) (record, error) {
-	item, err := s.one(ctx, "SELECT id,project_id,resource_type,resource_id,action,state,actor_id,request_id,error_code,error_message,retryable,attempts,created_at,started_at,finished_at FROM operations WHERE id=$1 AND project_id=$2", id, project)
+	item, err := s.one(ctx, `SELECT o.id,o.project_id,o.resource_type,o.resource_id,o.action,o.state,o.actor_id,o.request_id,
+ o.error_code,o.error_message,o.retryable,o.attempts,o.created_at,o.started_at,o.finished_at,
+ CASE WHEN o.resource_type='function' AND o.action='deploy_function' THEN (
+   SELECT w.id FROM operations w
+   JOIN function_definitions f ON f.id=o.resource_id AND f.project_id=o.project_id AND f.branch_id=o.payload->>'branch_id'
+   WHERE w.id=o.payload->>'writer_resume_operation_id' AND w.project_id=o.project_id AND w.resource_type='endpoint'
+    AND w.action='resume_endpoint_dsga_v1' AND w.resource_id=f.endpoint_id AND w.payload->>'branch_id'=f.branch_id
+ ) END AS writer_resume_operation_id
+ FROM operations o WHERE o.id=$1 AND o.project_id=$2`, id, project)
 	if err != nil {
 		return nil, err
+	}
+	if item["writer_resume_operation_id"] == nil {
+		delete(item, "writer_resume_operation_id")
 	}
 	steps, err := s.many(ctx, "SELECT ordinal,name,state,attempts,detail,updated_at FROM operation_steps WHERE operation_id=$1 ORDER BY ordinal", id)
 	if err != nil {

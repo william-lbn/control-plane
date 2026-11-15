@@ -527,6 +527,10 @@
           "retryable": {
             "type": "boolean"
           },
+          "writer_resume_operation_id": {
+            "type": "string",
+            "description": "Original same-project Writer resume required by this Function deployment, when admitted against a suspended DSGA Writer."
+          },
           "steps": {
             "type": "array",
             "items": {

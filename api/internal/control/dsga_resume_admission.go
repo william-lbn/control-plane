@@ -79,6 +79,19 @@ func (s *server) queueDSGAResume(ctx context.Context, project, endpoint string, 
 	if err = lockDSGAProjectParents(ctx, tx, p); err != nil {
 		return "", err
 	}
+	p.TenantID = tenant
+	id, err := s.queueDSGAResumeTx(ctx, tx, p, major, region, version, actor, request, key, hash)
+	if err != nil {
+		return "", err
+	}
+	return id, tx.Commit(ctx)
+}
+
+// The caller locks the authorized project, branch and endpoint before admitting
+// the Writer and commits it alongside any dependent product Operation.
+func (s *server) queueDSGAResumeTx(ctx context.Context, tx pgx.Tx, p createPayload, major uint32, region string, version int64, actor, request, key, hash string) (string, error) {
+	project, endpoint := p.ProjectID, p.EndpointID
+	var err error
 	var suspended bool
 	var current int64
 	var minMem, maxMem int
@@ -93,7 +106,6 @@ func (s *server) queueDSGAResume(ctx context.Context, project, endpoint string, 
 	if !suspended {
 		return "", errDSGACreationIdentity
 	}
-	p.TenantID = tenant
 	p.TimelineID, err = lockDSGARetainedBranch(ctx, tx, project, p.BranchID)
 	if err != nil {
 		return "", err
@@ -161,5 +173,5 @@ func (s *server) queueDSGAResume(ctx context.Context, project, endpoint string, 
 	if err = addCreateOperationJSON(ctx, tx, dsgaResumeAction, "endpoint", endpoint, project, id, actor, request, raw, key, hash, dsgaEndpointCreateSteps()); err != nil {
 		return "", err
 	}
-	return id, tx.Commit(ctx)
+	return id, nil
 }

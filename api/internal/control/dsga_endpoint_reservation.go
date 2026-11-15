@@ -128,6 +128,15 @@ func (k *kubeClient) verifyDSGAPriorWriterAbsent(ctx context.Context, namespace,
 
 // Keep the project as the parent lock for writer/reader admission and retained-source checks.
 func lockDSGAEndpointAuthority(ctx context.Context, tx pgx.Tx, org, project, actor string) (string, uint32, string, error) {
+	tenant, version, region, err := lockDSGAEndpointActor(ctx, tx, org, project, actor)
+	if err != nil {
+		return "", 0, "", err
+	}
+	err = lockDSGARequestCredentialForProject(ctx, tx, org, actor, project)
+	return tenant, version, region, err
+}
+
+func lockDSGAEndpointActor(ctx context.Context, tx pgx.Tx, org, project, actor string) (string, uint32, string, error) {
 	var orgState, projectOrg, projectState, kind, tenant, region string
 	var version uint32
 	if err := tx.QueryRow(ctx, `SELECT state FROM organizations WHERE id=$1 FOR NO KEY UPDATE`, org).Scan(&orgState); err != nil {
@@ -149,8 +158,7 @@ func lockDSGAEndpointAuthority(ctx context.Context, tx pgx.Tx, org, project, act
 	if orgState != "active" || projectOrg != org || projectState != "ready" || kind != "managed" || effectivePermission(orgRole, grant) < 2 || !dsgaSupportedPostgresVersion(version) {
 		return "", 0, "", errDSGACreationAuthority
 	}
-	err = lockDSGARequestCredentialForProject(ctx, tx, org, actor, project)
-	return tenant, version, region, err
+	return tenant, version, region, nil
 }
 
 func lockDSGARetainedBranch(ctx context.Context, tx pgx.Tx, project, branch string) (string, error) {

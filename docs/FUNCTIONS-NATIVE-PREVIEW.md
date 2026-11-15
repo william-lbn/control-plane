@@ -44,6 +44,14 @@ through the real Operations UI. It continues SQL read/write, schema denial,
 safe response rendering, stop, configuration-only redeployment and deletion.
 Saved failures remain evidence, separate from successful recovery receipts.
 
+A Function deployment, retained resume or rollback targeting a suspended DSGA
+Writer admits its Writer resume in the same transaction. The project Operation
+shows `writer_resume_operation_id`. The Worker waits for that exact Writer
+generation before provisioning SQL or reserving a guest. If the Writer fails,
+retry its original Operation first, then retry the dependent Function Operation.
+Public automatic resume requires the current idle policy and its authorized
+actor. The Writer follows the existing retained Timeline and routing checks.
+
 If the first deployment already created a guest and its one-shot bootstrap
 failed, retrying that same boot cannot restart initialization safely. Use
 **Stop function instance**, acknowledge background-work termination, and wait

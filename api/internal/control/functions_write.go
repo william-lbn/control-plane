@@ -326,17 +326,27 @@ func (s *server) admitFunctionDeployment(w http.ResponseWriter, r *http.Request,
 		return
 	}
 	defer tx.Rollback(r.Context())
-	var eligible bool
+	writer, err := s.lockFunctionWriterResume(r, tx, functionID, resume)
+	if err != nil {
+		status, code, message := functionWriterResumeError(err)
+		fail(w, r, status, code, message)
+		return
+	}
+	var eligible, coldDSGA bool
+	var writerID string
+	var writerVersion int64
 	err = tx.QueryRow(r.Context(), `SELECT f.version=$4 AND f.state NOT IN ('active','deleting','deleted') AND p.state='ready' AND p.source='managed'
 	AND NOT EXISTS(SELECT 1 FROM function_instances i WHERE i.function_id=f.id AND i.state<>'retired')
  AND (NOT $5 OR (f.state='suspended' AND EXISTS(SELECT 1 FROM function_deployments d WHERE d.id=f.active_deployment_id AND d.function_id=f.id AND d.project_id=f.project_id AND d.branch_id=f.branch_id AND d.state='completed')))
  AND ($6='' OR EXISTS(SELECT 1 FROM function_deployments d WHERE d.id=$6 AND d.function_id=f.id AND d.project_id=f.project_id AND d.branch_id=f.branch_id AND d.state='completed'))
  AND p.deleted_at IS NULL AND b.state='ready' AND b.deleted_at IS NULL AND o.state='active'
- AND e.endpoint_type='read_write' AND e.state IN ('active','suspended') AND e.deleted_at IS NULL,f.generation
+ AND e.endpoint_type='read_write' AND e.state IN ('active','suspended') AND e.deleted_at IS NULL,f.generation,e.id,e.version,
+ e.state='suspended' AND e.workload_kind='neonvm' AND EXISTS (
+  SELECT 1 FROM branch_service_instances v WHERE v.branch_id=e.branch_id AND v.service_kind='postgres' AND v.driver_version='dsga-v1')
  FROM function_definitions f JOIN projects p ON p.id=f.project_id JOIN branches b ON b.id=f.branch_id
- JOIN organizations o ON o.id=f.org_id JOIN endpoints e ON e.id=f.endpoint_id
- WHERE f.id=$1 AND f.project_id=$2 AND f.branch_id=$3 FOR UPDATE OF p,b,e,f`, functionID, r.PathValue("project"), r.PathValue("branch"), version, retained, source).Scan(&eligible, &generation)
-	if err != nil || !eligible {
+ JOIN organizations o ON o.id=f.org_id JOIN endpoints e ON e.id=f.endpoint_id AND e.project_id=f.project_id AND e.branch_id=f.branch_id
+ WHERE f.id=$1 AND f.project_id=$2 AND f.branch_id=$3 FOR UPDATE OF p,b,e,f`, functionID, r.PathValue("project"), r.PathValue("branch"), version, retained, source).Scan(&eligible, &generation, &writerID, &writerVersion, &coldDSGA)
+	if err != nil || !eligible || (coldDSGA && writerID != writer.scope.EndpointID) {
 		fail(w, r, 412, "function_intent_changed", "Function or parents changed before admission")
 		return
 	}
@@ -348,7 +358,16 @@ func (s *server) admitFunctionDeployment(w http.ResponseWriter, r *http.Request,
 	}
 	p := functionInstanceTarget{FunctionID: functionID, ProjectID: r.PathValue("project"), BranchID: r.PathValue("branch"), DeploymentID: deployment, Generation: generation + 1, Slug: r.PathValue("slug")}
 	op := s.functionRequestID("op_", userFrom(r).ID, key, fingerprint)
-	payload, _ := json.Marshal(p)
+	operation := functionDeploymentOperation{functionInstanceTarget: p}
+	if coldDSGA {
+		operation.WriterResumeOperation, err = s.queueFunctionWriterResume(r, tx, writer, functionID, op, writerVersion)
+		if err != nil {
+			status, code, message := functionWriterResumeError(err)
+			fail(w, r, status, code, message)
+			return
+		}
+	}
+	payload, _ := json.Marshal(operation)
 	_, err = tx.Exec(r.Context(), `INSERT INTO operations(id,project_id,resource_type,resource_id,action,state,actor_id,request_id,payload)
  VALUES($1,$2,'function',$3,'deploy_function','queued',$4,$5,$6)`, op, p.ProjectID, p.FunctionID, userFrom(r).ID, requestID(r), payload)
 	if err == nil {
@@ -379,6 +398,13 @@ func (s *server) admitFunctionDeployment(w http.ResponseWriter, r *http.Request,
 			action = "rollback_function"
 		}
 		_, err = tx.Exec(r.Context(), `INSERT INTO audit_events(actor_id,action,resource_type,resource_id,request_id,outcome) VALUES($1,$2,'function',$3,$4,'accepted')`, userFrom(r).ID, action, functionID, requestID(r))
+	}
+	if err == nil && coldDSGA && !writer.automatic {
+		if authErr := lockDSGARequestCredentialForProject(writer.ctx, tx, writer.org, userFrom(r).ID, p.ProjectID); authErr != nil {
+			status, code, message := functionWriterResumeError(authErr)
+			fail(w, r, status, code, message)
+			return
+		}
 	}
 	if err == nil {
 		err = tx.Commit(r.Context())

@@ -242,6 +242,9 @@ func testDSGAResumeGeneration(t *testing.T, ctx context.Context, b *dsgaCreation
 		t.Fatalf("disabled driver accepted resume: %d %s", w.Code, w.Body.String())
 	}
 	t.Setenv("NEON_DSGA_SUSPENSION_ENABLED", "true")
+	t.Run("function-writer-resume-admission", func(t *testing.T) {
+		testFunctionWriterResumeAdmission(t, ctx, s, p, source)
+	})
 	if w := post("resume", `"1"`, "same-resume-intent"); w.Code != 412 {
 		t.Fatalf("stale version accepted: %d %s", w.Code, w.Body.String())
 	}
