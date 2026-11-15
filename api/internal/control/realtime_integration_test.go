@@ -8,6 +8,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pglogrepl"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/william-lbn/control-plane/api/internal/realtime"
 )
@@ -141,4 +144,140 @@ VALUES('br_a','prj_a','main','11111111111111111111111111111111',true,'ready',now
 	if _, err := store.ReadAfter(ctx, key, 3, 2); !errors.Is(err, realtime.ErrSourceUnavailable) {
 		t.Fatalf("retired generation cursor became readable: %v", err)
 	}
+}
+
+func TestRealtimeSourceWorker(t *testing.T) {
+	dsn := os.Getenv("NEON_REALTIME_TEST_DATABASE_URL")
+	if dsn == "" {
+		t.Skip("explicit disposable PostgreSQL cluster required")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	cfg, err := pgxpool.ParseConfig(dsn)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.ConnConfig.Database != "realtime_wire_test" {
+		t.Fatal("integration test requires a disposable realtime_wire_test database")
+	}
+	sql, err := pgx.ConnectConfig(ctx, cfg.ConnConfig.Copy())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer sql.Close(ctx)
+	must := func(err error) {
+		t.Helper()
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	exec := func(query string) {
+		t.Helper()
+		_, err := sql.Exec(ctx, query)
+		must(err)
+	}
+	exec(`CREATE SCHEMA wire_worker_meta;
+CREATE ROLE rt_wire_worker LOGIN REPLICATION;
+CREATE TABLE public.rt_worker_events(id integer PRIMARY KEY);
+CREATE PUBLICATION rt_worker_pub FOR TABLE public.rt_worker_events;`)
+	cfg.ConnConfig.RuntimeParams["search_path"] = "wire_worker_meta"
+	db, err := pgxpool.NewWithConfig(ctx, cfg)
+	must(err)
+	defer db.Close()
+	must(migrate(ctx, db))
+	_, err = db.Exec(ctx, `INSERT INTO organizations(id,slug,name) VALUES('org_worker','worker','Realtime worker');
+INSERT INTO projects(id,org_id,name,tenant_id,region_id,postgres_version,state,source,created_at,updated_at)
+VALUES('prj_worker','org_worker','Worker','33333333333333333333333333333333','rke2-lab',17,'ready','managed',now(),now());
+INSERT INTO branches(id,project_id,name,timeline_id,is_default,state,created_at)
+VALUES('br_worker','prj_worker','main','44444444444444444444444444444444',true,'ready',now());`)
+	must(err)
+
+	var created string
+	must(sql.QueryRow(ctx, "SELECT lsn::text FROM pg_create_logical_replication_slot('rt_worker_slot','pgoutput')").Scan(&created))
+	start, err := pglogrepl.ParseLSN(created)
+	must(err)
+	config := cfg.ConnConfig.Config.Copy()
+	config.User = "rt_wire_worker"
+	config.RuntimeParams = map[string]string{"replication": "database"}
+	open := func(ctx context.Context, _ realtime.Lease) (*pgconn.PgConn, error) {
+		return pgconn.ConnectConfig(ctx, config.Copy())
+	}
+	replication, err := open(ctx, realtime.Lease{})
+	must(err)
+	pgIdentity, err := pglogrepl.IdentifySystem(ctx, replication)
+	must(err)
+	must(replication.Close(ctx))
+
+	store := realtime.Store{DB: db}
+	key := realtime.SourceKey{ID: "rts_333333333333333333333333", Scope: realtime.Scope{
+		Project: "prj_worker", Branch: "br_worker", Timeline: "44444444444444444444444444444444", Database: cfg.ConnConfig.Database,
+	}}
+	relation := realtime.Relation{Schema: "public", Name: "rt_worker_events"}
+	must(store.Register(ctx, key, realtime.Source{
+		SystemID: pgIdentity.SystemID, Timeline: pgIdentity.Timeline, Database: key.Database, Slot: "rt_worker_slot",
+		Publication: "rt_worker_pub", ConfirmedLSN: start, Relations: []realtime.Relation{relation},
+	}, 4))
+	openSQL := func(ctx context.Context, _ realtime.Lease) (*pgx.Conn, error) {
+		cfg := cfg.ConnConfig.Copy()
+		cfg.User = "rt_wire_worker"
+		return pgx.ConnectConfig(ctx, cfg)
+	}
+	limits := realtime.WorkerLimits{LeaseDuration: 3 * time.Second, FeedbackInterval: 25 * time.Millisecond,
+		MaxFrameBytes: 128 * 1024, MaxWALBytes: 16 << 20}
+	follow := func() (context.CancelFunc, <-chan error) {
+		t.Helper()
+		active, stop := context.WithCancel(ctx)
+		done := make(chan error, 1)
+		go func() { done <- store.RunSource(active, key, limits, openSQL, open) }()
+		t.Cleanup(stop)
+		return stop, done
+	}
+	observe := func(cursor int64, done <-chan error) realtime.Invalidation {
+		t.Helper()
+		for {
+			batch, err := store.ReadAfter(ctx, key, cursor, 2)
+			must(err)
+			var confirmed string
+			must(sql.QueryRow(ctx, "SELECT confirmed_flush_lsn::text FROM pg_replication_slots WHERE slot_name='rt_worker_slot'").Scan(&confirmed))
+			if len(batch) == 1 && batch[0].EndLSN.String() == confirmed {
+				return batch[0]
+			}
+			select {
+			case err := <-done:
+				t.Fatalf("worker exited before a committed invalidation: %v", err)
+			case <-time.After(20 * time.Millisecond):
+			case <-ctx.Done():
+				t.Fatal(ctx.Err())
+			}
+		}
+	}
+	stop, done := follow()
+	exec("INSERT INTO public.rt_worker_events VALUES (1)")
+	a := observe(0, done)
+	if a.Position != 1 || len(a.Relations) != 1 || a.Relations[0] != relation {
+		t.Fatalf("first durable invalidation: %+v", a)
+	}
+	stop()
+	if err := <-done; !errors.Is(err, context.Canceled) {
+		t.Fatalf("worker cancellation: %v", err)
+	}
+	stop, done = follow()
+	exec("INSERT INTO public.rt_worker_events VALUES (2)")
+	b := observe(a.Position, done)
+	if b.Position != 2 || b.LSN < a.EndLSN {
+		t.Fatalf("worker did not resume the original logical slot: %+v %+v", a, b)
+	}
+	must(store.Retire(ctx, key))
+	select {
+	case err := <-done:
+		if !errors.Is(err, realtime.ErrLeaseLost) {
+			t.Fatalf("retirement did not cancel the worker: %v", err)
+		}
+	case <-ctx.Done():
+		t.Fatal(ctx.Err())
+	}
+	stop()
+	exec("SELECT pg_drop_replication_slot('rt_worker_slot')")
+	t.Logf("PostgreSQL %s resumed the durable source across two worker leases at %s and %s",
+		sql.PgConn().ParameterStatus("server_version"), a.EndLSN, b.EndLSN)
 }

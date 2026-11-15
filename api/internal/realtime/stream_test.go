@@ -112,6 +112,18 @@ func TestPgoutputWire(t *testing.T) {
 	source := Source{SystemID: identity.SystemID, Timeline: identity.Timeline, Database: cfg.Database,
 		Slot: "c3_wire_slot", Publication: "c3_wire_pub", ConfirmedLSN: start, Relations: []Relation{alpha, beta},
 		MaxFrameBytes: 128 * 1024, FeedbackInterval: 25 * time.Millisecond}
+	lease := Lease{Key: SourceKey{Scope: Scope{Database: cfg.Database}}, Slot: source.Slot, ConfirmedLSN: start}
+	if err := checkSlot(ctx, db, lease, 16<<20, false); err != nil {
+		t.Fatalf("original slot preflight: %v", err)
+	}
+	oldLease := lease
+	oldLease.ConfirmedLSN = start - 1
+	if err := checkSlot(ctx, db, oldLease, 16<<20, false); !errors.Is(err, ErrSlotAhead) {
+		t.Fatalf("slot advanced past the stale lease cursor: %v", err)
+	}
+	if err := checkSlot(ctx, db, lease, 1, false); !errors.Is(err, ErrSlotWALBudget) {
+		t.Fatalf("original slot exceeded its test WAL allowance: %v", err)
+	}
 	run := func(runCtx context.Context, source Source, fn func(context.Context, Commit) error) error {
 		t.Helper()
 		return Consume(runCtx, open(), source, fn)
