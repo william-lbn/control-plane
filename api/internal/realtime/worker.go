@@ -79,6 +79,9 @@ func (s Store) RunSource(ctx context.Context, key SourceKey, limits WorkerLimits
 	starting, cancelStart := context.WithTimeout(ctx, limits.LeaseDuration/3)
 	defer cancelStart()
 	sql, err := openSQL(starting, lease)
+	if errors.Is(err, ErrSlotWALBudget) {
+		return err
+	}
 	if err != nil || sql == nil {
 		return ErrSourceUnavailable
 	}

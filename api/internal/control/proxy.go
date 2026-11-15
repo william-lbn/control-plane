@@ -145,10 +145,10 @@ type sqlResult struct {
 	Truncated bool     `json:"truncated"`
 }
 
-func connectSQL(ctx context.Context, host, port, role, password, database, selector string) (*pgx.Conn, error) {
+func sqlConnectionConfig(host, port, role, password, database, selector string) (*pgx.ConnConfig, time.Duration, error) {
 	connectTimeout, err := sqlConnectTimeout()
 	if err != nil {
-		return nil, sqlExecutionError{"configuration", err}
+		return nil, 0, sqlExecutionError{"configuration", err}
 	}
 	uri := url.URL{Scheme: "postgresql", User: url.UserPassword(role, password), Host: host + ":" + port, Path: "/" + database}
 	mode := os.Getenv("NEON_PG_TLS_MODE")
@@ -156,7 +156,7 @@ func connectSQL(ctx context.Context, host, port, role, password, database, selec
 		mode = "require"
 	}
 	if mode != "require" && mode != "verify-full" {
-		return nil, sqlExecutionError{"configuration", errors.New("invalid TLS mode")}
+		return nil, 0, sqlExecutionError{"configuration", errors.New("invalid TLS mode")}
 	}
 	values := url.Values{"sslmode": []string{mode}, "options": []string{"endpoint=" + selector},
 		"connect_timeout": []string{strconv.Itoa(int(connectTimeout / time.Second))}}
@@ -166,15 +166,23 @@ func connectSQL(ctx context.Context, host, port, role, password, database, selec
 	uri.RawQuery = values.Encode()
 	config, err := pgx.ParseConfig(uri.String())
 	if err != nil {
-		return nil, sqlExecutionError{"configuration", err}
+		return nil, 0, sqlExecutionError{"configuration", err}
 	}
 	// 对应libpq的hostaddr：SSH只改变TCP目标，原host仍用于TLS名称校验。
 	// 配置属于运营者，不从HTTP请求读取；保留连接预算、Proxy selector和认证。
 	if address := os.Getenv("NEON_PG_HOSTADDR"); address != "" {
 		if net.ParseIP(address) == nil {
-			return nil, sqlExecutionError{"configuration", errors.New("NEON_PG_HOSTADDR must be an IP address")}
+			return nil, 0, sqlExecutionError{"configuration", errors.New("NEON_PG_HOSTADDR must be an IP address")}
 		}
 		config.LookupFunc = func(context.Context, string) ([]string, error) { return []string{address}, nil }
+	}
+	return config, connectTimeout, nil
+}
+
+func connectSQL(ctx context.Context, host, port, role, password, database, selector string) (*pgx.Conn, error) {
+	config, connectTimeout, err := sqlConnectionConfig(host, port, role, password, database, selector)
+	if err != nil {
+		return nil, err
 	}
 	connectCtx, cancelConnect := context.WithTimeout(ctx, connectTimeout)
 	conn, err := pgx.ConnectConfig(connectCtx, config)

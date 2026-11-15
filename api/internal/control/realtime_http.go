@@ -32,6 +32,7 @@ type registeredRealtimeQuery struct {
 type realtimeRuntime struct {
 	notifications *realtime.Notifications
 	openWriter    func(context.Context, registeredRealtimeQuery) (*pgx.Conn, error)
+	sourceLimit   int
 }
 
 func (s *server) configureRealtime(ctx context.Context) error {
@@ -43,7 +44,11 @@ func (s *server) configureRealtime(ctx context.Context) error {
 		return errors.New("Realtime requires an explicit subscription budget and Backend credential keys")
 	}
 	n := realtime.NewNotifications(s.db, limit)
-	s.realtime = &realtimeRuntime{notifications: n, openWriter: s.openRealtimeWriter}
+	sourceLimit, err := realtimeWorkerLimit()
+	if err != nil {
+		return err
+	}
+	s.realtime = &realtimeRuntime{notifications: n, openWriter: s.openRealtimeWriter, sourceLimit: sourceLimit}
 	go func() {
 		if err := n.Run(ctx, time.Second); err != nil && ctx.Err() == nil {
 			s.logger.Error("Realtime notification listener exited")
@@ -75,42 +80,8 @@ WHERE q.branch_id=$1 AND q.name=$2 AND q.retired_at IS NULL AND s.retired_at IS 
 }
 
 func (s *server) openRealtimeWriter(ctx context.Context, q registeredRealtimeQuery) (*pgx.Conn, error) {
-	source, err := s.dsgaEndpointRuntime(ctx, q.Source.Project, q.Writer)
-	if err != nil || source == nil || source.Payload.BranchID != q.Source.Branch ||
-		source.Payload.TimelineID != q.Source.Timeline || source.Payload.EndpointType != "read_write" {
-		return nil, realtime.ErrSourceUnavailable
-	}
-	_, vm, _, _, err := s.readDSGABoundSelection(ctx, source)
-	if err != nil || vm == nil {
-		return nil, realtime.ErrSourceUnavailable
-	}
-	secret, err := s.kube.request(ctx, http.MethodGet, s.kube.path("secret", q.Credential), nil)
-	if err != nil || !owned(secret, q.Source.Project, q.Writer) || nested(secret, "metadata", "uid") != q.CredentialUID ||
-		nested(secret, "metadata", "labels", "neon-control/branch-id") != q.Source.Branch ||
-		nested(secret, "metadata", "labels", "neon-control/realtime-query") != q.ID || secret["immutable"] != true {
-		return nil, realtime.ErrSourceUnavailable
-	}
-	user, err := secretText(secret, "user")
-	if err != nil || user != q.Query.Role {
-		return nil, realtime.ErrSourceUnavailable
-	}
-	password, err := secretText(secret, "password")
-	if err != nil || password == "" {
-		return nil, realtime.ErrSourceUnavailable
-	}
-	conn, err := connectSQL(ctx, s.proxyHost, s.proxyPort, user, password, q.Source.Database, selector(q.Writer))
-	if err != nil {
-		return nil, realtime.ErrSourceUnavailable
-	}
-	var tenant, timeline string
-	err = conn.QueryRow(ctx, `SELECT current_setting('neon.tenant_id'),current_setting('neon.timeline_id')`).Scan(&tenant, &timeline)
-	if err != nil || tenant != source.Payload.TenantID || timeline != q.Source.Timeline {
-		cleanup, cancel := context.WithTimeout(context.Background(), time.Second)
-		defer cancel()
-		_ = conn.Close(cleanup)
-		return nil, realtime.ErrSourceUnavailable
-	}
-	return conn, nil
+	return s.openRealtimeSQL(ctx, realtimeLoginBinding{key: q.Source, writer: q.Writer, role: q.Query.Role,
+		credential: q.Credential, credentialUID: q.CredentialUID, ownerLabel: "neon-control/realtime-query", ownerID: q.ID})
 }
 
 func (s *server) realtimeStream(w http.ResponseWriter, r *http.Request) {
@@ -188,7 +159,17 @@ func (s *server) realtimeStream(w http.ResponseWriter, r *http.Request) {
 		}
 		return nil
 	}
-	(realtime.Store{DB: s.db}).ServeSSE(w, r.WithContext(ctx), s.realtime.notifications,
+	stream, release, err := s.realtimeDemand(ctx, q.Source, s.realtime.sourceLimit)
+	if err != nil {
+		if errors.Is(err, realtime.ErrSubscriptionCapacity) {
+			fail(w, r, 429, "realtime_capacity", "Realtime source capacity is exhausted")
+		} else {
+			fail(w, r, 503, "realtime_unavailable", "Realtime source unavailable")
+		}
+		return
+	}
+	defer release()
+	(realtime.Store{DB: s.db}).ServeSSE(w, r.WithContext(stream), s.realtime.notifications,
 		realtime.Subscription{Key: q.Source, Query: q.Query, Relations: q.RelationNames, PageSize: 16, DeliveryLimit: 5 * time.Second},
 		options, authorize, func(ctx context.Context) (*pgx.Conn, error) { return s.realtime.openWriter(ctx, q) })
 }

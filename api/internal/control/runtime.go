@@ -159,7 +159,14 @@ func (s *server) runLeaderControllers(ctx context.Context, role processRole, sta
 		group.Add(1)
 		go func() { defer group.Done(); run(controllerCtx) }()
 	}
+	realtimeSources, err := realtimeWorkerLimit()
+	if err != nil {
+		return err
+	}
 	start(s.runWorker)
+	if realtimeSources > 0 {
+		start(func(ctx context.Context) { s.runRealtimeSources(ctx, realtimeSources) })
+	}
 	start(s.runComputeCatalogBootstrapController)
 	start(s.runBranchExpirationController)
 	start(s.runMonitor)

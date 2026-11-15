@@ -532,6 +532,11 @@ INSERT INTO organization_members(org_id,user_id,role) VALUES('org_worker','realt
 INSERT INTO endpoints(id,project_id,branch_id,selector,workload_kind,workload_name,service_name,state,role_name,database_name,endpoint_type,created_at,updated_at)
 VALUES('ep_5555555555555555','prj_worker','br_4444444444444444','realtime-fixture','neonvm','fixture','fixture','active','owner','realtime_wire_test','read_write',now(),now());`)
 	must(err)
+	_, err = db.Exec(ctx, `INSERT INTO realtime_source_runtime(source_id,project_id,branch_id,writer_id,
+credential_ref,credential_uid,max_wal_bytes,max_frame_bytes)
+VALUES($1,$2,$3,'ep_5555555555555555','neon-rt-333333333333333333333333','33333333-3333-4333-8333-333333333333',33554432,131072)`,
+		key.ID, key.Project, key.Branch)
+	must(err)
 	_, err = db.Exec(ctx, `INSERT INTO realtime_queries(id,source_id,project_id,branch_id,writer_id,name,statement,relations,parameter_count,
         read_role,credential_ref,credential_uid,max_rows,max_result_bytes,max_frame_bytes,query_timeout_ms)
 VALUES('rtq_555555555555555555555555',$1,$2,$3,'ep_5555555555555555','latest',
@@ -541,7 +546,7 @@ VALUES('rtq_555555555555555555555555',$1,$2,$3,'ep_5555555555555555','latest',
 	s := &server{db: db, logger: slog.New(slog.NewTextHandler(io.Discard, nil)), idempotencyKey: []byte(strings.Repeat("k", 32)),
 		backendKeys: &backendKeyring{Active: "v1", decoded: map[string][]byte{"v1": []byte(strings.Repeat("p", 32))}}}
 	n := realtime.NewNotifications(db, 2)
-	s.realtime = &realtimeRuntime{notifications: n, openWriter: func(call context.Context, q registeredRealtimeQuery) (*pgx.Conn, error) {
+	s.realtime = &realtimeRuntime{notifications: n, sourceLimit: 1, openWriter: func(call context.Context, q registeredRealtimeQuery) (*pgx.Conn, error) {
 		if q.Source != key || q.Query.Role != readConfig.User {
 			return nil, realtime.ErrSourceUnavailable
 		}
@@ -593,5 +598,24 @@ VALUES($1,$2,'org_worker',$3,'realtime_user',$4,$5,'v1',$6,'self',now()+interval
 	if !strings.HasPrefix(first, "id: ") || kind != "event: snapshot\n" || data != "data: {\"columns\":[\"id\"],\"rows\":[[3],[4]]}\n" {
 		t.Fatal("public route differs from the registered query and its bound parameter")
 	}
+	desired, err := s.realtimeWantedSources(ctx, 1)
+	must(err)
+	if len(desired) != 1 || desired[0].key != key || desired[0].role != "rtp_"+key.ID[4:] {
+		t.Fatalf("public subscription desired runtime differs: %+v", desired)
+	}
 	must(response.Body.Close())
+	settled, cancel := context.WithTimeout(ctx, 3*time.Second)
+	defer cancel()
+	for {
+		desired, err := s.realtimeWantedSources(settled, 1)
+		must(err)
+		if len(desired) == 0 {
+			break
+		}
+		select {
+		case <-time.After(20 * time.Millisecond):
+		case <-settled.Done():
+			t.Fatal("last subscriber left a source placement demand")
+		}
+	}
 }
