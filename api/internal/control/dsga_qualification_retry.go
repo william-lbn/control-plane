@@ -43,12 +43,18 @@ func dsgaQualificationStoppedWithoutImage(job *batch.Job, pod *core.Pod) bool {
 		return false
 	}
 	for _, condition := range job.Status.Conditions {
-		if condition.Type != batch.JobFailed || condition.Status != core.ConditionTrue || condition.Reason != "DeadlineExceeded" {
+		if condition.Type != batch.JobFailed || condition.Status != core.ConditionTrue {
+			continue
+		}
+		legacyDeadline := job.Spec.Template.Spec.ActiveDeadlineSeconds == nil && condition.Reason == batch.JobReasonDeadlineExceeded
+		kubeletDeadline := job.Spec.ActiveDeadlineSeconds == nil && job.Spec.Template.Spec.ActiveDeadlineSeconds != nil &&
+			condition.Reason == batch.JobReasonBackoffLimitExceeded && pod.Status.Reason == "DeadlineExceeded"
+		if (!legacyDeadline && !kubeletDeadline) || len(job.Spec.Template.Spec.Containers) != 1 {
 			continue
 		}
 		owner := metav1.GetControllerOf(pod)
 		if owner == nil || owner.APIVersion != "batch/v1" || owner.Kind != "Job" || owner.UID != job.UID ||
-			owner.Name != job.Name || pod.UID == "" || pod.DeletionTimestamp == nil || pod.Status.Phase != core.PodFailed ||
+			owner.Name != job.Name || pod.UID == "" || (legacyDeadline && pod.DeletionTimestamp == nil) || pod.Status.Phase != core.PodFailed ||
 			pod.Spec.NodeName != job.Spec.Template.Spec.NodeSelector["kubernetes.io/hostname"] ||
 			len(pod.Spec.Containers) != 1 || len(pod.Spec.InitContainers) != 0 || len(pod.Spec.EphemeralContainers) != 0 ||
 			pod.Spec.Containers[0].Name != "qualifier" || pod.Spec.Containers[0].Image != job.Spec.Template.Spec.Containers[0].Image ||
@@ -108,6 +114,19 @@ func dsgaQualificationRetryKinds(attempt int) (string, string) {
 	return fmt.Sprintf("qualification_retry_%d", attempt), fmt.Sprintf("qualification_job_retry_%d", attempt)
 }
 
+// Pre-upgrade Jobs keep their original Kubernetes contract and recorded Pod
+// digest. A retry Job may use the new execution deadline while the old Job
+// remains available for reconciliation.
+func matchDSGAQualificationJob(got, wanted *batch.Job) (*batch.Job, bool) {
+	if sameDSGAQualificationJob(got, wanted) {
+		return wanted, true
+	}
+	legacy := wanted.DeepCopy()
+	legacy.Spec.ActiveDeadlineSeconds = legacy.Spec.Template.Spec.ActiveDeadlineSeconds
+	legacy.Spec.Template.Spec.ActiveDeadlineSeconds = nil
+	return legacy, sameDSGAQualificationJob(got, legacy)
+}
+
 // Retain the first Job and all recovery Jobs. A retry after an unknown write
 // response must recover that attempt or stop on identity drift.
 func (b *dsgaCreationBinding) selectDSGAQualificationJob(ctx context.Context, clients kubernetes.Interface, vmNamespace string, vmUID types.UID, first *batch.Job) (*batch.Job, *batch.Job, error) {
@@ -130,10 +149,11 @@ func (b *dsgaCreationBinding) selectDSGAQualificationJob(ctx context.Context, cl
 		if err != nil {
 			return nil, nil, err
 		}
-		if !sameDSGAQualificationJob(actual, wanted) || (rawFact != nil && original.UID != string(actual.UID)) {
+		matched, same := matchDSGAQualificationJob(actual, wanted)
+		if !same || (rawFact != nil && original.UID != string(actual.UID)) {
 			return nil, nil, errDSGACreationIdentity
 		}
-		spec, err := json.Marshal(wanted.Spec.Template.Spec)
+		spec, err := json.Marshal(matched.Spec.Template.Spec)
 		if err != nil {
 			return nil, nil, err
 		}
@@ -141,7 +161,7 @@ func (b *dsgaCreationBinding) selectDSGAQualificationJob(ctx context.Context, cl
 			return nil, nil, err
 		}
 		if !dsgaQualificationJobFailed(actual) {
-			return actual, wanted, nil
+			return actual, matched, nil
 		}
 
 		retryKind, nextKind := dsgaQualificationRetryKinds(attempt)

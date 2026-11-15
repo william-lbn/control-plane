@@ -95,3 +95,53 @@ func TestDSGAQualificationRetryPreservesPreviouslyPublishedClaim(t *testing.T) {
 		t.Fatalf("missing original Pod should prevent retry: %v", err)
 	}
 }
+
+func TestDSGAQualificationJobKeepsOriginalDeadlineContract(t *testing.T) {
+	original, _ := stoppedQualificationFixture()
+	original.ResourceVersion = "42"
+	original.Spec.Template.Spec.RestartPolicy = core.RestartPolicyNever
+	deadline := int64(dsgaQualifierPodDeadlineSeconds)
+	original.Spec.ActiveDeadlineSeconds = &deadline
+	current := original.DeepCopy()
+	current.Spec.ActiveDeadlineSeconds = nil
+	current.Spec.Template.Spec.ActiveDeadlineSeconds = &deadline
+
+	for _, job := range []*batch.Job{original, current} {
+		matched, ok := matchDSGAQualificationJob(job, current)
+		if !ok || !sameDSGAQualificationJob(job, matched) {
+			t.Fatal("could not resume the original frozen job deadline contract")
+		}
+	}
+	shifted := int64(dsgaQualifierPodDeadlineSeconds + 1)
+	changed := current.DeepCopy()
+	changed.Spec.Template.Spec.ActiveDeadlineSeconds = &shifted
+	if _, ok := matchDSGAQualificationJob(changed, current); ok {
+		t.Fatal("an unrelated deadline change matched the frozen Job")
+	}
+	changed = original.DeepCopy()
+	changed.Spec.Template.Spec.NodeSelector = map[string]string{"kubernetes.io/hostname": "worker-119"}
+	if _, ok := matchDSGAQualificationJob(changed, current); ok {
+		t.Fatal("compatibility changed the recorded target Node")
+	}
+}
+
+func TestDSGAQualificationRetryRequiresPodDeadlineWithNoExecution(t *testing.T) {
+	job, pod := stoppedQualificationFixture()
+	deadline := int64(dsgaQualifierPodDeadlineSeconds)
+	job.Spec.Template.Spec.ActiveDeadlineSeconds = &deadline
+	job.Status.Conditions[0].Reason = batch.JobReasonBackoffLimitExceeded
+	pod.DeletionTimestamp = nil
+	pod.Status.Reason = "DeadlineExceeded"
+	if !dsgaQualificationStoppedWithoutImage(job, pod) {
+		t.Fatal("terminal kubelet deadline with no container execution was not recoverable")
+	}
+	pod.Status.Reason = "Evicted"
+	if dsgaQualificationStoppedWithoutImage(job, pod) {
+		t.Fatal("a different Pod failure is not no-execution proof")
+	}
+	pod.Status.Reason = "DeadlineExceeded"
+	pod.Status.ContainerStatuses[0].ContainerID = "containerd://started"
+	if dsgaQualificationStoppedWithoutImage(job, pod) {
+		t.Fatal("a prior runtime allocation is not no-execution proof")
+	}
+}

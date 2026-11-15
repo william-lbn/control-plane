@@ -61,6 +61,8 @@ func (b *dsgaCreationBinding) supplyFact(ctx context.Context, kind string, value
 	return raw, tx.Commit(ctx)
 }
 
+const dsgaQualifierPodDeadlineSeconds = 300
+
 type dsgaSupplyObject struct {
 	Name   string `json:"name"`
 	UID    string `json:"uid"`
@@ -69,6 +71,8 @@ type dsgaSupplyObject struct {
 
 // Job无shell、无宿主PID/特权，不拿业务凭据；只连接同节点原Agent只读UDS。
 // backoff=0 + Never防止不确定签发被自动重放。新Job名绑定原VM UID与PG boot。
+// 运行时限从同节点 kubelet 接收 Pod 后开始计时。等待 Host 容量时，Worker
+// 的有界等待可重试并沿用原 Job 与 Pod。
 func dsgaQualificationJob(vm *vmv1.VirtualMachine, plan dsgaCreationPlan, nodeUID string, boot dsgapi.Uint64) (*core.ConfigMap, *batch.Job, error) {
 	s := plan.VM.supply()
 	if s == nil || s.validate() != nil || vm == nil || vm.UID == "" || vm.Status.Node == "" || boot == 0 {
@@ -86,12 +90,12 @@ func dsgaQualificationJob(vm *vmv1.VirtualMachine, plan dsgaCreationPlan, nodeUI
 	}
 	yes, no, zero := true, false, int32(0)
 	root := int64(0)
-	deadline := int64(300)
+	deadline := int64(dsgaQualifierPodDeadlineSeconds)
 	mode := int32(0400)
 	directory := core.HostPathDirectory
 	labels := map[string]string{dsgaSupplyVMLabel: string(vm.UID)}
 	cm := &core.ConfigMap{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: s.PlatformNamespace, Labels: labels}, Immutable: &yes, Data: map[string]string{"collector.json": string(raw)}}
-	pod := core.PodSpec{SchedulerName: plan.VM.SchedulerName, NodeSelector: map[string]string{"kubernetes.io/hostname": vm.Status.Node}, ServiceAccountName: s.QualifierServiceAccount, RestartPolicy: core.RestartPolicyNever, AutomountServiceAccountToken: &yes,
+	pod := core.PodSpec{ActiveDeadlineSeconds: &deadline, SchedulerName: plan.VM.SchedulerName, NodeSelector: map[string]string{"kubernetes.io/hostname": vm.Status.Node}, ServiceAccountName: s.QualifierServiceAccount, RestartPolicy: core.RestartPolicyNever, AutomountServiceAccountToken: &yes,
 		SecurityContext: &core.PodSecurityContext{RunAsUser: &root, RunAsGroup: &root, SeccompProfile: &core.SeccompProfile{Type: core.SeccompProfileTypeRuntimeDefault}},
 		Containers: []core.Container{{Name: "qualifier", Image: s.QualifierImage, ImagePullPolicy: core.PullIfNotPresent, Args: []string{"--collect-publish-config", "/config/collector.json"},
 			SecurityContext: &core.SecurityContext{AllowPrivilegeEscalation: &no, ReadOnlyRootFilesystem: &yes, Capabilities: &core.Capabilities{Drop: []core.Capability{"ALL"}}},
@@ -100,7 +104,7 @@ func dsgaQualificationJob(vm *vmv1.VirtualMachine, plan dsgaCreationPlan, nodeUI
 		Volumes: []core.Volume{{Name: "config", VolumeSource: core.VolumeSource{ConfigMap: &core.ConfigMapVolumeSource{LocalObjectReference: core.LocalObjectReference{Name: name}, DefaultMode: &mode}}},
 			{Name: "output", VolumeSource: core.VolumeSource{EmptyDir: &core.EmptyDirVolumeSource{SizeLimit: resource.NewQuantity(32<<20, resource.BinarySI)}}},
 			{Name: "root-read", VolumeSource: core.VolumeSource{HostPath: &core.HostPathVolumeSource{Path: s.ResourceReadHostDirectory, Type: &directory}}}}}
-	job := &batch.Job{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: s.PlatformNamespace, Labels: labels}, Spec: batch.JobSpec{BackoffLimit: &zero, ActiveDeadlineSeconds: &deadline, Template: core.PodTemplateSpec{ObjectMeta: metav1.ObjectMeta{Labels: labels}, Spec: pod}}}
+	job := &batch.Job{ObjectMeta: metav1.ObjectMeta{Name: name, Namespace: s.PlatformNamespace, Labels: labels}, Spec: batch.JobSpec{BackoffLimit: &zero, Template: core.PodTemplateSpec{ObjectMeta: metav1.ObjectMeta{Labels: labels}, Spec: pod}}}
 	return cm, job, nil
 }
 
@@ -111,7 +115,7 @@ func sameDSGAQualificationJob(got, wanted *batch.Job) bool {
 	}
 	// Kubernetes默认字段合法；仅投影已显式冻结的完整执行合同，额外容器/卷仍拒绝。
 	a, b := got.Spec.Template.Spec, wanted.Spec.Template.Spec
-	if a.NodeName != b.NodeName || a.SchedulerName != b.SchedulerName || !reflect.DeepEqual(a.NodeSelector, b.NodeSelector) || a.ServiceAccountName != b.ServiceAccountName || a.RestartPolicy != core.RestartPolicyNever ||
+	if !reflect.DeepEqual(a.ActiveDeadlineSeconds, b.ActiveDeadlineSeconds) || a.NodeName != b.NodeName || a.SchedulerName != b.SchedulerName || !reflect.DeepEqual(a.NodeSelector, b.NodeSelector) || a.ServiceAccountName != b.ServiceAccountName || a.RestartPolicy != core.RestartPolicyNever ||
 		a.HostNetwork || a.HostPID || a.HostIPC || len(a.InitContainers) != 0 || len(a.EphemeralContainers) != 0 || len(a.Containers) != 1 || len(a.Volumes) != len(b.Volumes) ||
 		!reflect.DeepEqual(a.SecurityContext, b.SecurityContext) || !reflect.DeepEqual(a.AutomountServiceAccountToken, b.AutomountServiceAccountToken) {
 		return false
