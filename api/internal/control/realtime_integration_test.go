@@ -2,6 +2,7 @@ package control
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"os"
 	"regexp"
@@ -178,7 +179,11 @@ func TestRealtimeSourceWorker(t *testing.T) {
 	}
 	exec(`CREATE SCHEMA wire_worker_meta;
 CREATE ROLE rt_wire_worker LOGIN REPLICATION;
+CREATE ROLE rt_wire_reader LOGIN;
 CREATE TABLE public.rt_worker_events(id integer PRIMARY KEY);
+CREATE TABLE public.rt_worker_private(id integer PRIMARY KEY);
+INSERT INTO public.rt_worker_private VALUES(4);
+GRANT SELECT ON public.rt_worker_events TO rt_wire_reader;
 CREATE PUBLICATION rt_worker_pub FOR TABLE public.rt_worker_events;`)
 	cfg.ConnConfig.RuntimeParams["search_path"] = "wire_worker_meta"
 	db, err := pgxpool.NewWithConfig(ctx, cfg)
@@ -217,6 +222,37 @@ VALUES('br_worker','prj_worker','main','44444444444444444444444444444444',true,'
 		SystemID: pgIdentity.SystemID, Timeline: pgIdentity.Timeline, Database: key.Database, Slot: "rt_worker_slot",
 		Publication: "rt_worker_pub", ConfirmedLSN: start, Relations: []realtime.Relation{relation},
 	}, 4))
+	readConfig := cfg.ConnConfig.Copy()
+	readConfig.User = "rt_wire_reader"
+	reader, err := pgx.ConnectConfig(ctx, readConfig)
+	must(err)
+	defer reader.Close(ctx)
+	notification, err := pgx.ConnectConfig(ctx, cfg.ConnConfig.Copy())
+	must(err)
+	defer notification.Close(ctx)
+	_, err = notification.Exec(ctx, "LISTEN realtime_invalidations")
+	must(err)
+	query := realtime.Query{Statement: "SELECT id FROM public.rt_worker_events WHERE id>$1 ORDER BY id", Params: []any{0},
+		Role: readConfig.User, MaxRows: 10, MaxBytes: 4096, MaxFrameBytes: 128 << 10, Timeout: 2 * time.Second}
+	readSnapshot := func(expectedPosition int64, expectedRows int) {
+		t.Helper()
+		result, err := store.Snapshot(ctx, key, reader, query)
+		must(err)
+		var data struct {
+			Columns []string `json:"columns"`
+			Rows    [][]int  `json:"rows"`
+		}
+		must(json.Unmarshal(result.Data, &data))
+		if result.Position != expectedPosition || len(data.Columns) != 1 || data.Columns[0] != "id" || len(data.Rows) != expectedRows {
+			t.Fatalf("bounded query snapshot at %d: %+v", result.Position, data)
+		}
+	}
+	readSnapshot(0, 0)
+	private := query
+	private.Statement, private.Params = "SELECT id FROM public.rt_worker_private", nil
+	if _, err := store.Snapshot(ctx, key, reader, private); !errors.Is(err, realtime.ErrQueryRejected) {
+		t.Fatalf("ungranted relation was readable: %v", err)
+	}
 	openSQL := func(ctx context.Context, _ realtime.Lease) (*pgx.Conn, error) {
 		cfg := cfg.ConnConfig.Copy()
 		cfg.User = "rt_wire_worker"
@@ -257,6 +293,14 @@ VALUES('br_worker','prj_worker','main','44444444444444444444444444444444',true,'
 	if a.Position != 1 || len(a.Relations) != 1 || a.Relations[0] != relation {
 		t.Fatalf("first durable invalidation: %+v", a)
 	}
+	waitCtx, cancelWait := context.WithTimeout(ctx, 2*time.Second)
+	note, err := notification.WaitForNotification(waitCtx)
+	cancelWait()
+	must(err)
+	if note.Channel != "realtime_invalidations" || note.Payload != key.ID {
+		t.Fatalf("notification differs from the committed source: %+v", note)
+	}
+	readSnapshot(1, 1)
 	stop()
 	if err := <-done; !errors.Is(err, context.Canceled) {
 		t.Fatalf("worker cancellation: %v", err)
@@ -267,7 +311,24 @@ VALUES('br_worker','prj_worker','main','44444444444444444444444444444444',true,'
 	if b.Position != 2 || b.LSN < a.EndLSN {
 		t.Fatalf("worker did not resume the original logical slot: %+v %+v", a, b)
 	}
+	readSnapshot(2, 2)
+	excess := query
+	excess.MaxRows = 1
+	if _, err := store.Snapshot(ctx, key, reader, excess); !errors.Is(err, realtime.ErrResultBudget) {
+		t.Fatalf("over-budget query was delivered: %v", err)
+	}
+	write := query
+	write.Statement, write.Params = "INSERT INTO public.rt_worker_events VALUES(7) RETURNING id", nil
+	exec("GRANT INSERT ON public.rt_worker_events TO rt_wire_reader")
+	if _, err := store.Snapshot(ctx, key, reader, write); !errors.Is(err, realtime.ErrQueryRejected) {
+		t.Fatalf("read-only transaction admitted a write: %v", err)
+	}
+	exec("REVOKE INSERT ON public.rt_worker_events FROM rt_wire_reader")
+	readSnapshot(2, 2)
 	must(store.Retire(ctx, key))
+	if _, err := store.Snapshot(ctx, key, reader, query); !errors.Is(err, realtime.ErrSourceUnavailable) {
+		t.Fatalf("retired source snapshot: %v", err)
+	}
 	select {
 	case err := <-done:
 		if !errors.Is(err, realtime.ErrLeaseLost) {

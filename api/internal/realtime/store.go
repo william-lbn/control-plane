@@ -209,8 +209,24 @@ WHERE id=$1 AND lease_epoch=$4 AND lease_until>clock_timestamp()`, key.ID, lates
 		}
 		_, err = tx.Exec(ctx, `DELETE FROM realtime_invalidations WHERE source_id=$1 AND position<=$2`,
 			key.ID, latest-int64(retain))
+		if err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx, "SELECT pg_notify('realtime_invalidations',$1)", key.ID)
 		return err
 	})
+}
+
+// Head fences an initial Writer snapshot. Commits recorded after this position
+// can be replayed even when the query snapshot already includes their effects.
+func (s Store) Head(ctx context.Context, key SourceKey) (int64, error) {
+	var latest int64
+	err := s.DB.QueryRow(ctx, `SELECT latest FROM realtime_sources s WHERE `+sourceScope,
+		key.ID, key.Project, key.Branch, key.Timeline, key.Database).Scan(&latest)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, ErrSourceUnavailable
+	}
+	return latest, err
 }
 
 // ReadAfter takes one metadata snapshot for the retention bound and the events.
