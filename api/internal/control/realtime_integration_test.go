@@ -1,11 +1,16 @@
 package control
 
 import (
+	"bufio"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"regexp"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -400,6 +405,97 @@ VALUES('br_worker','prj_worker','main','44444444444444444444444444444444',true,'
 	stopListening()
 	if err := <-listener; !errors.Is(err, context.Canceled) {
 		t.Fatalf("notification listener exit: %v", err)
+	}
+	httpNotifications := realtime.NewNotifications(db, 4)
+	httpCtx, cancelHTTP := context.WithCancel(ctx)
+	httpListener := make(chan error, 1)
+	go func() { httpListener <- httpNotifications.Run(httpCtx, 25*time.Millisecond) }()
+	defer cancelHTTP()
+	scope := realtime.CursorScope{Source: key, Query: "latest", QueryVersion: 1, Principal: "original-app",
+		Authorization: 1, ParametersSHA256: sha256.Sum256([]byte("[0]"))}
+	signer := realtime.CursorSigner{Key: []byte(strings.Repeat("a", 32))}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		principal := scope
+		if r.URL.Path == "/different-principal" {
+			principal.Principal = "other-app"
+		}
+		store.ServeSSE(w, r, httpNotifications, realtime.Subscription{
+			Key: key, Query: query, Relations: []realtime.Relation{relation}, PageSize: 2, DeliveryLimit: 300 * time.Millisecond,
+		}, realtime.SSEOptions{Cursor: signer, Scope: principal, ExpiresAt: time.Now().Add(15 * time.Second),
+			CursorTTL: 10 * time.Second, Heartbeat: 330 * time.Millisecond}, func(context.Context) error {
+			if blocked.Load() {
+				return revoked
+			}
+			return nil
+		}, func(call context.Context) (*pgx.Conn, error) {
+			return pgx.ConnectConfig(call, readConfig.Copy())
+		})
+	}))
+	defer func() {
+		server.CloseClientConnections()
+		server.Close()
+	}()
+	openStream := func(path, cursor string, expected int) *http.Response {
+		t.Helper()
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, server.URL+path, nil)
+		must(err)
+		if cursor != "" {
+			req.Header.Set("Last-Event-ID", cursor)
+		}
+		response, err := server.Client().Do(req)
+		must(err)
+		t.Cleanup(func() { _ = response.Body.Close() })
+		if response.StatusCode != expected {
+			t.Fatalf("subscription HTTP %d, expected %d", response.StatusCode, expected)
+		}
+		return response
+	}
+	event := func(response *http.Response, expectedKind string, expectedPosition int64) string {
+		t.Helper()
+		if response.Header.Get("Content-Type") != "text/event-stream" || response.Header.Get("Cache-Control") != "no-store" {
+			t.Fatal("subscription did not negotiate SSE")
+		}
+		lines := bufio.NewReader(response.Body)
+		var id, kind string
+		var data []byte
+		for {
+			line, err := lines.ReadString('\n')
+			must(err)
+			switch {
+			case strings.HasPrefix(line, "id: "):
+				id = strings.TrimSpace(line[4:])
+			case strings.HasPrefix(line, "event: "):
+				kind = strings.TrimSpace(line[7:])
+			case strings.HasPrefix(line, "data: "):
+				data = []byte(strings.TrimSpace(line[6:]))
+			case line == "\n" && id != "":
+				pos, err := signer.Verify(scope, id, time.Now())
+				must(err)
+				if pos != expectedPosition || kind != expectedKind || !json.Valid(data) {
+					t.Fatalf("SSE event %s at %d, expected %s at %d", kind, pos, expectedKind, expectedPosition)
+				}
+				return id
+			}
+		}
+	}
+	blocked.Store(false)
+	initial := openStream("/original", "", http.StatusOK)
+	originalCursor := event(initial, "snapshot", 3)
+	must(initial.Body.Close())
+	foreign := openStream("/different-principal", originalCursor, http.StatusBadRequest)
+	must(foreign.Body.Close())
+	expired, err := signer.Sign(scope, 1, time.Now().Add(-time.Second))
+	must(err)
+	reset := openStream("/original", expired, http.StatusOK)
+	event(reset, "snapshot", 3)
+	must(reset.Body.Close())
+	resumed := openStream("/original", originalCursor, http.StatusOK)
+	exec("INSERT INTO public.rt_worker_events VALUES (4)")
+	event(resumed, "change", 4)
+	must(resumed.Body.Close())
+	cancelHTTP()
+	if err := <-httpListener; !errors.Is(err, context.Canceled) {
+		t.Fatalf("SSE notification listener exit: %v", err)
 	}
 	must(store.Retire(ctx, key))
 	if _, err := store.Snapshot(ctx, key, reader, query); !errors.Is(err, realtime.ErrSourceUnavailable) {
