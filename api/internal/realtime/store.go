@@ -149,8 +149,7 @@ WHERE id=$1 AND project_id=$2 AND branch_id=$3 AND timeline_id=$4 AND database_n
 		if err != nil {
 			return err
 		}
-		_, err = tx.Exec(ctx, "SELECT pg_notify($1,$2)", invalidationChannel, key.ID)
-		return err
+		return NotifySourceChange(ctx, tx, key.ID)
 	})
 }
 
@@ -229,9 +228,14 @@ WHERE id=$1 AND lease_epoch=$4 AND lease_until>clock_timestamp()`, key.ID, lates
 		if err != nil {
 			return err
 		}
-		_, err = tx.Exec(ctx, "SELECT pg_notify($1,$2)", invalidationChannel, key.ID)
-		return err
+		return NotifySourceChange(ctx, tx, key.ID)
 	})
+}
+
+// NotifySourceChange wakes subscribers after a committed source or query change.
+func NotifySourceChange(ctx context.Context, tx pgx.Tx, sourceID string) error {
+	_, err := tx.Exec(ctx, "SELECT pg_notify($1,$2)", invalidationChannel, sourceID)
+	return err
 }
 
 // Head fences an initial Writer snapshot. Commits recorded after this position

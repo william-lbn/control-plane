@@ -1,7 +1,7 @@
 # 实际 API 合同
 
 OpenAPI 3 合同的权威源是 [openapi-v1.json](../contracts/openapi-v1.json)。
-版本 0.92.0，230 个路径、321 个操作，全部拥有稳定且唯一的 operationId。
+版本 0.93.0，232 个路径、324 个操作，全部拥有稳定且唯一的 operationId。
 运行 Swagger 位于 `/api/docs`，JSON 位于 `/api/openapi.json`。
 本合同是自托管 `/api/v1`，不声称兼容 Neon SaaS `/api/v2`。
 
@@ -83,6 +83,9 @@ request_id/operation_id/error_code，再由显式 retry 接口恢复可重试操
 | DELETE | `/api/v1/projects/{project}/branches/{branch}/data-api` | `disableDataAPI` | 202 |
 | GET | `/api/v1/projects/{project}/branches/{branch}/realtime/sources` | `listRealtimeSources` | 200 |
 | POST | `/api/v1/projects/{project}/branches/{branch}/realtime/sources` | `registerRealtimeSource` | 202 |
+| GET | `/api/v1/projects/{project}/branches/{branch}/realtime/sources/{rtSource}/queries` | `listRealtimeQueries` | 200 |
+| POST | `/api/v1/projects/{project}/branches/{branch}/realtime/sources/{rtSource}/queries` | `registerRealtimeQuery` | 202 |
+| DELETE | `/api/v1/projects/{project}/branches/{branch}/realtime/sources/{rtSource}/queries/{rtQueryID}` | `retireRealtimeQuery` | 202 |
 | DELETE | `/api/v1/projects/{project}/branches/{branch}/realtime/sources/{rtSource}` | `retireRealtimeSource` | 202 |
 | GET | `/realtime/v1/{rtBranch}/queries/{rtQuery}` | `subscribeRealtimeQuery` | 200 |
 | GET | `/api/v1/projects/{project}/branches/{branch}/credentials` | `listBackendCredentials` | 200 |

@@ -242,6 +242,21 @@ VALUES('br_4444444444444444','prj_worker','main','444444444444444444444444444444
 	must(err)
 	query := realtime.Query{Statement: "SELECT id FROM public.rt_worker_events WHERE id>$1 ORDER BY id", Params: []any{0},
 		Role: readConfig.User, MaxRows: 10, MaxBytes: 4096, MaxFrameBytes: 128 << 10, Timeout: 2 * time.Second}
+	spec := realtimeQuerySpec{Statement: query.Statement, ParameterCount: len(query.Params), QueryTimeoutMS: 2000}
+	must(validateRealtimeQuery(ctx, reader, spec))
+	for _, statement := range []string{
+		"SELECT id FROM public.rt_worker_private",
+		"SELECT id FROM public.rt_worker_events; SELECT 2",
+		"SELECT id FROM public.rt_worker_events FOR UPDATE",
+	} {
+		if err := validateRealtimeQuery(ctx, reader, realtimeQuerySpec{Statement: statement, QueryTimeoutMS: 2000}); !errors.Is(err, realtime.ErrQueryRejected) {
+			t.Fatalf("registration accepted %q: %v", statement, err)
+		}
+	}
+	spec.ParameterCount++
+	if err := validateRealtimeQuery(ctx, reader, spec); !errors.Is(err, realtime.ErrQueryRejected) {
+		t.Fatalf("registration accepted wrong parameter arity: %v", err)
+	}
 	readSnapshot := func(expectedPosition int64, expectedRows int) {
 		t.Helper()
 		result, err := store.Snapshot(ctx, key, reader, query)
@@ -386,6 +401,10 @@ VALUES('br_4444444444444444','prj_worker','main','444444444444444444444444444444
 	write := query
 	write.Statement, write.Params = "INSERT INTO public.rt_worker_events VALUES(7) RETURNING id", nil
 	exec("GRANT INSERT ON public.rt_worker_events TO rtr_555555555555555555555555")
+	cte := realtimeQuerySpec{Statement: "WITH changed AS (INSERT INTO public.rt_worker_events VALUES(7) RETURNING id) SELECT id FROM changed", QueryTimeoutMS: 2000}
+	if err := validateRealtimeQuery(ctx, reader, cte); !errors.Is(err, realtime.ErrQueryRejected) {
+		t.Fatalf("registration accepted a modifying CTE: %v", err)
+	}
 	if _, err := store.Snapshot(ctx, key, reader, write); !errors.Is(err, realtime.ErrQueryRejected) {
 		t.Fatalf("read-only transaction admitted a write: %v", err)
 	}

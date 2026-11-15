@@ -83,7 +83,7 @@ WHERE q.branch_id=$1 AND q.name=$2 AND q.retired_at IS NULL AND s.retired_at IS 
 func (s *server) openRealtimeWriter(ctx context.Context, q registeredRealtimeQuery) (*pgx.Conn, error) {
 	return s.openRealtimeSQL(ctx, realtimeLoginBinding{key: q.Source, writer: q.Writer, role: q.Query.Role,
 		credential: q.Credential, credentialUID: q.CredentialUID, credentialNamespace: q.CredentialNamespace,
-		ownerLabel: "neon-control/realtime-query", ownerID: q.ID})
+		ownerLabel: realtimeQueryOwner, ownerID: q.ID})
 }
 
 func (s *server) realtimeStream(w http.ResponseWriter, r *http.Request) {

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Neon Self-hosted Control API",
-    "version": "0.92.0",
+    "version": "0.93.0",
     "description": "Implemented self-hosted control API. M2 creation is enabled only when capability discovery reports its driver ready; unsupported SaaS Backend services remain disabled."
   },
   "servers": [
@@ -15665,6 +15665,405 @@
             }
           }
         }
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/realtime/sources/{rtSource}/queries": {
+      "get": {
+        "tags": [
+          "Realtime"
+        ],
+        "operationId": "listRealtimeQueries",
+        "summary": "List registered Realtime queries for the original source",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "name": "rtSource",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^rts_[0-9a-f]{24}$"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          },
+          {
+            "bearerToken": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Realtime query list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "pattern": "^rtq_[0-9a-f]{24}$"
+                          },
+                          "writer_id": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "registering",
+                              "ready",
+                              "retiring"
+                            ]
+                          },
+                          "operation_id": {
+                            "type": "string"
+                          },
+                          "query_name": {
+                            "type": "string",
+                            "pattern": "^[a-z][a-z0-9_-]{0,47}$"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "writer_id",
+                          "state",
+                          "operation_id",
+                          "query_name"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "enabled",
+                    "items"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Realtime"
+        ],
+        "operationId": "registerRealtimeQuery",
+        "summary": "Register a bounded named SELECT for an active Realtime source",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "name": "rtSource",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^rts_[0-9a-f]{24}$"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "description": "Current quoted Writer version from the endpoint resource",
+            "schema": {
+              "type": "string",
+              "pattern": "^\"[1-9][0-9]*\"$"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted or replayed Realtime query Operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "query_id": {
+                      "type": "string",
+                      "pattern": "^rtq_[0-9a-f]{24}$"
+                    },
+                    "operation": {
+                      "$ref": "#/components/schemas/Operation"
+                    }
+                  },
+                  "required": [
+                    "query_id",
+                    "operation"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "headers": {
+              "Location": {
+                "description": "Original Operation status URL",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_-]{0,47}$"
+                  },
+                  "statement": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 65536
+                  },
+                  "relations": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 32,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "schema": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,62}$"
+                        },
+                        "name": {
+                          "type": "string",
+                          "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,62}$"
+                        }
+                      },
+                      "required": [
+                        "schema",
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "parameter_count": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 32,
+                    "default": 0
+                  },
+                  "max_rows": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 2000,
+                    "default": 200
+                  },
+                  "max_result_bytes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1048576,
+                    "default": 262144
+                  },
+                  "query_timeout_ms": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 30000,
+                    "default": 5000
+                  }
+                },
+                "required": [
+                  "name",
+                  "statement",
+                  "relations"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "description": "Requires project administration. Qualify all application relations and include them in the source relation subset. The Worker checks parameter arity and the result description using the original Writer. Subscriber arguments are supplied as strings."
+      }
+    },
+    "/api/v1/projects/{project}/branches/{branch}/realtime/sources/{rtSource}/queries/{rtQueryID}": {
+      "delete": {
+        "tags": [
+          "Realtime"
+        ],
+        "operationId": "retireRealtimeQuery",
+        "summary": "Retire a registered query and its dedicated Writer login",
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/project"
+          },
+          {
+            "$ref": "#/components/parameters/branch"
+          },
+          {
+            "name": "rtSource",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^rts_[0-9a-f]{24}$"
+            }
+          },
+          {
+            "name": "rtQueryID",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^rtq_[0-9a-f]{24}$"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/csrf"
+          },
+          {
+            "$ref": "#/components/parameters/idempotency"
+          },
+          {
+            "name": "If-Match",
+            "in": "header",
+            "required": true,
+            "description": "Current quoted Writer version from the endpoint resource",
+            "schema": {
+              "type": "string",
+              "pattern": "^\"[1-9][0-9]*\"$"
+            }
+          }
+        ],
+        "security": [
+          {
+            "sessionCookie": []
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted or replayed Realtime query Operation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "query_id": {
+                      "type": "string",
+                      "pattern": "^rtq_[0-9a-f]{24}$"
+                    },
+                    "operation": {
+                      "$ref": "#/components/schemas/Operation"
+                    }
+                  },
+                  "required": [
+                    "query_id",
+                    "operation"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "headers": {
+              "Location": {
+                "description": "Original Operation status URL",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "412": {
+            "$ref": "#/components/responses/Error"
+          },
+          "422": {
+            "$ref": "#/components/responses/Error"
+          },
+          "428": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "description": "Requires project administration. Existing subscriptions are revoked, the read login is disabled and its dedicated credential is released by the original Operation."
       }
     },
     "/api/v1/projects/{project}/branches/{branch}/realtime/sources/{rtSource}": {

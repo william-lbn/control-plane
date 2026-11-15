@@ -220,7 +220,8 @@ func (s *server) mutateRealtimeSource(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		var held bool
-		err = tx.QueryRow(ctx, "SELECT EXISTS(SELECT FROM realtime_queries WHERE source_id=$1 AND retired_at IS NULL)", p.ID).Scan(&held)
+		err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT FROM realtime_queries WHERE source_id=$1 AND retired_at IS NULL)
+ OR EXISTS(SELECT FROM realtime_query_operations WHERE source_id=$1 AND state<>'retired')`, p.ID).Scan(&held)
 		if err != nil {
 			fail(w, r, 503, "metadata_unavailable", "Could not check Realtime queries")
 			return
