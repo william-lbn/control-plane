@@ -10,6 +10,8 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"regexp"
+	"strings"
 	"time"
 
 	dsgapi "github.com/neondatabase/autoscaling/pkg/api/dsga"
@@ -19,19 +21,29 @@ import (
 const dsgaAuthLoginPath = "/dsg/v1/catalog/service-login"
 const dsgaDataAPIServiceLogin = "data_api"
 const dsgaFunctionServiceLogin = "function"
+const dsgaRealtimeServiceLogin = "realtime"
+
+var dsgaRealtimeLoginID = regexp.MustCompile(`^rt[sq]_[a-f0-9]{24}$`)
+
+type dsgaRealtimeRelation struct {
+	Schema string `json:"schema"`
+	Name   string `json:"name"`
+}
 
 type dsgaAuthLoginRequest struct {
-	ProtocolVersion uint32        `json:"protocol_version"`
-	Service         string        `json:"service,omitempty"`
-	ProjectID       string        `json:"project_id"`
-	BranchID        string        `json:"branch_id"`
-	EndpointID      string        `json:"endpoint_id"`
-	PGBootID        dsgapi.Uint64 `json:"pg_boot_id"`
-	Database        string        `json:"database"`
-	FunctionID      string        `json:"function_id,omitempty"`
-	Schema          string        `json:"schema,omitempty"`
-	Generation      dsgapi.Uint64 `json:"generation"`
-	Verifier        *string       `json:"verifier"`
+	ProtocolVersion uint32                  `json:"protocol_version"`
+	Service         string                  `json:"service,omitempty"`
+	ProjectID       string                  `json:"project_id"`
+	BranchID        string                  `json:"branch_id"`
+	EndpointID      string                  `json:"endpoint_id"`
+	PGBootID        dsgapi.Uint64           `json:"pg_boot_id"`
+	Database        string                  `json:"database"`
+	FunctionID      string                  `json:"function_id,omitempty"`
+	Schema          string                  `json:"schema,omitempty"`
+	RealtimeID      string                  `json:"realtime_id,omitempty"`
+	Relations       *[]dsgaRealtimeRelation `json:"relations,omitempty"`
+	Generation      dsgapi.Uint64           `json:"generation"`
+	Verifier        *string                 `json:"verifier"`
 }
 
 type dsgaAuthLoginReceipt struct {
@@ -41,6 +53,7 @@ type dsgaAuthLoginReceipt struct {
 	PGBootID        dsgapi.Uint64 `json:"pg_boot_id"`
 	FunctionID      string        `json:"function_id,omitempty"`
 	Schema          string        `json:"schema,omitempty"`
+	RealtimeID      string        `json:"realtime_id,omitempty"`
 	Generation      dsgapi.Uint64 `json:"generation"`
 	Enabled         bool          `json:"enabled"`
 }
@@ -110,6 +123,22 @@ func (s *server) applyDSGAServiceLogin(ctx context.Context, runtime *dsgaEndpoin
 		refusal = dataAPIPrerequisiteError{"function_writer_service_login_unconfirmed", "Original DSGA Writer Function login is unconfirmed"}
 		if !functionDefinitionID.MatchString(input.FunctionID) || !validPGIdentifier(input.Schema) {
 			return refusal
+		}
+	case dsgaRealtimeServiceLogin:
+		refusal = dataAPIPrerequisiteError{"realtime_writer_service_login_unconfirmed", "Original DSGA Writer Realtime login is unconfirmed"}
+		if !dsgaRealtimeLoginID.MatchString(input.RealtimeID) || input.Relations == nil ||
+			input.FunctionID != "" || input.Schema != "" {
+			return refusal
+		}
+		tables := *input.Relations
+		if (strings.HasPrefix(input.RealtimeID, "rts_") && len(tables) != 0) ||
+			(strings.HasPrefix(input.RealtimeID, "rtq_") && (len(tables) == 0 || len(tables) > 32)) {
+			return refusal
+		}
+		for _, relation := range tables {
+			if !validPGIdentifier(relation.Schema) || !validPGIdentifier(relation.Name) {
+				return refusal
+			}
 		}
 	case "":
 	default:
@@ -181,7 +210,8 @@ func requestDSGAAuthLogin(ctx context.Context, client *http.Client, target strin
 		resp.Header.Get("Content-Type") != "application/json" || resp.Header.Get("Cache-Control") != "no-store" ||
 		dsgapi.UnmarshalObject(body, &receipt) != nil ||
 		receipt != (dsgaAuthLoginReceipt{ProtocolVersion: 1, Service: input.Service, BranchID: input.BranchID, PGBootID: input.PGBootID,
-			FunctionID: input.FunctionID, Schema: input.Schema, Generation: input.Generation, Enabled: input.Verifier != nil}) {
+			FunctionID: input.FunctionID, Schema: input.Schema, RealtimeID: input.RealtimeID,
+			Generation: input.Generation, Enabled: input.Verifier != nil}) {
 		return errors.New("service login receipt differs")
 	}
 	return nil
