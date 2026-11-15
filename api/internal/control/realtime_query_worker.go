@@ -3,6 +3,7 @@ package control
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strconv"
 	"time"
 
@@ -66,15 +67,18 @@ func validateRealtimeQuery(ctx context.Context, conn *pgx.Conn, spec realtimeQue
 	ctx, cancel := context.WithTimeout(ctx, time.Duration(spec.QueryTimeoutMS)*time.Millisecond)
 	defer cancel()
 	conn.PgConn().Frontend().SetMaxBodyLen(realtimeSourceMaxFrameBytes)
-	return pgx.BeginTxFunc(ctx, conn, pgx.TxOptions{AccessMode: pgx.ReadOnly}, func(tx pgx.Tx) error {
+	err := pgx.BeginTxFunc(ctx, conn, pgx.TxOptions{AccessMode: pgx.ReadOnly}, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx, "SET LOCAL search_path='pg_catalog'"); err != nil {
-			return realtime.ErrQueryRejected
+			return err
 		}
 		if _, err := tx.Exec(ctx, "SELECT set_config('statement_timeout',$1,true)", strconv.Itoa(spec.QueryTimeoutMS)+"ms"); err != nil {
-			return realtime.ErrQueryRejected
+			return err
 		}
 		desc, err := tx.Prepare(ctx, "", spec.Statement)
-		if err != nil || len(desc.Fields) == 0 || len(desc.ParamOIDs) != spec.ParameterCount {
+		if err != nil {
+			return err
+		}
+		if len(desc.Fields) == 0 || len(desc.ParamOIDs) != spec.ParameterCount {
 			return realtime.ErrQueryRejected
 		}
 		// EXPLAIN without ANALYZE checks the original login's plan and grants
@@ -84,11 +88,18 @@ func validateRealtimeQuery(ctx context.Context, conn *pgx.Conn, spec realtimeQue
 		var raw []byte
 		err = tx.QueryRow(ctx, "EXPLAIN (FORMAT JSON, COSTS OFF) "+spec.Statement, args...).Scan(&raw)
 		var plans []struct{ Plan realtimeQueryPlan }
-		if err != nil || json.Unmarshal(raw, &plans) != nil || len(plans) != 1 || !plans[0].Plan.readOnly() {
+		if err != nil {
+			return err
+		}
+		if json.Unmarshal(raw, &plans) != nil || len(plans) != 1 || !plans[0].Plan.readOnly() {
 			return realtime.ErrQueryRejected
 		}
 		return nil
 	})
+	if err != nil && !errors.Is(err, realtime.ErrQueryRejected) {
+		return errors.Join(realtime.ErrQueryRejected, sqlExecutionError{"query", err})
+	}
+	return err
 }
 
 func (s *server) reconcileRealtimeQuery(ctx context.Context, id, worker, action string, p realtimeQueryOperation) error {
@@ -131,6 +142,20 @@ func (s *server) reconcileRealtimeQuery(ctx context.Context, id, worker, action 
 			}
 			binding := p.loginBinding(intent.credentialUID)
 			conn, err := s.openRealtimeSQL(ctx, binding)
+			// A failed Proxy connection has sent no query. Recheck the
+			// original Operation, then resolve the bound Writer and Secret
+			// again before one additional read-only attempt.
+			if err != nil && ctx.Err() == nil {
+				failure := classifySQLFailure(err)
+				if failure.retryable {
+					s.logger.Warn("retrying Realtime query Writer validation", "operation_id", id,
+						"stage", failure.stage, "error_class", failure.class, "sqlstate", failure.sqlState)
+					if err := authorize(ctx); err != nil {
+						return err
+					}
+					conn, err = s.openRealtimeSQL(ctx, p.loginBinding(intent.credentialUID))
+				}
+			}
 			if err != nil {
 				return err
 			}

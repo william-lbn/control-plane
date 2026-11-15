@@ -93,10 +93,12 @@ func (s *server) openRealtimeSQL(ctx context.Context, binding realtimeLoginBindi
 	conn, err := pgx.ConnectConfig(connect, verified.config)
 	cancelConnect()
 	if err != nil {
-		return nil, realtime.ErrSourceUnavailable
+		return nil, sqlExecutionError{"connect", err}
 	}
 	var correct bool
-	err = conn.QueryRow(ctx, `SELECT current_setting('neon.project_id',true)=$1
+	observe, cancelObserve := context.WithTimeout(ctx, 5*time.Second)
+	defer cancelObserve()
+	err = conn.QueryRow(observe, `SELECT current_setting('neon.project_id',true)=$1
  AND current_setting('neon.branch_id',true)=$2 AND current_setting('neon.timeline_id',true)=$3
  AND current_database()=$4 AND session_user=$5 AND current_user=$5 AND NOT pg_is_in_recovery()
  AND current_setting('neon.tenant_id',true)=$6`,
@@ -105,6 +107,9 @@ func (s *server) openRealtimeSQL(ctx context.Context, binding realtimeLoginBindi
 		cleanup, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
 		_ = conn.Close(cleanup)
+		if err != nil {
+			return nil, sqlExecutionError{"session", err}
+		}
 		return nil, realtime.ErrSourceUnavailable
 	}
 	return conn, nil

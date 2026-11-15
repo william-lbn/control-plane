@@ -15948,7 +15948,7 @@
             }
           }
         },
-        "description": "Requires project administration. Qualify all application relations and include them in the source relation subset. The Worker checks parameter arity and the result description using the original Writer. Subscriber arguments are supplied as strings."
+        "description": "Requires project administration. Qualify all application relations and include them in the source relation subset. On the original Writer, the database and object owners must explicitly delegate CONNECT on that database, USAGE on the listed schemas, and SELECT on the listed tables to control_probe WITH GRANT OPTION. The Worker publishes a separate read login for the named query and checks its plan and parameter arity. Subscriber arguments are supplied as strings."
       }
     },
     "/api/v1/projects/{project}/branches/{branch}/realtime/sources/{rtSource}/queries/{rtQueryID}": {
