@@ -15,10 +15,10 @@ function find(objects, kind, name, namespace) {
   return object;
 }
 
-function roleBinding(objects, {name, namespace, roleName, serviceAccount}) {
+function roleBinding(objects, {name, namespace, roleName, serviceAccount, serviceAccounts = [serviceAccount]}) {
   const object = find(objects, 'RoleBinding', name, namespace);
   assert.deepEqual(object.roleRef, {apiGroup: 'rbac.authorization.k8s.io', kind: 'Role', name: roleName});
-  assert.deepEqual(object.subjects, [{kind: 'ServiceAccount', name: serviceAccount, namespace: 'neon'}]);
+  assert.deepEqual(object.subjects, serviceAccounts.map(name => ({kind: 'ServiceAccount', name, namespace: 'neon'})));
   return object;
 }
 
@@ -46,7 +46,10 @@ for (const [profile, file, combined] of [['split', splitPath, false], ['combined
   roleBinding(objects, {name: `${base}-dsga-neon-worker`, namespace: 'neon', roleName: 'neon-control-runtime-neon-runtime-access-worker', serviceAccount: workerSA});
   roleBinding(objects, {name: `${base}-dsga-platform-policy`, namespace: 'neon-control-runtime', roleName: `${base}-dsga-platform-policy`, serviceAccount: apiSA});
   roleBinding(objects, {name: `${base}-dsga-platform-worker`, namespace: 'neon-control-runtime', roleName: 'neon-control-runtime-neon-runtime-access-platform-worker', serviceAccount: workerSA});
-  roleBinding(objects, {name: `${base}-dsga-agent-observation`, namespace: 'kube-system', roleName: 'neon-control-runtime-neon-runtime-access-agent-observation', serviceAccount: apiSA});
+  roleBinding(objects, {name: `${base}-dsga-agent-observation`, namespace: 'kube-system', roleName: 'neon-control-runtime-neon-runtime-access-agent-observation', serviceAccounts: combined ? [apiSA] : [apiSA, workerSA]});
+  const lookup = `${base}-dsga-qualification-lookup`;
+  roleBinding(objects, {name: lookup, namespace: 'neon', roleName: lookup, serviceAccount: workerSA});
+  assert.deepEqual(find(objects, 'Role', lookup, 'neon').rules, [{apiGroups: [''], resources: ['configmaps'], verbs: ['list']}]);
 
   const policy = find(objects, 'Role', `${base}-dsga-platform-policy`, 'neon-control-runtime');
   assert.deepEqual(policy.rules, [{apiGroups: [''], resources: ['configmaps'], verbs: ['get', 'update']}]);

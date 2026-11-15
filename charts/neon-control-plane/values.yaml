@@ -58,6 +58,7 @@ functions:
   enabled: false
   edge:
     enabled: false
+    nodeSelector: {}
     replicaCount: 1
     existingClientSecret: ''
     existingBrokerSecret: ''

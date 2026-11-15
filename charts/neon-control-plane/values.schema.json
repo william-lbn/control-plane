@@ -627,6 +627,10 @@
               "type": "integer",
               "const": 1
             },
+            "nodeSelector": {
+              "type": "object",
+              "additionalProperties": {"type": "string"}
+            },
             "existingClientSecret": {
               "type": "string",
               "maxLength": 253,

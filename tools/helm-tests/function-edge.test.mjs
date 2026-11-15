@@ -143,3 +143,19 @@ test('Functions edge schema and template reject unknown fields missing trust and
     ['--set', 'objectStorage.enabled=false'],
   ]) assert.throws(() => render([...enabledArgs, ...extra]), /./);
 });
+
+test('Functions edge role placement overrides its hostname and retains shared architecture', () => {
+  const shared = ['--set-json', 'nodeSelector={"kubernetes.io/hostname":"worker-117","kubernetes.io/arch":"amd64"}'];
+  const common = render([...enabledArgs, ...shared]);
+  assert.deepEqual(deployment(common, 'function-edge').spec.template.spec.nodeSelector, {
+    'kubernetes.io/hostname': 'worker-117', 'kubernetes.io/arch': 'amd64',
+  });
+  const split = render([...enabledArgs, ...shared,
+    '--set-json', 'functions.edge.nodeSelector={"kubernetes.io/hostname":"worker-119"}']);
+  assert.deepEqual(deployment(split, 'function-edge').spec.template.spec.nodeSelector, {
+    'kubernetes.io/hostname': 'worker-119', 'kubernetes.io/arch': 'amd64',
+  });
+  for (const role of ['api', 'worker']) {
+    assert.equal(deployment(split, role).spec.template.spec.nodeSelector['kubernetes.io/hostname'], 'worker-117');
+  }
+});

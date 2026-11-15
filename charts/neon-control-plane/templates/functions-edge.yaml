@@ -35,7 +35,7 @@ spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets: {{ toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.nodeSelector }}
+      {{- with mergeOverwrite (deepCopy (default dict .Values.nodeSelector)) (default dict .Values.functions.edge.nodeSelector) }}
       nodeSelector: {{ toYaml . | nindent 8 }}
       {{- end }}
       {{- with .Values.tolerations }}
