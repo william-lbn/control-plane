@@ -30,24 +30,11 @@ func readSuspendedEndpointDeletionSource(ctx context.Context, db connectionDefau
 	err := db.QueryRow(ctx, `SELECT gone.id,project.tenant_id,branch.timeline_id,binding.namespace,intent.intent
  FROM endpoints e JOIN projects project ON project.id=e.project_id
  JOIN branches branch ON branch.id=e.branch_id AND branch.project_id=e.project_id
- JOIN operations gone ON gone.project_id=e.project_id AND gone.resource_type='endpoint' AND gone.resource_id=e.id
- JOIN operations original ON original.id=gone.payload->>'creation_operation_id'
- JOIN dsga_creation_bindings binding ON binding.operation_id=original.id
+ JOIN operations gone ON gone.id=dsga_suspended_delete_source(e.project_id,e.branch_id,e.id,$5)
+ JOIN dsga_creation_bindings binding ON binding.operation_id=gone.payload->>'creation_operation_id'
  JOIN dsga_suspension_intents intent ON intent.operation_id=gone.id
- WHERE e.id=$1 AND e.project_id=$2 AND e.branch_id=$3 AND e.workload_name=$4 AND e.workload_kind='neonvm'
- AND e.state IN ('suspended','deleting','deleted')
- AND gone.action=$5 AND gone.state='succeeded' AND ($6='' OR gone.id=$6)
- AND ((e.dsga_runtime_operation_id IS NULL AND original.action IN ('create_project_dsga_v1','create_endpoint_dsga_v1'))
-   OR (e.dsga_runtime_operation_id=original.id AND original.action=$7))
- AND NOT EXISTS(SELECT 1 FROM operations successor
-   WHERE successor.project_id=e.project_id AND successor.resource_type='endpoint' AND successor.resource_id=e.id
-   AND successor.action=$7 AND successor.payload->>'resume_from'=gone.id
-   AND NOT EXISTS(SELECT 1 FROM dsga_failed_resume_retirements evidence JOIN operations retirement ON retirement.id=evidence.operation_id
-     WHERE evidence.failed_resume_operation_id=successor.id AND retirement.project_id=e.project_id
-     AND retirement.resource_type='endpoint' AND retirement.resource_id=e.id AND retirement.action=$8 AND retirement.state='succeeded'
-     AND retirement.finished_at IS NOT NULL AND retirement.lease_owner IS NULL AND retirement.lease_expires_at IS NULL))`,
-		p.EndpointID, p.ProjectID, p.BranchID, kubeName(p.EndpointID), dsgaSuspendAction, p.SuspensionOperationID,
-		dsgaResumeAction, dsgaRetireResumeAction).
+ WHERE e.id=$1 AND e.project_id=$2 AND e.branch_id=$3 AND e.workload_name=$4`,
+		p.EndpointID, p.ProjectID, p.BranchID, kubeName(p.EndpointID), p.SuspensionOperationID).
 		Scan(&suspension, &scope.TenantID, &scope.TimelineID, &result.Namespace, &raw)
 	if err != nil {
 		return result, err

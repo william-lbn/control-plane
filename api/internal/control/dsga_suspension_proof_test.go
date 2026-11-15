@@ -196,6 +196,40 @@ func testDSGASuspensionIntentPinsBootAndHostAcrossWorkerRetry(t *testing.T, init
 	if _, err = readDSGAResumeSource(ctx, tx, foreignTimeline, id); err == nil {
 		t.Fatal("resume accepted a different Timeline")
 	}
+	t.Run("retained-deletion-database-admission", func(t *testing.T) {
+		for _, fixture := range []struct {
+			name       string
+			suspension string
+			authorized bool
+		}{
+			{"missing", "", false},
+			{"foreign", "different-suspension", false},
+			{"settled", id, true},
+		} {
+			t.Run(fixture.name, func(t *testing.T) {
+				attempt, err := tx.Begin(ctx)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer attempt.Rollback(ctx)
+				deletePayload, err := json.Marshal(endpointDeletionPayload{
+					ProjectID: p.ProjectID, BranchID: p.BranchID, EndpointID: p.EndpointID,
+					SuspensionOperationID: fixture.suspension,
+				})
+				if err != nil {
+					t.Fatal(err)
+				}
+				_, err = attempt.Exec(ctx, `INSERT INTO operations(id,project_id,resource_type,resource_id,action,state,actor_id,request_id,payload)
+ VALUES('delete-after-suspension',$1,'endpoint',$2,'delete_endpoint','queued','local-admin','delete-test',$3)`, p.ProjectID, p.EndpointID, deletePayload)
+				if fixture.authorized && err != nil {
+					t.Fatalf("database refused a settled suspension: %v", err)
+				}
+				if !fixture.authorized && (err == nil || !strings.Contains(err.Error(), "original settled Compute suspension required")) {
+					t.Fatalf("database accepted an unproven suspension or returned a different constraint: %v", err)
+				}
+			})
+		}
+	})
 	if err := tx.Commit(ctx); err != nil {
 		t.Fatal(err)
 	}
