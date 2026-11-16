@@ -11,8 +11,30 @@ import (
 
 	vmv1 "github.com/neondatabase/autoscaling/neonvm/apis/neonvm/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
+
+func TestDSGANativeInitializationFailureReasonPreservesTypedBoundary(t *testing.T) {
+	for _, tc := range []struct {
+		err  error
+		want string
+	}{
+		{errDSGAQualificationJobFailed, "qualification_job_failed"},
+		{errDSGAQualificationUnconfirmed, "qualification_unconfirmed"},
+		{context.DeadlineExceeded, "deadline"},
+		{errDSGACreationIdentity, "original_identity_unconfirmed"},
+		{apierrors.NewForbidden(schema.GroupResource{Resource: "configmaps"}, "private-name",
+			errors.New("private authorization detail")), "permission_denied"},
+		{errors.New("unrecognized runtime response detail"), "unconfirmed"},
+	} {
+		wrapped := fmt.Errorf("confirm_native_initialization: %w", tc.err)
+		if got := dsgaInitializationFailureReason(wrapped); got != tc.want {
+			t.Errorf("reason %q, want %q", got, tc.want)
+		}
+	}
+}
 
 // 公开接受→原Worker分派→真实元数据库失败提交/重试；Kube仍是TLS协议夹具。
 // 故意缺少存储管理Service，不能把无执行器/未知来源误计为项目Ready。

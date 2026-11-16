@@ -11,6 +11,7 @@ import (
 
 	vmv1 "github.com/neondatabase/autoscaling/neonvm/apis/neonvm/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -115,22 +116,33 @@ func (s *server) reconcileDSGACompute(ctx context.Context, binding *dsgaCreation
 		return err
 	}
 	var initialization dsgaInitializationResponse
-	if err := step(2, "confirm_native_initialization", func(ctx context.Context) error {
+	if err := step(2, "confirm_native_initialization", func(ctx context.Context) (stepErr error) {
+		stage := "configure_original_compute"
+		defer func() {
+			if stepErr != nil && s.logger != nil {
+				s.logger.Warn("original native initialization blocked", "operation_id", binding.operationID,
+					"stage", stage, "reason", dsgaInitializationFailureReason(stepErr))
+			}
+		}()
 		if err := binding.configureGenericCompute(ctx); err != nil {
 			return err
 		}
 		var err error
+		stage = "observe_original_initialization"
 		initialization, err = binding.waitOriginalInitialization(ctx)
 		if err != nil {
 			return err
 		}
+		stage = "persist_original_initialization"
 		if err := binding.recordInitialization(ctx, initialization); err != nil {
 			return err
 		}
+		stage = "qualify_and_publish_runtime"
 		if err := binding.provisionDSGARuntime(ctx, initialization); err != nil {
 			return err
 		}
 		originalInstance := initialization.Observed.Instance
+		stage = "observe_initialized_runtime"
 		initialization, err = binding.waitOriginalInitialization(ctx)
 		if err != nil {
 			return err
@@ -138,17 +150,21 @@ func (s *server) reconcileDSGACompute(ctx context.Context, binding *dsgaCreation
 		if initialization.Observed.Instance != originalInstance {
 			return errDSGACreationIdentity
 		}
+		stage = "persist_initialized_runtime"
 		if err := binding.recordInitialization(ctx, initialization); err != nil {
 			return err
 		}
 		if binding.action == dsgaResumeAction && binding.intent.EndpointType == "read_write" {
 			boot := initialization.Observed.Instance.PGBootID
+			stage = "revoke_disabled_auth_on_resume"
 			if err := binding.revokeDisabledDSGAAuthOnResume(ctx, boot); err != nil {
 				return err
 			}
+			stage = "revoke_disabled_data_api_on_resume"
 			if err := binding.revokeDisabledDSGADataAPIOnResume(ctx, boot); err != nil {
 				return err
 			}
+			stage = "revoke_deleted_functions_on_resume"
 			return binding.revokeDeletedDSGAFunctionsOnResume(ctx, boot)
 		}
 		return nil
@@ -279,6 +295,32 @@ func dsgaComputeWaitError(err error, lastPhase, runnerReason string) error {
 		return vmWaitError{phase: lastPhase, runnerReason: runnerReason, cause: err}
 	}
 	return err
+}
+
+// 日志只记录原阶段和固定错误类别。保留原错误供 Worker 判定重试。
+func dsgaInitializationFailureReason(err error) string {
+	switch {
+	case errors.Is(err, errDSGAQualificationJobFailed):
+		return "qualification_job_failed"
+	case errors.Is(err, errDSGAQualificationUnconfirmed):
+		return "qualification_unconfirmed"
+	case errors.Is(err, context.DeadlineExceeded):
+		return "deadline"
+	case errors.Is(err, context.Canceled):
+		return "cancelled"
+	case apierrors.IsForbidden(err), apierrors.IsUnauthorized(err):
+		return "permission_denied"
+	case errors.Is(err, errDSGACreationIdentity):
+		return "original_identity_unconfirmed"
+	case errors.Is(err, errDSGACredentialSource):
+		return "credential_source_unconfirmed"
+	case errors.Is(err, errDSGANativeConfigure):
+		return "native_configuration_unconfirmed"
+	case errors.Is(err, errDSGAInitializationPending):
+		return "native_initialization_pending"
+	default:
+		return "unconfirmed"
+	}
 }
 
 func (binding *dsgaCreationBinding) waitOriginalCompute(ctx context.Context) error {
