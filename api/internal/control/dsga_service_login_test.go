@@ -43,7 +43,7 @@ func TestDSGAServiceLoginReceiptIsBoundToService(t *testing.T) {
 				})
 			}))
 			defer endpoint.Close()
-			err := requestDSGAAuthLogin(context.Background(), endpoint.Client(), endpoint.URL, key, current, input)
+			_, err := requestDSGAAuthLogin(context.Background(), endpoint.Client(), endpoint.URL, key, current, input)
 			if (err == nil) != tc.ok {
 				t.Fatalf("service %q returned %v", tc.service, err)
 			}
@@ -75,10 +75,67 @@ func TestDSGARealtimeLoginReceiptBindsOriginalIdentity(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(dsgaAuthLoginReceipt{ProtocolVersion: 1, Service: input.Service,
 				BranchID: input.BranchID, PGBootID: input.PGBootID, RealtimeID: returned, Generation: input.Generation})
 		}))
-		err := requestDSGAAuthLogin(context.Background(), peer.Client(), peer.URL, key, current, input)
+		_, err := requestDSGAAuthLogin(context.Background(), peer.Client(), peer.URL, key, current, input)
 		peer.Close()
 		if (err == nil) != (returned == input.RealtimeID) {
 			t.Fatalf("native login accepted identity %q with result %v", returned, err)
+		}
+	}
+}
+
+func TestDSGACatalogRoleReceiptBindsOriginalOperationAndOID(t *testing.T) {
+	intent := dsgaCatalogRoleIntent{OperationID: "op_000000000000000000000004", Action: "delete",
+		Name: "customer test", ExpectedOID: 16395}
+	input := dsgaAuthLoginRequest{ProtocolVersion: 1, Service: dsgaCatalogRoleServiceLogin,
+		ProjectID: "prj_0123456789abcdef", BranchID: "br_0123456789abcdef", EndpointID: "ep_0123456789abcdef",
+		PGBootID: 42, Database: "postgres", Generation: 3, CatalogRole: &intent}
+	current := &dsgaEndpointRuntime{Payload: createPayload{ProjectID: input.ProjectID, EndpointID: input.EndpointID}}
+	key := ed25519.NewKeyFromSeed(make([]byte, ed25519.SeedSize))
+	good := dsgaCatalogRoleReceipt{OperationID: intent.OperationID, Action: intent.Action, OID: intent.ExpectedOID}
+	for _, tc := range []struct {
+		name    string
+		role    *dsgaCatalogRoleReceipt
+		boot    dsgapi.Uint64
+		allowed bool
+	}{
+		{"exact", &good, input.PGBootID, true},
+		{"missing", nil, input.PGBootID, false},
+		{"wrong_boot", &good, input.PGBootID + 1, false},
+		{"wrong_operation", &dsgaCatalogRoleReceipt{"op_000000000000000000000005", good.Action, good.OID}, input.PGBootID, false},
+		{"wrong_oid", &dsgaCatalogRoleReceipt{good.OperationID, good.Action, good.OID + 1}, input.PGBootID, false},
+		{"wrong_action", &dsgaCatalogRoleReceipt{good.OperationID, "rotate", good.OID}, input.PGBootID, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			peer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				var sent dsgaAuthLoginRequest
+				body, err := io.ReadAll(r.Body)
+				if err != nil || dsgapi.UnmarshalObject(body, &sent) != nil ||
+					sent.CatalogRole == nil || *sent.CatalogRole != intent || sent.Verifier != nil {
+					t.Error("request differs from role intent")
+					w.WriteHeader(http.StatusBadRequest)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				w.Header().Set("Cache-Control", "no-store")
+				_ = json.NewEncoder(w).Encode(dsgaAuthLoginReceipt{ProtocolVersion: 1, Service: input.Service,
+					BranchID: input.BranchID, PGBootID: tc.boot, Generation: input.Generation, CatalogRole: tc.role})
+			}))
+			defer peer.Close()
+			receipt, err := requestDSGAAuthLogin(context.Background(), peer.Client(), peer.URL, key, current, input)
+			if tc.allowed {
+				if err != nil || receipt.CatalogRole == nil || *receipt.CatalogRole != good {
+					t.Fatal("exact receipt not returned", err)
+				}
+			} else if err == nil || receipt.CatalogRole != nil {
+				t.Fatal("mismatched original receipt was accepted", receipt)
+			}
+		})
+	}
+	for _, name := range []string{"app_owner", "PG_signal_backend", "rtP_example", "dsga_catalog_role_m", "/.*"} {
+		reserved := intent
+		reserved.Name = name
+		if reserved.valid(nil) {
+			t.Errorf("reserved role %q was accepted", name)
 		}
 	}
 }

@@ -269,6 +269,17 @@ func (s *server) catalogMutation(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 404, "writer_not_found", "Ready branch writer required")
 		return
 	}
+	if isRole && !dsgaCatalogRoleName(name) {
+		runtime, err := s.dsgaEndpointRuntime(r.Context(), project, endpoint)
+		if err != nil {
+			fail(w, r, 503, "catalog_unavailable", "Could not verify the original Writer")
+			return
+		}
+		if runtime != nil {
+			fail(w, r, 422, "protected_or_invalid_name", "Use a PostgreSQL role name permitted for the Writer")
+			return
+		}
+	}
 	if err = checkDefaultOwnerReservation(r.Context(), s.db, project, branch); err != nil {
 		s.defaultOwnerFailure(w, r, err)
 		return
@@ -532,6 +543,15 @@ func (s *server) applyCatalogSQLOnce(ctx context.Context, p catalogPayload, acti
 			return err
 		}
 	}
+	if strings.Contains(action, "role") {
+		runtime, err := s.dsgaEndpointRuntime(ctx, p.ProjectID, p.EndpointID)
+		if err != nil {
+			return err
+		}
+		if runtime != nil {
+			return s.applyDSGACatalogRole(ctx, runtime, p, action, verifier, createOID)
+		}
+	}
 	if action == "create_role" {
 		before, err := s.catalogConnection(ctx, p)
 		if err != nil {
@@ -676,6 +696,15 @@ func (s *server) updateCatalogSpecs(ctx context.Context, p catalogPayload, actio
 	}
 	for _, endpoint := range endpoints {
 		id := stringVal(endpoint["id"])
+		runtime, err := s.verifyDSGACatalogEndpoint(ctx, p, id)
+		if err != nil {
+			return err
+		}
+		if runtime != nil {
+			// 受管代次仅核原不可变配置；SQL 是运行目录真实来源，冷启动
+			// 使用同一 Timeline 并重新读取角色准入，绝不修改启动 Secret。
+			continue
+		}
 		for attempt := 0; attempt < 6; attempt++ {
 			secret, err := s.kube.request(ctx, http.MethodGet, s.kube.path("secret", kubeName(id)+"-config"), nil)
 			if err != nil || !owned(secret, p.ProjectID, id) {
@@ -761,6 +790,9 @@ func (s *server) updateCatalogRoutes(ctx context.Context, p catalogPayload, acti
 					delete(roles, p.Name)
 				} else {
 					roles[p.Name] = verifier
+				}
+				if err = s.verifyDSGACatalogRoute(ctx, p, id, route); err != nil {
+					return err
 				}
 			}
 		}
