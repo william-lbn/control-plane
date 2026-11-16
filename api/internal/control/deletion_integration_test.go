@@ -2,6 +2,7 @@ package control
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -16,6 +17,109 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+func TestDSGATombstoneRecoveryVerifiesOriginalStorage(t *testing.T) {
+	f := newDSGAProjectFixture(t)
+	ctx, s := f.ctx, f.s
+	const key = "tombstone-storage-original-project"
+	if response := f.request("creation_admin", key, f.body); response.Code != http.StatusAccepted {
+		t.Fatalf("original fixture project was not accepted: %d", response.Code)
+	}
+	op, _, _ := f.reservation(key)
+	var raw []byte
+	if err := s.db.QueryRow(ctx, `SELECT payload FROM operations WHERE id=$1`, op).Scan(&raw); err != nil {
+		t.Fatal(err)
+	}
+	var p struct {
+		createPayload
+		Creation dsgaCreationPlan `json:"dsga_creation"`
+	}
+	if err := json.Unmarshal(raw, &p); err != nil {
+		t.Fatal(err)
+	}
+	if p.ProjectID == "" || p.BranchID == "" || p.TenantID == "" || p.TimelineID == "" {
+		t.Fatal("original creation payload scope is missing")
+	}
+	profile := p.Creation.Storage
+	f.exec(`UPDATE operations SET state='succeeded',finished_at=clock_timestamp() WHERE id=$1`, op)
+
+	for _, scenario := range []string{"retained", "foreign_shard", "replaced_service"} {
+		t.Run(scenario, func(t *testing.T) {
+			service, secret, certificate := dsgaStorageTestObjects(t)
+			secret.TypeMeta.APIVersion, secret.TypeMeta.Kind = "v1", "Secret"
+			service.TypeMeta.APIVersion, service.TypeMeta.Kind = "v1", "Service"
+			delete(secret.Data, "create_token")
+			if scenario == "replaced_service" {
+				service.UID = "replacement-storage-service"
+			}
+			shards := dsgaTimelineShards(p.TenantID, p.TimelineID)
+			for _, item := range shards {
+				shard := item.(map[string]any)
+				shard["min_readable_lsn"], shard["last_record_lsn"] = "0/1000", "0/9000"
+			}
+			if scenario == "foreign_shard" {
+				shards[1].(map[string]any)["timeline_id"] = strings.Repeat("f", 32)
+			}
+			timelineRead := make(chan struct{}, 1)
+			storage := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodGet || r.URL.Path != "/control/v1/tenant/"+p.TenantID+"/timeline/"+p.TimelineID ||
+					r.TLS == nil || r.TLS.ServerName != "storage-controller-management.neon.svc" ||
+					r.Header.Get("Authorization") != "Bearer "+string(secret.Data["observe_token"]) {
+					t.Error("recovery left frozen read-only storage authority")
+					w.WriteHeader(http.StatusForbidden)
+					return
+				}
+				timelineRead <- struct{}{}
+				jsonResponse(w, 200, record{"shards": shards})
+			}))
+			storage.TLS = &tls.Config{Certificates: []tls.Certificate{certificate}, MinVersion: tls.VersionTLS12}
+			storage.StartTLS()
+			defer storage.Close()
+			socks, destination := serviceSOCKSFixture(t, storage.Listener.Addr().String(), false)
+			t.Setenv("NEON_INTERNAL_SOCKS5_ADDR", socks)
+
+			kube := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method != http.MethodGet {
+					t.Error("timeline verification wrote to Kubernetes")
+					w.WriteHeader(http.StatusMethodNotAllowed)
+					return
+				}
+				switch r.URL.Path {
+				case "/api/v1/namespaces/neon/services/" + profile.ServiceName:
+					jsonResponse(w, 200, service)
+				case "/api/v1/namespaces/neon/secrets/" + profile.CredentialSecretName:
+					jsonResponse(w, 200, secret)
+				default:
+					t.Errorf("unexpected legacy or replacement storage route: %s", r.URL.Path)
+					jsonResponse(w, 200, record{"state": "Active"})
+				}
+			}))
+			defer kube.Close()
+			s.kube = &kubeClient{base: kube.URL, namespace: "neon", http: kube.Client()}
+			err := s.verifyRetainedProjectTimelines(ctx, deletionPayload{ProjectID: p.ProjectID,
+				BranchIDs: []string{p.BranchID}, TombstoneID: "op_original_project_deletion"})
+			if (err == nil) != (scenario == "retained") {
+				t.Fatalf("unexpected retained storage outcome: %v", err)
+			}
+			if scenario != "replaced_service" {
+				select {
+				case <-timelineRead:
+				default:
+					t.Fatal("original timeline was never queried")
+				}
+				if target := <-destination; target != "10.66.0.7:1235" {
+					t.Fatalf("wrong storage transport destination: %s", target)
+				}
+			} else {
+				select {
+				case <-timelineRead:
+					t.Fatal("queried a replaced storage service")
+				default:
+				}
+			}
+		})
+	}
+}
 
 // Actual PostgreSQL transactions/migrations, authorization and Worker replay.
 // Native storage and Kubernetes faults are HTTP peers here, with a separate

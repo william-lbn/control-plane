@@ -545,6 +545,33 @@ func (s *server) retireDeletedComputeBound(ctx context.Context, p deletionPayloa
 	return nil
 }
 
+func (s *server) verifyRetainedProjectTimelines(ctx context.Context, p deletionPayload) error {
+	var tenant string
+	if err := s.db.QueryRow(ctx, "SELECT tenant_id FROM projects WHERE id=$1", p.ProjectID).Scan(&tenant); err != nil {
+		return err
+	}
+	plan, err := readDSGAProjectStoragePlan(ctx, s.db, p.ProjectID, tenant)
+	if err != nil {
+		return err
+	}
+	for _, bid := range p.BranchIDs {
+		var timeline string
+		if err := s.db.QueryRow(ctx, `SELECT timeline_id FROM branches WHERE id=$1 AND project_id=$2 AND
+		 (deletion_operation_id=$3 OR (deletion_operation_id IS NULL AND deleted_at IS NULL))`, bid, p.ProjectID, p.TombstoneID).Scan(&timeline); err != nil {
+			return err
+		}
+		if plan != nil {
+			_, err = s.dsgaRestoreWindow(ctx, plan, tenant, timeline)
+		} else {
+			_, err = s.kube.serviceRequest(ctx, "pageserver-managed", 9898, "v1/tenant/"+tenant+"/timeline/"+timeline, http.MethodGet, nil)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (s *server) reconcileDeletion(ctx context.Context, id, worker, action string, p deletionPayload) error {
 	var durable deletionPayload
 	var raw []byte
@@ -595,23 +622,7 @@ func (s *server) reconcileDeletion(ctx context.Context, id, worker, action strin
 	}
 	if recovering {
 		steps = []func(context.Context) error{
-			func(ctx context.Context) error {
-				var tenant string
-				if err := s.db.QueryRow(ctx, "SELECT tenant_id FROM projects WHERE id=$1", p.ProjectID).Scan(&tenant); err != nil {
-					return err
-				}
-				for _, bid := range p.BranchIDs {
-					var timeline string
-					if err := s.db.QueryRow(ctx, `SELECT timeline_id FROM branches WHERE id=$1 AND project_id=$2 AND
-					 (deletion_operation_id=$3 OR (deletion_operation_id IS NULL AND deleted_at IS NULL))`, bid, p.ProjectID, p.TombstoneID).Scan(&timeline); err != nil {
-						return err
-					}
-					if _, err := s.kube.serviceRequest(ctx, "pageserver-managed", 9898, "v1/tenant/"+tenant+"/timeline/"+timeline, http.MethodGet, nil); err != nil {
-						return err
-					}
-				}
-				return nil
-			},
+			func(ctx context.Context) error { return s.verifyRetainedProjectTimelines(ctx, p) },
 			func(ctx context.Context) error { return s.commitDeletion(ctx, id, worker, action, p) },
 			func(ctx context.Context) error { return s.kube.setDeletionRoutes(ctx, p, id, true) },
 		}
