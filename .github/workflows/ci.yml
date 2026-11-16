@@ -40,7 +40,7 @@ jobs:
     services:
       postgres:
         image: postgres@sha256:a3b7f434b2dc57ce85a67e171163eb8ab1a1ebcb39d27484661f26b1dfbe30d6
-        env: {POSTGRES_USER: ci, POSTGRES_PASSWORD: ci-disposable, POSTGRES_DB: control_ci, POSTGRES_INITDB_ARGS: '--auth-host=scram-sha-256'}
+        env: {POSTGRES_USER: ci, POSTGRES_PASSWORD: ci-disposable, POSTGRES_DB: control_ci, POSTGRES_INITDB_ARGS: '--auth-host=scram-sha-256 --set=wal_level=logical'}
         ports: ['5432:5432']
         # PostgreSQL 真实 RLS、迁移、并发/并行测试会使用 POSIX 动态共享内存。
         # Docker 默认 /dev/shm=64MiB，测试期间已观察到 ENOSPC，随后 PG 后端崩溃
@@ -60,9 +60,17 @@ jobs:
         run: node tools/check-public-source.mjs
       - name: Install pinned PostgREST for the real RLS integration gate
         run: bash tools/install-postgrest.sh "$RUNNER_TEMP/neon-postgrest"
+      - name: Prepare the isolated Realtime logical replication database
+        env:
+          NEON_V2_TEST_DATABASE_URL: postgres://ci:ci-disposable@127.0.0.1:5432/control_ci?sslmode=disable
+        run: |
+          set -euo pipefail
+          test "$(psql "$NEON_V2_TEST_DATABASE_URL" -XqAt -v ON_ERROR_STOP=1 -c 'SHOW wal_level')" = logical
+          psql "$NEON_V2_TEST_DATABASE_URL" -Xq -v ON_ERROR_STOP=1 -c 'CREATE DATABASE realtime_wire_test'
       - name: Format, vet, race, integration and contract gates (zero skips)
         env:
           NEON_V2_TEST_DATABASE_URL: postgres://ci:ci-disposable@127.0.0.1:5432/control_ci?sslmode=disable
+          NEON_REALTIME_TEST_DATABASE_URL: postgres://ci:ci-disposable@127.0.0.1:5432/realtime_wire_test?sslmode=disable
           NEON_CI_ATTEMPT: run_${{ github.run_id }}_${{ github.run_attempt }}_s${{ matrix.shard }}
           NEON_DATA_API_TEST_POSTGREST: ${{ runner.temp }}/neon-postgrest/postgrest
         run: bash tools/ci-go.sh

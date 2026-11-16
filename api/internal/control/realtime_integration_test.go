@@ -185,9 +185,13 @@ func TestRealtimeSourceWorker(t *testing.T) {
 		_, err := sql.Exec(ctx, query)
 		must(err)
 	}
+	workerPassword, readerPassword := randomToken(32), randomToken(32)
+	if workerPassword == "" || readerPassword == "" {
+		t.Fatal("generate disposable Realtime role credentials")
+	}
 	exec(`CREATE SCHEMA wire_worker_meta;
-CREATE ROLE rt_wire_worker LOGIN REPLICATION;
-CREATE ROLE rtr_555555555555555555555555 LOGIN;
+CREATE ROLE rt_wire_worker LOGIN REPLICATION PASSWORD ` + pgLiteral(workerPassword) + `;
+CREATE ROLE rtr_555555555555555555555555 LOGIN PASSWORD ` + pgLiteral(readerPassword) + `;
 CREATE TABLE public.rt_worker_events(id integer PRIMARY KEY);
 CREATE TABLE public.rt_worker_private(id integer PRIMARY KEY);
 INSERT INTO public.rt_worker_private VALUES(4);
@@ -211,6 +215,7 @@ VALUES('br_4444444444444444','prj_worker','main','444444444444444444444444444444
 	must(err)
 	config := cfg.ConnConfig.Config.Copy()
 	config.User = "rt_wire_worker"
+	config.Password = workerPassword
 	config.RuntimeParams = map[string]string{"replication": "database"}
 	open := func(ctx context.Context, _ realtime.Lease) (*pgconn.PgConn, error) {
 		return pgconn.ConnectConfig(ctx, config.Copy())
@@ -232,6 +237,7 @@ VALUES('br_4444444444444444','prj_worker','main','444444444444444444444444444444
 	}, 4))
 	readConfig := cfg.ConnConfig.Copy()
 	readConfig.User = "rtr_555555555555555555555555"
+	readConfig.Password = readerPassword
 	reader, err := pgx.ConnectConfig(ctx, readConfig)
 	must(err)
 	defer reader.Close(ctx)
@@ -330,6 +336,7 @@ VALUES('br_4444444444444444','prj_worker','main','444444444444444444444444444444
 	openSQL := func(ctx context.Context, _ realtime.Lease) (*pgx.Conn, error) {
 		cfg := cfg.ConnConfig.Copy()
 		cfg.User = "rt_wire_worker"
+		cfg.Password = workerPassword
 		return pgx.ConnectConfig(ctx, cfg)
 	}
 	limits := realtime.WorkerLimits{LeaseDuration: 3 * time.Second, FeedbackInterval: 25 * time.Millisecond,
