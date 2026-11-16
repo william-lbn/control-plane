@@ -61,6 +61,40 @@ func (in dsgaCatalogRoleIntent) valid(verifier *string) bool {
 	}
 }
 
+func validDSGAReaderCatalogRefresh(input dsgaAuthLoginRequest) bool {
+	if input.CatalogRole == nil || input.CatalogRole.ExpectedOID == 0 ||
+		!(catalogNativeScope{TenantID: input.TenantID, TimelineID: input.TimelineID}).valid() ||
+		input.Database != "postgres" || input.FunctionID != "" || input.Schema != "" ||
+		input.RealtimeID != "" || input.Relations != nil {
+		return false
+	}
+	role := *input.CatalogRole
+	if role.Action == "create" {
+		// Writer CREATE has no expected OID. Reader CREATE requires the OID
+		// already observed from that exact committed Writer operation.
+		role.ExpectedOID = 0
+	}
+	return role.valid(input.Verifier)
+}
+
+func dsgaCatalogRoleRequest(p catalogPayload, action, verifier string) (dsgaAuthLoginRequest, error) {
+	role := dsgaCatalogRoleIntent{OperationID: p.operationID, Name: p.Name, ExpectedOID: p.NativeIdentity.Object.OID}
+	var credential *string
+	switch action {
+	case "create_role":
+		role.Action, credential = "create", &verifier
+	case "rotate_role_password":
+		role.Action, credential = "rotate", &verifier
+	case "delete_role":
+		role.Action = "delete"
+	default:
+		return dsgaAuthLoginRequest{}, errDSGACreationIdentity
+	}
+	return dsgaAuthLoginRequest{ProtocolVersion: 1, Service: dsgaCatalogRoleServiceLogin, ProjectID: p.ProjectID,
+		BranchID: p.BranchID, EndpointID: p.EndpointID, Database: "postgres", Generation: dsgapi.Uint64(p.ExpectedVersion),
+		CatalogRole: &role, Verifier: credential}, nil
+}
+
 func (s *server) authorizeDSGACatalogRole(ctx context.Context, original *dsgaEndpointRuntime, p catalogPayload, action string) error {
 	latest, err := s.dsgaEndpointRuntime(ctx, p.ProjectID, p.EndpointID)
 	if err != nil {
@@ -92,28 +126,17 @@ func (s *server) applyDSGACatalogRole(ctx context.Context, runtime *dsgaEndpoint
 		runtime.Payload.TenantID != p.NativeIdentity.Scope.TenantID || runtime.Payload.TimelineID != p.NativeIdentity.Scope.TimelineID {
 		return errDSGACreationIdentity
 	}
-	role := dsgaCatalogRoleIntent{OperationID: p.operationID, Name: p.Name, ExpectedOID: p.NativeIdentity.Object.OID}
-	var credential *string
-	switch action {
-	case "create_role":
-		role.Action, credential = "create", &verifier
-	case "rotate_role_password":
-		role.Action, credential = "rotate", &verifier
-	case "delete_role":
-		role.Action = "delete"
-	default:
-		return errDSGACreationIdentity
+	input, err := dsgaCatalogRoleRequest(p, action, verifier)
+	if err != nil {
+		return err
 	}
-	input := dsgaAuthLoginRequest{ProtocolVersion: 1, Service: dsgaCatalogRoleServiceLogin, ProjectID: p.ProjectID,
-		BranchID: p.BranchID, EndpointID: p.EndpointID, Database: "postgres", Generation: dsgapi.Uint64(p.ExpectedVersion),
-		CatalogRole: &role, Verifier: credential}
 	receipt, err := s.applyDSGAServiceLoginResult(ctx, runtime, input, func(ctx context.Context) error {
 		return s.authorizeDSGACatalogRole(ctx, runtime, p, action)
 	})
 	if err != nil {
 		return err
 	}
-	if role.Action == "create" {
+	if input.CatalogRole.Action == "create" {
 		oid := receipt.CatalogRole.OID
 		if knownOID != 0 && knownOID != oid {
 			return errDSGACreationIdentity
@@ -129,6 +152,43 @@ func (s *server) applyDSGACatalogRole(ctx context.Context, runtime *dsgaEndpoint
 	}
 	defer conn.Close(context.Background())
 	return verifyCatalogNativeBinding(ctx, conn, p, action, knownOID, true)
+}
+
+// 在变更代理凭据之前，要求仍运行于原分支的 Reader 观察到 Writer
+// 事务与原 OID，并确认本地 HBA 已加载。管理请求只绑定该 Reader 启动代次。
+func (s *server) refreshDSGAReaderCatalogRole(ctx context.Context, reader *dsgaEndpointRuntime, p catalogPayload, action, verifier string) error {
+	writer, err := s.verifyDSGACatalogEndpoint(ctx, p, p.EndpointID)
+	if err != nil {
+		return err
+	}
+	if writer == nil || writer.Payload.EndpointType != "read_write" {
+		return errDSGACreationIdentity
+	}
+	input, err := dsgaCatalogRoleRequest(p, action, verifier)
+	if err != nil {
+		return err
+	}
+	if input.CatalogRole.Action == "create" {
+		input.CatalogRole.ExpectedOID, err = s.catalogCreateObservation(ctx, p, action)
+		if err != nil {
+			return err
+		}
+	}
+	input.Service = dsgaCatalogRoleRefreshLogin
+	input.EndpointID = reader.Payload.EndpointID
+	input.TenantID, input.TimelineID = p.NativeIdentity.Scope.TenantID, p.NativeIdentity.Scope.TimelineID
+	return s.applyDSGAServiceLogin(ctx, reader, input, func(ctx context.Context) error {
+		latest, err := s.dsgaEndpointRuntime(ctx, p.ProjectID, input.EndpointID)
+		if err != nil {
+			return err
+		}
+		if latest == nil || latest.Operation != reader.Operation || latest.VMUID != reader.VMUID ||
+			latest.ConfigUID != reader.ConfigUID || latest.Payload.BranchID != p.BranchID ||
+			latest.Payload.TenantID != input.TenantID || latest.Payload.TimelineID != input.TimelineID {
+			return errDSGACreationIdentity
+		}
+		return s.authorizeDSGACatalogRole(ctx, writer, p, action)
+	})
 }
 
 func (s *server) verifyDSGACatalogEndpoint(ctx context.Context, p catalogPayload, id string) (*dsgaEndpointRuntime, error) {

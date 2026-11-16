@@ -23,6 +23,7 @@ const dsgaDataAPIServiceLogin = "data_api"
 const dsgaFunctionServiceLogin = "function"
 const dsgaRealtimeServiceLogin = "realtime"
 const dsgaCatalogRoleServiceLogin = "catalog_role"
+const dsgaCatalogRoleRefreshLogin = "catalog_role_refresh"
 
 var dsgaRealtimeLoginID = regexp.MustCompile(`^rt[sq]_[a-f0-9]{24}$`)
 var dsgaRealtimeRole = regexp.MustCompile(`^rt[pr]_[a-f0-9]{24}$`)
@@ -47,6 +48,8 @@ type dsgaAuthLoginRequest struct {
 	Service         string                  `json:"service,omitempty"`
 	ProjectID       string                  `json:"project_id"`
 	BranchID        string                  `json:"branch_id"`
+	TenantID        string                  `json:"tenant_id,omitempty"`
+	TimelineID      string                  `json:"timeline_id,omitempty"`
 	EndpointID      string                  `json:"endpoint_id"`
 	PGBootID        dsgapi.Uint64           `json:"pg_boot_id"`
 	Database        string                  `json:"database"`
@@ -63,6 +66,8 @@ type dsgaAuthLoginReceipt struct {
 	ProtocolVersion uint32                  `json:"protocol_version"`
 	Service         string                  `json:"service,omitempty"`
 	BranchID        string                  `json:"branch_id"`
+	TenantID        string                  `json:"tenant_id,omitempty"`
+	TimelineID      string                  `json:"timeline_id,omitempty"`
 	PGBootID        dsgapi.Uint64           `json:"pg_boot_id"`
 	FunctionID      string                  `json:"function_id,omitempty"`
 	Schema          string                  `json:"schema,omitempty"`
@@ -136,9 +141,12 @@ func (s *server) applyDSGAServiceLogin(ctx context.Context, runtime *dsgaEndpoin
 func (s *server) applyDSGAServiceLoginResult(ctx context.Context, runtime *dsgaEndpointRuntime, input dsgaAuthLoginRequest, authorize func(context.Context) error) (dsgaAuthLoginReceipt, error) {
 	var zero dsgaAuthLoginReceipt
 	refusal := dataAPIPrerequisiteError{"auth_writer_service_login_unconfirmed", "Original DSGA Writer service login is unconfirmed"}
-	if (input.Service == dsgaCatalogRoleServiceLogin) != (input.CatalogRole != nil) {
+	reader := input.Service == dsgaCatalogRoleRefreshLogin
+	if (input.Service == dsgaCatalogRoleServiceLogin || reader) != (input.CatalogRole != nil) ||
+		(!reader && (input.TenantID != "" || input.TimelineID != "")) {
 		return zero, errDSGACreationIdentity
 	}
+	endpointType := "read_write"
 	switch input.Service {
 	case dsgaDataAPIServiceLogin:
 		refusal = dataAPIPrerequisiteError{"data_api_writer_service_login_unconfirmed", "Original DSGA Writer Data API login is unconfirmed"}
@@ -169,12 +177,19 @@ func (s *server) applyDSGAServiceLoginResult(ctx context.Context, runtime *dsgaE
 			input.FunctionID != "" || input.Schema != "" || input.Relations != nil {
 			return zero, refusal
 		}
+	case dsgaCatalogRoleRefreshLogin:
+		endpointType = "read_only"
+		refusal = dataAPIPrerequisiteError{"catalog_reader_role_unconfirmed", "Original DSGA Reader catalog role and HBA are unconfirmed"}
+		if !validDSGAReaderCatalogRefresh(input) || runtime == nil ||
+			runtime.Payload.TenantID != input.TenantID || runtime.Payload.TimelineID != input.TimelineID {
+			return zero, refusal
+		}
 	case "":
 	default:
 		return zero, errDSGACreationIdentity
 	}
 	if runtime == nil || runtime.Payload.ProjectID != input.ProjectID || runtime.Payload.BranchID != input.BranchID ||
-		runtime.Payload.EndpointID != input.EndpointID || runtime.Payload.EndpointType != "read_write" ||
+		runtime.Payload.EndpointID != input.EndpointID || runtime.Payload.EndpointType != endpointType ||
 		input.Generation < 1 || uint64(input.Generation) > uint64(1<<63-1) || !validPGIdentifier(input.Database) || authorize == nil {
 		return zero, refusal
 	}
@@ -217,6 +232,12 @@ func (s *server) applyDSGAServiceLoginResult(ctx context.Context, runtime *dsgaE
 	if err := authorize(ctx); err != nil {
 		return zero, err
 	}
+	if reader {
+		_, _, _, latest, err := s.readDSGABoundSelection(ctx, runtime)
+		if err != nil || latest.Instance != selected.Instance {
+			return zero, refusal
+		}
+	}
 	return receipt, nil
 }
 
@@ -252,6 +273,7 @@ func sameDSGAServiceLoginReceipt(input dsgaAuthLoginRequest, receipt dsgaAuthLog
 	role := receipt.CatalogRole
 	receipt.CatalogRole = nil
 	if receipt != (dsgaAuthLoginReceipt{ProtocolVersion: 1, Service: input.Service, BranchID: input.BranchID, PGBootID: input.PGBootID,
+		TenantID: input.TenantID, TimelineID: input.TimelineID,
 		FunctionID: input.FunctionID, Schema: input.Schema, RealtimeID: input.RealtimeID,
 		Generation: input.Generation, Enabled: input.Verifier != nil}) {
 		return false

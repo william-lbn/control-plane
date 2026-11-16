@@ -708,8 +708,11 @@ func (s *server) updateCatalogSpecs(ctx context.Context, p catalogPayload, actio
 			return err
 		}
 		if runtime != nil {
-			// 受管代次仅核原不可变配置；SQL 是运行目录真实来源，冷启动
-			// 使用同一 Timeline 并重新读取角色准入，绝不修改启动 Secret。
+			if runtime.Payload.EndpointType == "read_only" && strings.Contains(action, "role") {
+				if err := s.refreshDSGAReaderCatalogRole(ctx, runtime, p, action, verifier); err != nil {
+					return err
+				}
+			}
 			continue
 		}
 		for attempt := 0; attempt < 6; attempt++ {
