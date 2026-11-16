@@ -346,10 +346,11 @@ type createPayload struct {
 	MaxMem                    int    `json:"max_memory_mib"`
 }
 
-// vmWaitError contains only a Kubernetes phase, never a Secret or SQL value.
+// vmWaitError 的对外文字沿用 VM 阶段。Runner 诊断只使用内部固定枚举。
 type vmWaitError struct {
-	phase string
-	cause error
+	phase        string
+	runnerReason string
+	cause        error
 }
 
 func (e vmWaitError) Error() string {

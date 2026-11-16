@@ -10,6 +10,8 @@ import (
 	"time"
 
 	vmv1 "github.com/neondatabase/autoscaling/neonvm/apis/neonvm/v1"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // 公开接受→原Worker分派→真实元数据库失败提交/重试；Kube仍是TLS协议夹具。
@@ -126,13 +128,13 @@ func TestDSGAProjectWorkerWaitClassifiesOnlyDeadlineAndPreservesCause(t *testing
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			for _, phase := range []string{"", "Pending"} {
-				err := dsgaComputeWaitError(tc.err, phase)
+				err := dsgaComputeWaitError(tc.err, phase, "guest_image_pull_pending")
 				var wait vmWaitError
 				if errors.As(err, &wait) != tc.wait {
 					t.Fatalf("unexpected readiness classification: %v", err)
 				}
 				if tc.wait {
-					if wait.phase != phase || wait.cause != tc.err || !errors.Is(err, context.DeadlineExceeded) {
+					if wait.phase != phase || wait.runnerReason != "guest_image_pull_pending" || wait.cause != tc.err || !errors.Is(err, context.DeadlineExceeded) {
 						t.Fatalf("deadline lost its original cause or observed phase: %#v", wait)
 					}
 				} else if err != tc.err {
@@ -140,6 +142,46 @@ func TestDSGAProjectWorkerWaitClassifiesOnlyDeadlineAndPreservesCause(t *testing
 				}
 			}
 		})
+	}
+}
+
+func TestDSGAProjectWorkerStartupRunnerReasonsBindToOriginalVM(t *testing.T) {
+	vm := &vmv1.VirtualMachine{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "neon", Name: "original-vm", UID: "original-uid"},
+		Status:     vmv1.VirtualMachineStatus{PodName: "original-runner"},
+	}
+	controller := true
+	original := corev1.Pod{ObjectMeta: metav1.ObjectMeta{
+		Namespace: vm.Namespace, Name: vm.Status.PodName, UID: "pod-uid",
+		OwnerReferences: []metav1.OwnerReference{{APIVersion: vmv1.SchemeGroupVersion.String(), Kind: "VirtualMachine", Name: vm.Name, UID: vm.UID, Controller: &controller}},
+	}}
+	for _, tc := range []struct {
+		name, container, waiting, expected string
+	}{
+		{"guest", "init", "ImagePullBackOff", "guest_image_pull_pending"},
+		{"kernel", "init-kernel", "ErrImagePull", "kernel_image_pull_pending"},
+		{"runner", "neonvm-runner", "ErrImageNeverPull", "runner_image_pull_pending"},
+		{"runner crash", "neonvm-runner", "CrashLoopBackOff", "runner_container_restart_pending"},
+		{"other container", "unrelated", "ImagePullBackOff", ""},
+		{"unrecognized reason", "init", "arbitrary private text", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := original.DeepCopy()
+			pod.Status.InitContainerStatuses = []corev1.ContainerStatus{{Name: tc.container, State: corev1.ContainerState{
+				Waiting: &corev1.ContainerStateWaiting{Reason: tc.waiting, Message: "never include this diagnostic text"},
+			}}}
+			if got := dsgaStartupRunnerReason(vm, pod); got != tc.expected {
+				t.Fatalf("reason = %q, want %q", got, tc.expected)
+			}
+			pod.OwnerReferences[0].UID = "replaced-vm-uid"
+			if got := dsgaStartupRunnerReason(vm, pod); got != "runner_identity_unconfirmed" {
+				t.Fatalf("received diagnostic from replacement VM: %q", got)
+			}
+		})
+	}
+	original.Status.Conditions = []corev1.PodCondition{{Type: corev1.PodScheduled, Status: corev1.ConditionFalse, Reason: "Unschedulable"}}
+	if got := dsgaStartupRunnerReason(vm, &original); got != "runner_unschedulable" {
+		t.Fatalf("missing original scheduling diagnostic: %q", got)
 	}
 }
 

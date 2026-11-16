@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	vmv1 "github.com/neondatabase/autoscaling/neonvm/apis/neonvm/v1"
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -270,12 +271,12 @@ func waitDSGAStartupPoll(ctx context.Context) error {
 	}
 }
 
-func dsgaComputeWaitError(err error, lastPhase string) error {
+func dsgaComputeWaitError(err error, lastPhase, runnerReason string) error {
 	// Classify the returned cause, not ctx.Err(): a concurrent deadline must
 	// not hide an identity, lease or authorization failure. Cancellation is
 	// also distinct from exhausting the readiness deadline.
 	if errors.Is(err, context.DeadlineExceeded) {
-		return vmWaitError{phase: lastPhase, cause: err}
+		return vmWaitError{phase: lastPhase, runnerReason: runnerReason, cause: err}
 	}
 	return err
 }
@@ -284,22 +285,85 @@ func (binding *dsgaCreationBinding) waitOriginalCompute(ctx context.Context) err
 	ctx, cancel := context.WithTimeout(ctx, 3*time.Minute)
 	defer cancel()
 	lastPhase := "" // No VM phase has been observed until originalCompute succeeds.
+	runnerReason := ""
 	for {
-		_, vm, err := binding.originalCompute(ctx)
+		current, vm, err := binding.originalCompute(ctx)
 		if err != nil {
-			return dsgaComputeWaitError(err, lastPhase)
+			return dsgaComputeWaitError(err, lastPhase, runnerReason)
 		}
 		lastPhase = string(vm.Status.Phase)
 		switch lastPhase {
 		case "Running":
 			return nil
 		case "Failed", "Succeeded":
-			return vmWaitError{phase: lastPhase, cause: errors.New("original VM terminated before readiness")}
+			return vmWaitError{phase: lastPhase, runnerReason: current.observeStartupRunner(ctx, vm), cause: errors.New("original VM terminated before readiness")}
 		}
+		runnerReason = current.observeStartupRunner(ctx, vm)
 		if err := waitDSGAStartupPoll(ctx); err != nil {
-			return dsgaComputeWaitError(err, lastPhase)
+			return dsgaComputeWaitError(err, lastPhase, runnerReason)
 		}
 	}
+}
+
+// 原 VM 已经过 UID、租约和冻结计划检查。Runner 读回仅用于诊断，
+// 不改变就绪判断和原 Operation 的重试语义，也不缩短原等待窗口。
+func (binding *dsgaCreationBinding) observeStartupRunner(ctx context.Context, vm *vmv1.VirtualMachine) string {
+	if vm.Status.PodName == "" {
+		return "runner_not_assigned"
+	}
+	clients, _, err := newDSGAKubeClients(binding.server.kube)
+	if err != nil {
+		return "runner_observation_unavailable"
+	}
+	observeCtx, cancel := context.WithTimeout(ctx, 500*time.Millisecond)
+	defer cancel()
+	pod, err := clients.CoreV1().Pods(vm.Namespace).Get(observeCtx, vm.Status.PodName, metav1.GetOptions{})
+	if err != nil {
+		return "runner_observation_unavailable"
+	}
+	return dsgaStartupRunnerReason(vm, pod)
+}
+
+func dsgaStartupRunnerReason(vm *vmv1.VirtualMachine, pod *corev1.Pod) string {
+	ref := metav1.GetControllerOf(pod)
+	if vm.UID == "" || pod.Name != vm.Status.PodName || pod.Namespace != vm.Namespace || pod.UID == "" || ref == nil ||
+		ref.UID != vm.UID || ref.Name != vm.Name || ref.Kind != "VirtualMachine" || ref.APIVersion != vmv1.SchemeGroupVersion.String() {
+		return "runner_identity_unconfirmed"
+	}
+	for _, condition := range pod.Status.Conditions {
+		if condition.Type == corev1.PodScheduled && condition.Status == corev1.ConditionFalse && condition.Reason == "Unschedulable" {
+			return "runner_unschedulable"
+		}
+	}
+	for _, statuses := range [][]corev1.ContainerStatus{pod.Status.InitContainerStatuses, pod.Status.ContainerStatuses} {
+		for _, status := range statuses {
+			var role string
+			switch status.Name {
+			case "init":
+				role = "guest"
+			case "init-kernel":
+				role = "kernel"
+			case "neonvm-runner":
+				role = "runner"
+			default:
+				continue
+			}
+			if waiting := status.State.Waiting; waiting != nil {
+				switch waiting.Reason {
+				case "ErrImagePull", "ImagePullBackOff", "ErrImageNeverPull":
+					return role + "_image_pull_pending"
+				case "CrashLoopBackOff":
+					return role + "_container_restart_pending"
+				case "CreateContainerConfigError", "CreateContainerError":
+					return role + "_container_start_pending"
+				}
+			}
+			if exited := status.State.Terminated; exited != nil && exited.ExitCode != 0 {
+				return role + "_container_exited"
+			}
+		}
+	}
+	return ""
 }
 
 func (binding *dsgaCreationBinding) waitOriginalInitialization(ctx context.Context) (dsgaInitializationResponse, error) {

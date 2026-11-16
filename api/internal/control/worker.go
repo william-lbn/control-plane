@@ -361,7 +361,7 @@ func (s *server) workOnce(ctx context.Context, workerID string) error {
 	if errors.As(stepErr, &waitErr) {
 		code = "compute_not_ready"
 		message = "NeonVM did not become Running; inspect VM, Pod and scheduler events before retrying"
-		s.logger.Warn("compute readiness failed", "operation_id", id, "vm_phase", waitErr.phase)
+		s.logger.Warn("compute readiness failed", "operation_id", id, "vm_phase", waitErr.phase, "runner_reason", waitErr.runnerReason)
 	}
 	if runCtx.Err() != nil && ctx.Err() == nil {
 		state, retryable = "failed", true
