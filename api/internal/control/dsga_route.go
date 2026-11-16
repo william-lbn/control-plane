@@ -484,5 +484,10 @@ func (binding *dsgaCreationBinding) publishInitializedSQLRoute(ctx context.Conte
 		}
 		return nil
 	})
+	if err == nil && current.action == "create_endpoint_dsga_v1" && p.EndpointType == "read_only" {
+		// 基础探针路由先由原初始化事实发布，Reader 才能通过同一代理只读核验
+		// 目录；普通角色随后独立发布，不能为绕过此依赖而先放行未核验角色。
+		err = current.publishReaderCatalog(ctx, in, fresh.Observed.Instance)
+	}
 	return err
 }

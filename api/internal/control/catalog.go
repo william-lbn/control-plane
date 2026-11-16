@@ -362,10 +362,7 @@ func (s *server) catalogMutation(w http.ResponseWriter, r *http.Request) {
 		fail(w, r, 409, "branch_not_ready", "Branch is not ready")
 		return
 	}
-	var pending bool
-	err = tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM operations WHERE project_id=$1
-        AND state IN ('queued','running','retry_wait') AND (resource_id=$2 AND resource_type='branch_catalog'
-            OR action='create_endpoint' AND payload->>'branch_id'=$2))`, project, branch).Scan(&pending)
+	pending, err := catalogMutationPending(r.Context(), tx, project, branch)
 	if err != nil {
 		fail(w, r, 503, "metadata_unavailable", "Could not check catalog operations")
 		return
@@ -483,6 +480,16 @@ func (s *server) catalogMutation(w http.ResponseWriter, r *http.Request) {
 	}
 	s.audit(r.Context(), userFrom(r).ID, action, "branch_catalog", branch, "accepted", requestID(r))
 	s.acceptCatalog(w, r, opID)
+}
+
+// 与 Reader 初次目录投影共用分支行锁。受管创建及恢复同样在发布前冻结当前
+// 目录，不能只互斥 legacy create_endpoint 而接受一个随后无法执行的角色操作。
+func catalogMutationPending(ctx context.Context, db connectionDefaultReader, project, branch string) (bool, error) {
+	var pending bool
+	err := db.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM operations WHERE project_id=$1
+ AND state IN ('queued','running','retry_wait') AND (resource_id=$2 AND resource_type='branch_catalog'
+ OR action IN ('create_endpoint','create_endpoint_dsga_v1','resume_endpoint_dsga_v1') AND payload->>'branch_id'=$2))`, project, branch).Scan(&pending)
+	return pending, err
 }
 
 func (s *server) replayCatalog(w http.ResponseWriter, r *http.Request, key, hash string) bool {
