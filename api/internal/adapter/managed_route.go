@@ -71,6 +71,7 @@ func (b ManagedSQLBinding) Validate() error {
 // ManagedSQLConfiguration只投影强哈希固定的公开身份、Startup及角色verifier；不得记录整个返回值。
 type ManagedSQLConfiguration struct {
 	Spec struct {
+		Mode          string          `json:"mode"`
 		ProjectID     string          `json:"project_id"`
 		EndpointID    string          `json:"endpoint_id"`
 		BranchID      string          `json:"branch_id"`

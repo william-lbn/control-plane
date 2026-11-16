@@ -167,13 +167,13 @@ func (s *server) observeDSGAReaderRoles(ctx context.Context, runtime *dsgaEndpoi
 	return nil
 }
 
-// 仅首次 Reader 创建 Operation 调用。原 branch 行锁串行化目录准入；不持有
+// Reader 初次创建及原 suspension 恢复共用入口。原 branch 行锁串行化目录准入；不持有
 // Operation 行锁做外部请求，所以 heartbeat 可续租。SQL proxy/adapter 仅读 Kube
 // 路由及原来源，不回取此 branch 锁。整个区段含锁等待限时 45 秒，重试不改 SQL、
 // immutable Config 或角色 identity；发生不明 CAS 结果时只在下一轮重新读回确认。
 func (binding *dsgaCreationBinding) publishReaderCatalog(ctx context.Context, in managedSQLRouteInput, expected dsgapi.Instance) error {
 	p := binding.intent.createPayload
-	if binding.action != "create_endpoint_dsga_v1" || p.EndpointType != "read_only" {
+	if (binding.action != "create_endpoint_dsga_v1" && binding.action != dsgaResumeAction) || p.EndpointType != "read_only" {
 		return errDSGAReaderCatalog
 	}
 	ctx, cancel := context.WithTimeout(ctx, 45*time.Second)
@@ -197,12 +197,15 @@ func (binding *dsgaCreationBinding) publishReaderCatalog(ctx context.Context, in
 	if err = binding.checkLease(ctx, tx); err != nil {
 		return err
 	}
-	roles, err := readDSGAReaderRoles(ctx, tx, p)
-	if err != nil {
-		return err
+	var roles []dsgaReaderRole
+	if binding.action != dsgaResumeAction {
+		roles, err = readDSGAReaderRoles(ctx, tx, p)
+		if err != nil {
+			return err
+		}
 	}
 	// 无普通受管角色时沿既有基础路由，不引入额外 SQL 或写入。
-	if len(roles) == 0 {
+	if len(roles) == 0 && binding.action != dsgaResumeAction {
 		return binding.checkLease(ctx, tx)
 	}
 	plan, err := binding.creationPlan(ctx)
@@ -210,6 +213,9 @@ func (binding *dsgaCreationBinding) publishReaderCatalog(ctx context.Context, in
 		return err
 	}
 	runtime := &dsgaEndpointRuntime{Operation: binding.operationID, Payload: p, Plan: plan, VMUID: binding.vmUID, ConfigUID: binding.configUID}
+	if binding.action == dsgaResumeAction {
+		return binding.publishResumedReaderCatalog(ctx, tx, runtime, in, expected)
+	}
 	credentials, err := s.readDSGAReaderCredentials(ctx, p, roles)
 	if err != nil {
 		return err

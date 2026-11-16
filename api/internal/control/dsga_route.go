@@ -254,7 +254,7 @@ func publishManagedSQLRoute(ctx context.Context, k *kubeClient, in managedSQLRou
 	defer cancel()
 	for attempt := 0; attempt < 6; attempt++ {
 		source, err := readManagedSQLRouteSource(ctx, k, in)
-		if err != nil {
+		if err != nil || in.resume != nil && in.resume.ReaderCatalog && source.cfg.Spec.Mode != "Replica" {
 			return receipt, managedSQLRefuse("source")
 		}
 		fact, err := observe(ctx, in, source)
@@ -325,6 +325,12 @@ func publishManagedSQLRoute(ctx context.Context, k *kubeClient, in managedSQLRou
 		// 既有route完整保留Role/策略/未知字段；受控替换仅更新managed_binding。
 		if hadPrevious {
 			owned = map[string]any{"managed_binding": b}
+			// Reader 恢复先与新 binding 一次性撤下旧代普通凭据，避免在随后
+			// WAL/角色核验前暴露旧密码。该分支只接受内部原 suspension 证明
+			// 和原不可变 Replica 配置；Writer、普通替换及网络策略保持原语义。
+			if in.resume != nil && source.cfg.Spec.Mode == "Replica" {
+				owned["roles"] = roles
+			}
 		}
 		for name, value := range owned {
 			encoded, encodeErr := json.Marshal(value)
@@ -469,6 +475,7 @@ func (binding *dsgaCreationBinding) publishInitializedSQLRoute(ctx context.Conte
 			}
 			return nil
 		})
+		in.resume.ReaderCatalog = p.EndpointType == "read_only"
 	}
 	_, err = publishManagedSQLRoute(ctx, k, in, func(ctx context.Context, in managedSQLRouteInput, source managedSQLRouteSource) (dsgaInitializationResponse, error) {
 		// 仅复用本次Driver刚读取、严格验证且已记录的响应；不读取旧持久fact。
@@ -484,7 +491,7 @@ func (binding *dsgaCreationBinding) publishInitializedSQLRoute(ctx context.Conte
 		}
 		return nil
 	})
-	if err == nil && current.action == "create_endpoint_dsga_v1" && p.EndpointType == "read_only" {
+	if err == nil && (current.action == "create_endpoint_dsga_v1" || current.action == dsgaResumeAction) && p.EndpointType == "read_only" {
 		// 基础探针路由先由原初始化事实发布，Reader 才能通过同一代理只读核验
 		// 目录；普通角色随后独立发布，不能为绕过此依赖而先放行未核验角色。
 		err = current.publishReaderCatalog(ctx, in, fresh.Observed.Instance)

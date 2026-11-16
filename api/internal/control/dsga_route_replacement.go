@@ -57,6 +57,7 @@ func managedSQLSuccessorIdentity(old, next adapter.ManagedSQLBinding) bool {
 // The public publisher cannot supply this process-local proof.
 type managedSQLResumeProof struct {
 	OriginalVMUID, OriginalConfigUID, OriginalServiceUID string
+	ReaderCatalog                                        bool
 	Verify                                               func(context.Context, adapter.ManagedSQLBinding) error
 }
 
