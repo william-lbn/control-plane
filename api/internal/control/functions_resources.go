@@ -28,7 +28,7 @@ type functionRuntimeResource struct {
 	ClusterIP string
 }
 
-var functionVMImage = regexp.MustCompile(`^[a-z0-9./-]+@sha256:[a-f0-9]{64}$`)
+var functionVMImage = regexp.MustCompile(`^[a-z0-9][a-z0-9.:/_-]*@sha256:[a-f0-9]{64}$`)
 var functionNodeName = regexp.MustCompile(`^[a-z0-9]([-a-z0-9.]{0,251}[a-z0-9])?$`)
 var errFunctionRuntimeResource = errors.New("Functions runtime resource unavailable or ownership rejected")
 

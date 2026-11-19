@@ -152,7 +152,7 @@ func runProcess(ctx context.Context, role processRole) error {
 	if _, err := sqlConnectTimeout(); err != nil {
 		return err
 	}
-	if !regexp.MustCompile(`^[a-z0-9./-]+@sha256:[a-f0-9]{64}$`).MatchString(vmComputeImage()) {
+	if !regexp.MustCompile(`^[a-z0-9][a-z0-9.:/_-]*@sha256:[a-f0-9]{64}$`).MatchString(vmComputeImage()) {
 		return errors.New("NEON_VM_COMPUTE_IMAGE must be an image pinned by sha256 digest")
 	}
 	if err := configureStorageCapacity(); err != nil {

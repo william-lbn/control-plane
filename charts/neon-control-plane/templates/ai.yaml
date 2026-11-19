@@ -3,7 +3,7 @@
 {{- if not (and .Values.backendCredentials.enabled .Values.aiGateway.labHTTP) -}}
 {{- fail "AI Gateway preview requires backendCredentials.enabled and explicit aiGateway.labHTTP; production TLS is a separate gate" -}}
 {{- end -}}
-{{- if not (regexMatch "^[a-z0-9./-]+@sha256:[a-f0-9]{64}$" .Values.aiGateway.image) -}}
+{{- if not (regexMatch "^[a-z0-9][a-z0-9.:/_-]*@sha256:[a-f0-9]{64}$" .Values.aiGateway.image) -}}
 {{- fail "AI Gateway requires an immutable digest image" -}}
 {{- end -}}
 apiVersion: apps/v1

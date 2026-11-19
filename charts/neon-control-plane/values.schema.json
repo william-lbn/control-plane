@@ -61,7 +61,7 @@
         },
         "computeImage": {
           "type": "string",
-          "pattern": "^[a-z0-9./_-]+@sha256:[a-f0-9]{64}$"
+          "pattern": "^[a-z0-9][a-z0-9.:/_-]*@sha256:[a-f0-9]{64}$"
         },
         "image": {
           "$ref": "#/definitions/image",
@@ -213,10 +213,10 @@
                 "const": true
               },
               "gatewayImage": {
-                "pattern": "^[a-z0-9./_-]+@sha256:[a-f0-9]{64}$"
+                "pattern": "^[a-z0-9][a-z0-9.:/_-]*@sha256:[a-f0-9]{64}$"
               },
               "postgrestImage": {
-                "pattern": "^[a-z0-9./_-]+@sha256:[a-f0-9]{64}$"
+                "pattern": "^[a-z0-9][a-z0-9.:/_-]*@sha256:[a-f0-9]{64}$"
               }
             }
           }
@@ -486,7 +486,7 @@
                 "const": true
               },
               "runtimeImage": {
-                "pattern": "^[a-z0-9./_-]+@sha256:[a-f0-9]{64}$"
+                "pattern": "^[a-z0-9][a-z0-9.:/_-]*@sha256:[a-f0-9]{64}$"
               },
               "publicOrigin": {
                 "pattern": "^https?://[^/\\s*?#@]+$"
@@ -1027,7 +1027,7 @@
       "properties": {
         "reference": {
           "type": "string",
-          "pattern": "^[a-z0-9./_-]+@sha256:[a-f0-9]{64}$"
+          "pattern": "^[a-z0-9][a-z0-9.:/_-]*@sha256:[a-f0-9]{64}$"
         },
         "pullPolicy": {
           "enum": [

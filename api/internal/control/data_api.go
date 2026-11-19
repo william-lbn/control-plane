@@ -40,7 +40,7 @@ type dataAPIPayload struct {
 	Spec       DataAPISpec `json:"spec"`
 }
 
-var digestImage = regexp.MustCompile(`^[a-z0-9./-]+@sha256:[a-f0-9]{64}$`)
+var digestImage = regexp.MustCompile(`^[a-z0-9][a-z0-9.:/_-]*@sha256:[a-f0-9]{64}$`)
 var dataBranchID = regexp.MustCompile(`^br_[a-f0-9]{16}$`)
 var dataSchema = regexp.MustCompile(`^[a-z][a-z0-9_]{0,62}$`)
 

@@ -58,7 +58,7 @@ functions:
   enabled: false
   edge:
     enabled: false
-    nodeSelector: {}
+    nodeSelector: {}  # empty = any Ready node; do not pin worker-117/118/119
     replicaCount: 1
     existingClientSecret: ''
     existingBrokerSecret: ''
