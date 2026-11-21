@@ -63,8 +63,9 @@ func TestPgoutputWire(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	const deniedPassword = "rt-wire-denied-test-password"
 	exec(`CREATE ROLE rt_wire_client LOGIN REPLICATION;
-		CREATE ROLE rt_wire_denied LOGIN;
+		CREATE ROLE rt_wire_denied LOGIN PASSWORD '${deniedPassword}';
 		CREATE TABLE c3_alpha(id int PRIMARY KEY, note text);
 		CREATE TABLE c3_beta(id int PRIMARY KEY);
 		CREATE TABLE c3_hidden(id int PRIMARY KEY);
@@ -121,6 +122,11 @@ func TestPgoutputWire(t *testing.T) {
 	connect := func(user string) (*pgconn.PgConn, error) {
 		replication := cfg.Config.Copy()
 		replication.User = user
+		// Authenticate the negative replication-privilege case successfully so the
+		// assertion observes SQLSTATE 42501, not a preceding SCRAM password failure.
+		if user == "rt_wire_denied" {
+			replication.Password = deniedPassword
+		}
 		replication.RuntimeParams["replication"] = "database"
 		return pgconn.ConnectConfig(ctx, replication)
 	}
