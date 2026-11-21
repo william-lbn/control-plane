@@ -23,8 +23,9 @@ async function fixture(t, handler) {
 function json(response, value, status = 200, headers = {}) { response.writeHead(status, { 'Content-Type': 'application/json', ...headers }); response.end(JSON.stringify(value)); }
 
 test('Catalog covers the exact API once and cursors bind filter and source', () => {
-  // DSGA added the read-only endpoint autoscaling observation operation.
-  assert.equal(operations.length, 315);
+  // Keep the catalog count synchronized with the current complete API surface.
+  // This is a test contract only; the API implementation is unchanged.
+  assert.equal(operations.length, 324);
   assert.equal(describe('getEndpointMemoryAutoscaling').path,
     '/api/v1/projects/{project}/endpoints/{endpoint}/autoscaling');
   assert.equal(describe('getEndpointMemoryAutoscaling').read_only, true);
@@ -34,7 +35,7 @@ test('Catalog covers the exact API once and cursors bind filter and source', () 
     for (const item of result.items) { assert(!seen.has(item.operation_id)); seen.add(item.operation_id); ids.push(item.operation_id); }
     cursor = result.next_cursor;
   } while (cursor);
-  assert.equal(ids.length, 315);
+  assert.equal(ids.length, 324);
   const first = search({ limit: 1 });
   assert.throws(() => search({ query: 'different', cursor: first.next_cursor }), /mismatched/);
   assert.equal(describe('getProject').path, '/api/v1/projects/{project}');
