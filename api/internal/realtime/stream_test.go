@@ -66,7 +66,7 @@ func TestPgoutputWire(t *testing.T) {
 	const deniedPassword = "rt-wire-denied-test-password"
 	exec(`CREATE ROLE rt_wire_client LOGIN REPLICATION;
 		CREATE ROLE rt_wire_denied LOGIN;`)
-	if _, err := db.Exec(ctx, "ALTER ROLE rt_wire_denied PASSWORD $1", deniedPassword); err != nil {
+	if _, err := db.Exec(ctx, "ALTER ROLE rt_wire_denied PASSWORD 'rt-wire-denied-test-password'"); err != nil {
 		t.Fatal(err)
 	}
 	exec(`CREATE TABLE c3_alpha(id int PRIMARY KEY, note text);
