@@ -235,6 +235,27 @@ func TestDSGAProxySuspensionDrainRequiresSettledExactClose(t *testing.T) {
 	}
 }
 
+func TestDSGAProxySafetyDrainRejectsIncompletePermanentBudget(t *testing.T) {
+	instance := dsgapi.Instance{VMUID: "vm", ComputeInstanceID: "compute", PGBootID: 91}
+	close := dsgapi.AdmissionRequest{ProtocolVersion: 1, Instance: instance, IssuerEpoch: 3,
+		Revision: 4, ExpectedCapacityGeneration: 5, BudgetCommitmentID: "budget"}
+	body, err := json.Marshal(close)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 只填关闭文字和数值不能取得安全排空资格；完整原永久预算、Root和
+	// PG绑定由共享SDK校验，已签名身份也不能替代这些持久来源。
+	state := journal.Model{ProtocolVersion: 10, Owner: journal.Owner{Epoch: 4}, PGInstance: &instance,
+		ServiceClosure: &journal.ServiceClosure{Reason: "idle_source_unconfirmed", Request: close, Phase: journal.Settled}}
+	if validDSGASuspensionDrain(body, state) {
+		t.Fatal("incomplete safety closure acquired drain permission")
+	}
+	state.ProtocolVersion = 11
+	if validDSGASuspensionDrain(body, state) {
+		t.Fatal("version change substituted for original permanent budget")
+	}
+}
+
 func TestDSGAProxyRejectsStaleOwnerAndUnsafeServiceBeforeNative(t *testing.T) {
 	for _, scenario := range []string{"owner_epoch", "lease_expired", "vm_recreated", "unmanaged", "service_project", "service_selector", "service_external", "service_port", "bad_journal", "bootstrap_config", "config_owner"} {
 		t.Run(scenario, func(t *testing.T) {

@@ -145,6 +145,11 @@ dataAPI:
 # 禁止在公开 API 请求或 Helm values 中直接提交镜像选择和预算原始 JSON。
 # 默认关闭新建；只配置目录但不开启创建时，可以安全展示只读版本选项。
 dsga:
+  # 站点权限引用必须与 runtime-access Chart 和发行目录一致；不绑定实验集群。
+  runtimeSelectionNamespace: neon-control-runtime
+  agentNamespace: kube-system
+  runtimeAccessRolePrefix: neon-control-runtime-neon-runtime-access
+  nodeReadClusterRole: neon-control-runtime-worker-nodes
   createEnabled: false
   # Enable after the Agent that understands the versioned suspension selection.
   suspensionEnabled: false

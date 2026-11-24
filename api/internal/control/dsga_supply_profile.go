@@ -40,7 +40,7 @@ func (p *dsgaSupplyProfile) validate() error {
 		!dsgaPinnedImage.MatchString(p.QualifierImage) || !dsgaPlanNamespace.MatchString(p.QualifierServiceAccount) || len(p.QualifierServiceAccount) > 63 ||
 		(p.AdapterServiceAccount != "" && p.AdapterServiceAccount != "neon-control-adapter") ||
 		dsgapi.ValidateID(p.NodeReadClusterRole, "node read role") != nil || !filepath.IsAbs(p.ResourceReadHostDirectory) || filepath.Clean(p.ResourceReadHostDirectory) != p.ResourceReadHostDirectory ||
-		p.ResourceReadHostDirectory == "/" || len(validation.IsDNS1123Subdomain(p.ResourceReadSocketName)) != 0 || len(p.HostLeases) != 3 || len(p.Targets) < 1 || len(p.Targets) > 32 || p.Automatic.Validate() != nil {
+		p.ResourceReadHostDirectory == "/" || len(validation.IsDNS1123Subdomain(p.ResourceReadSocketName)) != 0 || len(p.HostLeases) < 1 || len(p.HostLeases) > 128 || len(p.Targets) < 1 || len(p.Targets) > 32 || p.Automatic.Validate() != nil {
 		return errDSGACreationPlan
 	}
 	seen := map[dsgaSupplyLease]bool{}
@@ -85,7 +85,9 @@ func (p dsgaCreationPlan) validateSupply(input createPayload) error {
 	if s == nil {
 		return nil
 	}
-	if s.validate() != nil || s.PlatformNamespace == p.Namespace {
+	// 可变站点规模不放宽绑定：供应Lease集合必须完整覆盖本计划冻结的节点数。
+	// 真实Node/Lease UID与资格仍由后续原生供应路径逐个验证。
+	if s.validate() != nil || s.PlatformNamespace == p.Namespace || p.VM.Placement == nil || len(s.HostLeases) != len(p.VM.Placement.AllowedNodeNames) {
 		return errDSGACreationPlan
 	}
 	low, high := dsgapi.Uint64(input.MinMem)*(1<<20), dsgapi.Uint64(input.MaxMem)*(1<<20)

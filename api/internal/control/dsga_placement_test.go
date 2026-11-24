@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -121,14 +122,11 @@ func TestDSGAVM3RejectsIncompletePlacementBeforeProducingTemplate(t *testing.T) 
 	for name, mutate := range map[string]func(*dsgaVMProfile){
 		"missing":          func(v *dsgaVMProfile) { v.Placement = nil },
 		"missing_selector": func(v *dsgaVMProfile) { v.Placement.NodeSelector = nil },
-		"missing_pool":     func(v *dsgaVMProfile) { delete(v.Placement.NodeSelector, dsgaMemoryPoolLabel) },
 		"wrong_os":         func(v *dsgaVMProfile) { v.Placement.NodeSelector[core.LabelOSStable] = "windows" },
 		"wrong_arch":       func(v *dsgaVMProfile) { v.Placement.NodeSelector[core.LabelArchStable] = "arm64" },
 		"bad_label":        func(v *dsgaVMProfile) { v.Placement.NodeSelector["invalid key"] = "value" },
 		"bad_value":        func(v *dsgaVMProfile) { v.Placement.NodeSelector[dsgaMemoryPoolLabel] = "bad value" },
 		"no_hosts":         func(v *dsgaVMProfile) { v.Placement.AllowedNodeNames = nil },
-		"two_hosts":        func(v *dsgaVMProfile) { v.Placement.AllowedNodeNames = v.Placement.AllowedNodeNames[:2] },
-		"four_hosts":       func(v *dsgaVMProfile) { v.Placement.AllowedNodeNames = append(v.Placement.AllowedNodeNames, "ubuntu") },
 		"duplicate":        func(v *dsgaVMProfile) { v.Placement.AllowedNodeNames[0] = v.Placement.AllowedNodeNames[1] },
 		"invalid_host":     func(v *dsgaVMProfile) { v.Placement.AllowedNodeNames[0] = "bad/host" },
 		"v2_hidden_placement": func(v *dsgaVMProfile) {
@@ -153,6 +151,32 @@ func TestDSGAVM3RejectsIncompletePlacementBeforeProducingTemplate(t *testing.T) 
 			vm, err := renderDSGAVM(p, plan)
 			if !errors.Is(err, errDSGACreationPlan) || vm != nil {
 				t.Fatal("invalid placement produced usable VM")
+			}
+		})
+	}
+}
+
+func TestDSGAPlacementUsesConfiguredPoolSizeWithoutLaboratoryLabel(t *testing.T) {
+	for _, count := range []int{1, 2, 5, 128} {
+		t.Run(fmt.Sprint(count), func(t *testing.T) {
+			p := &dsgaVMPlacement{NodeSelector: map[string]string{core.LabelOSStable: "linux", core.LabelArchStable: "amd64"}}
+			for i := 0; i < count; i++ {
+				p.AllowedNodeNames = append(p.AllowedNodeNames, fmt.Sprintf("node-%d", i))
+			}
+			if err := p.validate("amd64"); err != nil {
+				t.Fatal(err)
+			}
+			before, _ := json.Marshal(p)
+			vm := &vmv1.VirtualMachine{}
+			p.apply(vm)
+			terms := vm.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms
+			if len(terms) != 1 || len(terms[0].MatchExpressions) != 1 || len(terms[0].MatchExpressions[0].Values) != count {
+				t.Fatal("configured pool changed or OR bypass introduced")
+			}
+			vm.Spec.Affinity.NodeAffinity.RequiredDuringSchedulingIgnoredDuringExecution.NodeSelectorTerms[0].MatchExpressions[0].Values[0] = "mutated-output"
+			after, _ := json.Marshal(p)
+			if !bytes.Equal(before, after) {
+				t.Fatal("API output aliased the frozen plan")
 			}
 		})
 	}

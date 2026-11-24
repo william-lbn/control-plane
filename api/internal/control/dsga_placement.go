@@ -18,9 +18,12 @@ type dsgaVMPlacement struct {
 }
 
 func (p *dsgaVMPlacement) validate(architecture string) error {
-	if p == nil || len(p.NodeSelector) < 3 || len(p.NodeSelector) > 16 ||
+	// 节点数是站点输入，不是三节点协议。与Host调度器的1..128域边界一致；
+	// 每个新计划仍冻结完整selector/名单，旧计划及恢复从不补入当前环境节点。
+	// linux/架构与合法标签继续强制，不再要求实验室派生pool标签。
+	if p == nil || len(p.NodeSelector) < 2 || len(p.NodeSelector) > 16 ||
 		p.NodeSelector[core.LabelOSStable] != "linux" || p.NodeSelector[core.LabelArchStable] != architecture ||
-		p.NodeSelector[dsgaMemoryPoolLabel] == "" || len(p.AllowedNodeNames) != 3 {
+		len(p.AllowedNodeNames) < 1 || len(p.AllowedNodeNames) > 128 {
 		return errDSGACreationPlan
 	}
 	for key, value := range p.NodeSelector {
@@ -28,7 +31,7 @@ func (p *dsgaVMPlacement) validate(architecture string) error {
 			return errDSGACreationPlan
 		}
 	}
-	seen := make(map[string]bool, 3)
+	seen := make(map[string]bool, len(p.AllowedNodeNames))
 	for _, name := range p.AllowedNodeNames {
 		if len(validation.IsDNS1123Subdomain(name)) != 0 || seen[name] {
 			return errDSGACreationPlan

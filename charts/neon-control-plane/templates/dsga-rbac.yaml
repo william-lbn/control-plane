@@ -4,9 +4,9 @@
 {{- $apiAccount := printf "%s-api" $name -}}
 {{- /* 兼容单进程模式：API 同时承担 Worker 时必须继承同一组受限权限。 */ -}}
 {{- $workerAccount := ternary (printf "%s-worker" $name) $apiAccount .Values.worker.enabled -}}
-{{- if ne .Release.Namespace "neon" -}}
-{{- fail "DSGA creation RBAC is pinned to the neon namespace" -}}
-{{- end -}}
+{{- $accessPrefix := required "dsga.runtimeAccessRolePrefix is required" .Values.dsga.runtimeAccessRolePrefix -}}
+{{- $platformNamespace := required "dsga.runtimeSelectionNamespace is required" .Values.dsga.runtimeSelectionNamespace -}}
+{{- $agentNamespace := required "dsga.agentNamespace is required" .Values.dsga.agentNamespace -}}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
@@ -18,7 +18,7 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: neon-control-runtime-neon-runtime-access-api
+  name: {{ printf "%s-api" $accessPrefix }}
 subjects:
   - kind: ServiceAccount
     name: {{ $apiAccount }}
@@ -34,7 +34,7 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: neon-control-runtime-neon-runtime-access-worker
+  name: {{ printf "%s-worker" $accessPrefix }}
 subjects:
   - kind: ServiceAccount
     name: {{ $workerAccount }}
@@ -76,7 +76,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: {{ printf "%s-dsga-platform-policy" $name | trunc 63 | trimSuffix "-" }}
-  namespace: neon-control-runtime
+  namespace: {{ $platformNamespace }}
   labels:
     {{- include "neonControl.labels" . | nindent 4 }}
 rules:
@@ -88,7 +88,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: {{ printf "%s-dsga-platform-policy" $name | trunc 63 | trimSuffix "-" }}
-  namespace: neon-control-runtime
+  namespace: {{ $platformNamespace }}
   labels:
     {{- include "neonControl.labels" . | nindent 4 }}
 roleRef:
@@ -106,13 +106,13 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: {{ printf "%s-dsga-platform-worker" $name | trunc 63 | trimSuffix "-" }}
-  namespace: neon-control-runtime
+  namespace: {{ $platformNamespace }}
   labels:
     {{- include "neonControl.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: neon-control-runtime-neon-runtime-access-platform-worker
+  name: {{ printf "%s-platform-worker" $accessPrefix }}
 subjects:
   - kind: ServiceAccount
     name: {{ $workerAccount }}
@@ -123,13 +123,13 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: {{ printf "%s-dsga-agent-observation" $name | trunc 63 | trimSuffix "-" }}
-  namespace: kube-system
+  namespace: {{ $agentNamespace }}
   labels:
     {{- include "neonControl.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: neon-control-runtime-neon-runtime-access-agent-observation
+  name: {{ printf "%s-agent-observation" $accessPrefix }}
 subjects:
 {{- range $account := list $apiAccount $workerAccount | uniq }}
   - kind: ServiceAccount
@@ -147,7 +147,7 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: neon-control-runtime-worker-nodes
+  name: {{ .Values.dsga.nodeReadClusterRole }}
 subjects:
   - kind: ServiceAccount
     name: {{ $workerAccount }}
@@ -164,7 +164,7 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: neon-control-runtime-neon-runtime-access-runner-delegation
+  name: {{ printf "%s-runner-delegation" $accessPrefix }}
 subjects:
   - kind: ServiceAccount
     name: {{ $workerAccount }}

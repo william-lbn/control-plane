@@ -1000,6 +1000,26 @@
       ],
       "additionalProperties": false,
       "properties": {
+        "runtimeSelectionNamespace": {
+          "type": "string",
+          "maxLength": 63,
+          "pattern": "^neon-control-[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        },
+        "agentNamespace": {
+          "type": "string",
+          "maxLength": 63,
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        },
+        "runtimeAccessRolePrefix": {
+          "type": "string",
+          "maxLength": 48,
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        },
+        "nodeReadClusterRole": {
+          "type": "string",
+          "maxLength": 63,
+          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$"
+        },
         "createEnabled": {
           "type": "boolean"
         },

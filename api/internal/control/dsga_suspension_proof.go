@@ -99,6 +99,12 @@ func validateDSGASuspensionObservation(observation dsgaOwnerObservation, now tim
 		return errDSGAInitializationPending
 	}
 	c := state.ServiceClosure
+	if state.HasSettledIdleServiceClosure() {
+		// The exact persisted suspension selection was authenticated above.
+		// Preserve the original safety close and require its current native drain;
+		// never reopen PostgreSQL merely to obtain a suspension-labelled close.
+		return state.CheckClosedSafetyDrain(*observation.SuspensionDrain)
+	}
 	if c.Reason != "compute_suspension" || c.Reopen != nil || c.Rearm != nil {
 		return errDSGACreationIdentity
 	}

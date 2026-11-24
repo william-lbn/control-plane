@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"reflect"
+	"strconv"
 	"strings"
 
 	vmv1 "github.com/neondatabase/autoscaling/neonvm/apis/neonvm/v1"
@@ -51,11 +52,13 @@ func dsgaSupplyAccess(vm *vmv1.VirtualMachine, p dsgaCreationPlan) []any {
 	role := &rbac.Role{TypeMeta: metav1.TypeMeta{APIVersion: rbac.SchemeGroupVersion.String(), Kind: "Role"}, ObjectMeta: metadata(account, vm.Namespace), Rules: rules}
 	binding := &rbac.RoleBinding{TypeMeta: role.TypeMeta, ObjectMeta: metadata(account, vm.Namespace), RoleRef: rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "Role", Name: account}, Subjects: subject}
 	binding.Kind = "RoleBinding"
-	// ClusterRole本身由Helm只读固定117/118/119；这里不允许按租户输入扩大规则。
+	// ClusterRole由Helm按本站点节点池授予读取范围；租户输入不能扩大该角色。
 	cluster := &rbac.ClusterRoleBinding{TypeMeta: metav1.TypeMeta{APIVersion: rbac.SchemeGroupVersion.String(), Kind: "ClusterRoleBinding"}, ObjectMeta: metadata(vm.Namespace+"-"+account, ""), RoleRef: rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "ClusterRole", Name: s.NodeReadClusterRole}, Subjects: subject}
 	out := []any{sa, role, binding, cluster}
 	for i, l := range s.HostLeases {
-		name := vm.Namespace + "-" + account + "-host-" + string(rune('0'+i))
+		// 十个及以上节点必须使用十进制序号；单字符加法会生成':'等非法名称。
+		// 0..9名称保持原字节，既有三节点实例的授权与恢复身份不变。
+		name := vm.Namespace + "-" + account + "-host-" + strconv.Itoa(i)
 		hr := &rbac.Role{TypeMeta: role.TypeMeta, ObjectMeta: metadata(name, l.Namespace), Rules: []rbac.PolicyRule{{APIGroups: []string{"coordination.k8s.io"}, Resources: []string{"leases"}, ResourceNames: []string{l.Name}, Verbs: []string{"get"}}}}
 		hb := &rbac.RoleBinding{TypeMeta: binding.TypeMeta, ObjectMeta: metadata(name, l.Namespace), RoleRef: rbac.RoleRef{APIGroup: rbac.GroupName, Kind: "Role", Name: name}, Subjects: subject}
 		out = append(out, hr, hb)

@@ -3,6 +3,7 @@ package control
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"reflect"
 	"strings"
 	"testing"
@@ -13,6 +14,7 @@ import (
 	core "k8s.io/api/core/v1"
 	rbac "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/validation"
 )
 
 func supplyFixture(t *testing.T, version uint32) (createPayload, dsgaCreationPlan) {
@@ -26,6 +28,40 @@ func supplyFixture(t *testing.T, version uint32) (createPayload, dsgaCreationPla
 		Automatic: policy.Config{Targets: []policy.Target{{VMMemoryBytes: dsgapi.Uint64(p.MinMem) << 20, Buffers: uint32(plan.Budget.BootstrapBufferBytes / 8192)}, {VMMemoryBytes: dsgapi.Uint64(p.MaxMem) << 20, Buffers: uint32(plan.Budget.MaximumBufferBytes / 8192)}},
 			SampleIntervalSeconds: 2, MaximumSampleGapSeconds: 10, GrowWindowSeconds: 4, ShrinkWindowSeconds: 10, CooldownSeconds: 4, RequestDeadlineSeconds: 120, ShrinkThresholdPermille: 200, GrowThresholdPermille: 700, EmergencyThresholdPermille: 900}}
 	return p, plan
+}
+
+func TestDSGASupplyConfiguredPoolRequiresCompleteLeaseSet(t *testing.T) {
+	for _, count := range []int{1, 5, 128} {
+		t.Run(fmt.Sprint(count), func(t *testing.T) {
+			input, plan := supplyFixture(t, 17)
+			plan.VM.Placement.NodeSelector = map[string]string{core.LabelOSStable: "linux", core.LabelArchStable: "amd64"}
+			plan.VM.Placement.AllowedNodeNames = nil
+			plan.VM.GenericGuest.Supply.HostLeases = nil
+			for i := 0; i < count; i++ {
+				name := fmt.Sprintf("node-%d", i)
+				plan.VM.Placement.AllowedNodeNames = append(plan.VM.Placement.AllowedNodeNames, name)
+				plan.VM.GenericGuest.Supply.HostLeases = append(plan.VM.GenericGuest.Supply.HostLeases, dsgaSupplyLease{Namespace: "platform", Name: "host-" + name})
+			}
+			if err := plan.validateSupply(input); err != nil {
+				t.Fatal(err)
+			}
+			vm, err := renderDSGAVM(input, plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			vm.UID = "original-vm"
+			for _, object := range dsgaSupplyAccess(vm, plan) {
+				metadata, ok := object.(metav1.Object)
+				if !ok || len(validation.IsDNS1123Subdomain(metadata.GetName())) != 0 {
+					t.Fatal("configured pool produced invalid Kubernetes access identity")
+				}
+			}
+			plan.VM.GenericGuest.Supply.HostLeases = plan.VM.GenericGuest.Supply.HostLeases[:count-1]
+			if plan.validateSupply(input) == nil {
+				t.Fatal("incomplete lease set accepted for frozen placement")
+			}
+		})
+	}
 }
 func TestDSGASupplyCommonReleaseIsFrozenAndIdentitySpecific(t *testing.T) {
 	for _, version := range []uint32{17, 18} {

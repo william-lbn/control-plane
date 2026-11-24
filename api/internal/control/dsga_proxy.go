@@ -360,9 +360,12 @@ func (proxy *dsgaProxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 func validDSGASuspensionDrain(body []byte, state journal.Model) bool {
 	closure := state.ServiceClosure
-	if closure == nil || closure.SuspensionOperation == "" || closure.Pending() || state.Active != nil || state.PGInstance == nil {
+	if closure == nil || closure.SuspensionOperation == "" && !state.HasSettledIdleServiceClosure() || closure.Pending() || state.Active != nil || state.PGInstance == nil {
 		return false
 	}
+	// 当前签名Owner可在原稳定安全关闭下请求原生排空；不重命名旧关闭、
+	// 不开放准入、不授予VM删除或Host释放。业务暂停授权仍由Agent的可信
+	// 运行选择和控制面原Operation独立核验。缺原预算或任何恢复未知均拒绝。
 	var request dsgapi.AdmissionRequest
 	// Match the Rust wire parser exactly. Go's JSON decoder otherwise accepts
 	// case-insensitive field aliases and an omitted open field as false.
