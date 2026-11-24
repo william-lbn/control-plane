@@ -50,10 +50,20 @@ test "$(grep -c NEON_DSGA_RUNTIME_CATALOG artifacts/helm/dsga-combined.yaml)" -e
 # DSGA 开启态必须为 API/Worker 分别授予最小跨 namespace 权限；
 # 仅允许固定 Node-read 与 Runner-delegation 两个 ClusterRoleBinding。
 node tools/check-dsga-rbac.mjs artifacts/helm/dsga-runtime.yaml artifacts/helm/dsga-combined.yaml
-if helm_template bad charts/neon-control-plane --namespace default \
+# 产品空间是站点输入，不能保留旧的“default必须拒绝”断言。
+helm_template dsga-other-site charts/neon-control-plane --namespace product-acceptance \
   -f charts/neon-control-plane/ci/render-values.yaml \
+  --set dsga.runtimeSelectionNamespace=neon-control-acceptance \
+  --set dsga.runtimeAccessRolePrefix=acceptance-runtime \
   --set dsga.runtimeCatalogSecret=neon-dsga-runtime-catalog \
-  --set dsga.createEnabled=true > artifacts/helm/rejected-dsga-namespace.log 2>&1; then exit 1; fi
+  --set dsga.createEnabled=true > artifacts/helm/dsga-other-site.yaml
+# 原生平台空间合同仍须严格验证，不能把产品空间通用化变成越权。
+if helm_template bad charts/neon-control-plane --namespace product-acceptance \
+  -f charts/neon-control-plane/ci/render-values.yaml \
+  --set dsga.runtimeSelectionNamespace=default \
+  --set dsga.runtimeCatalogSecret=neon-dsga-runtime-catalog \
+  --set dsga.createEnabled=true > artifacts/helm/rejected-dsga-platform-namespace.log 2>&1; then exit 1; fi
+
 # 反向门禁：缺少可信目录、全局创建关闭或 Secret 名不合法时必须拒绝渲染。
 if helm_template bad charts/neon-control-plane  \
   -f charts/neon-control-plane/ci/render-values.yaml \
