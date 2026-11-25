@@ -116,13 +116,13 @@ func (binding *dsgaCreationBinding) lockOperationTx(ctx context.Context, tx pgx.
 		}
 		return nil
 	}
-	var endpointBranch, endpointState string
-	err = tx.QueryRow(ctx, `SELECT branch_id,state FROM endpoints WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL`, binding.intent.EndpointID, project).
-		Scan(&endpointBranch, &endpointState)
+	var endpointBranch, endpointState, endpointType string
+	err = tx.QueryRow(ctx, `SELECT branch_id,state,endpoint_type FROM endpoints WHERE id=$1 AND project_id=$2 AND deleted_at IS NULL`, binding.intent.EndpointID, project).
+		Scan(&endpointBranch, &endpointState, &endpointType)
 	if err != nil {
 		return err
 	}
-	if endpointBranch != binding.intent.BranchID {
+	if endpointBranch != binding.intent.BranchID || endpointType != binding.intent.EndpointType {
 		return errDSGACreationIdentity
 	}
 	if action == dsgaResumeAction {

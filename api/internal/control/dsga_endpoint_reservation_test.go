@@ -94,6 +94,29 @@ func TestDSGARetainedReplicaUsesOriginalCredentialsAndIntent(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
+			for range 2 {
+				if err := replica.verifyFrozenReaderSource(f.ctx); err != nil {
+					t.Fatal("Reader Worker cannot verify the original accepted source", err)
+				}
+			}
+			// 接受后原 Writer 可以独立暂停；不得把历史来源变成 Writer 生存租约。
+			f.exec(`UPDATE endpoints SET state='suspended' WHERE id=$1`, p.EndpointID)
+			if err := replica.verifyFrozenReaderSource(f.ctx); err != nil {
+				t.Fatal("Writer pause invalidated the accepted Reader source", err)
+			}
+			f.exec(`UPDATE endpoints SET state='active' WHERE id=$1`, p.EndpointID)
+			// 同名来源改成 Reader，不能仍凭原 Operation 被当作 Writer 收养。
+			f.exec(`UPDATE endpoints SET endpoint_type='read_only' WHERE id=$1`, p.EndpointID)
+			if err := replica.verifyFrozenReaderSource(f.ctx); err == nil {
+				t.Fatal("Reader Worker accepted a source whose role changed")
+			}
+			f.exec(`UPDATE endpoints SET endpoint_type='read_write' WHERE id=$1`, p.EndpointID)
+			tampered := *replica
+			tampered.intent.EndpointType = "read_write"
+			if tx, err := tampered.lockOperation(f.ctx); err == nil {
+				_ = tx.Rollback(f.ctx)
+				t.Fatal("Reader Worker accepted a role different from the original endpoint")
+			}
 			if err := replica.bind(f.ctx, "fixture-retained-replica-vm", ""); err != nil {
 				t.Fatal(err)
 			}
@@ -107,6 +130,9 @@ func TestDSGARetainedReplicaUsesOriginalCredentialsAndIntent(t *testing.T) {
 				}
 			}
 			f.exec(`UPDATE operations SET lease_expires_at=clock_timestamp()-interval '1 second' WHERE id=$1`, replicaOperation)
+			if err := replica.verifyFrozenReaderSource(f.ctx); err == nil {
+				t.Fatal("expired Worker retained Reader source authority")
+			}
 			if _, err := replica.supplyFact(f.ctx, "runtime_selection", job); err == nil {
 				t.Fatal("expired retained Worker published a new supply fact")
 			}

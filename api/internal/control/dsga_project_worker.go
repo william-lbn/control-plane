@@ -203,6 +203,11 @@ func (s *server) reconcileDSGAEndpoint(ctx context.Context, binding *dsgaCreatio
 	err = s.createStep(ctx, binding.operationID, binding.workerID, 0, "verify_retained_timeline", func(ctx context.Context) error {
 		p := binding.intent.createPayload
 		var fork dsgaRetainedFork
+		if p.EndpointType == "read_only" {
+			if err := binding.verifyFrozenReaderSource(ctx); err != nil {
+				return err
+			}
+		}
 		if p.EndpointType == "read_write" {
 			// Confirm the accepted provenance before allowing any VM to start.
 			var raw []byte
