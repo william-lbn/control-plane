@@ -336,6 +336,7 @@ type createPayload struct {
 	ParentLSN                 string `json:"parent_lsn"`
 	RestoreSource             string `json:"restore_source,omitempty"`
 	CatalogPolicy             string `json:"catalog_policy,omitempty"`
+	BranchFunctionCopyPolicy  string `json:"branch_function_copy_policy,omitempty"`
 	CatalogInitializePlatform bool   `json:"-"`
 	ResetInspectionOperation  string `json:"-"`
 	ResetInspectionLSN        string `json:"-"`

@@ -78,17 +78,17 @@ func (s *server) prepareFunctionBranchPlans(ctx context.Context, project, branch
 		return err
 	}
 	defer tx.Rollback(ctx)
-	var org, writer, locked string
+	var org, writer, locked, timeline string
 	if err = tx.QueryRow(ctx, `SELECT p.org_id FROM projects p JOIN organizations o ON o.id=p.org_id WHERE p.id=$1 AND p.state='ready' AND p.source='managed' AND p.deleted_at IS NULL AND o.state='active' FOR UPDATE OF p`, project).Scan(&org); err != nil {
 		return err
 	}
-	if err = tx.QueryRow(ctx, `SELECT id FROM branches WHERE id=$1 AND project_id=$2 AND state='ready' AND deleted_at IS NULL FOR UPDATE`, branch, project).Scan(&locked); err != nil {
+	if err = tx.QueryRow(ctx, `SELECT id,timeline_id FROM branches WHERE id=$1 AND project_id=$2 AND state='ready' AND deleted_at IS NULL FOR UPDATE`, branch, project).Scan(&locked, &timeline); err != nil {
 		return err
 	}
 	if err = tx.QueryRow(ctx, `SELECT id FROM endpoints WHERE project_id=$1 AND branch_id=$2 AND endpoint_type='read_write' AND workload_kind='neonvm' AND state IN ('active','suspended') AND deleted_at IS NULL FOR UPDATE`, project, branch).Scan(&writer); err != nil {
 		return err
 	}
-	rows, err := tx.Query(ctx, `SELECT plan.function_id,COALESCE(plan.deployment_id,''),plan.operation_id,plan.source_function_id,plan.source_branch_id,COALESCE(plan.source_deployment_id,''),plan.source_version,plan.admitted_actor_id,creation.request_id,source.slug,source.database_name,source.sql_schema,plan.trigger_snapshots
+	rows, err := tx.Query(ctx, `SELECT plan.function_id,COALESCE(plan.deployment_id,''),plan.operation_id,plan.source_function_id,plan.source_branch_id,COALESCE(plan.source_deployment_id,''),plan.source_version,plan.admitted_actor_id,creation.request_id,source.slug,source.database_name,source.sql_schema,plan.trigger_snapshots,creation.action
   FROM function_branch_copy_plans plan JOIN function_definitions source ON source.id=plan.source_function_id
   JOIN operations creation ON creation.id=plan.creation_operation_id
   WHERE plan.project_id=$1 AND plan.branch_id=$2 AND plan.prepared_function_id IS NULL ORDER BY source.slug FOR UPDATE OF plan`, project, branch)
@@ -96,12 +96,19 @@ func (s *server) prepareFunctionBranchPlans(ctx context.Context, project, branch
 		return err
 	}
 	admissions := []functionCopyAdmission{}
+	needsDSGAWriter := false
 	for rows.Next() {
 		a := functionCopyAdmission{Org: org, Writer: writer}
+		var action string
 		a.Target.ProjectID, a.Target.BranchID, a.Target.Generation = project, branch, 1
-		if err = rows.Scan(&a.Target.FunctionID, &a.Target.DeploymentID, &a.Operation, &a.Source.Function, &a.Source.Branch, &a.Source.Deployment, &a.SourceVersion, &a.Source.Actor, &a.Request, &a.Target.Slug, &a.Database, &a.Schema, &a.TriggerSnapshots); err != nil {
+		if err = rows.Scan(&a.Target.FunctionID, &a.Target.DeploymentID, &a.Operation, &a.Source.Function, &a.Source.Branch, &a.Source.Deployment, &a.SourceVersion, &a.Source.Actor, &a.Request, &a.Target.Slug, &a.Database, &a.Schema, &a.TriggerSnapshots, &action); err != nil {
 			break
 		}
+		if action != "create_branch" && action != "create_branch_dsga_v1" {
+			err = errFunctionCopy
+			break
+		}
+		needsDSGAWriter = needsDSGAWriter || action == "create_branch_dsga_v1"
 		admissions = append(admissions, a)
 	}
 	if err == nil {
@@ -110,6 +117,11 @@ func (s *server) prepareFunctionBranchPlans(ctx context.Context, project, branch
 	rows.Close()
 	if err != nil {
 		return err
+	}
+	if needsDSGAWriter {
+		if err := s.verifyDSGAFunctionBranchWriter(ctx, tx, project, branch, timeline, writer); err != nil {
+			return err
+		}
 	}
 	for _, a := range admissions {
 		if err = s.authorizeFunctionCopyActor(ctx, project, a.Source.Actor); err != nil {

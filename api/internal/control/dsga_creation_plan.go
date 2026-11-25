@@ -171,6 +171,10 @@ func (plan dsgaCreationPlan) validate(p createPayload) error {
 	}
 	storageFork := p.EndpointID == "" && p.ParentBranchID != "" && p.ParentBranchID != p.BranchID &&
 		p.ParentTimelineID != "" && p.EndpointType == "read_write" && p.CatalogPolicy == catalogPreserveInheritedSQL
+	if p.BranchFunctionCopyPolicy != "" && (!storageFork ||
+		(p.BranchFunctionCopyPolicy != "omit" && p.BranchFunctionCopyPolicy != "inherit_paused")) {
+		return errDSGACreationPlan
+	}
 	if p.EndpointID == "" && (!storageFork || plan.Credentials != (dsgaCredentialReference{})) {
 		return errDSGACreationPlan
 	}

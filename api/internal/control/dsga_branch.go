@@ -17,10 +17,6 @@ func (s *server) createDSGAStorageBranch(w http.ResponseWriter, r *http.Request,
 		fail(w, r, 422, "dsga_branch_compute_unavailable", "Choose a storage-only branch while DSGA branch Compute is unavailable")
 		return
 	}
-	if body.FunctionCopyPolicy != "" && body.FunctionCopyPolicy != "omit" {
-		fail(w, r, 422, "dsga_branch_option_unavailable", "Omit Function copying for this DSGA operation")
-		return
-	}
 	if !validName(body.Name, 63) || body.ParentBranchID == "" {
 		fail(w, r, 422, "invalid_branch", "Check branch name and parent branch")
 		return
@@ -39,6 +35,15 @@ func (s *server) createDSGAStorageBranch(w http.ResponseWriter, r *http.Request,
 	scope := "POST:/projects/" + project + "/branches"
 	hash := s.createRequestHash(scope, body)
 	if s.replayCreate(w, r, key, hash, "", "branch") {
+		return
+	}
+	if _, err := s.dsgaBranchFunctionPolicy(body); err != nil {
+		var fault dsgaBranchFunctionError
+		if errors.As(err, &fault) {
+			fail(w, r, fault.status, fault.code, fault.message)
+		} else {
+			s.dsgaCreationFailure(w, r, err)
+		}
 		return
 	}
 	parent, err := s.one(ctx, `SELECT p.tenant_id,b.timeline_id
@@ -80,6 +85,11 @@ func (s *server) createDSGAStorageBranch(w http.ResponseWriter, r *http.Request,
 	}
 	p, operation, err := s.admitDSGAStorageBranch(ctx, project, org, actor, tenant, timeline, lsn, source, body, storage, key, hash, requestID(r))
 	if err != nil {
+		var copyFault dsgaBranchFunctionError
+		if errors.As(err, &copyFault) {
+			fail(w, r, copyFault.status, copyFault.code, copyFault.message)
+			return
+		}
 		var pgErr restoreError
 		if errors.As(err, &pgErr) {
 			fail(w, r, pgErr.status, pgErr.code, "The original branch source changed before acceptance")
@@ -98,6 +108,10 @@ func (s *server) createDSGAStorageBranch(w http.ResponseWriter, r *http.Request,
 func (s *server) admitDSGAStorageBranch(ctx context.Context, project, org, actor, tenant, parent, lsn, source string,
 	body branchCreateRequest, storage *dsgaCreationPlan, key, hash, request string) (createPayload, string, error) {
 	var p createPayload
+	copyPolicy, err := s.dsgaBranchFunctionPolicy(body)
+	if err != nil {
+		return p, "", err
+	}
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	tx, err := s.db.Begin(ctx)
@@ -115,6 +129,11 @@ func (s *server) admitDSGAStorageBranch(ctx context.Context, project, org, actor
 	}
 	if lockedTenant != tenant || lockedParent != parent || major != storage.PostgresVersion {
 		return p, "", restoreError{412, "restore_source_changed"}
+	}
+	if copyPolicy == "inherit_paused" {
+		if err := checkDSGABranchFunctionConsent(ctx, tx, project, body, source != ""); err != nil {
+			return p, "", err
+		}
 	}
 	if _, err = tx.Exec(ctx, "SELECT dsga_lock_creation_key($1,$2)", actor, keyHash(key)); err != nil {
 		return p, "", err
@@ -135,6 +154,7 @@ func (s *server) admitDSGAStorageBranch(ctx context.Context, project, org, actor
 	p = creationPayload(project, "br_"+suffix, "", tenant, stableHex(suffix, "timeline"), policy.Bounds)
 	p.ParentBranchID, p.ParentTimelineID, p.ParentLSN = body.ParentBranchID, parent, lsn
 	p.RestoreSource, p.EndpointType, p.CatalogPolicy = source, "read_write", catalogPreserveInheritedSQL
+	p.BranchFunctionCopyPolicy = copyPolicy
 	plan, err := newDSGACreationPlan(p, policy.Creation, time.Now())
 	if err != nil {
 		return p, "", err
@@ -155,6 +175,11 @@ func (s *server) admitDSGAStorageBranch(ctx context.Context, project, org, actor
 	}
 	if err := s.captureCatalogInheritanceTx(ctx, tx, operation, p, p.ParentBranchID, source != ""); err != nil {
 		return p, "", err
+	}
+	if copyPolicy == "inherit_paused" {
+		if err := s.snapshotFunctionBranchTx(ctx, tx, project, p.ParentBranchID, p.BranchID, operation, actor); err != nil {
+			return p, "", err
+		}
 	}
 	if err := lockDSGARequestCredentialForProject(ctx, tx, org, actor, project); err != nil {
 		return p, "", err

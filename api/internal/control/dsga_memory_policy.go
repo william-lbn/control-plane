@@ -29,7 +29,17 @@ type dsgaEndpointRuntime struct {
 }
 
 func (s *server) dsgaEndpointRuntime(ctx context.Context, project, endpoint string) (*dsgaEndpointRuntime, error) {
-	rows, err := s.db.Query(ctx, `SELECT o.id,o.action,o.payload,b.vm_uid,COALESCE(b.config_uid,'')
+	return readDSGAEndpointRuntime(ctx, s.db, project, endpoint)
+}
+
+// 同一只读解析也可在调用者已持生命周期锁的原事务内执行，不额外借连接
+// 或读取另一事务的 Writer 选择；返回值仍不是 Kube/Guest 的执行许可。
+type dsgaRuntimeQueryer interface {
+	Query(context.Context, string, ...any) (pgx.Rows, error)
+}
+
+func readDSGAEndpointRuntime(ctx context.Context, reader dsgaRuntimeQueryer, project, endpoint string) (*dsgaEndpointRuntime, error) {
+	rows, err := reader.Query(ctx, `SELECT o.id,o.action,o.payload,b.vm_uid,COALESCE(b.config_uid,'')
  FROM endpoints e JOIN operations o ON o.project_id=e.project_id AND o.payload->>'endpoint_id'=e.id
  LEFT JOIN dsga_creation_bindings b ON b.operation_id=o.id
  WHERE e.project_id=$1 AND e.id=$2
