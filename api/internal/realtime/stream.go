@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"regexp"
 	"slices"
 	"strings"
@@ -251,11 +252,12 @@ func Consume(ctx context.Context, conn *pgconn.PgConn, source Source, persist fu
 	}); err != nil {
 		return errors.New("logical replication could not start from the confirmed LSN")
 	}
+	streaming := true
 	defer func() {
 		// A socket close alone leaves the backend slot active until the
 		// walsender processes the disconnect. Read back CopyDone before the
 		// next lease can start when this connection can still exchange data.
-		if conn.IsClosed() {
+		if !streaming || conn.IsClosed() {
 			return
 		}
 		cleanup, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -298,12 +300,31 @@ func Consume(ctx context.Context, conn *pgconn.PgConn, source Source, persist fu
 			}
 			return errors.New("logical stream receive failed")
 		}
-		if _, isNotice := msg.(*pgproto3.NoticeResponse); isNotice {
+		switch status := msg.(type) {
+		case *pgproto3.NoticeResponse, *pgproto3.ParameterStatus:
+			// PostgreSQL 允许这两类异步元数据穿插 CopyData。pgconn 已维护
+			// 参数/通知状态；它们不代表 WAL、提交或可推进的持久位置。
 			continue
+		case *pgproto3.ErrorResponse:
+			// 服务端错误已终止 COPY，不能再发送 CopyDone。只保留规范
+			// SQLSTATE 供调用者分类；不将错误载荷/SQL/字段值反射到日志。
+			streaming = false
+			code := status.Code
+			if len(code) != 5 || strings.IndexFunc(code, func(ch rune) bool {
+				return !((ch >= '0' && ch <= '9') || (ch >= 'A' && ch <= 'Z'))
+			}) >= 0 {
+				code = "XX000"
+			}
+			return &pgconn.PgError{Severity: "ERROR", Code: code, Message: "logical replication stream failed"}
+		case *pgproto3.CopyDone, *pgproto3.ReadyForQuery:
+			streaming = false
+			return errors.New("logical replication stream ended before cancellation")
 		}
 		copyData, ok := msg.(*pgproto3.CopyData)
 		if !ok || len(copyData.Data) == 0 {
-			return errors.New("unexpected message in active logical stream")
+			// 只报告协议类型，不输出服务端载荷、SQL 或凭据；便于区分合法
+			// 异步消息、流终止和服务端错误，未知消息仍关闭本次流。
+			return fmt.Errorf("unexpected %T in active logical stream", msg)
 		}
 		data := copyData.Data
 		switch data[0] {
